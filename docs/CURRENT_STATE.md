@@ -86,7 +86,15 @@ owner's private key is `C:\Users\<you>\.jlr-scanner\library-issuer.key`
 `TRUSTED_ISSUER_KEYS`). Tools and tests keep the reporting loader, which
 refuses nothing. Setting the clock back is not defended against: the aim
 is traceable, stale copies, not an unbreakable lock. The owner's own
-working copy is stamped for a year the same way.
+working copy is stamped for a year the same way. *Built as `8587697` — the first build of the public
+repository and the first that carries both this check and the localized
+capture verdict (run 34023004882, all four jobs green, on free public
+minutes): macOS `JLR Scanner_0.9.0_universal.dmg`, 8.1 MB, SHA-256
+`4f219a569cd8bf621296a56cb42cf3801b042bbc2fe0bec7f489fb4a4358d520`;
+Windows `JLR Scanner_0.9.0_x64-setup.exe`, 2.5 MB, SHA-256
+`a3e2a4a29d30fca7093befb28b6084a1aab955d92293305c4c33cd7cf3748056`; both
+in `Downloads/jlr-scanner-build-8587697/`. This build loads only a signed,
+dated library copy.*
 
 ```bash
 # a signed copy for one tester, valid 30 days (Docker; library and key mounted)
