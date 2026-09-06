@@ -105,11 +105,13 @@ where the model changed face (X250 from 2012, X260 from 2021, X351 from
 than one (X150 and X152 coupe or convertible, X260 Sportbrake). Covered:
 S-Type, XF (both), XJ (X350, X358, X351), XK, F-Type, Defender L316 and
 L663, Range Rover L322, L405, L460, Range Rover Sport L320, L494, L461,
-Evoque L538 and L551, Velar L560, Discovery 3, 4 and 5. Without a
-picture, and drawn as the rail's mark until one arrives: Discovery Sport
-(L550), Freelander 2 (L359), X-Type (X400, X404), XK8 (X100, X103), XE
-(X760), F-Pace (X761). Verified in the browser preview: X250 shows the
-2008 face at model year 2009 and the 2012 face at 2013. *Built as
+Evoque L538 and L551, Velar L560, Discovery 3, 4 and 5; and, from the
+owner's second batch the same day, Discovery Sport (L550), Freelander 2
+(L359), X-Type (X400; the X404 estate wears the saloon's picture), XK8
+(X100), XE (X760) and F-Pace (X761): 34 files, 2.2 MB. Only the XK8
+convertible (X103) still draws the rail's mark. Verified in the browser
+preview: X250 shows the 2008 face at model year 2009 and the 2012 face at
+2013. *Built as
 `189d9ec` (run 34024659188, all four jobs green): macOS
 `JLR Scanner_0.9.0_universal.dmg`, 11.6 MB, SHA-256
 `4ff12927c52fde566979865d344f079196539ea0548041c89ef38ac0c76910dd`;

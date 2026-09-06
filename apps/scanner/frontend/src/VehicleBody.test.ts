@@ -44,7 +44,9 @@ describe("the owner's picture of a model", () => {
   });
 
   it("is null for a programme without a picture", () => {
-    expect(vehicleImageUrl("L550", 2016, "compact-suv")).toBeNull();
+    expect(vehicleImageUrl("L550", 2016, "compact-suv")).toBe("/vehicles/L550.webp");
+    expect(vehicleImageUrl("X404", 2005, "wagon")).toBe("/vehicles/X400.webp");
+    expect(vehicleImageUrl("X103", 2003, "cabrio")).toBeNull();
     expect(vehicleImageUrl("", null, null)).toBeNull();
   });
 });

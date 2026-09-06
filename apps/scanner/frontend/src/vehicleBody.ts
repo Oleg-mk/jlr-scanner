@@ -92,9 +92,10 @@ interface ProgrammeArt {
   body?: BodyType;
 }
 
-/** The owner's pictures, 2026-09-06: one per model, by SDD programme. */
+/** The owner's pictures, 2026-09-06: one per model, by SDD programme; 34 files. */
 const PROGRAMME_ART: Record<string, ProgrammeArt[]> = {
   // Jaguar
+  X100: [{ file: "X100" }],
   X200: [{ file: "X202" }],
   X202: [{ file: "X202" }],
   X204: [{ file: "X202" }],
@@ -107,6 +108,10 @@ const PROGRAMME_ART: Record<string, ProgrammeArt[]> = {
   X351: [{ file: "X351" }, { file: "X351-from2016", from: 2016 }],
   X150: [{ file: "X150-coupe" }, { file: "X150-cabrio", body: "cabrio" }],
   X152: [{ file: "X152-coupe" }, { file: "X152-cabrio", body: "cabrio" }],
+  X400: [{ file: "X400" }],
+  X404: [{ file: "X400" }],
+  X760: [{ file: "X760" }],
+  X761: [{ file: "X761" }],
   // Land Rover
   L316: [{ file: "L316" }],
   L663: [{ file: "L663" }],
@@ -123,6 +128,8 @@ const PROGRAMME_ART: Record<string, ProgrammeArt[]> = {
   L560: [{ file: "L560" }],
   L319: [{ file: "L319" }, { file: "L319-from2010", from: 2010 }],
   L462: [{ file: "L462" }],
+  L359: [{ file: "L359" }],
+  L550: [{ file: "L550" }],
   // The browser demo's synthetic car wears the XF's picture.
   SYNTHA: [{ file: "X250" }],
 };
