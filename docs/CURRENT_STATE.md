@@ -109,7 +109,14 @@ Evoque L538 and L551, Velar L560, Discovery 3, 4 and 5. Without a
 picture, and drawn as the rail's mark until one arrives: Discovery Sport
 (L550), Freelander 2 (L359), X-Type (X400, X404), XK8 (X100, X103), XE
 (X760), F-Pace (X761). Verified in the browser preview: X250 shows the
-2008 face at model year 2009 and the 2012 face at 2013.
+2008 face at model year 2009 and the 2012 face at 2013. *Built as
+`189d9ec` (run 34024659188, all four jobs green): macOS
+`JLR Scanner_0.9.0_universal.dmg`, 11.6 MB, SHA-256
+`4ff12927c52fde566979865d344f079196539ea0548041c89ef38ac0c76910dd`;
+Windows `JLR Scanner_0.9.0_x64-setup.exe`, 4.3 MB, SHA-256
+`a04065287f7decdf81291e61670fb19153908881f79339fcdebaa5f30c867c10`; both
+in `Downloads/jlr-scanner-build-189d9ec/`. The installers grew by the
+pictures.*
 
 ```bash
 # a signed copy for one tester, valid 30 days (Docker; library and key mounted)
