@@ -1,10 +1,10 @@
 import type { DecodedAttribute } from "./library";
 
 /**
- * The body type a car is drawn as. One image per body type lives in
- * `public/vehicles/<body>.png` — the owner's own artwork — and the rail
- * shows it once the vehicle is known; a body type without a file falls
- * back to the drawn silhouette.
+ * The body type a car is drawn as. The owner's artwork is one picture per
+ * model (`public/vehicles/<programme>[-variant].webp`, see `PROGRAMME_ART`);
+ * a programme without a picture may still have a body-type image in
+ * `public/vehicles/<body>.png`, and without either the rail draws its mark.
  */
 export type BodyType =
   | "sedan"
@@ -20,6 +20,7 @@ const PROGRAMME_BODY: Record<string, BodyType> = {
   // Jaguar
   X100: "coupe",
   X103: "cabrio",
+  X200: "sedan",
   X150: "coupe",
   X152: "coupe",
   X202: "sedan",
@@ -47,6 +48,12 @@ const PROGRAMME_BODY: Record<string, BodyType> = {
   L538C: "cabrio",
   L538JV: "compact-suv",
   L550: "compact-suv",
+  L551: "compact-suv",
+  L560: "large-suv",
+  L460: "large-suv",
+  L461: "large-suv",
+  L462: "large-suv",
+  L663: "defender",
   // The browser demo's synthetic car, so the owner's artwork can be previewed there.
   SYNTHA: "sedan",
 };
@@ -72,4 +79,75 @@ export function bodyFor(programme: string, decoded: DecodedAttribute[] = []): Bo
 /** Where the image for a body type is served from, inside the application. */
 export function bodyImageUrl(body: BodyType) {
   return `/vehicles/${body}.png`;
+}
+
+/**
+ * One of the owner's pictures: the file under `public/vehicles/`, and when
+ * it applies — from a model year on, or for one body only. The first entry
+ * of a programme is its default.
+ */
+interface ProgrammeArt {
+  file: string;
+  from?: number;
+  body?: BodyType;
+}
+
+/** The owner's pictures, 2026-09-06: one per model, by SDD programme. */
+const PROGRAMME_ART: Record<string, ProgrammeArt[]> = {
+  // Jaguar
+  X200: [{ file: "X202" }],
+  X202: [{ file: "X202" }],
+  X204: [{ file: "X202" }],
+  X206: [{ file: "X202" }],
+  X250: [{ file: "X250" }, { file: "X250-from2012", from: 2012 }],
+  X260: [{ file: "X260" }, { file: "X260-from2021", from: 2021 }, { file: "X260-wagon", body: "wagon" }],
+  X350: [{ file: "X350" }],
+  X356: [{ file: "X350" }],
+  X358: [{ file: "X358" }],
+  X351: [{ file: "X351" }, { file: "X351-from2016", from: 2016 }],
+  X150: [{ file: "X150-coupe" }, { file: "X150-cabrio", body: "cabrio" }],
+  X152: [{ file: "X152-coupe" }, { file: "X152-cabrio", body: "cabrio" }],
+  // Land Rover
+  L316: [{ file: "L316" }],
+  L663: [{ file: "L663" }],
+  L322: [{ file: "L322" }],
+  L405: [{ file: "L405" }],
+  L460: [{ file: "L460" }],
+  L320: [{ file: "L320" }],
+  L494: [{ file: "L494" }],
+  L461: [{ file: "L461" }],
+  L538: [{ file: "L538" }],
+  L538C: [{ file: "L538" }],
+  L538JV: [{ file: "L538" }],
+  L551: [{ file: "L551" }],
+  L560: [{ file: "L560" }],
+  L319: [{ file: "L319" }, { file: "L319-from2010", from: 2010 }],
+  L462: [{ file: "L462" }],
+  // The browser demo's synthetic car wears the XF's picture.
+  SYNTHA: [{ file: "X250" }],
+};
+
+/**
+ * The owner's picture for a car: the programme's variant for the body when
+ * one exists (a convertible, an estate), else the latest variant whose
+ * model year has been reached, else the programme's default; `null` when
+ * the programme has no picture.
+ */
+export function vehicleImageUrl(
+  programme: string,
+  modelYear: number | null,
+  body: BodyType | null,
+): string | null {
+  const art = PROGRAMME_ART[programme.trim().toUpperCase()];
+  if (!art || art.length === 0) return null;
+  const forBody = body === null ? undefined : art.find((entry) => entry.body === body);
+  const byYear = art
+    .filter((entry) => entry.body === undefined)
+    .filter((entry) => entry.from === undefined || (modelYear !== null && modelYear >= entry.from))
+    .reduce<ProgrammeArt | undefined>(
+      (best, entry) => (best === undefined || (entry.from ?? 0) >= (best.from ?? 0) ? entry : best),
+      undefined,
+    );
+  const chosen = forBody ?? byYear ?? art[0];
+  return `/vehicles/${chosen.file}.webp`;
 }

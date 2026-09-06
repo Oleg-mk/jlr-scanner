@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { bodyFor, bodyImageUrl } from "./vehicleBody";
+import { bodyFor, bodyImageUrl, vehicleImageUrl } from "./vehicleBody";
 
 describe("the body a car is drawn as", () => {
   it("comes from the programme", () => {
@@ -23,5 +23,28 @@ describe("the body a car is drawn as", () => {
 
   it("names the image file by the body", () => {
     expect(bodyImageUrl("large-suv")).toBe("/vehicles/large-suv.png");
+  });
+});
+
+describe("the owner's picture of a model", () => {
+  it("is chosen by programme, and by model year where the model changed face", () => {
+    expect(vehicleImageUrl("X250", 2010, "sedan")).toBe("/vehicles/X250.webp");
+    expect(vehicleImageUrl("X250", 2013, "sedan")).toBe("/vehicles/X250-from2012.webp");
+    expect(vehicleImageUrl("x250", null, null)).toBe("/vehicles/X250.webp");
+    expect(vehicleImageUrl("L319", 2006, "large-suv")).toBe("/vehicles/L319.webp");
+    expect(vehicleImageUrl("L319", 2012, "large-suv")).toBe("/vehicles/L319-from2010.webp");
+    expect(vehicleImageUrl("X204", 2006, "sedan")).toBe("/vehicles/X202.webp");
+  });
+
+  it("follows the body where the model came as more than one", () => {
+    expect(vehicleImageUrl("X152", 2015, "coupe")).toBe("/vehicles/X152-coupe.webp");
+    expect(vehicleImageUrl("X152", 2015, "cabrio")).toBe("/vehicles/X152-cabrio.webp");
+    expect(vehicleImageUrl("X260", 2018, "wagon")).toBe("/vehicles/X260-wagon.webp");
+    expect(vehicleImageUrl("X260", 2022, "sedan")).toBe("/vehicles/X260-from2021.webp");
+  });
+
+  it("is null for a programme without a picture", () => {
+    expect(vehicleImageUrl("L550", 2016, "compact-suv")).toBeNull();
+    expect(vehicleImageUrl("", null, null)).toBeNull();
   });
 });

@@ -6,8 +6,10 @@ import type { SessionStep } from "../sessionReport";
 export interface RailVehicle {
   title: string;
   details: string[];
-  /** The body the car is drawn as, when known; its image replaces the silhouette. */
+  /** The body the car is drawn as, when known; its image is the fallback for `image`. */
   body: BodyType | null;
+  /** The owner's picture of this model, when there is one. */
+  image: string | null;
 }
 
 interface SessionPanelProps {
@@ -19,21 +21,26 @@ interface SessionPanelProps {
 }
 
 /**
- * The owner's image for the body type, or the drawn silhouette while the
- * image is missing (the file is not there yet, or the body is unknown).
+ * The owner's picture of the model; failing that, the image for the body
+ * type; failing that, the drawn mark. A source that does not load is
+ * skipped for the next one.
  */
-function VehicleArt({ body }: { body: BodyType | null }) {
-  const [failed, setFailed] = useState<BodyType | null>(null);
+function VehicleArt({ image, body }: { image: string | null; body: BodyType | null }) {
+  const sources = [image, body === null ? null : bodyImageUrl(body)].filter(
+    (source): source is string => source !== null,
+  );
+  const [failed, setFailed] = useState<string[]>([]);
   useEffect(() => {
-    setFailed(null);
-  }, [body]);
-  if (body !== null && failed !== body) {
+    setFailed([]);
+  }, [image, body]);
+  const source = sources.find((candidate) => !failed.includes(candidate));
+  if (source !== undefined) {
     return (
       <img
         className="rail-vehicle-image"
-        src={bodyImageUrl(body)}
+        src={source}
         alt=""
-        onError={() => setFailed(body)}
+        onError={() => setFailed((known) => [...known, source])}
       />
     );
   }
@@ -112,7 +119,7 @@ export function SessionPanel({ steps, onJump, vehicle }: SessionPanelProps) {
         className={vehicle ? "rail-vehicle" : "rail-vehicle rail-vehicle--empty"}
         aria-live="polite"
       >
-        <VehicleArt body={vehicle?.body ?? null} />
+        <VehicleArt image={vehicle?.image ?? null} body={vehicle?.body ?? null} />
         {vehicle ? (
           <>
             <strong className="rail-vehicle-title">{vehicle.title}</strong>

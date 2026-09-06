@@ -1971,6 +1971,13 @@ main.flow {
   text-align: center;
 }
 
+.rail-vehicle-image {
+  width: 100%;
+  max-width: 250px;
+  height: auto;
+  margin-bottom: 0.5rem;
+}
+
 .rail-vehicle-art {
   width: 100%;
   max-width: 220px;

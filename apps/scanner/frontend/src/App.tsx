@@ -35,7 +35,7 @@ import type { SessionReportClient } from "./sessionReport";
 import type { SessionStep } from "./sessionReport";
 import { defaultSessionReportClient, sessionSteps } from "./sessionReport";
 import { useAdapterController } from "./useAdapterController";
-import { bodyFor } from "./vehicleBody";
+import { bodyFor, vehicleImageUrl } from "./vehicleBody";
 import { useCaptureController } from "./useCaptureController";
 import { useDiagnosticController } from "./useDiagnosticController";
 import { useLibraryController } from "./useLibraryController";
@@ -200,7 +200,8 @@ export function App({
       library.vehicle.powertrain,
     ].filter((detail): detail is string => detail !== null && detail !== undefined && detail !== "");
     const body = bodyFor(programme, library.vinDecode?.valid ? library.vinDecode.attributes : []);
-    return { title: model ? `${model} · ${programme}` : programme, details, body };
+    const image = vehicleImageUrl(programme, library.vehicle.modelYear, body);
+    return { title: model ? `${model} · ${programme}` : programme, details, body, image };
   })();
   const selected = surveyModules.find((module) => module.ecuFamily === selectedModule) ?? null;
   const checkable = checkableModules(

@@ -96,6 +96,21 @@ Windows `JLR Scanner_0.9.0_x64-setup.exe`, 2.5 MB, SHA-256
 in `Downloads/jlr-scanner-build-8587697/`. This build loads only a signed,
 dated library copy.*
 
+**The owner's pictures of the models (2026-09-06).** Twenty-eight pictures,
+one per model, drawn in one style, trimmed and stored as WebP under
+`apps/scanner/frontend/public/vehicles/` (1.7 MB in all). The rail shows
+the picture of the described car by SDD programme, refined by model year
+where the model changed face (X250 from 2012, X260 from 2021, X351 from
+2016, L319 Discovery 4 from 2010) and by body where the model came as more
+than one (X150 and X152 coupe or convertible, X260 Sportbrake). Covered:
+S-Type, XF (both), XJ (X350, X358, X351), XK, F-Type, Defender L316 and
+L663, Range Rover L322, L405, L460, Range Rover Sport L320, L494, L461,
+Evoque L538 and L551, Velar L560, Discovery 3, 4 and 5. Without a
+picture, and drawn as the rail's mark until one arrives: Discovery Sport
+(L550), Freelander 2 (L359), X-Type (X400, X404), XK8 (X100, X103), XE
+(X760), F-Pace (X761). Verified in the browser preview: X250 shows the
+2008 face at model year 2009 and the 2012 face at 2013.
+
 ```bash
 # a signed copy for one tester, valid 30 days (Docker; library and key mounted)
 docker run --rm -v "C:/Users/<you>/Desktop/jlr-scanner:/w" -w /w -v jlr-cargo-registry:/usr/local/cargo/registry -v "C:/Users/<you>/Downloads:/downloads" -v "C:/Users/<you>/.jlr-scanner:/issuer" rust:1.98-slim sh -c 'cargo run --release -p diagnostic-session --example stamp_library -- /downloads/jlr-scanner-library "/downloads/jlr-scanner-issued/Ім_я" "Ім'"'"'я Прізвище" 30'
