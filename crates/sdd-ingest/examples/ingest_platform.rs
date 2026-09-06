@@ -61,7 +61,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             acquired_on: Some("2026-09-02".into()),
             declared_vehicle_programs: vec![],
             provenance:
-                "Platform documents of the official installer; see docs/research/sdd/PROVENANCE.md".into(),
+                "Platform documents of the official installer; see docs/research/sdd/PROVENANCE.md"
+                    .into(),
             redistribution_status: RedistributionStatus::RestrictedMetadataOnly,
             notes: None,
         };
