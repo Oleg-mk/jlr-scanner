@@ -118,7 +118,12 @@ preview: X250 shows the 2008 face at model year 2009 and the 2012 face at
 Windows `JLR Scanner_0.9.0_x64-setup.exe`, 4.3 MB, SHA-256
 `a04065287f7decdf81291e61670fb19153908881f79339fcdebaa5f30c867c10`; both
 in `Downloads/jlr-scanner-build-189d9ec/`. The installers grew by the
-pictures.*
+pictures.* *Then `417d9d1` with all 34 (run 34025743774, all four jobs
+green): macOS dmg 12.4 MB, SHA-256
+`a43bd0a3acc7d04ce22e2131abfe60ef908b78b32f2a326eca9dc259ae3b8eb3`;
+Windows setup 4.7 MB, SHA-256
+`cc361d4482678593cfca82921e4d77d1ab5d37a57f8a178eb91f0b42e53ba6bc`; in
+`Downloads/jlr-scanner-build-417d9d1/`.*
 
 ```bash
 # a signed copy for one tester, valid 30 days (Docker; library and key mounted)
