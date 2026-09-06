@@ -123,7 +123,13 @@ green): macOS dmg 12.4 MB, SHA-256
 `a43bd0a3acc7d04ce22e2131abfe60ef908b78b32f2a326eca9dc259ae3b8eb3`;
 Windows setup 4.7 MB, SHA-256
 `cc361d4482678593cfca82921e4d77d1ab5d37a57f8a178eb91f0b42e53ba6bc`; in
-`Downloads/jlr-scanner-build-417d9d1/`.*
+`Downloads/jlr-scanner-build-417d9d1/`.* **Owner's check of `417d9d1` on his Windows PC, same evening:** his own
+XF's VIN decoded to the right model and the rail drew the X250 picture;
+capture on the bus listened and stayed silent with no car, as it should;
+the library panel accepted his signed copy and named its 365 days. The
+signed-issue path (ADR-0019), the model pictures and the localized verdict
+are therefore `HARDWARE_CONFIRMED` in the product on Windows; the Mac
+check of the same build is still his to do.
 
 ```bash
 # a signed copy for one tester, valid 30 days (Docker; library and key mounted)
