@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!--
+  SYNTHETIC F9 FIXTURE. Not JLR evidence and not promotable to evidence.
+
+  This file reproduces only the element shape of an SDD CAN link monitor
+  configuration so the parser can be tested offline. Values are chosen to
+  exercise parsing branches, not to describe any real vehicle:
+
+    * an "ALL" model year and a numeric model year;
+    * both 11-bit and 29-bit addressing;
+    * a blank AddressingType that must be skipped rather than guessed;
+    * a prose model-year marker whose boundary must not be invented;
+    * modules whose mnemonics use the short and 11-bit forms;
+    * an exact repeat that must be ignored, and a reused mnemonic carrying a
+      different description that must surface as a conflict.
+-->
+<configuration>
+<Vehicles>
+	<Vehicle>
+		<Name id="SYNTHA">
+			<ModelYear id="ALL">
+				<AddressingType>11bit</AddressingType>
+			</ModelYear>
+		</Name>
+	</Vehicle>
+	<Vehicle>
+		<Name id="SYNTHB">
+			<ModelYear id="2014">
+				<AddressingType>29bit</AddressingType>
+			</ModelYear>
+			<ModelYear id="2015">
+				<AddressingType></AddressingType>
+			</ModelYear>
+			<ModelYear id="Post MY10">
+				<AddressingType>11bit</AddressingType>
+			</ModelYear>
+		</Name>
+	</Vehicle>
+</Vehicles>
+<Modules>
+	<Module>
+		<Mnemonic>10</Mnemonic>
+		<Description>Synthetic short-address module</Description>
+	</Module>
+	<Module>
+		<Mnemonic>7E0</Mnemonic>
+		<Description>Synthetic eleven-bit module</Description>
+	</Module>
+	<Module>
+		<Mnemonic>7E1</Mnemonic>
+	</Module>
+	<Module>
+		<Mnemonic>10</Mnemonic>
+		<Description>Synthetic short-address module</Description>
+	</Module>
+	<Module>
+		<Mnemonic>10</Mnemonic>
+		<Description>Synthetic reused-address module</Description>
+	</Module>
+</Modules>
+</configuration>

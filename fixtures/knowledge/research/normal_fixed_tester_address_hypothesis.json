@@ -1,0 +1,53 @@
+{
+  "schema_version": 1,
+  "source": {
+    "id": "jlr-scanner-normal-fixed-tester-address-hypothesis",
+    "title": "Tester source address 0xF1 for JLR normal-fixed diagnostics (hypothesis)",
+    "source_type": "unverified_research",
+    "origin": "JLR Scanner reasoning: the SDD platform documents declare no tester address for their normal_fixed buses; ISO 15765-4 assigns 0xF1 to external test equipment for legislated OBD, and J2534 tooling uses it; ADR-0017",
+    "source_locator": "docs/adr/ADR-0017-derived-normal-fixed-identifiers.md",
+    "content_fingerprint": null,
+    "acquired_on": "2026-09-04",
+    "declared_vehicle_programs": ["L322", "L319", "L320"],
+    "provenance": "Research hypothesis; refuted or confirmed by a tester's first read on such a bus (ADR-0016)",
+    "redistribution_status": "permitted",
+    "notes": "Every derived normal-fixed identifier cites this evidence, so every such record stays Unverified until a module answers."
+  },
+  "evidence": [
+    {
+      "id": "evidence-normal-fixed-tester-address-hypothesis",
+      "source_id": "jlr-scanner-normal-fixed-tester-address-hypothesis",
+      "evidence_class": "unverified_research",
+      "locator": {
+        "description": "docs/adr/ADR-0017, Context and Decision 2: the tester address is not documented for JLR enhanced diagnostics; 0xF1 is assumed as for legislated OBD",
+        "document_page": null,
+        "document_section": "Decision",
+        "record_key": "tester_source_address",
+        "capture_timestamp_us": null
+      },
+      "excerpt": "N_SA = 0xF1 assumed for the tester on L322 MY04.5-MY07, L319 MY05 and L320 MY06 normal_fixed buses",
+      "notes": null
+    }
+  ],
+  "records": [
+    {
+      "id": "hypothesis-normal-fixed-tester-address",
+      "entity": { "kind": "diagnostic_addressing", "id": "normal_fixed" },
+      "key": { "kind": "custom", "name": "tester_source_address" },
+      "value": { "kind": "text", "value": "0xF1" },
+      "applicability": {
+        "vehicle_program": { "state": "any" },
+        "model_year": { "state": "any" },
+        "architecture_generation": { "state": "any" },
+        "ecu_family": { "state": "any" },
+        "powertrain": { "state": "any" },
+        "variant": { "state": "any" },
+        "market": { "state": "any" },
+        "diagnostic_implementation": { "state": "any" },
+        "other": {}
+      },
+      "evidence_ids": ["evidence-normal-fixed-tester-address-hypothesis"],
+      "validation_state": "unverified"
+    }
+  ]
+}

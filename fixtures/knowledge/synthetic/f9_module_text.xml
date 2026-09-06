@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  SYNTHETIC F9 FIXTURE. Not JLR evidence and not promotable to evidence.
+  Reproduces the element shape of one SDD text-database item that names a
+  module in several languages, including the xmlns:lang attribute spelling.
+-->
+<tm id="@J_14229_M_DESC_SYNTHMOD">
+	<tu xmlns:lang="eng">Synthetic control module</tu>
+	<tu xmlns:lang="deu">Synthetisches Steuermodul</tu>
+	<tu xmlns:lang="rus">Синтетический блок управления</tu>
+	<tu xmlns:lang="fra"></tu>
+</tm>

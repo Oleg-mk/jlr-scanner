@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  SYNTHETIC F9 FIXTURE. Not JLR evidence and not promotable to evidence.
+  Reproduces the element shape of an SDD linear converter definition.
+-->
+<COMPONENT id="CVT_SYNTH_VOLT Component">
+<LinearConverter showPreferred="false" offsetFirst="true" id="CVT_SYNTH_VOLT" multiplier="1" offset="0">
+<Properties>
+<inType quantity="Dimensionless" unit="int"/>
+<outType quantity="Voltage" unit="V"/>
+</Properties>
+<quantityState id="State 1 - Sensor short">
+<Properties>
+<range>
+<quantity showPreferred="false" tolType="absolute" lowValue="65535" highValue="65535" quantityType="Dimensionless" unitType="int"/>
+</range>
+<name><![CDATA[Sensor short; value=invalid]]></name>
+</Properties>
+</quantityState>
+</LinearConverter>
+</COMPONENT>

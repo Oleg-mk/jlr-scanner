@@ -1,0 +1,390 @@
+port COM3 open at 115200
+
+>>> cGetBoardInfo
+    TX 0C 00 EA 51 01 00 00 00 09 01 01 00 00 00 00 00
+    RX FRAME 00 00 01 00 09 81 01 00 00 00 00 00 00 00 00 00 54 A7 7D 30 05 01 01 01 B4 B0 00 00 D8 55 00 00 00 08 01 01 00 10 01 01 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+       route_a=0x0000 route_b=0x0001 command=0x8109 seq=1 body[168]=00 00 00 00 54 A7 7D 30 05 01 01 01 B4 B0 00 00 D8 55 00 00 00 08 01 01… | status=0x00000000
+
+>>> open resource 0 (route 0x0001) listen-only 125k
+    TX 14 00 F2 51 01 00 00 00 06 00 02 00 00 00 00 00 00 00 00 10 48 E8 01 00
+    RX FRAME 00 00 01 00 06 80 02 00 00 00 00 00 03 00 00 00 C4 5E 8D 30 63 4F 70 65 6E 43 68 61 6E 6E 65 6C 3A 20 55 6E 73 75 70 70 6F 72 74 65 64 20 6F 72 20 49 6E 76 61 6C 69 64 20 52 65 73 6F 75 72 63 65 20 49 44 20 30 00
+       route_a=0x0000 route_b=0x0001 command=0x8006 seq=2 body[59]=03 00 00 00 C4 5E 8D 30 63 4F 70 65 6E 43 68 61 6E 6E 65 6C 3A 20 55 6E… | status=0x00000003
+   -> open status 0x00000003 text='cOpenChannel: Unsupported or Invalid Resource ID 0'
+
+>>> open resource 1 (route 0x0101) listen-only 125k
+    TX 14 00 F2 51 01 01 00 00 06 00 03 00 00 00 00 00 00 00 00 10 48 E8 01 00
+    RX FRAME 00 00 01 01 06 80 03 00 00 00 00 00 03 00 00 00 B4 22 9D 30 63 4F 70 65 6E 43 68 61 6E 6E 65 6C 3A 20 55 6E 73 75 70 70 6F 72 74 65 64 20 6F 72 20 49 6E 76 61 6C 69 64 20 52 65 73 6F 75 72 63 65 20 49 44 20 31 00
+       route_a=0x0000 route_b=0x0101 command=0x8006 seq=3 body[59]=03 00 00 00 B4 22 9D 30 63 4F 70 65 6E 43 68 61 6E 6E 65 6C 3A 20 55 6E… | status=0x00000003
+   -> open status 0x00000003 text='cOpenChannel: Unsupported or Invalid Resource ID 1'
+
+>>> open resource 2 (route 0x0201) listen-only 125k
+    TX 14 00 F2 51 01 02 00 00 06 00 04 00 00 00 00 00 00 00 00 10 48 E8 01 00
+    RX FRAME 00 00 01 02 06 80 04 00 00 00 00 00 00 00 00 00 8C EA AC 30 00
+       route_a=0x0000 route_b=0x0201 command=0x8006 seq=4 body[9]=00 00 00 00 8C EA AC 30 00 | status=0x00000000
+   -> open status 0x00000000 text=''
+
+>>> cSetPin(1, 3, 11) on 0x0201
+    TX 18 00 FE 51 01 02 00 00 12 00 05 00 00 00 00 00 01 00 00 00 03 00 00 00 0B 00 00 00
+    RX FRAME 00 00 01 02 12 80 05 00 00 00 00 00 06 02 00 00 54 A4 BC 30 4D 6F 6E 67 6F 6F 73 65 50 72 6F 20 4A 4C 52 20 62 6F 61 72 64 20 6F 6E 6C 79 20 73 75 70 70 6F 72 74 73 20 50 57 4D 20 6F 6E 20 70 69 6E 73 20 32 20 61 6E 64 20 31 30 00
+       route_a=0x0000 route_b=0x0201 command=0x8012 seq=5 body[65]=06 02 00 00 54 A4 BC 30 4D 6F 6E 67 6F 6F 73 65 50 72 6F 20 4A 4C 52 20… | status=0x00000206
+   -> setpin status 0x00000206 text='MongoosePro JLR board only supports PWM on pins 2 and 10'
+
+>>> cSetPin(1, 6, 14) on 0x0201
+    TX 18 00 FE 51 01 02 00 00 12 00 06 00 00 00 00 00 01 00 00 00 06 00 00 00 0E 00 00 00
+    RX FRAME 00 00 01 02 12 80 06 00 00 00 00 00 06 02 00 00 D8 AB CC 30 4D 6F 6E 67 6F 6F 73 65 50 72 6F 20 4A 4C 52 20 62 6F 61 72 64 20 6F 6E 6C 79 20 73 75 70 70 6F 72 74 73 20 50 57 4D 20 6F 6E 20 70 69 6E 73 20 32 20 61 6E 64 20 31 30 00
+       route_a=0x0000 route_b=0x0201 command=0x8012 seq=6 body[65]=06 02 00 00 D8 AB CC 30 4D 6F 6E 67 6F 6F 73 65 50 72 6F 20 4A 4C 52 20… | status=0x00000206
+   -> setpin status 0x00000206 text='MongoosePro JLR board only supports PWM on pins 2 and 10'
+
+>>> cCloseChannel 0x0201
+    TX 0C 00 EA 51 01 02 00 00 07 00 07 00 00 00 00 00
+    RX FRAME 00 00 01 02 07 80 07 00 00 00 00 00 00 00 00 00 94 B2 DC 30 00
+       route_a=0x0000 route_b=0x0201 command=0x8007 seq=7 body[9]=00 00 00 00 94 B2 DC 30 00 | status=0x00000000
+
+>>> open resource 3 (route 0x0301) listen-only 125k
+    TX 14 00 F2 51 01 03 00 00 06 00 08 00 00 00 00 00 00 00 00 10 48 E8 01 00
+    RX FRAME 00 00 01 03 06 80 08 00 00 00 00 00 00 00 00 00 78 78 EC 30 00
+       route_a=0x0000 route_b=0x0301 command=0x8006 seq=8 body[9]=00 00 00 00 78 78 EC 30 00 | status=0x00000000
+   -> open status 0x00000000 text=''
+
+>>> cSetPin(1, 3, 11) on 0x0301
+    TX 18 00 FE 51 01 03 00 00 12 00 09 00 00 00 00 00 01 00 00 00 03 00 00 00 0B 00 00 00
+    RX FRAME 00 00 01 03 12 80 09 00 00 00 00 00 06 02 00 00 C0 3E FC 30 4D 6F 6E 67 6F 6F 73 65 50 72 6F 20 4A 4C 52 20 62 6F 61 72 64 20 73 75 70 70 6F 72 74 73 20 4C 20 6C 69 6E 65 20 6F 6E 20 70 69 6E 20 31 35 20 6F 6E 6C 79 00
+       route_a=0x0000 route_b=0x0301 command=0x8012 seq=9 body[61]=06 02 00 00 C0 3E FC 30 4D 6F 6E 67 6F 6F 73 65 50 72 6F 20 4A 4C 52 20… | status=0x00000206
+   -> setpin status 0x00000206 text='MongoosePro JLR board supports L line on pin 15 only'
+
+>>> cSetPin(1, 6, 14) on 0x0301
+    TX 18 00 FE 51 01 03 00 00 12 00 0A 00 00 00 00 00 01 00 00 00 06 00 00 00 0E 00 00 00
+    RX FRAME 00 00 01 03 12 80 0A 00 00 00 00 00 06 02 00 00 64 FE 0B 31 4D 6F 6E 67 6F 6F 73 65 50 72 6F 20 4A 4C 52 20 62 6F 61 72 64 20 73 75 70 70 6F 72 74 73 20 49 53 4F 39 31 34 31 20 4B 20 6C 69 6E 65 20 6F 6E 20 70 69 6E 20 33 2C 20 37 20 6F 72 20 38 00
+       route_a=0x0000 route_b=0x0301 command=0x8012 seq=10 body[71]=06 02 00 00 64 FE 0B 31 4D 6F 6E 67 6F 6F 73 65 50 72 6F 20 4A 4C 52 20… | status=0x00000206
+   -> setpin status 0x00000206 text='MongoosePro JLR board supports ISO9141 K line on pin 3, 7 or 8'
+
+>>> cCloseChannel 0x0301
+    TX 0C 00 EA 51 01 03 00 00 07 00 0B 00 00 00 00 00
+    RX FRAME 00 00 01 03 07 80 0B 00 00 00 00 00 00 00 00 00 4C 06 1C 31 00
+       route_a=0x0000 route_b=0x0301 command=0x8007 seq=11 body[9]=00 00 00 00 4C 06 1C 31 00 | status=0x00000000
+
+>>> open resource 4 (route 0x0401) listen-only 125k
+    TX 14 00 F2 51 01 04 00 00 06 00 0C 00 00 00 00 00 00 00 00 10 48 E8 01 00
+    RX FRAME 00 00 01 04 06 80 0C 00 00 00 00 00 00 00 00 00 34 0E 2C 31 00
+       route_a=0x0000 route_b=0x0401 command=0x8006 seq=12 body[9]=00 00 00 00 34 0E 2C 31 00 | status=0x00000000
+   -> open status 0x00000000 text=''
+
+>>> cSetPin(1, 3, 11) on 0x0401
+    TX 18 00 FE 51 01 04 00 00 12 00 0D 00 00 00 00 00 01 00 00 00 03 00 00 00 0B 00 00 00
+    RX FRAME 00 00 01 04 12 80 0D 00 00 00 00 00 06 02 00 00 B0 0E 3C 31 4D 6F 6E 67 6F 6F 73 65 50 72 6F 20 4A 4C 52 20 62 6F 61 72 64 20 73 75 70 70 6F 72 74 73 20 4C 20 6C 69 6E 65 20 6F 6E 20 70 69 6E 20 31 35 20 6F 6E 6C 79 00
+       route_a=0x0000 route_b=0x0401 command=0x8012 seq=13 body[61]=06 02 00 00 B0 0E 3C 31 4D 6F 6E 67 6F 6F 73 65 50 72 6F 20 4A 4C 52 20… | status=0x00000206
+   -> setpin status 0x00000206 text='MongoosePro JLR board supports L line on pin 15 only'
+
+>>> cSetPin(1, 6, 14) on 0x0401
+    TX 18 00 FE 51 01 04 00 00 12 00 0E 00 00 00 00 00 01 00 00 00 06 00 00 00 0E 00 00 00
+    RX FRAME 00 00 01 04 12 80 0E 00 00 00 00 00 06 02 00 00 94 D4 4B 31 4D 6F 6E 67 6F 6F 73 65 50 72 6F 20 4A 4C 52 20 62 6F 61 72 64 20 73 75 70 70 6F 72 74 73 20 49 53 4F 39 31 34 31 20 4B 20 6C 69 6E 65 20 6F 6E 20 70 69 6E 20 33 2C 20 37 20 6F 72 20 38 00
+       route_a=0x0000 route_b=0x0401 command=0x8012 seq=14 body[71]=06 02 00 00 94 D4 4B 31 4D 6F 6E 67 6F 6F 73 65 50 72 6F 20 4A 4C 52 20… | status=0x00000206
+   -> setpin status 0x00000206 text='MongoosePro JLR board supports ISO9141 K line on pin 3, 7 or 8'
+
+>>> cCloseChannel 0x0401
+    TX 0C 00 EA 51 01 04 00 00 07 00 0F 00 00 00 00 00
+    RX FRAME 00 00 01 04 07 80 0F 00 00 00 00 00 00 00 00 00 44 DD 5B 31 00
+       route_a=0x0000 route_b=0x0401 command=0x8007 seq=15 body[9]=00 00 00 00 44 DD 5B 31 00 | status=0x00000000
+
+>>> open resource 5 (route 0x0501) listen-only 125k
+    TX 14 00 F2 51 01 05 00 00 06 00 10 00 00 00 00 00 00 00 00 10 48 E8 01 00
+    RX FRAME 00 00 01 05 06 80 10 00 00 00 00 00 00 00 00 00 34 A1 6B 31 00
+       route_a=0x0000 route_b=0x0501 command=0x8006 seq=16 body[9]=00 00 00 00 34 A1 6B 31 00 | status=0x00000000
+   -> open status 0x00000000 text=''
+
+>>> cSetPin(1, 3, 11) on 0x0501
+    TX 18 00 FE 51 01 05 00 00 12 00 11 00 00 00 00 00 01 00 00 00 03 00 00 00 0B 00 00 00
+    RX FRAME 00 00 01 05 12 80 11 00 00 00 00 00 06 02 00 00 F8 63 7B 31 53 65 74 50 69 6E 73 3A 20 4D 6F 6E 67 6F 6F 73 65 50 72 6F 20 4A 4C 52 20 62 6F 61 72 64 20 6F 6E 6C 79 20 73 75 70 70 6F 72 74 73 20 43 41 4E 20 6F 6E 20 70 69 6E 73 20 36 20 61 6E 64 20 31 34 00
+       route_a=0x0000 route_b=0x0501 command=0x8012 seq=17 body[74]=06 02 00 00 F8 63 7B 31 53 65 74 50 69 6E 73 3A 20 4D 6F 6E 67 6F 6F 73… | status=0x00000206
+   -> setpin status 0x00000206 text='SetPins: MongoosePro JLR board only supports CAN on pins 6 and 14'
+
+>>> cSetPin(1, 6, 14) on 0x0501
+    TX 18 00 FE 51 01 05 00 00 12 00 12 00 00 00 00 00 01 00 00 00 06 00 00 00 0E 00 00 00
+    RX FRAME 00 00 01 05 12 80 12 00 00 00 00 00 00 00 00 00 20 27 8B 31 00
+       route_a=0x0000 route_b=0x0501 command=0x8012 seq=18 body[9]=00 00 00 00 20 27 8B 31 00 | status=0x00000000
+   -> setpin status 0x00000000 text=''
+
+>>> cCloseChannel 0x0501
+    TX 0C 00 EA 51 01 05 00 00 07 00 13 00 00 00 00 00
+    RX FRAME 00 00 01 05 07 80 13 00 00 00 00 00 00 00 00 00 80 E9 9A 31 00
+       route_a=0x0000 route_b=0x0501 command=0x8007 seq=19 body[9]=00 00 00 00 80 E9 9A 31 00 | status=0x00000000
+
+>>> open resource 6 (route 0x0601) listen-only 125k
+    TX 14 00 F2 51 01 06 00 00 06 00 14 00 00 00 00 00 00 00 00 10 48 E8 01 00
+    RX FRAME 00 00 01 06 06 80 14 00 00 00 00 00 00 00 00 00 C8 AF AA 31 00
+       route_a=0x0000 route_b=0x0601 command=0x8006 seq=20 body[9]=00 00 00 00 C8 AF AA 31 00 | status=0x00000000
+   -> open status 0x00000000 text=''
+
+>>> cSetPin(1, 3, 11) on 0x0601
+    TX 18 00 FE 51 01 06 00 00 12 00 15 00 00 00 00 00 01 00 00 00 03 00 00 00 0B 00 00 00
+    RX FRAME 00 00 01 06 12 80 15 00 00 00 00 00 06 02 00 00 78 6D BA 31 53 65 74 50 69 6E 73 3A 20 4D 6F 6E 67 6F 6F 73 65 50 72 6F 20 4A 4C 52 20 62 6F 61 72 64 20 6F 6E 6C 79 20 73 75 70 70 6F 72 74 73 20 49 53 4F 31 35 37 36 35 20 6F 6E 20 70 69 6E 73 20 36 20 61 6E 64 20 31 34 00
+       route_a=0x0000 route_b=0x0601 command=0x8012 seq=21 body[79]=06 02 00 00 78 6D BA 31 53 65 74 50 69 6E 73 3A 20 4D 6F 6E 67 6F 6F 73… | status=0x00000206
+   -> setpin status 0x00000206 text='SetPins: MongoosePro JLR board only supports ISO15765 on pins 6 and 14'
+
+>>> cSetPin(1, 6, 14) on 0x0601
+    TX 18 00 FE 51 01 06 00 00 12 00 16 00 00 00 00 00 01 00 00 00 06 00 00 00 0E 00 00 00
+    RX FRAME 00 00 01 06 12 80 16 00 00 00 00 00 00 00 00 00 7C 36 CA 31 00
+       route_a=0x0000 route_b=0x0601 command=0x8012 seq=22 body[9]=00 00 00 00 7C 36 CA 31 00 | status=0x00000000
+   -> setpin status 0x00000000 text=''
+
+>>> cCloseChannel 0x0601
+    TX 0C 00 EA 51 01 06 00 00 07 00 17 00 00 00 00 00
+    RX FRAME 00 00 01 06 07 80 17 00 00 00 00 00 00 00 00 00 44 BE D9 31 00
+       route_a=0x0000 route_b=0x0601 command=0x8007 seq=23 body[9]=00 00 00 00 44 BE D9 31 00 | status=0x00000000
+
+>>> open resource 7 (route 0x0701) listen-only 125k
+    TX 14 00 F2 51 01 07 00 00 06 00 18 00 00 00 00 00 00 00 00 10 48 E8 01 00
+    RX FRAME 00 00 01 07 06 80 18 00 00 00 00 00 03 00 00 00 40 80 E9 31 63 4F 70 65 6E 43 68 61 6E 6E 65 6C 3A 20 55 6E 73 75 70 70 6F 72 74 65 64 20 6F 72 20 49 6E 76 61 6C 69 64 20 52 65 73 6F 75 72 63 65 20 49 44 20 37 00
+       route_a=0x0000 route_b=0x0701 command=0x8006 seq=24 body[59]=03 00 00 00 40 80 E9 31 63 4F 70 65 6E 43 68 61 6E 6E 65 6C 3A 20 55 6E… | status=0x00000003
+   -> open status 0x00000003 text='cOpenChannel: Unsupported or Invalid Resource ID 7'
+
+>>> open resource 8 (route 0x0801) listen-only 125k
+    TX 14 00 F2 51 01 08 00 00 06 00 19 00 00 00 00 00 00 00 00 10 48 E8 01 00
+    RX FRAME 00 00 01 08 06 80 19 00 00 00 00 00 03 00 00 00 30 44 F9 31 63 4F 70 65 6E 43 68 61 6E 6E 65 6C 3A 20 55 6E 73 75 70 70 6F 72 74 65 64 20 6F 72 20 49 6E 76 61 6C 69 64 20 52 65 73 6F 75 72 63 65 20 49 44 20 38 00
+       route_a=0x0000 route_b=0x0801 command=0x8006 seq=25 body[59]=03 00 00 00 30 44 F9 31 63 4F 70 65 6E 43 68 61 6E 6E 65 6C 3A 20 55 6E… | status=0x00000003
+   -> open status 0x00000003 text='cOpenChannel: Unsupported or Invalid Resource ID 8'
+
+>>> open resource 9 (route 0x0901) listen-only 125k
+    TX 14 00 F2 51 01 09 00 00 06 00 1A 00 00 00 00 00 00 00 00 10 48 E8 01 00
+    RX FRAME 00 00 01 09 06 80 1A 00 00 00 00 00 03 00 00 00 58 07 09 32 63 4F 70 65 6E 43 68 61 6E 6E 65 6C 3A 20 55 6E 73 75 70 70 6F 72 74 65 64 20 6F 72 20 49 6E 76 61 6C 69 64 20 52 65 73 6F 75 72 63 65 20 49 44 20 39 00
+       route_a=0x0000 route_b=0x0901 command=0x8006 seq=26 body[59]=03 00 00 00 58 07 09 32 63 4F 70 65 6E 43 68 61 6E 6E 65 6C 3A 20 55 6E… | status=0x00000003
+   -> open status 0x00000003 text='cOpenChannel: Unsupported or Invalid Resource ID 9'
+
+>>> open resource 10 (route 0x0A01) listen-only 125k
+    TX 14 00 F2 51 01 0A 00 00 06 00 1B 00 00 00 00 00 00 00 00 10 48 E8 01 00
+    RX FRAME 00 00 01 0A 06 80 1B 00 00 00 00 00 03 00 00 00 D8 CC 18 32 63 4F 70 65 6E 43 68 61 6E 6E 65 6C 3A 20 55 6E 73 75 70 70 6F 72 74 65 64 20 6F 72 20 49 6E 76 61 6C 69 64 20 52 65 73 6F 75 72 63 65 20 49 44 20 31 30 00
+       route_a=0x0000 route_b=0x0A01 command=0x8006 seq=27 body[60]=03 00 00 00 D8 CC 18 32 63 4F 70 65 6E 43 68 61 6E 6E 65 6C 3A 20 55 6E… | status=0x00000003
+   -> open status 0x00000003 text='cOpenChannel: Unsupported or Invalid Resource ID 10'
+
+>>> open resource 11 (route 0x0B01) listen-only 125k
+    TX 14 00 F2 51 01 0B 00 00 06 00 1C 00 00 00 00 00 00 00 00 10 48 E8 01 00
+    RX FRAME 00 00 01 0B 06 80 1C 00 00 00 00 00 03 00 00 00 08 97 28 32 63 4F 70 65 6E 43 68 61 6E 6E 65 6C 3A 20 55 6E 73 75 70 70 6F 72 74 65 64 20 6F 72 20 49 6E 76 61 6C 69 64 20 52 65 73 6F 75 72 63 65 20 49 44 20 31 31 00
+       route_a=0x0000 route_b=0x0B01 command=0x8006 seq=28 body[60]=03 00 00 00 08 97 28 32 63 4F 70 65 6E 43 68 61 6E 6E 65 6C 3A 20 55 6E… | status=0x00000003
+   -> open status 0x00000003 text='cOpenChannel: Unsupported or Invalid Resource ID 11'
+
+>>> open resource 12 (route 0x0C01) listen-only 125k
+    TX 14 00 F2 51 01 0C 00 00 06 00 1D 00 00 00 00 00 00 00 00 10 48 E8 01 00
+    RX FRAME 00 00 01 0C 06 80 1D 00 00 00 00 00 03 00 00 00 54 54 38 32 63 4F 70 65 6E 43 68 61 6E 6E 65 6C 3A 20 55 6E 73 75 70 70 6F 72 74 65 64 20 6F 72 20 49 6E 76 61 6C 69 64 20 52 65 73 6F 75 72 63 65 20 49 44 20 31 32 00
+       route_a=0x0000 route_b=0x0C01 command=0x8006 seq=29 body[60]=03 00 00 00 54 54 38 32 63 4F 70 65 6E 43 68 61 6E 6E 65 6C 3A 20 55 6E… | status=0x00000003
+   -> open status 0x00000003 text='cOpenChannel: Unsupported or Invalid Resource ID 12'
+
+>>> open resource 13 (route 0x0D01) listen-only 125k
+    TX 14 00 F2 51 01 0D 00 00 06 00 1E 00 00 00 00 00 00 00 00 10 48 E8 01 00
+    RX FRAME 00 00 01 0D 06 80 1E 00 00 00 00 00 00 00 00 00 38 1A 48 32 00
+       route_a=0x0000 route_b=0x0D01 command=0x8006 seq=30 body[9]=00 00 00 00 38 1A 48 32 00 | status=0x00000000
+   -> open status 0x00000000 text=''
+
+>>> cSetPin(1, 3, 11) on 0x0D01
+    TX 18 00 FE 51 01 0D 00 00 12 00 1F 00 00 00 00 00 01 00 00 00 03 00 00 00 0B 00 00 00
+    RX FRAME 00 00 01 0D 12 80 1F 00 00 00 00 00 06 02 00 00 40 DA 57 32 4D 6F 6E 67 6F 6F 73 65 50 72 6F 20 4A 4C 52 20 62 6F 61 72 64 20 73 75 70 70 6F 72 74 73 20 55 45 42 20 6F 6E 20 70 69 6E 20 37 20 6F 6E 6C 79 00
+       route_a=0x0000 route_b=0x0D01 command=0x8012 seq=31 body[57]=06 02 00 00 40 DA 57 32 4D 6F 6E 67 6F 6F 73 65 50 72 6F 20 4A 4C 52 20… | status=0x00000206
+   -> setpin status 0x00000206 text='MongoosePro JLR board supports UEB on pin 7 only'
+
+>>> cSetPin(1, 6, 14) on 0x0D01
+    TX 18 00 FE 51 01 0D 00 00 12 00 20 00 00 00 00 00 01 00 00 00 06 00 00 00 0E 00 00 00
+    RX FRAME 00 00 01 0D 12 80 20 00 00 00 00 00 06 02 00 00 50 A1 67 32 4D 6F 6E 67 6F 6F 73 65 50 72 6F 20 4A 4C 52 20 62 6F 61 72 64 20 73 75 70 70 6F 72 74 73 20 55 45 42 20 6F 6E 20 70 69 6E 20 37 20 6F 6E 6C 79 00
+       route_a=0x0000 route_b=0x0D01 command=0x8012 seq=32 body[57]=06 02 00 00 50 A1 67 32 4D 6F 6E 67 6F 6F 73 65 50 72 6F 20 4A 4C 52 20… | status=0x00000206
+   -> setpin status 0x00000206 text='MongoosePro JLR board supports UEB on pin 7 only'
+
+>>> cCloseChannel 0x0D01
+    TX 0C 00 EA 51 01 0D 00 00 07 00 21 00 00 00 00 00
+    RX FRAME 00 00 01 0D 07 80 21 00 00 00 00 00 00 00 00 00 08 66 77 32 00
+       route_a=0x0000 route_b=0x0D01 command=0x8007 seq=33 body[9]=00 00 00 00 08 66 77 32 00 | status=0x00000000
+
+>>> open resource 14 (route 0x0E01) listen-only 125k
+    TX 14 00 F2 51 01 0E 00 00 06 00 22 00 00 00 00 00 00 00 00 10 48 E8 01 00
+    RX FRAME 00 00 01 0E 06 80 22 00 00 00 00 00 03 00 00 00 94 29 87 32 63 4F 70 65 6E 43 68 61 6E 6E 65 6C 3A 20 55 6E 73 75 70 70 6F 72 74 65 64 20 6F 72 20 49 6E 76 61 6C 69 64 20 52 65 73 6F 75 72 63 65 20 49 44 20 31 34 00
+       route_a=0x0000 route_b=0x0E01 command=0x8006 seq=34 body[60]=03 00 00 00 94 29 87 32 63 4F 70 65 6E 43 68 61 6E 6E 65 6C 3A 20 55 6E… | status=0x00000003
+   -> open status 0x00000003 text='cOpenChannel: Unsupported or Invalid Resource ID 14'
+
+>>> open resource 15 (route 0x0F01) listen-only 125k
+    TX 14 00 F2 51 01 0F 00 00 06 00 23 00 00 00 00 00 00 00 00 10 48 E8 01 00
+    RX FRAME 00 00 01 0F 06 80 23 00 00 00 00 00 03 00 00 00 84 ED 96 32 63 4F 70 65 6E 43 68 61 6E 6E 65 6C 3A 20 55 6E 73 75 70 70 6F 72 74 65 64 20 6F 72 20 49 6E 76 61 6C 69 64 20 52 65 73 6F 75 72 63 65 20 49 44 20 31 35 00
+       route_a=0x0000 route_b=0x0F01 command=0x8006 seq=35 body[60]=03 00 00 00 84 ED 96 32 63 4F 70 65 6E 43 68 61 6E 6E 65 6C 3A 20 55 6E… | status=0x00000003
+   -> open status 0x00000003 text='cOpenChannel: Unsupported or Invalid Resource ID 15'
+
+>>> open resource 16 (route 0x1001) listen-only 125k
+    TX 14 00 F2 51 01 10 00 00 06 00 24 00 00 00 00 00 00 00 00 10 48 E8 01 00
+    RX FRAME 00 00 01 10 06 80 24 00 00 00 00 00 03 00 00 00 64 71 A6 32 63 4F 70 65 6E 43 68 61 6E 6E 65 6C 3A 20 55 6E 73 75 70 70 6F 72 74 65 64 20 6F 72 20 49 6E 76 61 6C 69 64 20 52 65 73 6F 75 72 63 65 20 49 44 20 31 36 00
+       route_a=0x0000 route_b=0x1001 command=0x8006 seq=36 body[60]=03 00 00 00 64 71 A6 32 63 4F 70 65 6E 43 68 61 6E 6E 65 6C 3A 20 55 6E… | status=0x00000003
+   -> open status 0x00000003 text='cOpenChannel: Unsupported or Invalid Resource ID 16'
+
+>>> open resource 17 (route 0x1101) listen-only 125k
+    TX 14 00 F2 51 01 11 00 00 06 00 25 00 00 00 00 00 00 00 00 10 48 E8 01 00
+    RX FRAME 00 00 01 11 06 80 25 00 00 00 00 00 03 00 00 00 54 35 B6 32 63 4F 70 65 6E 43 68 61 6E 6E 65 6C 3A 20 55 6E 73 75 70 70 6F 72 74 65 64 20 6F 72 20 49 6E 76 61 6C 69 64 20 52 65 73 6F 75 72 63 65 20 49 44 20 31 37 00
+       route_a=0x0000 route_b=0x1101 command=0x8006 seq=37 body[60]=03 00 00 00 54 35 B6 32 63 4F 70 65 6E 43 68 61 6E 6E 65 6C 3A 20 55 6E… | status=0x00000003
+   -> open status 0x00000003 text='cOpenChannel: Unsupported or Invalid Resource ID 17'
+
+>>> open resource 18 (route 0x1201) listen-only 125k
+    TX 14 00 F2 51 01 12 00 00 06 00 26 00 00 00 00 00 00 00 00 10 48 E8 01 00
+    RX FRAME 00 00 01 12 06 80 26 00 00 00 00 00 03 00 00 00 0C FA C5 32 63 4F 70 65 6E 43 68 61 6E 6E 65 6C 3A 20 55 6E 73 75 70 70 6F 72 74 65 64 20 6F 72 20 49 6E 76 61 6C 69 64 20 52 65 73 6F 75 72 63 65 20 49 44 20 31 38 00
+       route_a=0x0000 route_b=0x1201 command=0x8006 seq=38 body[60]=03 00 00 00 0C FA C5 32 63 4F 70 65 6E 43 68 61 6E 6E 65 6C 3A 20 55 6E… | status=0x00000003
+   -> open status 0x00000003 text='cOpenChannel: Unsupported or Invalid Resource ID 18'
+
+>>> open resource 19 (route 0x1301) listen-only 125k
+    TX 14 00 F2 51 01 13 00 00 06 00 27 00 00 00 00 00 00 00 00 10 48 E8 01 00
+    RX FRAME 00 00 01 13 06 80 27 00 00 00 00 00 03 00 00 00 8C BF D5 32 63 4F 70 65 6E 43 68 61 6E 6E 65 6C 3A 20 55 6E 73 75 70 70 6F 72 74 65 64 20 6F 72 20 49 6E 76 61 6C 69 64 20 52 65 73 6F 75 72 63 65 20 49 44 20 31 39 00
+       route_a=0x0000 route_b=0x1301 command=0x8006 seq=39 body[60]=03 00 00 00 8C BF D5 32 63 4F 70 65 6E 43 68 61 6E 6E 65 6C 3A 20 55 6E… | status=0x00000003
+   -> open status 0x00000003 text='cOpenChannel: Unsupported or Invalid Resource ID 19'
+
+>>> open resource 20 (route 0x1401) listen-only 125k
+    TX 14 00 F2 51 01 14 00 00 06 00 28 00 00 00 00 00 00 00 00 10 48 E8 01 00
+    RX FRAME 00 00 01 14 06 80 28 00 00 00 00 00 03 00 00 00 24 81 E5 32 63 4F 70 65 6E 43 68 61 6E 6E 65 6C 3A 20 55 6E 73 75 70 70 6F 72 74 65 64 20 6F 72 20 49 6E 76 61 6C 69 64 20 52 65 73 6F 75 72 63 65 20 49 44 20 32 30 00
+       route_a=0x0000 route_b=0x1401 command=0x8006 seq=40 body[60]=03 00 00 00 24 81 E5 32 63 4F 70 65 6E 43 68 61 6E 6E 65 6C 3A 20 55 6E… | status=0x00000003
+   -> open status 0x00000003 text='cOpenChannel: Unsupported or Invalid Resource ID 20'
+
+>>> open resource 21 (route 0x1501) listen-only 125k
+    TX 14 00 F2 51 01 15 00 00 06 00 29 00 00 00 00 00 00 00 00 10 48 E8 01 00
+    RX FRAME 00 00 01 15 06 80 29 00 00 00 00 00 00 00 00 00 C4 49 F5 32 00
+       route_a=0x0000 route_b=0x1501 command=0x8006 seq=41 body[9]=00 00 00 00 C4 49 F5 32 00 | status=0x00000000
+   -> open status 0x00000000 text=''
+
+>>> cSetPin(1, 3, 11) on 0x1501
+    TX 18 00 FE 51 01 15 00 00 12 00 2A 00 00 00 00 00 01 00 00 00 03 00 00 00 0B 00 00 00
+    RX FRAME 00 00 01 15 12 80 2A 00 00 00 00 00 00 00 00 00 3C 08 05 33 00
+       route_a=0x0000 route_b=0x1501 command=0x8012 seq=42 body[9]=00 00 00 00 3C 08 05 33 00 | status=0x00000000
+   -> setpin status 0x00000000 text=''
+
+>>> cCloseChannel 0x1501
+    TX 0C 00 EA 51 01 15 00 00 07 00 2B 00 00 00 00 00
+    RX FRAME 00 00 01 15 07 80 2B 00 00 00 00 00 00 00 00 00 C8 16 15 33 00
+       route_a=0x0000 route_b=0x1501 command=0x8007 seq=43 body[9]=00 00 00 00 C8 16 15 33 00 | status=0x00000000
+
+>>> open resource 22 (route 0x1601) listen-only 125k
+    TX 14 00 F2 51 01 16 00 00 06 00 2C 00 00 00 00 00 00 00 00 10 48 E8 01 00
+    RX FRAME 00 00 01 16 06 80 2C 00 00 00 00 00 00 00 00 00 98 D7 24 33 00
+       route_a=0x0000 route_b=0x1601 command=0x8006 seq=44 body[9]=00 00 00 00 98 D7 24 33 00 | status=0x00000000
+   -> open status 0x00000000 text=''
+
+>>> cSetPin(1, 3, 11) on 0x1601
+    TX 18 00 FE 51 01 16 00 00 12 00 2D 00 00 00 00 00 01 00 00 00 03 00 00 00 0B 00 00 00
+    RX FRAME 00 00 01 16 12 80 2D 00 00 00 00 00 00 00 00 00 4C 5A 34 33 00
+       route_a=0x0000 route_b=0x1601 command=0x8012 seq=45 body[9]=00 00 00 00 4C 5A 34 33 00 | status=0x00000000
+   -> setpin status 0x00000000 text=''
+
+>>> cCloseChannel 0x1601
+    TX 0C 00 EA 51 01 16 00 00 07 00 2E 00 00 00 00 00
+    RX FRAME 00 00 01 16 07 80 2E 00 00 00 00 00 00 00 00 00 F0 19 44 33 00
+       route_a=0x0000 route_b=0x1601 command=0x8007 seq=46 body[9]=00 00 00 00 F0 19 44 33 00 | status=0x00000000
+
+>>> open resource 23 (route 0x1701) listen-only 125k
+    TX 14 00 F2 51 01 17 00 00 06 00 2F 00 00 00 00 00 00 00 00 10 48 E8 01 00
+    RX FRAME 00 00 01 17 06 80 2F 00 00 00 00 00 03 00 00 00 80 A2 53 33 63 4F 70 65 6E 43 68 61 6E 6E 65 6C 3A 20 55 6E 73 75 70 70 6F 72 74 65 64 20 6F 72 20 49 6E 76 61 6C 69 64 20 52 65 73 6F 75 72 63 65 20 49 44 20 32 33 00
+       route_a=0x0000 route_b=0x1701 command=0x8006 seq=47 body[60]=03 00 00 00 80 A2 53 33 63 4F 70 65 6E 43 68 61 6E 6E 65 6C 3A 20 55 6E… | status=0x00000003
+   -> open status 0x00000003 text='cOpenChannel: Unsupported or Invalid Resource ID 23'
+
+>>> open resource 24 (route 0x1801) listen-only 125k
+    TX 14 00 F2 51 01 18 00 00 06 00 30 00 00 00 00 00 00 00 00 10 48 E8 01 00
+    RX FRAME 00 00 01 18 06 80 30 00 00 00 00 00 03 00 00 00 EC 62 63 33 63 4F 70 65 6E 43 68 61 6E 6E 65 6C 3A 20 55 6E 73 75 70 70 6F 72 74 65 64 20 6F 72 20 49 6E 76 61 6C 69 64 20 52 65 73 6F 75 72 63 65 20 49 44 20 32 34 00
+       route_a=0x0000 route_b=0x1801 command=0x8006 seq=48 body[60]=03 00 00 00 EC 62 63 33 63 4F 70 65 6E 43 68 61 6E 6E 65 6C 3A 20 55 6E… | status=0x00000003
+   -> open status 0x00000003 text='cOpenChannel: Unsupported or Invalid Resource ID 24'
+
+>>> open resource 25 (route 0x1901) listen-only 125k
+    TX 14 00 F2 51 01 19 00 00 06 00 31 00 00 00 00 00 00 00 00 10 48 E8 01 00
+    RX FRAME 00 00 01 19 06 80 31 00 00 00 00 00 00 00 00 00 34 29 73 33 00
+       route_a=0x0000 route_b=0x1901 command=0x8006 seq=49 body[9]=00 00 00 00 34 29 73 33 00 | status=0x00000000
+   -> open status 0x00000000 text=''
+
+>>> cSetPin(1, 3, 11) on 0x1901
+    TX 18 00 FE 51 01 19 00 00 12 00 32 00 00 00 00 00 01 00 00 00 03 00 00 00 0B 00 00 00
+    RX FRAME 00 00 01 19 12 80 32 00 00 00 00 00 06 02 00 00 94 EB 82 33 4D 6F 6E 67 6F 6F 73 65 50 72 6F 20 4D 46 43 20 62 6F 61 72 64 20 73 75 70 70 6F 72 74 73 20 49 53 4F 39 31 34 31 5F 50 53 20 4B 20 6C 69 6E 65 20 6F 6E 20 70 69 6E 20 31 35 20 6F 6E 6C 79 00
+       route_a=0x0000 route_b=0x1901 command=0x8012 seq=50 body[72]=06 02 00 00 94 EB 82 33 4D 6F 6E 67 6F 6F 73 65 50 72 6F 20 4D 46 43 20… | status=0x00000206
+   -> setpin status 0x00000206 text='MongoosePro MFC board supports ISO9141_PS K line on pin 15 only'
+
+>>> cSetPin(1, 6, 14) on 0x1901
+    TX 18 00 FE 51 01 19 00 00 12 00 33 00 00 00 00 00 01 00 00 00 06 00 00 00 0E 00 00 00
+    RX FRAME 00 00 01 19 12 80 33 00 00 00 00 00 06 02 00 00 1C 6D 92 33 4D 6F 6E 67 6F 6F 73 65 50 72 6F 20 4D 46 43 20 62 6F 61 72 64 20 73 75 70 70 6F 72 74 73 20 49 53 4F 39 31 34 31 5F 50 53 20 4B 20 6C 69 6E 65 20 6F 6E 20 70 69 6E 20 31 35 20 6F 6E 6C 79 00
+       route_a=0x0000 route_b=0x1901 command=0x8012 seq=51 body[72]=06 02 00 00 1C 6D 92 33 4D 6F 6E 67 6F 6F 73 65 50 72 6F 20 4D 46 43 20… | status=0x00000206
+   -> setpin status 0x00000206 text='MongoosePro MFC board supports ISO9141_PS K line on pin 15 only'
+
+>>> cCloseChannel 0x1901
+    TX 0C 00 EA 51 01 19 00 00 07 00 34 00 00 00 00 00
+    RX FRAME 00 00 01 19 07 80 34 00 00 00 00 00 00 00 00 00 74 73 A2 33 00
+       route_a=0x0000 route_b=0x1901 command=0x8007 seq=52 body[9]=00 00 00 00 74 73 A2 33 00 | status=0x00000000
+
+>>> open resource 26 (route 0x1A01) listen-only 125k
+    TX 14 00 F2 51 01 1A 00 00 06 00 35 00 00 00 00 00 00 00 00 10 48 E8 01 00
+    RX FRAME 00 00 01 1A 06 80 35 00 00 00 00 00 00 00 00 00 E8 3A B2 33 00
+       route_a=0x0000 route_b=0x1A01 command=0x8006 seq=53 body[9]=00 00 00 00 E8 3A B2 33 00 | status=0x00000000
+   -> open status 0x00000000 text=''
+
+>>> cSetPin(1, 3, 11) on 0x1A01
+    TX 18 00 FE 51 01 1A 00 00 12 00 36 00 00 00 00 00 01 00 00 00 03 00 00 00 0B 00 00 00
+    RX FRAME 00 00 01 1A 12 80 36 00 00 00 00 00 06 02 00 00 AC FD C1 33 4D 6F 6E 67 6F 6F 73 65 50 72 6F 20 4D 46 43 20 62 6F 61 72 64 20 73 75 70 70 6F 72 74 73 20 49 53 4F 39 31 34 31 5F 50 53 20 4B 20 6C 69 6E 65 20 6F 6E 20 70 69 6E 20 31 35 20 6F 6E 6C 79 00
+       route_a=0x0000 route_b=0x1A01 command=0x8012 seq=54 body[72]=06 02 00 00 AC FD C1 33 4D 6F 6E 67 6F 6F 73 65 50 72 6F 20 4D 46 43 20… | status=0x00000206
+   -> setpin status 0x00000206 text='MongoosePro MFC board supports ISO9141_PS K line on pin 15 only'
+
+>>> cSetPin(1, 6, 14) on 0x1A01
+    TX 18 00 FE 51 01 1A 00 00 12 00 37 00 00 00 00 00 01 00 00 00 06 00 00 00 0E 00 00 00
+    RX FRAME 00 00 01 1A 12 80 37 00 00 00 00 00 06 02 00 00 C8 C2 D1 33 4D 6F 6E 67 6F 6F 73 65 50 72 6F 20 4D 46 43 20 62 6F 61 72 64 20 73 75 70 70 6F 72 74 73 20 49 53 4F 39 31 34 31 5F 50 53 20 4B 20 6C 69 6E 65 20 6F 6E 20 70 69 6E 20 31 35 20 6F 6E 6C 79 00
+       route_a=0x0000 route_b=0x1A01 command=0x8012 seq=55 body[72]=06 02 00 00 C8 C2 D1 33 4D 6F 6E 67 6F 6F 73 65 50 72 6F 20 4D 46 43 20… | status=0x00000206
+   -> setpin status 0x00000206 text='MongoosePro MFC board supports ISO9141_PS K line on pin 15 only'
+
+>>> cCloseChannel 0x1A01
+    TX 0C 00 EA 51 01 1A 00 00 07 00 38 00 00 00 00 00
+    RX FRAME 00 00 01 1A 07 80 38 00 00 00 00 00 00 00 00 00 70 47 E1 33 00
+       route_a=0x0000 route_b=0x1A01 command=0x8007 seq=56 body[9]=00 00 00 00 70 47 E1 33 00 | status=0x00000000
+
+>>> open resource 27 (route 0x1B01) listen-only 125k
+    TX 14 00 F2 51 01 1B 00 00 06 00 39 00 00 00 00 00 00 00 00 10 48 E8 01 00
+    RX FRAME 00 00 01 1B 06 80 39 00 00 00 00 00 03 00 00 00 D0 09 F1 33 63 4F 70 65 6E 43 68 61 6E 6E 65 6C 3A 20 55 6E 73 75 70 70 6F 72 74 65 64 20 6F 72 20 49 6E 76 61 6C 69 64 20 52 65 73 6F 75 72 63 65 20 49 44 20 32 37 00
+       route_a=0x0000 route_b=0x1B01 command=0x8006 seq=57 body[60]=03 00 00 00 D0 09 F1 33 63 4F 70 65 6E 43 68 61 6E 6E 65 6C 3A 20 55 6E… | status=0x00000003
+   -> open status 0x00000003 text='cOpenChannel: Unsupported or Invalid Resource ID 27'
+
+>>> open resource 28 (route 0x1C01) listen-only 125k
+    TX 14 00 F2 51 01 1C 00 00 06 00 3A 00 00 00 00 00 00 00 00 10 48 E8 01 00
+    RX FRAME 00 00 01 1C 06 80 3A 00 00 00 00 00 03 00 00 00 5C CD 00 34 63 4F 70 65 6E 43 68 61 6E 6E 65 6C 3A 20 55 6E 73 75 70 70 6F 72 74 65 64 20 6F 72 20 49 6E 76 61 6C 69 64 20 52 65 73 6F 75 72 63 65 20 49 44 20 32 38 00
+       route_a=0x0000 route_b=0x1C01 command=0x8006 seq=58 body[60]=03 00 00 00 5C CD 00 34 63 4F 70 65 6E 43 68 61 6E 6E 65 6C 3A 20 55 6E… | status=0x00000003
+   -> open status 0x00000003 text='cOpenChannel: Unsupported or Invalid Resource ID 28'
+
+>>> open resource 29 (route 0x1D01) listen-only 125k
+    TX 14 00 F2 51 01 1D 00 00 06 00 3B 00 00 00 00 00 00 00 00 10 48 E8 01 00
+    RX FRAME 00 00 01 1D 06 80 3B 00 00 00 00 00 03 00 00 00 88 D2 10 34 63 4F 70 65 6E 43 68 61 6E 6E 65 6C 3A 20 55 6E 73 75 70 70 6F 72 74 65 64 20 6F 72 20 49 6E 76 61 6C 69 64 20 52 65 73 6F 75 72 63 65 20 49 44 20 32 39 00
+       route_a=0x0000 route_b=0x1D01 command=0x8006 seq=59 body[60]=03 00 00 00 88 D2 10 34 63 4F 70 65 6E 43 68 61 6E 6E 65 6C 3A 20 55 6E… | status=0x00000003
+   -> open status 0x00000003 text='cOpenChannel: Unsupported or Invalid Resource ID 29'
+
+>>> open resource 30 (route 0x1E01) listen-only 125k
+    TX 14 00 F2 51 01 1E 00 00 06 00 3C 00 00 00 00 00 00 00 00 10 48 E8 01 00
+    RX FRAME 00 00 01 1E 06 80 3C 00 00 00 00 00 03 00 00 00 40 97 20 34 63 4F 70 65 6E 43 68 61 6E 6E 65 6C 3A 20 55 6E 73 75 70 70 6F 72 74 65 64 20 6F 72 20 49 6E 76 61 6C 69 64 20 52 65 73 6F 75 72 63 65 20 49 44 20 33 30 00
+       route_a=0x0000 route_b=0x1E01 command=0x8006 seq=60 body[60]=03 00 00 00 40 97 20 34 63 4F 70 65 6E 43 68 61 6E 6E 65 6C 3A 20 55 6E… | status=0x00000003
+   -> open status 0x00000003 text='cOpenChannel: Unsupported or Invalid Resource ID 30'
+
+>>> open resource 31 (route 0x1F01) listen-only 125k
+    TX 14 00 F2 51 01 1F 00 00 06 00 3D 00 00 00 00 00 00 00 00 10 48 E8 01 00
+    RX FRAME 00 00 01 1F 06 80 3D 00 00 00 00 00 03 00 00 00 B4 5E 30 34 63 4F 70 65 6E 43 68 61 6E 6E 65 6C 3A 20 55 6E 73 75 70 70 6F 72 74 65 64 20 6F 72 20 49 6E 76 61 6C 69 64 20 52 65 73 6F 75 72 63 65 20 49 44 20 33 31 00
+       route_a=0x0000 route_b=0x1F01 command=0x8006 seq=61 body[60]=03 00 00 00 B4 5E 30 34 63 4F 70 65 6E 43 68 61 6E 6E 65 6C 3A 20 55 6E… | status=0x00000003
+   -> open status 0x00000003 text='cOpenChannel: Unsupported or Invalid Resource ID 31'
+
+=== summary (resource, opens, pins taken / refusal text)
+    (0, 'no', 'cOpenChannel: Unsupported or Invalid Resource ID 0')
+    (1, 'no', 'cOpenChannel: Unsupported or Invalid Resource ID 1')
+    (2, 'yes', [((3, 11), 'MongoosePro JLR board only supports PWM on pins 2 and 10'), ((6, 14), 'MongoosePro JLR board only supports PWM on pins 2 and 10')])
+    (3, 'yes', [((3, 11), 'MongoosePro JLR board supports L line on pin 15 only'), ((6, 14), 'MongoosePro JLR board supports ISO9141 K line on pin 3, 7 or 8')])
+    (4, 'yes', [((3, 11), 'MongoosePro JLR board supports L line on pin 15 only'), ((6, 14), 'MongoosePro JLR board supports ISO9141 K line on pin 3, 7 or 8')])
+    (5, 'yes', [((3, 11), 'SetPins: MongoosePro JLR board only supports CAN on pins 6 and 14'), (6, 14)])
+    (6, 'yes', [((3, 11), 'SetPins: MongoosePro JLR board only supports ISO15765 on pins 6 and 14'), (6, 14)])
+    (7, 'no', 'cOpenChannel: Unsupported or Invalid Resource ID 7')
+    (8, 'no', 'cOpenChannel: Unsupported or Invalid Resource ID 8')
+    (9, 'no', 'cOpenChannel: Unsupported or Invalid Resource ID 9')
+    (10, 'no', 'cOpenChannel: Unsupported or Invalid Resource ID 10')
+    (11, 'no', 'cOpenChannel: Unsupported or Invalid Resource ID 11')
+    (12, 'no', 'cOpenChannel: Unsupported or Invalid Resource ID 12')
+    (13, 'yes', [((3, 11), 'MongoosePro JLR board supports UEB on pin 7 only'), ((6, 14), 'MongoosePro JLR board supports UEB on pin 7 only')])
+    (14, 'no', 'cOpenChannel: Unsupported or Invalid Resource ID 14')
+    (15, 'no', 'cOpenChannel: Unsupported or Invalid Resource ID 15')
+    (16, 'no', 'cOpenChannel: Unsupported or Invalid Resource ID 16')
+    (17, 'no', 'cOpenChannel: Unsupported or Invalid Resource ID 17')
+    (18, 'no', 'cOpenChannel: Unsupported or Invalid Resource ID 18')
+    (19, 'no', 'cOpenChannel: Unsupported or Invalid Resource ID 19')
+    (20, 'no', 'cOpenChannel: Unsupported or Invalid Resource ID 20')
+    (21, 'yes', [(3, 11)])
+    (22, 'yes', [(3, 11)])
+    (23, 'no', 'cOpenChannel: Unsupported or Invalid Resource ID 23')
+    (24, 'no', 'cOpenChannel: Unsupported or Invalid Resource ID 24')
+    (25, 'yes', [((3, 11), 'MongoosePro MFC board supports ISO9141_PS K line on pin 15 only'), ((6, 14), 'MongoosePro MFC board supports ISO9141_PS K line on pin 15 only')])
+    (26, 'yes', [((3, 11), 'MongoosePro MFC board supports ISO9141_PS K line on pin 15 only'), ((6, 14), 'MongoosePro MFC board supports ISO9141_PS K line on pin 15 only')])
+    (27, 'no', 'cOpenChannel: Unsupported or Invalid Resource ID 27')
+    (28, 'no', 'cOpenChannel: Unsupported or Invalid Resource ID 28')
+    (29, 'no', 'cOpenChannel: Unsupported or Invalid Resource ID 29')
+    (30, 'no', 'cOpenChannel: Unsupported or Invalid Resource ID 30')
+    (31, 'no', 'cOpenChannel: Unsupported or Invalid Resource ID 31')

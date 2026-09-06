@@ -1,0 +1,19 @@
+{
+  "name": "jlr-scanner",
+  "version": "0.9.0",
+  "private": true,
+  "packageManager": "pnpm@11.19.0",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "pnpm --filter @jlr-scanner/frontend build",
+    "check:architecture": "node scripts/check-architecture.mjs",
+    "lint": "pnpm --filter @jlr-scanner/frontend lint && pnpm check:architecture",
+    "tauri": "tauri",
+    "test": "pnpm --filter @jlr-scanner/frontend test"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.0.0"
+  }
+}

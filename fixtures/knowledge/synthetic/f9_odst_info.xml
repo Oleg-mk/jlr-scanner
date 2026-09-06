@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  SYNTHETIC F9 FIXTURE. Not JLR evidence and not promotable to evidence.
+
+  Reproduces only the element shape of an SDD on-demand self test document.
+  Values exercise parsing branches:
+
+    * a test named through a help-screen data name, and one without a name;
+    * qualifiers with and without engine TYPE / SUBTYPE narrowing;
+    * a vendor CM_QUAL_* qualifier that must be recorded verbatim, not guessed.
+
+  On-demand self tests are stage-2 material. Every record derived from this
+  file must carry ServiceRoutine and never READ_ONLY.
+-->
+<odstInfo moduleType="SYNTHMOD">
+<language isoCode="en">English</language>
+<odstTestQualification>
+<odstTestSelection helpScreenDataNameId="4274" testID="14" timeout="40000" time="40000" flag="4">
+<odstTestQualifier model="SYNTHA" year="MY03"/>
+<odstTestQualifier model="SYNTHB" year="MY04">
+<qual type="TYPE" value="SYNTHENGINE"/>
+<qual type="SUBTYPE" value="SYNTHVARIANT"/>
+</odstTestQualifier>
+<odstTestQualifier model="SYNTHB" year="MY04">
+<qual type="CM_QUAL_ENG_TYPE" value="VAL_ENG_SYNTH"/>
+</odstTestQualifier>
+</odstTestSelection>
+<odstTestSelection testID="99" timeout="5000" time="5000" flag="1">
+<odstTestQualifier model="SYNTHA" year="BASE"/>
+</odstTestSelection>
+</odstTestQualification>
+<helpScreenQualification>
+<helpScreenDataName id="4274" name="DR_ODST_14_SYNTHMOD">
+<helpScreenSelection helpScreenId="5032" helpScreenName="DR_ODST_14_SYNTHMOD_HLP_000">
+<helpScreenQualifier model="BASE" year="BASE"/>
+</helpScreenSelection>
+</helpScreenDataName>
+</helpScreenQualification>
+<helpScreenList>
+<helpScreen id="5032" name="DR_ODST_14_SYNTHMOD_HLP_000"/>
+</helpScreenList>
+<helpScreenMnemonicList>
+<mnemonic name="J_A_ENS_IGN_ON"><![CDATA[Make sure the ignition is switched on.]]></mnemonic>
+</helpScreenMnemonicList>
+</odstInfo>

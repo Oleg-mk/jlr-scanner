@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  SYNTHETIC F9 FIXTURE. Not JLR evidence and not promotable to evidence.
+
+  Reproduces the shape of the SDD failure type byte catalogue, including the
+  negative number SDD uses for the SAE reserved range and a CDATA body that
+  contains a bare "<" character.
+-->
+<faultTypeList>
+<faultType number="-1"><![CDATA[SAE - reserved]]></faultType>
+<faultType number="0"><![CDATA[General failure information - no sub type information]]></faultType>
+<faultType number="33"><![CDATA[General signal failure - signal amplitude<minimum]]></faultType>
+<faultType number="99"></faultType>
+</faultTypeList>

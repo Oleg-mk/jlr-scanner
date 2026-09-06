@@ -1,0 +1,13 @@
+[package]
+name = "sdd-ingest"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+knowledge.workspace = true
+roxmltree = "0.20"
+
+[dev-dependencies]
+serde_json.workspace = true

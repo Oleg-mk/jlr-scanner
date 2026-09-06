@@ -1,0 +1,70 @@
+{
+  "schema_version": 1,
+  "source": {
+    "id": "iso-15765-normal-fixed-addressing",
+    "title": "ISO 15765-2 normal fixed addressing and the ISO 15765-4 test equipment address",
+    "source_type": "documented",
+    "origin": "ISO 15765-2:2016, Road vehicles — Diagnostic communication over CAN, Part 2, normal fixed addressing (11-bit/29-bit CAN identifier mapping); ISO 15765-4:2016, Part 4, requirements for emissions-related systems, external test equipment source address",
+    "source_locator": "docs/adr/ADR-0017-derived-normal-fixed-identifiers.md",
+    "content_fingerprint": { "algorithm": "sha256", "value": "d3d0ab621eb65bc26a99de68da32e30ccdf4b23d9a570b625b7b5ad87f798ef3" },
+    "acquired_on": "2026-09-04",
+    "declared_vehicle_programs": [],
+    "provenance": "Standards facts restated by the project; the standards themselves are not redistributed",
+    "redistribution_status": "permitted",
+    "notes": "Two facts only: how a 29-bit normal-fixed identifier is composed, and that ISO 15765-4 assigns 0xF1 to external test equipment. Whether JLR's enhanced diagnostics accept 0xF1 is a separate, research-class claim."
+  },
+  "evidence": [
+    {
+      "id": "evidence-iso15765-2-normal-fixed-layout",
+      "source_id": "iso-15765-normal-fixed-addressing",
+      "evidence_class": "standard_documentation",
+      "locator": {
+        "description": "ISO 15765-2:2016, normal fixed addressing, 29-bit CAN identifier: priority and PDU format in the upper bits (0x18DA for physical, 0x18DB for functional target addressing), target address N_TA in bits 15..8, source address N_SA in bits 7..0; a response carries the addresses swapped",
+        "document_page": null,
+        "document_section": "Normal fixed addressing",
+        "record_key": "normal_fixed",
+        "capture_timestamp_us": null
+      },
+      "excerpt": "request = prefix << 16 | N_TA << 8 | N_SA; response = prefix << 16 | N_SA << 8 | N_TA",
+      "notes": null
+    },
+    {
+      "id": "evidence-iso15765-4-tester-address",
+      "source_id": "iso-15765-normal-fixed-addressing",
+      "evidence_class": "standard_documentation",
+      "locator": {
+        "description": "ISO 15765-4:2016, external test equipment source address for legislated OBD over CAN with normal fixed addressing",
+        "document_page": null,
+        "document_section": "Addressing, external test equipment",
+        "record_key": "tester_source_address",
+        "capture_timestamp_us": null
+      },
+      "excerpt": "N_SA of the external test equipment = 0xF1",
+      "notes": "Stated for legislated OBD. Its use for JLR enhanced diagnostics is the research hypothesis recorded separately."
+    }
+  ],
+  "records": [
+    {
+      "id": "record-iso15765-normal-fixed-layout",
+      "entity": { "kind": "diagnostic_addressing", "id": "normal_fixed" },
+      "key": { "kind": "custom", "name": "iso15765_normal_fixed_layout" },
+      "value": {
+        "kind": "text",
+        "value": "request=prefix<<16|target<<8|source;response=prefix<<16|source<<8|target;prefix_physical=0x18DA;prefix_functional=0x18DB"
+      },
+      "applicability": {
+        "vehicle_program": { "state": "any" },
+        "model_year": { "state": "any" },
+        "architecture_generation": { "state": "any" },
+        "ecu_family": { "state": "any" },
+        "powertrain": { "state": "any" },
+        "variant": { "state": "any" },
+        "market": { "state": "any" },
+        "diagnostic_implementation": { "state": "any" },
+        "other": {}
+      },
+      "evidence_ids": ["evidence-iso15765-2-normal-fixed-layout"],
+      "validation_state": "source_backed"
+    }
+  ]
+}

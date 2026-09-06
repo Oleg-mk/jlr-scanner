@@ -1,0 +1,49 @@
+JLR Scanner F6 minimal normalized public-observation snapshot
+Acquired: 2026-08-31
+
+Primary public locator:
+https://www.jaguarforums.com/forum/xf-xfr-x250-44/man-all-these-codes-p2105-p0101-p0236-p061a-p2105-p061a-p0158-p2105-159551/
+
+Repeated public locator:
+https://www.jaguarforums.com/forum/xf-xfr-x250-44/whats-up-code-p0236-powertrain-stored-turbo-super-charger-boost-sensor-159757/
+
+Acquisition note:
+Direct HTTP retrieval returned Cloudflare Error 1005 on 2026-08-31, and the
+original linked HTML download could not be acquired. Public search-index
+results for both exact source URLs exposed the forum post and embedded OBD
+Fusion report text. This file retains only the minimum normalized facts needed
+for provenance; it is not a mirror of either forum thread.
+
+Owner-reported vehicle:
+2010 Jaguar XF Supercharged
+
+Diagnostic report identity:
+Created by OBD Fusion - OCTech, LLC
+Primary report timestamp: 2016-03-15 17:01:38
+Repeated report timestamp: 2016-03-19 18:57:38
+
+Observed Mode $09 vehicle information:
+VIN: SAJWA0HE4AMR59890
+Calibration ID - $7E8: CX23-14C204-ZAD
+Calibration ID - $7E9: 9X23-7J105-CB
+Calibration Verification Number - $7E8: AE746751
+Calibration Verification Number - $7E9: 00001A67
+
+Evidence semantics:
+- The report observes response identifier $7E8 and calibration
+  CX23-14C204-ZAD for the target positive golden.
+- The report also observes $7E9 / 9X23-7J105-CB, retained only as context.
+- The report does not directly observe a request frame on 0x7E0.
+- This source does not prove functional request 0x7DF, physical request 0x7E0,
+  ISO 15765-4, 11-bit addressing, bitrate, DLC pins, or backend routing.
+
+Retrieval queries used to reproduce the indexed facts:
+- exact VIN: "SAJWA0HE4AMR59890"
+- exact calibration: "CX23-14C204-ZAD"
+- exact page URL plus "Created by OBD Fusion"
+
+Classification intent:
+Underlying diagnostic values: DIRECT_OBSERVATION.
+Owner vehicle description: OWNER_REPORTED observation.
+Acquisition wrapper: normalized public search-index snapshot; original
+attachment unavailable from the acquisition environment.

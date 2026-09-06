@@ -1,0 +1,18 @@
+[package]
+name = "mongoose-jlr"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+core-types.workspace = true
+diagnostic-execution.workspace = true
+isotp.workspace = true
+obd-j1979.workspace = true
+transport-api.workspace = true
+uds-execution.workspace = true
+
+[dev-dependencies]
+diagnostic-environment.workspace = true
+jlr-profiles.workspace = true

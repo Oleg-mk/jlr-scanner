@@ -1,0 +1,34 @@
+//! Evidence-first JLR knowledge foundation.
+//!
+//! This crate is read-only domain infrastructure. It has no protocol,
+//! transport, operating-system, application-shell, or UI dependency.
+
+mod applicability;
+mod error;
+mod evidence;
+mod ingestion;
+mod model;
+mod source;
+mod store;
+
+pub use applicability::{
+    Applicability, ApplicabilityResolution, DimensionConstraint, VehicleContext, YearConstraint,
+};
+pub use error::KnowledgeError;
+pub use evidence::{EvidenceClass, EvidenceId, EvidenceRecord, SourceLocator};
+pub use ingestion::{
+    IngestionAdapter, IngestionBatch, IngestionReceipt, JsonManifestAdapter,
+    KNOWLEDGE_SCHEMA_VERSION,
+};
+pub use model::{
+    CanIdFormat, ClaimKey, DiagnosticSafetyClass, EntityKind, ImplementationMarkerKind,
+    KnowledgeEntity, KnowledgeRecord, KnowledgeValue, ValidationState,
+};
+pub use source::{
+    sha256_bytes, sha256_file, ContentFingerprint, RedistributionStatus, RegistrationOutcome,
+    SourceId, SourceRecord, SourceRegistry, SourceType,
+};
+pub use store::{
+    ConflictReport, EvidenceTrace, KnowledgeQuery, KnowledgeQueryResult, KnowledgeStore,
+    ResolvedKnowledge,
+};

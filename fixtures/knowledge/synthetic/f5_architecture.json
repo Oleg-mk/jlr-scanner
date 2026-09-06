@@ -1,0 +1,97 @@
+{
+  "schema_version": 1,
+  "source": {
+    "id": "synthetic-f5-architecture-v1",
+    "title": "F5 synthetic architecture fixture",
+    "source_type": "synthetic",
+    "origin": "JLR Scanner unit tests",
+    "source_locator": "repository:fixtures/knowledge/synthetic/f5_architecture.json",
+    "content_fingerprint": null,
+    "acquired_on": null,
+    "declared_vehicle_programs": [],
+    "provenance": "Generated test-only data with no JLR factual meaning",
+    "redistribution_status": "permitted",
+    "notes": "Must never be represented as real JLR evidence"
+  },
+  "evidence": [
+    {
+      "id": "evidence-synthetic-f5-architecture-v1",
+      "source_id": "synthetic-f5-architecture-v1",
+      "evidence_class": "synthetic_test",
+      "locator": {
+        "description": "Synthetic record in the committed fixture",
+        "document_page": null,
+        "document_section": null,
+        "record_key": "records[0]",
+        "capture_timestamp_us": null
+      },
+      "excerpt": null,
+      "notes": "Architecture test only"
+    }
+  ],
+  "records": [
+    {
+      "id": "record-synthetic-implementation-a",
+      "entity": {
+        "kind": "diagnostic_implementation",
+        "id": "IMPL-A"
+      },
+      "key": {
+        "kind": "uses_protocol_family"
+      },
+      "value": {
+        "kind": "protocol_family",
+        "name": "GENERIC-PROTOCOL"
+      },
+      "applicability": {
+        "vehicle_program": {
+          "state": "one_of",
+          "values": [
+            "PROGRAM-A",
+            "PROGRAM-B"
+          ]
+        },
+        "model_year": {
+          "state": "range",
+          "model_year_from": 2010,
+          "model_year_to": 2014
+        },
+        "architecture_generation": {
+          "state": "one_of",
+          "values": [
+            "ARCH-A"
+          ]
+        },
+        "ecu_family": {
+          "state": "one_of",
+          "values": [
+            "ECU-FAMILY-A"
+          ]
+        },
+        "powertrain": {
+          "state": "any"
+        },
+        "variant": {
+          "state": "one_of",
+          "values": [
+            "VARIANT-A"
+          ]
+        },
+        "market": {
+          "state": "any"
+        },
+        "diagnostic_implementation": {
+          "state": "one_of",
+          "values": [
+            "IMPL-A"
+          ]
+        },
+        "other": {}
+      },
+      "evidence_ids": [
+        "evidence-synthetic-f5-architecture-v1"
+      ],
+      "validation_state": "unverified"
+    }
+  ]
+}

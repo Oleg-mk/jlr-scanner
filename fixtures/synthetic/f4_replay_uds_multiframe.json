@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "fixture_class": "synthetic",
+  "name": "generic-did-multiframe-positive",
+  "metadata": {
+    "diagnostic_implementation": "generic UDS over ISO-TP",
+    "evidence": "synthetic F4 test vector",
+    "validation": "workspace golden test"
+  },
+  "frames": [
+    {
+      "timestamp_us": 1000,
+      "route": "synthetic-can",
+      "id": 1800,
+      "extended": false,
+      "dlc": 8,
+      "data": [16, 10, 98, 18, 52, 222, 173, 190]
+    },
+    {
+      "timestamp_us": 2000,
+      "route": "synthetic-can",
+      "id": 1800,
+      "extended": false,
+      "dlc": 5,
+      "data": [33, 239, 1, 2, 3]
+    }
+  ]
+}

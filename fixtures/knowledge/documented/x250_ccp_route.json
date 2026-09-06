@@ -1,0 +1,93 @@
+{
+  "schema_version": 1,
+  "source": {
+    "id": "jlr-x250-ewd-2008-13-56-10-1e",
+    "title": "X250 Electrical Wiring Diagrams",
+    "source_type": "documented",
+    "origin": "JLR publication 13 56 10_1E",
+    "source_locator": "user-provided:x250_electrical_wiring.pdf",
+    "content_fingerprint": {
+      "algorithm": "sha256",
+      "value": "406e07bfc3a8afc2caaa7384795210d911d44b3e23ca53ed7aab663c2782bee3"
+    },
+    "acquired_on": "2026-08-31",
+    "declared_vehicle_programs": [
+      "X250"
+    ],
+    "provenance": "User-provided local PDF; publication JLR 13 56 10_1E, March 2008; PDF metadata title X250_1PP_SERVICE.book",
+    "redistribution_status": "restricted_metadata_only",
+    "notes": "Original 4,789,074-byte PDF is not redistributed by this repository"
+  },
+  "evidence": [
+    {
+      "id": "evidence-x250-ewd-diagnostic-connector-ccp",
+      "source_id": "jlr-x250-ewd-2008-13-56-10-1e",
+      "evidence_class": "oem_documentation",
+      "locator": {
+        "description": "PDF page 181; printed page 133; section 418-00; CAN bus - high speed - Part 4; diagnostic connector C2DB04B",
+        "document_page": 181,
+        "document_section": "418-00",
+        "record_key": "C2DB04B/12,C2DB04B/13",
+        "capture_timestamp_us": null
+      },
+      "excerpt": "C2DB04B/12 HS_CAN_POS_CCP; C2DB04B/13 HS_CAN_NEG_CCP",
+      "notes": "Minimal factual excerpt retained for traceability"
+    }
+  ],
+  "records": [
+    {
+      "id": "record-x250-diagnostic-connector-ccp-route",
+      "entity": {
+        "kind": "network_route",
+        "id": "x250.ccp_hs_can.diagnostic_connector"
+      },
+      "key": {
+        "kind": "network_route"
+      },
+      "value": {
+        "kind": "network_route",
+        "logical_name": "CCP_HS_CAN",
+        "connector": "C2DB04B",
+        "pins": [
+          12,
+          13
+        ],
+        "bitrate_bps": null
+      },
+      "applicability": {
+        "vehicle_program": {
+          "state": "one_of",
+          "values": [
+            "X250"
+          ]
+        },
+        "model_year": {
+          "state": "unknown"
+        },
+        "architecture_generation": {
+          "state": "unknown"
+        },
+        "ecu_family": {
+          "state": "unknown"
+        },
+        "powertrain": {
+          "state": "unknown"
+        },
+        "variant": {
+          "state": "unknown"
+        },
+        "market": {
+          "state": "unknown"
+        },
+        "diagnostic_implementation": {
+          "state": "unknown"
+        },
+        "other": {}
+      },
+      "evidence_ids": [
+        "evidence-x250-ewd-diagnostic-connector-ccp"
+      ],
+      "validation_state": "source_backed"
+    }
+  ]
+}

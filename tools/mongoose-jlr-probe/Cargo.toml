@@ -1,0 +1,11 @@
+[package]
+name = "mongoose-jlr-probe"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+publish = false
+
+[dependencies]
+mongoose-jlr.workspace = true
+transport-serial.workspace = true

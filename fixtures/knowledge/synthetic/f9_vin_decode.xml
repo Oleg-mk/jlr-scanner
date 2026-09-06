@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE VINDecode []>
+<!--
+  SYNTHETIC F9 FIXTURE. Not JLR evidence and not promotable to evidence.
+  Reproduces the element shape of the SDD VIN decode document: rule blocks
+  that place a VIN in a decode model, and the attributes each model decodes.
+  The manufacturer code SYN does not exist.
+-->
+<VINDecode>
+	<Models>
+		<!-- SYNTHA unless position 12 says otherwise -->
+		<VIN DecodeModel="1">
+			<Test CharPos="1,3" Operator="EQUAL" CharValue="SYN"/>
+			<Test CharPos="12" Operator="NOT_EQUAL" CharValue="B"/>
+		</VIN>
+		<!-- SYNTHB, reached by either of two blocks -->
+		<VIN DecodeModel="2">
+			<Test CharPos="1,3" Operator="EQUAL" CharValue="SYN"/>
+			<Test CharPos="12" Operator="EQUAL" CharValue="B"/>
+		</VIN>
+		<VIN DecodeModel="2">
+			<Test CharPos="1,5" Operator="EQUAL" CharValue="SYNLB"/>
+		</VIN>
+	</Models>
+	<Decodes>
+		<DecodeModel id="1">
+			<Version Ref="Synthetic VIN chart issue 1"></Version>
+			<Attribute Name="Brand" Decode="Synthetic"></Attribute>
+			<Attribute Name="Model" Char="6,7">
+				<Value Value="01" Decode="SYNTHA"></Value>
+				<Value Value="02" Decode="SYNTHA"></Value>
+			</Attribute>
+			<Attribute Name="ModelName" Char="6,7">
+				<Value Value="01" Decode="Synth A saloon"></Value>
+				<Value Value="02" Decode="Synth A estate; long"></Value>
+			</Attribute>
+			<Attribute Name="ModelYear" Char="10">
+				<Value Value="A" Decode="2010"></Value>
+				<Value Value="B" Decode="2011"></Value>
+			</Attribute>
+			<Attribute Name="Engine" Char="8">
+				<Value Value="V" Decode="3.0L V6 synthetic"></Value>
+			</Attribute>
+		</DecodeModel>
+		<DecodeModel id="2">
+			<Attribute Name="Brand" Decode="Synthetic"></Attribute>
+			<Attribute Name="Model" Decode="SYNTHB"></Attribute>
+			<Attribute Name="ModelYear" Char="10">
+				<Value Value="A" Decode="2010"></Value>
+			</Attribute>
+		</DecodeModel>
+	</Decodes>
+</VINDecode>

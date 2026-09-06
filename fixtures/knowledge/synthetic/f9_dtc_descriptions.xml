@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  SYNTHETIC F9 FIXTURE. Not JLR evidence and not promotable to evidence.
+
+  Reproduces the shape of an SDD DTC description index. Values exercise:
+    * a generic entry with no module, which must not claim to hold everywhere;
+    * a module-scoped entry;
+    * the same code and module given two different wordings, which the real
+      index does 209 times and which must surface as a conflict;
+    * an exact repeat, which carries nothing new and is dropped;
+    * an entry with no text, which must not become an empty claim.
+-->
+<dtcDescriptionList>
+<dtc id="P0100"><![CDATA[Synthetic generic description]]></dtc>
+<dtc id="B1250" module="SYNTHMOD"><![CDATA[Synthetic sensor circuit failure]]></dtc>
+<dtc id="B1250" module="SYNTHMOD"><![CDATA[Synthetic sensor open circuit fault]]></dtc>
+<dtc id="B1250" module="SYNTHMOD"><![CDATA[Synthetic sensor circuit failure]]></dtc>
+<dtc id="B1251" module="OTHERMOD"></dtc>
+</dtcDescriptionList>

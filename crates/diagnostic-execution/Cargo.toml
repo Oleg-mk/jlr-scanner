@@ -1,0 +1,18 @@
+[package]
+name = "diagnostic-execution"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+diagnostic-environment.workspace = true
+diagnostic-simulator.workspace = true
+isotp.workspace = true
+obd-j1979.workspace = true
+transport-api.workspace = true
+transport-replay.workspace = true
+
+[dev-dependencies]
+knowledge.workspace = true
+serde_json.workspace = true

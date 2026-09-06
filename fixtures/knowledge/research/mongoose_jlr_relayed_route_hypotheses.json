@@ -1,0 +1,156 @@
+{
+  "schema_version": 1,
+  "source": {
+    "id": "jlr-scanner-relayed-route-hypotheses",
+    "title": "Hypothesis: 2014-and-later buses are reached through the gateway — high-speed via hs-can, medium-speed via ms-can",
+    "source_type": "unverified_research",
+    "origin": "JLR Scanner reasoning over ISO 15765-4, the SDD platform documents and the MongoosePro JLR pinout (ADR-0015); for the medium-speed buses, a community statement relayed by the owner on 2026-09-05 (docs/research/sdd/COMMUNITY_NOTES.md)",
+    "source_locator": "repository:docs/adr/ADR-0015-gateway-relayed-routes-and-live-uds-reads.md",
+    "content_fingerprint": null,
+    "acquired_on": "2026-09-03",
+    "declared_vehicle_programs": [],
+    "provenance": "Not a documented fact. ISO 15765-4 puts the legislated diagnostic bus on J1962 pins 6 and 14; SDD places the PCM on PT_HSCAN and declares no gateway routine for PT_HSCAN, CH_HSCAN, HY_HSCAN or CO_HSCAN, addressing their modules directly; the JLR variant of the adapter has two CAN pairs. Hence the hypothesis that modules on these buses are reached through route hs-can, relayed by the vehicle gateway, at the diagnostic CAN's 500 kbit/s. Confirmed by the first read-only response on such a vehicle; refuted by its absence. The medium-speed buses BO_MSCAN and CO_MSCAN were not hypothesised until 2026-09-05, when a community statement placed both behind the gateway on J1962 pins 3 and 11: they are now hypothesised through route ms-can at 125 kbit/s on that statement's strength alone, and stay Unverified until a module on one of them answers.",
+    "redistribution_status": "permitted",
+    "notes": "Records here resolve as Unverified and the survey shows them as a hypothesis, never as a reachable route."
+  },
+  "evidence": [
+    {
+      "id": "evidence-relayed-route-reasoning",
+      "source_id": "jlr-scanner-relayed-route-hypotheses",
+      "evidence_class": "unverified_research",
+      "locator": {
+        "description": "docs/adr/ADR-0015, Reason: why hs-can for the high-speed buses and nothing for the medium-speed ones",
+        "document_page": null,
+        "document_section": "Reason",
+        "record_key": "PT_HSCAN CH_HSCAN HY_HSCAN CO_HSCAN",
+        "capture_timestamp_us": null
+      },
+      "excerpt": "ISO 15765-4 pins 6/14; PCM on PT_HSCAN per SDD; no gateway routine declared for the high-speed buses; adapter has two CAN pairs",
+      "notes": "Reasoning, not observation"
+    },
+    {
+      "id": "evidence-relayed-ms-route-community-statement",
+      "source_id": "jlr-scanner-relayed-route-hypotheses",
+      "evidence_class": "unverified_research",
+      "locator": {
+        "description": "Community statement relayed by the owner on 2026-09-05, recorded in docs/research/sdd/COMMUNITY_NOTES.md: the car has two physical medium-speed buses, BO_MSCAN (body) and CO_MSCAN (comfort); neither reaches J1962 pins 3 and 11 directly; the central gateway — GWM, or CJB/BCM — joins them and relays or switches the tester's diagnostic requests to the BO or CO branch; HS_CAN is on pins 6 and 14",
+        "document_page": null,
+        "document_section": "Bus topology of the 2014-and-later cars, stated 2026-09-05",
+        "record_key": "BO_MSCAN CO_MSCAN",
+        "capture_timestamp_us": null
+      },
+      "excerpt": "BO_MSCAN and CO_MSCAN behind the gateway on pins 3/11; HS_CAN on pins 6/14",
+      "notes": "A statement without a cited document or measurement; its source is being asked for. Whether the gateway relays transparently or switches per request is not settled by it."
+    }
+  ],
+  "records": [
+    {
+      "id": "hypothesis-relayed-pt-hscan-route",
+      "entity": { "kind": "network_route", "id": "PT_HSCAN" },
+      "key": { "kind": "network_route" },
+      "value": { "kind": "network_route", "logical_name": "PT_HSCAN", "connector": "J1962", "pins": [6, 14], "bitrate_bps": 500000 },
+      "applicability": { "vehicle_program": { "state": "any" }, "model_year": { "state": "any" }, "architecture_generation": { "state": "any" }, "ecu_family": { "state": "any" }, "powertrain": { "state": "any" }, "variant": { "state": "any" }, "market": { "state": "any" }, "diagnostic_implementation": { "state": "any" }, "other": {} },
+      "evidence_ids": ["evidence-relayed-route-reasoning"],
+      "validation_state": "unverified"
+    },
+    {
+      "id": "hypothesis-relayed-pt-hscan-backend",
+      "entity": { "kind": "network_route", "id": "PT_HSCAN" },
+      "key": { "kind": "custom", "name": "backend_route" },
+      "value": { "kind": "backend_route", "backend": "mongoose-jlr", "route_id": "hs-can" },
+      "applicability": { "vehicle_program": { "state": "any" }, "model_year": { "state": "any" }, "architecture_generation": { "state": "any" }, "ecu_family": { "state": "any" }, "powertrain": { "state": "any" }, "variant": { "state": "any" }, "market": { "state": "any" }, "diagnostic_implementation": { "state": "any" }, "other": {} },
+      "evidence_ids": ["evidence-relayed-route-reasoning"],
+      "validation_state": "unverified"
+    },
+    {
+      "id": "hypothesis-relayed-ch-hscan-route",
+      "entity": { "kind": "network_route", "id": "CH_HSCAN" },
+      "key": { "kind": "network_route" },
+      "value": { "kind": "network_route", "logical_name": "CH_HSCAN", "connector": "J1962", "pins": [6, 14], "bitrate_bps": 500000 },
+      "applicability": { "vehicle_program": { "state": "any" }, "model_year": { "state": "any" }, "architecture_generation": { "state": "any" }, "ecu_family": { "state": "any" }, "powertrain": { "state": "any" }, "variant": { "state": "any" }, "market": { "state": "any" }, "diagnostic_implementation": { "state": "any" }, "other": {} },
+      "evidence_ids": ["evidence-relayed-route-reasoning"],
+      "validation_state": "unverified"
+    },
+    {
+      "id": "hypothesis-relayed-ch-hscan-backend",
+      "entity": { "kind": "network_route", "id": "CH_HSCAN" },
+      "key": { "kind": "custom", "name": "backend_route" },
+      "value": { "kind": "backend_route", "backend": "mongoose-jlr", "route_id": "hs-can" },
+      "applicability": { "vehicle_program": { "state": "any" }, "model_year": { "state": "any" }, "architecture_generation": { "state": "any" }, "ecu_family": { "state": "any" }, "powertrain": { "state": "any" }, "variant": { "state": "any" }, "market": { "state": "any" }, "diagnostic_implementation": { "state": "any" }, "other": {} },
+      "evidence_ids": ["evidence-relayed-route-reasoning"],
+      "validation_state": "unverified"
+    },
+    {
+      "id": "hypothesis-relayed-hy-hscan-route",
+      "entity": { "kind": "network_route", "id": "HY_HSCAN" },
+      "key": { "kind": "network_route" },
+      "value": { "kind": "network_route", "logical_name": "HY_HSCAN", "connector": "J1962", "pins": [6, 14], "bitrate_bps": 500000 },
+      "applicability": { "vehicle_program": { "state": "any" }, "model_year": { "state": "any" }, "architecture_generation": { "state": "any" }, "ecu_family": { "state": "any" }, "powertrain": { "state": "any" }, "variant": { "state": "any" }, "market": { "state": "any" }, "diagnostic_implementation": { "state": "any" }, "other": {} },
+      "evidence_ids": ["evidence-relayed-route-reasoning"],
+      "validation_state": "unverified"
+    },
+    {
+      "id": "hypothesis-relayed-hy-hscan-backend",
+      "entity": { "kind": "network_route", "id": "HY_HSCAN" },
+      "key": { "kind": "custom", "name": "backend_route" },
+      "value": { "kind": "backend_route", "backend": "mongoose-jlr", "route_id": "hs-can" },
+      "applicability": { "vehicle_program": { "state": "any" }, "model_year": { "state": "any" }, "architecture_generation": { "state": "any" }, "ecu_family": { "state": "any" }, "powertrain": { "state": "any" }, "variant": { "state": "any" }, "market": { "state": "any" }, "diagnostic_implementation": { "state": "any" }, "other": {} },
+      "evidence_ids": ["evidence-relayed-route-reasoning"],
+      "validation_state": "unverified"
+    },
+    {
+      "id": "hypothesis-relayed-co-hscan-route",
+      "entity": { "kind": "network_route", "id": "CO_HSCAN" },
+      "key": { "kind": "network_route" },
+      "value": { "kind": "network_route", "logical_name": "CO_HSCAN", "connector": "J1962", "pins": [6, 14], "bitrate_bps": 500000 },
+      "applicability": { "vehicle_program": { "state": "any" }, "model_year": { "state": "any" }, "architecture_generation": { "state": "any" }, "ecu_family": { "state": "any" }, "powertrain": { "state": "any" }, "variant": { "state": "any" }, "market": { "state": "any" }, "diagnostic_implementation": { "state": "any" }, "other": {} },
+      "evidence_ids": ["evidence-relayed-route-reasoning"],
+      "validation_state": "unverified"
+    },
+    {
+      "id": "hypothesis-relayed-co-hscan-backend",
+      "entity": { "kind": "network_route", "id": "CO_HSCAN" },
+      "key": { "kind": "custom", "name": "backend_route" },
+      "value": { "kind": "backend_route", "backend": "mongoose-jlr", "route_id": "hs-can" },
+      "applicability": { "vehicle_program": { "state": "any" }, "model_year": { "state": "any" }, "architecture_generation": { "state": "any" }, "ecu_family": { "state": "any" }, "powertrain": { "state": "any" }, "variant": { "state": "any" }, "market": { "state": "any" }, "diagnostic_implementation": { "state": "any" }, "other": {} },
+      "evidence_ids": ["evidence-relayed-route-reasoning"],
+      "validation_state": "unverified"
+    },
+    {
+      "id": "hypothesis-relayed-bo-mscan-route",
+      "entity": { "kind": "network_route", "id": "BO_MSCAN" },
+      "key": { "kind": "network_route" },
+      "value": { "kind": "network_route", "logical_name": "BO_MSCAN", "connector": "J1962", "pins": [3, 11], "bitrate_bps": 125000 },
+      "applicability": { "vehicle_program": { "state": "any" }, "model_year": { "state": "any" }, "architecture_generation": { "state": "any" }, "ecu_family": { "state": "any" }, "powertrain": { "state": "any" }, "variant": { "state": "any" }, "market": { "state": "any" }, "diagnostic_implementation": { "state": "any" }, "other": {} },
+      "evidence_ids": ["evidence-relayed-ms-route-community-statement"],
+      "validation_state": "unverified"
+    },
+    {
+      "id": "hypothesis-relayed-bo-mscan-backend",
+      "entity": { "kind": "network_route", "id": "BO_MSCAN" },
+      "key": { "kind": "custom", "name": "backend_route" },
+      "value": { "kind": "backend_route", "backend": "mongoose-jlr", "route_id": "ms-can" },
+      "applicability": { "vehicle_program": { "state": "any" }, "model_year": { "state": "any" }, "architecture_generation": { "state": "any" }, "ecu_family": { "state": "any" }, "powertrain": { "state": "any" }, "variant": { "state": "any" }, "market": { "state": "any" }, "diagnostic_implementation": { "state": "any" }, "other": {} },
+      "evidence_ids": ["evidence-relayed-ms-route-community-statement"],
+      "validation_state": "unverified"
+    },
+    {
+      "id": "hypothesis-relayed-co-mscan-route",
+      "entity": { "kind": "network_route", "id": "CO_MSCAN" },
+      "key": { "kind": "network_route" },
+      "value": { "kind": "network_route", "logical_name": "CO_MSCAN", "connector": "J1962", "pins": [3, 11], "bitrate_bps": 125000 },
+      "applicability": { "vehicle_program": { "state": "any" }, "model_year": { "state": "any" }, "architecture_generation": { "state": "any" }, "ecu_family": { "state": "any" }, "powertrain": { "state": "any" }, "variant": { "state": "any" }, "market": { "state": "any" }, "diagnostic_implementation": { "state": "any" }, "other": {} },
+      "evidence_ids": ["evidence-relayed-ms-route-community-statement"],
+      "validation_state": "unverified"
+    },
+    {
+      "id": "hypothesis-relayed-co-mscan-backend",
+      "entity": { "kind": "network_route", "id": "CO_MSCAN" },
+      "key": { "kind": "custom", "name": "backend_route" },
+      "value": { "kind": "backend_route", "backend": "mongoose-jlr", "route_id": "ms-can" },
+      "applicability": { "vehicle_program": { "state": "any" }, "model_year": { "state": "any" }, "architecture_generation": { "state": "any" }, "ecu_family": { "state": "any" }, "powertrain": { "state": "any" }, "variant": { "state": "any" }, "market": { "state": "any" }, "diagnostic_implementation": { "state": "any" }, "other": {} },
+      "evidence_ids": ["evidence-relayed-ms-route-community-statement"],
+      "validation_state": "unverified"
+    }
+  ]
+}

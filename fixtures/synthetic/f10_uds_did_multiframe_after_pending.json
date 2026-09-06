@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "fixture_class": "synthetic",
+  "name": "f10-synthetic-uds-did-multiframe-after-pending",
+  "metadata": {
+    "vehicle_program": "SYNTHA",
+    "model_year": 2010,
+    "ecu_family": "SYNTHMOD",
+    "evidence": "synthetic bytes: NRC 0x78 response-pending, then a two-frame positive ReadDataByIdentifier 0x1945 answer",
+    "validation": "synthetic_only_not_vehicle_capture"
+  },
+  "frames": [
+    {
+      "timestamp_us": 1000,
+      "route": "hs-can",
+      "id": 2024,
+      "extended": false,
+      "dlc": 8,
+      "data": [3, 127, 34, 120, 0, 0, 0, 0]
+    },
+    {
+      "timestamp_us": 2000,
+      "route": "hs-can",
+      "id": 2024,
+      "extended": false,
+      "dlc": 8,
+      "data": [16, 13, 98, 25, 69, 83, 89, 78]
+    },
+    {
+      "timestamp_us": 3000,
+      "route": "hs-can",
+      "id": 2024,
+      "extended": false,
+      "dlc": 8,
+      "data": [33, 84, 72, 45, 68, 65, 84, 65]
+    }
+  ]
+}

@@ -1,0 +1,10 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "bundle": {
+    "active": true,
+    "targets": ["nsis"],
+    "windows": {
+      "signCommand": "pwsh -NoProfile -File scripts/sign-windows-artifact.ps1 -FilePath %1"
+    }
+  }
+}

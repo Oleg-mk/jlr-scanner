@@ -1,0 +1,10 @@
+[package]
+name = "jlr-profiles"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+diagnostic-environment.workspace = true
+knowledge.workspace = true

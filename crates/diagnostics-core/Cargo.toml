@@ -1,0 +1,15 @@
+[package]
+name = "diagnostics-core"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+isotp.workspace = true
+transport-api.workspace = true
+uds.workspace = true
+
+[dev-dependencies]
+diagnostic-simulator.workspace = true
+transport-replay.workspace = true

@@ -1,0 +1,42 @@
+{
+  "schema_version": 1,
+  "fixture_class": "synthetic",
+  "name": "f7-x250-mode09-calibration-identification-multiframe",
+  "metadata": {
+    "vehicle_program": "X250",
+    "model_year": 2010,
+    "ecu_family": "jlr.x250.ecm",
+    "powertrain": "AJ133-5.0L-SC",
+    "variant": "Supercharged",
+    "market": "NAS",
+    "diagnostic_implementation": "jlr.x250.ecm.cx23-14c204-zad",
+    "evidence": "synthetic execution bytes reproduce a separately observed calibration value",
+    "validation": "synthetic_only_not_vehicle_capture"
+  },
+  "frames": [
+    {
+      "timestamp_us": 1000,
+      "route": "hs-can",
+      "id": 2024,
+      "extended": false,
+      "dlc": 8,
+      "data": [16, 19, 73, 4, 1, 67, 88, 50]
+    },
+    {
+      "timestamp_us": 2000,
+      "route": "hs-can",
+      "id": 2024,
+      "extended": false,
+      "dlc": 8,
+      "data": [33, 51, 45, 49, 52, 67, 50, 48]
+    },
+    {
+      "timestamp_us": 3000,
+      "route": "hs-can",
+      "id": 2024,
+      "extended": false,
+      "dlc": 8,
+      "data": [34, 52, 45, 90, 65, 68, 0, 0]
+    }
+  ]
+}

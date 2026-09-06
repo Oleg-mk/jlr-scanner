@@ -1,0 +1,85 @@
+name: Windows signed release candidate
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: windows-signed-release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build-sign-verify:
+    name: Build, sign, and verify Windows artifacts
+    runs-on: windows-2025
+    environment: windows-signing
+    env:
+      AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+      AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+      AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+      JLR_ARTIFACT_SIGNING_ENDPOINT: ${{ vars.JLR_ARTIFACT_SIGNING_ENDPOINT }}
+      JLR_ARTIFACT_SIGNING_ACCOUNT: ${{ vars.JLR_ARTIFACT_SIGNING_ACCOUNT }}
+      JLR_ARTIFACT_SIGNING_PROFILE: ${{ vars.JLR_ARTIFACT_SIGNING_PROFILE }}
+      JLR_EXPECTED_PUBLISHER: ${{ vars.JLR_EXPECTED_PUBLISHER }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Require trusted-signing configuration
+        shell: pwsh
+        run: ./scripts/require-signing-environment.ps1
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.19.0
+
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24.15.0
+          cache: pnpm
+
+      - name: Install pinned Rust toolchain
+        shell: pwsh
+        run: |
+          rustup toolchain install 1.98.0 --profile minimal --component clippy,rustfmt
+          rustup default 1.98.0
+
+      - name: Install JavaScript dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Validate frontend and architecture
+        run: |
+          pnpm lint
+          pnpm test
+          pnpm build
+
+      - name: Validate Rust workspace
+        shell: pwsh
+        run: |
+          cargo fmt --all -- --check
+          cargo clippy --workspace --all-targets -- -D warnings
+          cargo test --workspace
+          cargo check -p jlr-scanner-shell
+
+      - name: Install pinned Artifact Signing CLI
+        run: cargo install artifact-signing-cli --version 0.11.0 --locked
+
+      - name: Build and sign Tauri release
+        run: pnpm tauri build --ci --config apps/scanner/src-tauri/tauri.release.conf.json
+
+      - name: Verify and stage signed artifacts
+        shell: pwsh
+        run: ./scripts/verify-windows-release.ps1
+
+      - name: Upload verified signed artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: jlr-scanner-windows-signed-${{ github.sha }}
+          path: dist/windows-signed/
+          if-no-files-found: error
+          retention-days: 14

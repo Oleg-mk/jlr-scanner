@@ -1,0 +1,11 @@
+[package]
+name = "diagnostic-simulator"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+isotp.workspace = true
+transport-api.workspace = true
+uds.workspace = true

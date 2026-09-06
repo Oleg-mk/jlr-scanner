@@ -1,0 +1,29 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "JLR Scanner",
+  "version": "0.9.0",
+  "identifier": "com.jlrscanner.desktop",
+  "build": {
+    "beforeDevCommand": "pnpm --dir apps/scanner/frontend dev",
+    "beforeBuildCommand": "pnpm --dir apps/scanner/frontend build",
+    "devUrl": "http://127.0.0.1:1420",
+    "frontendDist": "../frontend/dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "JLR Scanner",
+        "width": 1280,
+        "height": 860,
+        "minWidth": 320,
+        "minHeight": 480
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": false
+  }
+}

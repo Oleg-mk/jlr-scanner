@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  SYNTHETIC F9 FIXTURE. Not JLR evidence and not promotable to evidence.
+
+  Reproduces the shape of an SDD platform document. Values exercise:
+    * two buses at different rates and one behind a gateway;
+    * a module with diagnostic and programming addresses, where only the
+      diagnostic pair may be ingested;
+    * a module whose network is declared and one where it is not;
+    * a module with no diagnostic address at all, which yields no claim;
+    * a module addressed only by a physical address, recorded verbatim without
+      CAN identifiers so that it is seen but never routed;
+    * a J1962 connector whose pins are recorded as listed, not assigned to buses.
+-->
+<platform>
+	<platform_name>SYNTHA_10MY</platform_name>
+	<network_architecture>
+		<connector>
+			<name>J1962</name>
+			<pin><name>CAN_P_HS</name><number>6</number></pin>
+			<pin><name>CAN_N_HS</name><number>14</number></pin>
+			<pin><name>SIGNAL_GROUND</name><number>5</number></pin>
+		</connector>
+		<network net_id="CAN_HS" main_net="CAN_HS">
+			<protocol type="diagnostic">ISO14229</protocol>
+			<can>
+				<rate>500</rate>
+				<identifier>11</identifier>
+			</can>
+			<addressing><can_iso15765><normal/></can_iso15765></addressing>
+		</network>
+		<network net_id="CAN_MS" main_net="CAN_MS">
+			<can>
+				<rate>125</rate>
+				<identifier>29</identifier>
+			</can>
+			<addressing><can_iso15765><extended/></can_iso15765></addressing>
+		</network>
+		<network net_id="CAN_FIXED" main_net="CAN_FIXED">
+			<protocol type="diagnostic">ISO14229</protocol>
+			<can>
+				<rate>500</rate>
+				<identifier>29</identifier>
+			</can>
+			<addressing>
+				<can_iso15765>
+					<normal_fixed>
+						<can_id_prefix type="phys">0x18DA</can_id_prefix>
+						<can_id_prefix type="func">0x18DB</can_id_prefix>
+					</normal_fixed>
+				</can_iso15765>
+			</addressing>
+		</network>
+	</network_architecture>
+	<car_configuration>
+		<master>
+			<ccf_source upload="did">SYNTHMOD_SYSTEM_A</ccf_source>
+			<qualifier model="SYNTHA" year="MY10"/>
+		</master>
+	</car_configuration>
+	<module_fitment>
+		<module>
+			<module_code_name acronym="SYNTHMOD" ISOName="SYNTHMOD">SYNTHMOD_SYSTEM_A</module_code_name>
+			<address type="can_tx" session="diag">0x7E0</address>
+			<address type="can_rx" session="diag">0x7E8</address>
+			<address type="can_tx" session="prog">0x111</address>
+			<address type="can_rx" session="prog">0x222</address>
+			<network>CAN_HS</network>
+			<fitment>mandatory</fitment>
+		</module>
+		<module>
+			<module_code_name acronym="OTHERMOD" ISOName="OTHERMOD">OTHERMOD_SYSTEM_A</module_code_name>
+			<address type="can_tx" session="diag">0x760</address>
+			<address type="can_rx" session="diag">0x768</address>
+			<network>CAN_MS</network>
+			<fitment>optional</fitment>
+		</module>
+		<module>
+			<module_code_name acronym="LEGACYMOD" ISOName="LEGACYMOD">LEGACYMOD_SYSTEM_A</module_code_name>
+			<address type="phys" session="diag">0x10</address>
+			<address type="phys" session="prog">0x10</address>
+			<network>CAN_HS</network>
+			<fitment>mandatory</fitment>
+		</module>
+		<module>
+			<module_code_name acronym="FIXEDMOD" ISOName="FIXEDMOD">FIXEDMOD_SYSTEM_A</module_code_name>
+			<address type="phys" session="diag">0x60</address>
+			<address type="phys" session="prog">0x60</address>
+			<network>CAN_FIXED</network>
+			<fitment>mandatory</fitment>
+		</module>
+		<module>
+			<module_code_name acronym="PROGONLY" ISOName="PROGONLY">PROGONLY_SYSTEM_A</module_code_name>
+			<address type="can_tx" session="prog">0x333</address>
+			<address type="can_rx" session="prog">0x33B</address>
+			<network>CAN_HS</network>
+		</module>
+	</module_fitment>
+</platform>

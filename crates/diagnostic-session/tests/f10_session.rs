@@ -1,0 +1,402 @@
+//! F10 golden tests for the composition layer: manifests in, survey out.
+//!
+//! The library is built the way the application builds it — built-in
+//! documented manifests plus a directory of exported ones — and the survey is
+//! checked for what it shows and, as importantly, for what it refuses to hide.
+
+use app_contracts::{LibraryState, ModuleApplicability, RouteStatus, VehicleContextInput};
+use diagnostic_session::{survey_vehicle, KnowledgeLibrary, SDD_YEAR_BREAKPOINT_DIMENSION};
+use knowledge::{
+    sha256_bytes, ContentFingerprint, IngestionAdapter, RedistributionStatus, SourceId,
+    SourceRecord, SourceType,
+};
+use sdd_ingest::{
+    ConverterCatalogue, DidFormattingAdapter, ModelYearTimeline, ModuleTextAdapter,
+    PlatformAdapter, VinDecodeAdapter,
+};
+
+const PLATFORM: &str = include_str!("../../../fixtures/knowledge/synthetic/f9_platform.xml");
+const DIDS: &str = include_str!("../../../fixtures/knowledge/synthetic/f9_did_formatting.xml");
+const CONVERTER: &str = include_str!("../../../fixtures/knowledge/synthetic/f9_converter.xml");
+const MODULE_TEXT: &str = include_str!("../../../fixtures/knowledge/synthetic/f9_module_text.xml");
+const VIN_DECODE: &str = include_str!("../../../fixtures/knowledge/synthetic/f9_vin_decode.xml");
+
+fn synthetic_source(id: &str, text: &str) -> SourceRecord {
+    SourceRecord {
+        id: SourceId::new(id).unwrap(),
+        title: format!("F10 session fixture {id}"),
+        source_type: SourceType::Synthetic,
+        origin: "F10 golden test".into(),
+        source_locator: format!("fixtures/knowledge/synthetic/{id}.xml"),
+        content_fingerprint: Some(
+            ContentFingerprint::sha256(sha256_bytes(text.as_bytes())).unwrap(),
+        ),
+        acquired_on: None,
+        declared_vehicle_programs: vec![],
+        provenance: "Synthetic fixture reproducing the SDD element shape only".into(),
+        redistribution_status: RedistributionStatus::Permitted,
+        notes: None,
+    }
+}
+
+fn timeline() -> ModelYearTimeline {
+    let mut timeline = ModelYearTimeline::new();
+    for marker in ["MY08", "MY10", "MY12"] {
+        timeline.observe("SYNTHA", marker).unwrap();
+    }
+    timeline
+}
+
+/// The manifests an export of the two fixtures would produce, as JSON text —
+/// one as a single manifest, one as a bundle, since the loader accepts both.
+fn exported_manifests() -> Vec<(String, String)> {
+    let platform = PlatformAdapter::new(synthetic_source("f10-session-plat", PLATFORM))
+        .unwrap()
+        .with_timeline(timeline());
+    let mut converters = ConverterCatalogue::new();
+    converters.insert_from_xml(CONVERTER).unwrap();
+    let dids = DidFormattingAdapter::new(synthetic_source("f10-session-did", DIDS), converters)
+        .unwrap()
+        .with_timeline(timeline());
+
+    let platform_batch = platform.parse(PLATFORM).unwrap();
+    let did_batch = dids.parse(DIDS).unwrap();
+    let text_batch = ModuleTextAdapter::new(synthetic_source("f10-session-text", MODULE_TEXT))
+        .unwrap()
+        .parse(MODULE_TEXT)
+        .unwrap();
+    let vin_batch = VinDecodeAdapter::new(synthetic_source("f10-session-vin", VIN_DECODE))
+        .unwrap()
+        .parse(VIN_DECODE)
+        .unwrap();
+    vec![
+        (
+            "platform.json".to_string(),
+            serde_json::to_string(&platform_batch).unwrap(),
+        ),
+        (
+            "bundle.json".to_string(),
+            serde_json::to_string(&vec![did_batch, text_batch, vin_batch]).unwrap(),
+        ),
+    ]
+}
+
+fn library() -> KnowledgeLibrary {
+    let manifests = exported_manifests();
+    KnowledgeLibrary::from_manifests(
+        manifests
+            .iter()
+            .map(|(name, text)| (name.as_str(), text.as_str())),
+    )
+}
+
+fn vehicle() -> VehicleContextInput {
+    VehicleContextInput {
+        vehicle_program: "SYNTHA".into(),
+        model_year: Some(2010),
+        powertrain: Some("SYNTHENGINE".into()),
+        variant: None,
+        market: None,
+        year_breakpoint: Some("MY10".into()),
+    }
+}
+
+#[test]
+fn built_in_library_holds_the_documented_and_research_manifests() {
+    let library = KnowledgeLibrary::built_in();
+    let snapshot = library.snapshot();
+    assert_eq!(snapshot.state, LibraryState::NotLoaded);
+    assert_eq!(snapshot.directory, None);
+    assert_eq!(snapshot.sources, 5);
+    assert_eq!(snapshot.manifests_failed, 0);
+    assert!(snapshot.message.contains("Built-in data only"));
+
+    // With no vehicle data at all, a survey names the gap rather than a car.
+    let survey = library.survey(&vehicle());
+    assert!(survey.modules.is_empty());
+    assert!(survey.message.contains("No modules are known"));
+}
+
+#[test]
+fn exported_manifests_and_bundles_load_and_are_counted_honestly() {
+    let library = library();
+    let snapshot = library.snapshot();
+    assert_eq!(snapshot.state, LibraryState::Loaded);
+    // Five built-in plus one manifest plus one bundle of three.
+    assert_eq!(snapshot.manifests_loaded, 9);
+    assert_eq!(snapshot.manifests_failed, 0);
+    assert_eq!(snapshot.sources, 9);
+    assert!(snapshot.records > 20);
+    assert!(snapshot.message.starts_with("Loaded 4 manifests"));
+}
+
+#[test]
+fn a_broken_manifest_is_reported_and_the_rest_still_load() {
+    let mut manifests = exported_manifests();
+    manifests.push(("broken.json".to_string(), "{ not json".to_string()));
+    manifests.push((
+        "wrong-shape.json".to_string(),
+        r#"{"schema_version": 1, "unexpected": true}"#.to_string(),
+    ));
+    let library = KnowledgeLibrary::from_manifests(
+        manifests
+            .iter()
+            .map(|(name, text)| (name.as_str(), text.as_str())),
+    );
+    let snapshot = library.snapshot();
+    assert_eq!(snapshot.state, LibraryState::PartiallyLoaded);
+    assert_eq!(snapshot.manifests_failed, 2);
+    let files: Vec<_> = snapshot
+        .failures
+        .iter()
+        .map(|failure| failure.file.as_str())
+        .collect();
+    assert_eq!(files, vec!["broken.json", "wrong-shape.json"]);
+    assert!(snapshot.failures[0].message.contains("not valid JSON"));
+    // The good data is still there.
+    assert_eq!(snapshot.sources, 9);
+}
+
+#[test]
+fn the_survey_shows_reachable_and_unreachable_modules_with_reasons() {
+    let survey = library().survey(&vehicle());
+    // SYNTHMOD, OTHERMOD, LEGACYMOD and FIXEDMOD; only the first has a route.
+    assert_eq!(survey.modules.len(), 4);
+    assert_eq!(survey.reachable, 1);
+    assert_eq!(survey.unreachable, 3);
+    assert!(survey.message.starts_with(
+        "4 modules known: 1 reachable over the adapter, 0 on a hypothesised route, 3 not"
+    ));
+
+    // Sorted by mnemonic: FIXEDMOD, LEGACYMOD, OTHERMOD, SYNTHMOD.
+    let reachable = &survey.modules[3];
+    assert_eq!(reachable.ecu_family, "SYNTHMOD");
+    assert_eq!(reachable.applicability, ModuleApplicability::Applicable);
+    assert_eq!(reachable.identifier_read.status, RouteStatus::Reachable);
+    assert_eq!(reachable.dtc_read.status, RouteStatus::Reachable);
+    assert!(reachable.identifier_read.reasons.is_empty());
+    assert_eq!(reachable.logical_network.as_deref(), Some("CAN_HS"));
+    assert_eq!(reachable.backend_route.as_deref(), Some("hs-can"));
+    assert_eq!(reachable.pins.as_deref(), Some("6/14"));
+    assert_eq!(reachable.bitrate_bps, Some(500_000));
+    assert_eq!(reachable.protocol.as_deref(), Some("ISO14229"));
+    assert_eq!(reachable.request_id.as_deref(), Some("0x7E0"));
+    assert_eq!(reachable.response_id.as_deref(), Some("0x7E8"));
+    let identifiers: Vec<_> = reachable
+        .readable_identifiers
+        .iter()
+        .map(|entry| entry.identifier.as_str())
+        .collect();
+    assert_eq!(identifiers, vec!["0x0347", "0x1945"]);
+
+    // OTHERMOD sits on a bound bus that declares no diagnostic protocol, so
+    // the survey says exactly that instead of dropping the row.
+    let unreachable = &survey.modules[2];
+    assert_eq!(unreachable.ecu_family, "OTHERMOD");
+    assert_eq!(
+        unreachable.identifier_read.status,
+        RouteStatus::Indeterminate
+    );
+    assert_eq!(unreachable.logical_network.as_deref(), Some("CAN_MS"));
+    assert_eq!(unreachable.backend_route.as_deref(), Some("ms-can"));
+    assert_eq!(unreachable.request_id.as_deref(), Some("0x760"));
+    assert!(unreachable
+        .identifier_read
+        .reasons
+        .iter()
+        .any(|reason| reason.starts_with("diagnostic protocol:")));
+    assert!(unreachable
+        .identifier_read
+        .reasons
+        .iter()
+        .any(|reason| reason.starts_with("read-only capability:")));
+    assert!(unreachable.readable_identifiers.is_empty());
+
+    // LEGACYMOD has a physical address and no CAN identifiers: seen, placed on
+    // its bus, and unreachable for exactly that reason. (FIXEDMOD, first in
+    // the order, has a physical address on a normal_fixed bus and is derived
+    // only when the ingester is asked to; this library did not ask.)
+    let legacy = &survey.modules[1];
+    assert_eq!(survey.modules[0].ecu_family, "FIXEDMOD");
+    assert_eq!(survey.modules[0].request_id, None);
+    assert_eq!(legacy.ecu_family, "LEGACYMOD");
+    assert_eq!(legacy.logical_network.as_deref(), Some("CAN_HS"));
+    assert_eq!(legacy.request_id, None);
+    assert_eq!(legacy.identifier_read.status, RouteStatus::Indeterminate);
+    assert!(legacy
+        .identifier_read
+        .reasons
+        .iter()
+        .any(|reason| reason.starts_with("request identifier:")));
+}
+
+#[test]
+fn an_incomplete_vehicle_description_is_named_not_guessed() {
+    let library = library();
+
+    let blank = library.survey(&VehicleContextInput::default());
+    assert!(blank.modules.is_empty());
+    assert!(blank.message.contains("State the vehicle programme"));
+
+    // Without the breakpoint marker the SDD-qualified data cannot apply, so
+    // every module is listed as lacking context rather than as reachable.
+    let mut partial = vehicle();
+    partial.year_breakpoint = None;
+    let survey = library.survey(&partial);
+    assert_eq!(survey.reachable, 0);
+    assert!(survey
+        .modules
+        .iter()
+        .all(|module| module.applicability == ModuleApplicability::InsufficientContext));
+    assert!(survey.modules[0].identifier_read.reasons[0].contains("lacks a detail"));
+}
+
+#[test]
+fn vehicle_context_dimension_names_match_the_ingester() {
+    assert_eq!(
+        SDD_YEAR_BREAKPOINT_DIMENSION,
+        sdd_ingest::YEAR_BREAKPOINT_DIMENSION
+    );
+    // And a store-level survey sees the same thing the library does.
+    let library = library();
+    assert_eq!(
+        survey_vehicle(library.store(), &vehicle(), &|mnemonic| library
+            .module_names(mnemonic)),
+        library.survey(&vehicle())
+    );
+}
+
+#[test]
+fn a_module_on_a_hypothesised_bus_is_shown_as_a_hypothesis_not_as_reachable() {
+    // The fixture's SYNTHMOD sits on CAN_HS, which the documented binding
+    // covers. Re-label its bus as PT_HSCAN, which only the research manifest
+    // binds, and the survey must say "hypothesis" and carry UNVERIFIED.
+    let manifests: Vec<(String, String)> = exported_manifests()
+        .into_iter()
+        .map(|(name, text)| (name, text.replace("CAN_HS", "PT_HSCAN")))
+        .collect();
+    let library = KnowledgeLibrary::from_manifests(
+        manifests
+            .iter()
+            .map(|(name, text)| (name.as_str(), text.as_str())),
+    );
+    let survey = library.survey(&vehicle());
+    let module = survey
+        .modules
+        .iter()
+        .find(|module| module.ecu_family == "SYNTHMOD")
+        .unwrap();
+    assert_eq!(module.identifier_read.status, RouteStatus::Hypothesis);
+    assert_eq!(module.logical_network.as_deref(), Some("PT_HSCAN"));
+    assert_eq!(module.backend_route.as_deref(), Some("hs-can"));
+    assert_eq!(module.route_validation, "UNVERIFIED");
+    assert!(module.identifier_read.reasons[0].contains("unverified hypothesis"));
+    assert_eq!(survey.hypothesis, 1);
+    assert_eq!(survey.reachable, 0);
+    assert!(survey.message.contains("1 on a hypothesised route"));
+}
+
+#[test]
+fn the_catalogue_offers_the_programmes_markers_years_and_engines_the_data_is_qualified_by() {
+    let library = library();
+    let catalogue = library.catalogue();
+    let programme = catalogue
+        .programmes
+        .iter()
+        .find(|entry| entry.program == "SYNTHA")
+        .expect("the platform fixture describes SYNTHA");
+    let marker = &programme.markers[0];
+    assert_eq!(marker.marker, "MY10");
+    assert_eq!(marker.model_year_from, Some(2010));
+    assert_eq!(marker.model_year_to, Some(2011));
+    // The DID catalogue qualifies one entry by engine.
+    assert_eq!(programme.powertrains, vec!["SYNTHENGINE".to_string()]);
+    // Built-in data alone describes no vehicle.
+    assert!(KnowledgeLibrary::built_in()
+        .catalogue()
+        .programmes
+        .is_empty());
+}
+
+#[test]
+fn fault_code_wording_is_joined_by_code_and_module_and_never_invented() {
+    let library = library();
+    // The fixtures carry no DTC index, so nothing is described.
+    let described = library.describe_dtc("P0301", 0, "SYNTHMOD");
+    assert_eq!(described, diagnostic_session::DtcDescription::default());
+}
+
+#[test]
+fn module_names_come_from_the_text_database_in_every_language_it_has() {
+    let library = library();
+    assert_eq!(
+        library.module_name("SYNTHMOD", "eng").as_deref(),
+        Some("Synthetic control module")
+    );
+    assert_eq!(
+        library.module_name("SYNTHMOD", "deu").as_deref(),
+        Some("Synthetisches Steuermodul")
+    );
+    // No Ukrainian in SDD's text database: absent, not guessed.
+    assert_eq!(library.module_name("SYNTHMOD", "ukr"), None);
+    // A programme-decorated mnemonic falls back to its base; an unknown one stays unknown.
+    assert_eq!(
+        library.module_name("LR_SYNTHMOD_L322", "eng").as_deref(),
+        Some("Synthetic control module")
+    );
+    assert_eq!(library.module_name("OTHERMOD", "eng"), None);
+
+    let survey = library.survey(&vehicle());
+    let named = survey
+        .modules
+        .iter()
+        .find(|module| module.ecu_family == "SYNTHMOD")
+        .expect("SYNTHMOD surveyed");
+    assert_eq!(named.name.as_deref(), Some("Synthetic control module"));
+    assert_eq!(
+        named.names.get("rus").map(String::as_str),
+        Some("Синтетический блок управления")
+    );
+    assert_eq!(named.names.len(), 3);
+}
+
+#[test]
+fn a_vin_is_decoded_with_the_tables_the_library_holds() {
+    let library = library();
+    assert!(library.has_vin_tables());
+    let decoded = library.decode_vin("syna102vbbac12345");
+    assert!(decoded.valid);
+    assert_eq!(decoded.decode_model, Some(1));
+    assert_eq!(decoded.program.as_deref(), Some("SYNTHA"));
+    assert_eq!(decoded.model_year, Some(2011));
+    let engine = decoded
+        .attributes
+        .iter()
+        .find(|attribute| attribute.name == "Engine")
+        .expect("engine decoded");
+    assert_eq!(engine.value, "3.0L V6 synthetic");
+    let model_name = decoded
+        .attributes
+        .iter()
+        .find(|attribute| attribute.name == "ModelName")
+        .expect("model name decoded");
+    assert_eq!(model_name.value, "Synth A estate; long");
+    assert_eq!(
+        decoded.table_version.as_deref(),
+        Some("SDD table version: Synthetic VIN chart issue 1")
+    );
+
+    // Position 12 = B routes to the second model, reached by either rule block.
+    let other = library.decode_vin("SYNLB02VBBAB12345");
+    assert_eq!(other.decode_model, Some(2));
+    assert_eq!(other.program.as_deref(), Some("SYNTHB"));
+    assert_eq!(other.model_year, None);
+
+    // Built-in data has no tables and says so.
+    let built_in = KnowledgeLibrary::built_in();
+    assert!(!built_in.has_vin_tables());
+    assert!(built_in
+        .decode_vin("SYNA102VBBAC12345")
+        .message
+        .contains("no VIN tables"));
+}

@@ -1,0 +1,171 @@
+{
+  "schema_version": 1,
+  "source": {
+    "id": "jlr-scanner-mongoose-jlr-route-bindings",
+    "title": "MongoosePro JLR production route bindings for SDD logical buses",
+    "source_type": "documented",
+    "origin": "JLR Scanner source code and docs/F2_JLR_NETWORK_INVENTORY.md, corroborated by the Drew Technologies MongoosePro user guide",
+    "source_locator": "repository:crates/mongoose-jlr/src/passive.rs",
+    "content_fingerprint": {
+      "algorithm": "sha256",
+      "value": "2c57765ccc1989fadc7017439000498c91af6a9d4c2e2e8ff342759a2d2f169e"
+    },
+    "acquired_on": "2026-09-03",
+    "declared_vehicle_programs": [],
+    "provenance": "ADR-0013. Binds the two SDD bus names whose physical route has evidence: CAN_HS to hs-can on J1962 pins 6/14 at 500 kbit/s and CAN_MS to ms-can on pins 3/11 at 125 kbit/s. Fingerprint is of passive.rs at commit e57b289. Every other SDD bus name is deliberately unbound.",
+    "redistribution_status": "permitted",
+    "notes": "The resolver checks these rates against each platform's own declaration; a mismatch is a CONFLICT, not a wrong wire."
+  },
+  "evidence": [
+    {
+      "id": "evidence-mongoose-jlr-hs-can-route-descriptor",
+      "source_id": "jlr-scanner-mongoose-jlr-route-bindings",
+      "evidence_class": "source_code",
+      "locator": {
+        "description": "crates/mongoose-jlr/src/passive.rs lines 75 and 79-84",
+        "document_page": null,
+        "document_section": "VEHICLE_ROUTES",
+        "record_key": "VehicleRouteId::HsCan",
+        "capture_timestamp_us": null
+      },
+      "excerpt": "route hs-can; obd_pins [6, 14]; bitrate 500000",
+      "notes": "Production route descriptor; opening it is not part of this evidence"
+    },
+    {
+      "id": "evidence-mongoose-jlr-ms-can-route-descriptor",
+      "source_id": "jlr-scanner-mongoose-jlr-route-bindings",
+      "evidence_class": "source_code",
+      "locator": {
+        "description": "crates/mongoose-jlr/src/passive.rs lines 76 and 88-92",
+        "document_page": null,
+        "document_section": "VEHICLE_ROUTES",
+        "record_key": "VehicleRouteId::MsCan",
+        "capture_timestamp_us": null
+      },
+      "excerpt": "route ms-can; obd_pins [3, 11]; bitrate 125000",
+      "notes": "Production route descriptor; opening it is not part of this evidence"
+    },
+    {
+      "id": "evidence-mongoosepro-user-guide-jlr-pinout",
+      "source_id": "jlr-scanner-mongoose-jlr-route-bindings",
+      "evidence_class": "secondary_corroboration",
+      "locator": {
+        "description": "docs/F2_JLR_NETWORK_INVENTORY.md, addendum 2026-09-03: MongoosePro user guide page 17, Vehicle Connector Pin Assignments, JLR column",
+        "document_page": 17,
+        "document_section": "Vehicle Connector Pin Assignments",
+        "record_key": "JLR",
+        "capture_timestamp_us": null
+      },
+      "excerpt": "pin 6 CAN+; pin 14 CAN-; pin 3 CAN 2+ / K-Line; pin 11 CAN 2-",
+      "notes": "Adapter-side pinout; which SDD bus each pair carries is the binding this manifest states"
+    }
+  ],
+  "records": [
+    {
+      "id": "record-mongoose-jlr-binding-can-hs-route",
+      "entity": { "kind": "network_route", "id": "CAN_HS" },
+      "key": { "kind": "network_route" },
+      "value": {
+        "kind": "network_route",
+        "logical_name": "CAN_HS",
+        "connector": "J1962",
+        "pins": [6, 14],
+        "bitrate_bps": 500000
+      },
+      "applicability": {
+        "vehicle_program": { "state": "any" },
+        "model_year": { "state": "any" },
+        "architecture_generation": { "state": "any" },
+        "ecu_family": { "state": "any" },
+        "powertrain": { "state": "any" },
+        "variant": { "state": "any" },
+        "market": { "state": "any" },
+        "diagnostic_implementation": { "state": "any" },
+        "other": {}
+      },
+      "evidence_ids": [
+        "evidence-mongoose-jlr-hs-can-route-descriptor",
+        "evidence-mongoosepro-user-guide-jlr-pinout"
+      ],
+      "validation_state": "source_backed"
+    },
+    {
+      "id": "record-mongoose-jlr-binding-can-hs-backend",
+      "entity": { "kind": "network_route", "id": "CAN_HS" },
+      "key": { "kind": "custom", "name": "backend_route" },
+      "value": {
+        "kind": "backend_route",
+        "backend": "mongoose-jlr",
+        "route_id": "hs-can"
+      },
+      "applicability": {
+        "vehicle_program": { "state": "any" },
+        "model_year": { "state": "any" },
+        "architecture_generation": { "state": "any" },
+        "ecu_family": { "state": "any" },
+        "powertrain": { "state": "any" },
+        "variant": { "state": "any" },
+        "market": { "state": "any" },
+        "diagnostic_implementation": { "state": "any" },
+        "other": {}
+      },
+      "evidence_ids": [
+        "evidence-mongoose-jlr-hs-can-route-descriptor"
+      ],
+      "validation_state": "source_backed"
+    },
+    {
+      "id": "record-mongoose-jlr-binding-can-ms-route",
+      "entity": { "kind": "network_route", "id": "CAN_MS" },
+      "key": { "kind": "network_route" },
+      "value": {
+        "kind": "network_route",
+        "logical_name": "CAN_MS",
+        "connector": "J1962",
+        "pins": [3, 11],
+        "bitrate_bps": 125000
+      },
+      "applicability": {
+        "vehicle_program": { "state": "any" },
+        "model_year": { "state": "any" },
+        "architecture_generation": { "state": "any" },
+        "ecu_family": { "state": "any" },
+        "powertrain": { "state": "any" },
+        "variant": { "state": "any" },
+        "market": { "state": "any" },
+        "diagnostic_implementation": { "state": "any" },
+        "other": {}
+      },
+      "evidence_ids": [
+        "evidence-mongoose-jlr-ms-can-route-descriptor",
+        "evidence-mongoosepro-user-guide-jlr-pinout"
+      ],
+      "validation_state": "source_backed"
+    },
+    {
+      "id": "record-mongoose-jlr-binding-can-ms-backend",
+      "entity": { "kind": "network_route", "id": "CAN_MS" },
+      "key": { "kind": "custom", "name": "backend_route" },
+      "value": {
+        "kind": "backend_route",
+        "backend": "mongoose-jlr",
+        "route_id": "ms-can"
+      },
+      "applicability": {
+        "vehicle_program": { "state": "any" },
+        "model_year": { "state": "any" },
+        "architecture_generation": { "state": "any" },
+        "ecu_family": { "state": "any" },
+        "powertrain": { "state": "any" },
+        "variant": { "state": "any" },
+        "market": { "state": "any" },
+        "diagnostic_implementation": { "state": "any" },
+        "other": {}
+      },
+      "evidence_ids": [
+        "evidence-mongoose-jlr-ms-can-route-descriptor"
+      ],
+      "validation_state": "source_backed"
+    }
+  ]
+}

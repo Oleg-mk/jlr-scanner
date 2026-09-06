@@ -1,0 +1,59 @@
+[workspace]
+members = [
+  "apps/scanner/src-tauri",
+  "crates/app-contracts",
+  "crates/core-types",
+  "crates/diagnostics-core",
+  "crates/diagnostic-execution",
+  "crates/diagnostic-environment",
+  "crates/diagnostic-session",
+  "crates/diagnostic-simulator",
+  "crates/isotp",
+  "crates/jlr-profiles",
+  "crates/knowledge",
+  "crates/mongoose-jlr",
+  "crates/obd-j1979",
+  "crates/report-intake",
+  "crates/sdd-ingest",
+  "crates/transport-api",
+  "crates/transport-replay",
+  "crates/transport-serial",
+  "crates/uds",
+  "crates/uds-execution",
+  "tools/mongoose-jlr-probe",
+]
+resolver = "2"
+
+[workspace.package]
+version = "0.9.0"
+edition = "2021"
+license = "UNLICENSED"
+rust-version = "1.77"
+
+[workspace.dependencies]
+app-contracts = { path = "crates/app-contracts" }
+core-types = { path = "crates/core-types" }
+diagnostics-core = { path = "crates/diagnostics-core" }
+diagnostic-execution = { path = "crates/diagnostic-execution" }
+diagnostic-simulator = { path = "crates/diagnostic-simulator" }
+diagnostic-environment = { path = "crates/diagnostic-environment" }
+diagnostic-session = { path = "crates/diagnostic-session" }
+ed25519-dalek = "2"
+getrandom = "0.2"
+isotp = { path = "crates/isotp" }
+jlr-profiles = { path = "crates/jlr-profiles" }
+knowledge = { path = "crates/knowledge" }
+mongoose-jlr = { path = "crates/mongoose-jlr" }
+obd-j1979 = { path = "crates/obd-j1979" }
+report-intake = { path = "crates/report-intake" }
+sdd-ingest = { path = "crates/sdd-ingest" }
+serialport = { version = "4", default-features = false }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha2 = "0.10"
+tauri = { version = "2" }
+transport-api = { path = "crates/transport-api" }
+transport-replay = { path = "crates/transport-replay" }
+transport-serial = { path = "crates/transport-serial" }
+uds = { path = "crates/uds" }
+uds-execution = { path = "crates/uds-execution" }

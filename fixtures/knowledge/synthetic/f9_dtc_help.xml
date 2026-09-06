@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  SYNTHETIC F9 FIXTURE. Not JLR evidence and not promotable to evidence.
+
+  Reproduces only the element shape of an SDD per-code DTC help document so the
+  parser can be tested offline. Values exercise parsing branches:
+
+    * two descriptions selected by different module/model qualifiers;
+    * several model-year designations for one description, including the
+      literal BASE that occurs in the real corpus and must not be interpreted;
+    * a selection pointing at a description the document does not define, which
+      must be skipped rather than recorded as an empty claim.
+-->
+<dtcHelp>
+<dtcCode>0x0000</dtcCode>
+<language isoCode="en">English</language>
+<dtcDescriptionQualification>
+<dtcDescriptionSelection dtcDescriptionId="1001" helpScreenDataNameId="9001">
+<dtcQualifier module="SYNTHMOD" moduleDataName="SYNTHMOD_SYSTEM_A" dtcType="BASE" model="SYNTHA" year="MY06"/>
+<dtcQualifier module="SYNTHMOD" moduleDataName="SYNTHMOD_SYSTEM_A" dtcType="BASE" model="SYNTHA" year="MY07"/>
+</dtcDescriptionSelection>
+<dtcDescriptionSelection dtcDescriptionId="1002" helpScreenDataNameId="9001">
+<dtcQualifier module="OTHERMOD" moduleDataName="OTHERMOD_SYSTEM_A" dtcType="BASE" model="SYNTHB" year="BASE"/>
+</dtcDescriptionSelection>
+<dtcDescriptionSelection dtcDescriptionId="1003" helpScreenDataNameId="9001">
+<dtcQualifier module="MISSINGMOD" moduleDataName="MISSINGMOD_SYSTEM_A" dtcType="BASE" model="SYNTHA" year="MY08"/>
+</dtcDescriptionSelection>
+</dtcDescriptionQualification>
+<dtcDescriptionList>
+<dtcDescription id="1001">Synthetic watchdog reset</dtcDescription>
+<dtcDescription id="1002">Synthetic sensor short circuit to ground</dtcDescription>
+</dtcDescriptionList>
+<helpScreenQualification>
+<helpScreenDataName id="9001" name="SYNTH_DEFAULT_HLP">
+<helpScreenSelection helpScreenId="9101" helpScreenName="SYNTH_DEFAULT_HLP_001">
+<helpScreenQualifier model="SYNTHA" year="MY06"/>
+</helpScreenSelection>
+</helpScreenDataName>
+</helpScreenQualification>
+<helpScreenList>
+<helpScreen id="9101" name="SYNTH_DEFAULT_HLP_001"/>
+</helpScreenList>
+<helpScreenMnemonicList>
+<mnemonic name="J_H_NO_HELP_AVAIL"><![CDATA[No help currently available]]></mnemonic>
+</helpScreenMnemonicList>
+</dtcHelp>
