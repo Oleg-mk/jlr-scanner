@@ -55,6 +55,18 @@ fn half_year_markers_order_arithmetically_within_their_year() {
 }
 
 #[test]
+fn a_dotted_fraction_means_the_same_point_as_an_underscored_one() {
+    // The XCL platform documents write MY02_5; the legacy MCP ones, which
+    // carry the older Jaguars, write MY02.5 for the same mid-year point.
+    assert_eq!(
+        parse_marker("MY02.5").unwrap().unwrap(),
+        parse_marker("MY02_5").unwrap().unwrap()
+    );
+    assert_eq!(parse_marker("MY02.5").unwrap().unwrap().year, 2002);
+    assert!(parse_marker("MY02").unwrap().unwrap() < parse_marker("MY02.5").unwrap().unwrap());
+}
+
+#[test]
 fn a_breakpoint_runs_until_the_next_one_and_the_last_stays_open() {
     // X250's real sequence: an XF launched in 2008 and facelifted in 2012.
     let timeline = build("X250", &["MY08", "MY10", "MY12", "MY13"]);

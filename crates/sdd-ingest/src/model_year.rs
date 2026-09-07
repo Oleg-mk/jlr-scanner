@@ -31,7 +31,10 @@ pub struct ModelYearPoint {
     pub fraction: u16,
 }
 
-/// Parse a marker such as `MY10`, `MY06_5`, `Pre MY10` or `Post MY10`.
+/// Parse a marker such as `MY10`, `MY06_5`, `MY02.5`, `Pre MY10` or
+/// `Post MY10`. SDD writes the mid-year fraction with an underscore in the
+/// XCL platform documents and with a dot in the legacy MCP ones; both mean
+/// the same point.
 ///
 /// Returns `None` for `BASE` and for prose markers whose span is a boundary
 /// rather than a point; those are handled by the timeline, not here.
@@ -48,7 +51,7 @@ pub fn parse_marker(marker: &str) -> Result<Option<ModelYearPoint>, KnowledgeErr
         return Ok(None);
     };
 
-    let (digits, fraction) = match rest.split_once('_') {
+    let (digits, fraction) = match rest.split_once('_').or_else(|| rest.split_once('.')) {
         Some((digits, fraction)) => {
             let parsed = fraction.parse::<u16>().map_err(|_| {
                 KnowledgeError::Parse(format!("model-year marker '{marker}' has a bad fraction"))

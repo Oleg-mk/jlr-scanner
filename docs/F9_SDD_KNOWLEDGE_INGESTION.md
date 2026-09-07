@@ -501,13 +501,17 @@ programme and marker come from the document's own `qualifier`, not its file
 name, and each of the ten declares exactly one of each after de-duplication.
 So they would parse as they stand.
 
-### Two things to settle before ingesting them
+### One thing to settle, and one that settled itself
 
-- **`PLATFORM_X400.xml` and `PLATFORM_X404.xml` both declare X400 MY04.**
-  Two documents, 16 and 30 modules, one programme-year key. Which is the
-  X-Type saloon and which the estate, or which supersedes which, is not
-  stated in the documents; ingesting both unresolved would produce a
-  duplicate source, which the loader counts as a failure.
+- **`PLATFORM_X400.xml` and `PLATFORM_X404.xml` both declare X400 MY04**,
+  with 16 and 30 module entries. This looked like a collision and is not
+  one. `X404` is the fuller revision of the same programme-year: its
+  acronyms are a strict superset, adding `DSM`, `GWM` and `TPM`, and its
+  repeated `ABS`, `ECM` and `TCM` entries are the variant qualifiers the
+  schema's own comment describes, petrol against diesel and high against
+  low line. The two documents merge on module family into the union of 19,
+  which is what the survey shows. Their source ids differ by file stem, so
+  no duplicate source arises.
 - **Ingesting them adds knowledge, not reach.** These cars are pre-UDS:
   `CAN_HS_NVJCOM` runs JAGCAN, `SCP` is J1850 PWM at 41.6 kbit/s, `ISO` is
   K-line at 10.4 kbit/s, `D2B` is optical. The adapter has the hardware for
@@ -524,6 +528,47 @@ wording first, so a person with an XJ of that era at least sees what the car
 carries and why it cannot be read yet; the legacy protocols are their own
 phase with their own ADR.
 
+### Ingested the same day
+
+The exporter now walks `CURRENT_JLR_MCP_XML_XML` beside the XCL tree. One
+code change was needed: SDD writes the mid-year fraction with an underscore
+in the XCL documents and with a dot in the legacy ones, so `parse_marker`
+accepts `MY02.5` as it already accepted `MY02_5`, with a golden test that
+the two mean the same point. Nothing else moved.
+
+| | before | after |
+| --- | --- | --- |
+| platform manifests | 45 | 55 |
+| platform records | 9,861 | 11,564 |
+| programmes | 18 | 22 |
+| sources | 6,505 | 6,515 |
+| records | 129,441 | 130,388 |
+
+Rejected: none. The library loads with no failed manifest.
+
+What the four new programmes give, surveyed offline:
+
+| Vehicle | modules known | reachable today |
+| --- | --- | --- |
+| X350 MY02_5 | 26 | 0 |
+| X350 MY06 | 28 | 5 |
+| X350 MY08 | 30 | 6 |
+| X400 MY04 | 19 | 0 |
+| X202 MY02.5, MY04, MY06 | 1, 24, 24 | 0 |
+| X100 MY01, MY03 | 17, 20 | 0 |
+
+The XJ of 2006 and 2008 is the one that gains something usable now: `ABS`
+`0x760/0x768`, `AHCM` `0x7B3/0x7BB`, `PBM` `0x7B4/0x7BC`, `PCM`
+`0x7E0/0x7E8`, `TPM` `0x7B5/0x7BD`, and on MY08 also `DCSM` `0x776/0x77E`,
+all on `CAN_HS` over `hs-can`. Everything else on these cars sits on
+`CAN_HS_NVJCOM`, `SCP`, `ISO` or `D2B` and says so with its reason.
+
+One cosmetic consequence: the vehicle picker now offers `X202` with marker
+`MY02.5` and `X350` with `MY02_5`, two spellings of the same point, because
+that is how SDD writes them. The marker is left as the source wrote it
+rather than normalised, since it is also a join key against the other
+slices.
+
 Worth knowing beside this: the vehicle pictures added on 2026-09-06 cover
-X-Type, XK8 and S-Type, so those cars can be chosen, drawn, and then
-truthfully told that no modules are known for them.
+X-Type, XK8 and S-Type, so those cars can now be chosen, drawn, surveyed,
+and truthfully told which of their modules cannot be reached and why.
