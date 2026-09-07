@@ -184,3 +184,34 @@ How this project relates to it, for the record:
   application for the whole SDD-era range rather than one device per
   car), transparency of every claim, and a community that grows the
   evidence base with each session report.
+
+## 2026-09-07 — X250 facelift, BCM after a battery sag (owner's observation)
+
+Recorded as a community observation, not evidence; nothing here is
+confirmed by a capture or a read.
+
+- On the facelift XF (X250, 2012 on) a battery voltage sag is said to
+  leave the body control module in a state where the car will not start:
+  the community's wording is that the BCM "loses its firmware".
+- The workaround people use is to re-programme their own keys with a
+  dealer-class tool; the car then runs until the next battery drop. The
+  full repair is said to be a BCM software reflash.
+- The owner's point: a tool that could re-pair the owner's existing keys
+  would keep such a car drivable without a tow to a specialist.
+
+What this project can do with it, in order of what it costs:
+
+1. Stage 1, now: diagnose the state exactly — the BCM's fault codes, the
+   readable key-count and status identifiers, the modules that answer and
+   do not — so the person knows what happened and what to ask for.
+2. Stage 2 or 3, by its own ADR and safety class: re-pairing keys that
+   are already the car's, developed and validated on a bench module with
+   its keys, never on a customer's car first, behind identity of the user
+   and a written log of every write. This is security programming and
+   stays forbidden until that decision is taken.
+3. Not at all: reflashing the BCM. That needs JLR's `.vbf` binaries and
+   the programming bootloader path (`ADR-0005`).
+
+Whether the failure is really lost firmware or a lost key
+synchronisation is itself unknown; the read-only diagnosis of step 1 is
+what would tell.
