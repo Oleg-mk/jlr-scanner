@@ -431,3 +431,76 @@ F8 calibration path is untouched and still sends unpadded frames.
   `ModuleRead.test.tsx` (2).
 - Workspace: 179 Rust tests across 49 suites plus 19 shell tests under Linux
   and 12 frontend tests; clippy clean, formatted, architecture boundaries pass.
+
+
+## 2026-09-07 — what medium-speed diagnostics actually rests on
+
+Offline analysis, no code changed. Six vehicles surveyed through the
+exported library with `diagnostic-session`'s `survey` example, which is the
+same path the application takes.
+
+The medium-speed side is not one question but three populations in very
+different states.
+
+**1. The SDD-era cars: bound from SDD's own platform documents, never met a
+car.** The route status is `Reachable`, not `Hypothesis`; nothing here is a
+guess about which bus the pair carries, because SDD names the bus per module
+and the binding of `CAN_MS` is documented.
+
+| Vehicle | modules | on `CAN_HS` via `hs-can` | on `CAN_MS` via `ms-can` | behind a gateway |
+| --- | --- | --- | --- | --- |
+| X250 MY10 | 39 | 14 | 14 | 11 (`SUB_MOST` 10, `SUB_CAN1` 1) |
+| L319 MY10 | 39 | 16 | 14 | 9 (`SUB_MOST`) |
+| L322 MY07 | 36 | 13 | 7 | 16 (`SUB_MOST` 8, `DS2` 8) |
+
+X250 MY10's fourteen medium-speed modules all carry a request and response
+identifier and a reachable fault-code read: DCSM `0x776/0x77E`, DDM
+`0x740/0x748`, DSM `0x744/0x74C`, FSJB `0x726/0x72E`, HVAC `0x733/0x73B`,
+ICM `0x784/0x78C`, ICP `0x7A0/0x7A8`, KVM `0x731/0x739`, PAM `0x736/0x73E`,
+PDM `0x741/0x749`, RSJB `0x7B7/0x7BF`, SODL `0x7C4/0x7CC`, SODR
+`0x7C6/0x7CE`, TPM `0x751/0x759`. Readable identifiers per module: HVAC 21,
+DDM and PDM 18 each, ICM and PAM 9, DCSM 8, SODL, SODR and TPM 5 each, DSM
+4; FSJB, ICP, KVM and RSJB carry none, so for those the only useful request
+is fault codes.
+
+**2. The 2014-and-later cars: half the car is a hypothesis.** L405 MY14 has
+59 modules, none `Reachable` and 52 on hypothesised routes, of which 25 are
+medium-speed: 13 on `CO_MSCAN` and 12 on `BO_MSCAN`. L494 MY16 has 57, 50
+hypothesised, 22 medium-speed: 13 and 9. Both buses were bound to `ms-can`
+on the owner's community statement (`ADR-0015` addendum) and stay
+`Unverified`.
+
+**3. The gatewayed sub-networks are a different problem and should not be
+called medium-speed.** `SUB_MOST`, `SUB_CAN1`, `NGI` and L322's `DS2` are
+reached through a gateway routine, which is `ROUTINE_CONTROL` and therefore
+stage 2. They are the bulk of what stays dark on the older cars: ten of
+X250 MY10's eleven unreachable modules are `SUB_MOST`.
+
+### The weak point, stated plainly
+
+The binding of `CAN_MS` to `ms-can` on J1962 pins 3/11 is recorded as
+`documented`, but its evidence is two separate facts joined by an inference:
+this repository's own route descriptor, and the MongoosePro user guide's
+pinout, which says pin 3 is CAN 2+ and pin 11 CAN 2-. Neither states that a
+given car brings its medium-speed bus to that pair. The inference is almost
+certainly right and is what the trade assumes, but no wiring diagram and no
+vehicle has confirmed it in this record.
+
+For the 2014-and-later cars the open question is larger and already written
+down in `COMMUNITY_NOTES.md`: whether the gateway relays a request from pins
+3/11 to the BO or CO branch transparently, or switches per request in a way
+SDD does not declare.
+
+### What settles it, cheapest first
+
+1. A listen-only capture on pins 3/11 of a tester's SDD-era car. Traffic at
+   125 kbit/s confirms the pair carries a live medium-speed bus. Zero risk,
+   the path is already hardware-confirmed on the bench.
+2. One fault-code read from one medium-speed module of that car. HVAC or DDM
+   on an X250 are the richest. An answer confirms the binding for that
+   vehicle through the F13 intake; silence refutes it, and both are recorded.
+3. The same two steps on a 2014-and-later car, where the answer also settles
+   the gateway question.
+
+Nothing above needs new code. The survey, the route, the read and the intake
+all exist; what is missing is a car.

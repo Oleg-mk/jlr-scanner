@@ -466,3 +466,64 @@ Two further adapters read parts of the payload outside the XCL data:
 
 The exporter classifies both by file name and writes `vin_decode.json` and
 `sdd_text.json`. See `F11_TESTER_APPLICATION.md`, slices 7–9.
+
+
+## 2026-09-07 — ten legacy Jaguar platform documents were never walked
+
+Found while asking why a survey of X350 MY2006 returns no modules at all.
+
+The exporter walks the roots it is given. The recorded command passes
+`CURRENT_JLR_XCL_XML_DATA_XML` for the platform documents, and that
+component holds 45 of them, all ingested: 18 programmes, 45 programme-years,
+from L316 MY07 to X761 MY17. That part is complete.
+
+The older Jaguars are not there. Their platform documents sit in a different
+component, `CURRENT_JLR_MCP_XML_XML`, which no export has ever walked:
+
+| Document | modules | programme, marker | networks |
+| --- | --- | --- | --- |
+| `PLATFORM_X101.xml` | 17 | X100 MY01 | `CAN_HS_NVJCOM`, `SCP`, `ISO` |
+| `PLATFORM_X103.xml` | 20 | X100 MY03 | `CAN_HS_NVJCOM`, `SCP`, `ISO` |
+| `PLATFORM_X202.xml` | 1 | X202 MY02.5 | `CAN_HS_NVJCOM` |
+| `PLATFORM_X204.xml` | 24 | X202 MY04 | + `CAN_HS`, `D2B` |
+| `PLATFORM_X206.xml` | 24 | X202 MY06 | + `CAN_HS`, `D2B` |
+| `PLATFORM_X350.xml` | 26 | X350 MY02_5 | `CAN_HS_NVJCOM`, `SCP`, `ISO`, `D2B` |
+| `PLATFORM_X356.xml` | 28 | X350 MY06 | + `CAN_HS` |
+| `PLATFORM_X358.xml` | 30 | X350 MY08 | + `CAN_HS` |
+| `PLATFORM_X400.xml` | 16 | X400 MY04 | `CAN_HS_NVJCOM`, `SCP`, `ISO`, `D2B` |
+| `PLATFORM_X404.xml` | 30 | X400 MY04 | + `CAN_HS_ISO14229` |
+
+216 modules over the S-Type, XK8, XJ of 2003-2009 and X-Type. The schema is
+the one `PlatformAdapter` already parses: `module_fitment` entries with
+`module_code_name`, `address type="can_tx"` and `"can_rx"`, `network`,
+`data_identifier_set`, `fitment` and a text-database `tm` reference; the
+programme and marker come from the document's own `qualifier`, not its file
+name, and each of the ten declares exactly one of each after de-duplication.
+So they would parse as they stand.
+
+### Two things to settle before ingesting them
+
+- **`PLATFORM_X400.xml` and `PLATFORM_X404.xml` both declare X400 MY04.**
+  Two documents, 16 and 30 modules, one programme-year key. Which is the
+  X-Type saloon and which the estate, or which supersedes which, is not
+  stated in the documents; ingesting both unresolved would produce a
+  duplicate source, which the loader counts as a failure.
+- **Ingesting them adds knowledge, not reach.** These cars are pre-UDS:
+  `CAN_HS_NVJCOM` runs JAGCAN, `SCP` is J1850 PWM at 41.6 kbit/s, `ISO` is
+  K-line at 10.4 kbit/s, `D2B` is optical. The adapter has the hardware for
+  three of them, which the 2026-09-06 resource sweep confirmed: resource 2
+  is J1850 PWM on pins 2/10 and resources 3 and 4 are K-line on pins 3, 7 or
+  8. What is missing is the protocol stacks and the bus bindings; none of
+  those buses is bound, and `uds-execution` does not speak NVJCOM. Only the
+  handful of modules these documents place on `CAN_HS` — 3 on X204, 5 on
+  X206, 5 on X356, 6 on X358 — and the 4 on `CAN_HS_ISO14229` of X404 could
+  ever use today's read path, and only once that bus is bound.
+
+The honest order is therefore: ingest for the survey and the fault-code
+wording first, so a person with an XJ of that era at least sees what the car
+carries and why it cannot be read yet; the legacy protocols are their own
+phase with their own ADR.
+
+Worth knowing beside this: the vehicle pictures added on 2026-09-06 cover
+X-Type, XK8 and S-Type, so those cars can be chosen, drawn, and then
+truthfully told that no modules are known for them.
