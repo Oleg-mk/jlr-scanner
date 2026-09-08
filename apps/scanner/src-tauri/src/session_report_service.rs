@@ -71,6 +71,7 @@ impl SessionReportService {
             "schema": SESSION_REPORT_SCHEMA,
             "schema_version": SESSION_REPORT_SCHEMA_VERSION,
             "application_version": env!("CARGO_PKG_VERSION"),
+            "application_build": build_id(),
             "session_started_unix_ms": self.started_unix_ms,
             "saved_unix_ms": unix_ms(),
             "validation": "session bundle; every item carries its own validation state and none is vehicle-confirmed by being here",
@@ -154,5 +155,16 @@ mod tests {
             .as_str()
             .unwrap()
             .contains("none is vehicle-confirmed"));
+    }
+}
+
+/// The commit CI built, seven characters, or "local" for a build made by
+/// hand; set through `JLR_BUILD_SHA` at compile time. With the version it
+/// names the build a report came from.
+fn build_id() -> &'static str {
+    match option_env!("JLR_BUILD_SHA") {
+        Some(sha) if sha.len() >= 7 => &sha[..7],
+        Some(sha) => sha,
+        None => "local",
     }
 }

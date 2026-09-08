@@ -140,6 +140,9 @@ that stays silent is evidence too.
 
 ## What to send
 
+The build you run is written at the foot of the window, for example `0.9.1 · a1b2c3d`; quote it in every message, and it is also inside the report file.
+
+
 The session report file, the capture file, and a few lines: the car
 (model, year, engine), the adapter (original or clone, and the clone's USB
 identifiers if it was not found), your Windows version, and what did or did

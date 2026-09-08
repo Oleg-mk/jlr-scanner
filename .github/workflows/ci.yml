@@ -48,6 +48,11 @@ jobs:
 
   windows-alpha-package:
     runs-on: windows-latest
+    env:
+      # Baked into the footer and every session report: the commit this
+      # installer was built from.
+      JLR_BUILD_SHA: ${{ github.sha }}
+      VITE_BUILD_SHA: ${{ github.sha }}
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -71,6 +76,9 @@ jobs:
   # docs/TESTER_GUIDE.md describes. This job is also the macOS compile check.
   macos-alpha-package:
     runs-on: macos-latest
+    env:
+      JLR_BUILD_SHA: ${{ github.sha }}
+      VITE_BUILD_SHA: ${{ github.sha }}
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -102,7 +110,8 @@ jobs:
           mkdir -p dist-dmg/root
           cp -R "$APP" dist-dmg/root/
           ln -s /Applications dist-dmg/root/Applications
-          hdiutil create -volname "JLR Scanner" -srcfolder dist-dmg/root -ov -format UDZO "dist-dmg/JLR Scanner_0.9.0_universal.dmg"
+          VERSION=$(node -p "require('./apps/scanner/src-tauri/tauri.conf.json').version")
+          hdiutil create -volname "JLR Scanner" -srcfolder dist-dmg/root -ov -format UDZO "dist-dmg/JLR Scanner_${VERSION}_universal.dmg"
       - uses: actions/upload-artifact@v4
         with:
           name: jlr-scanner-macos-unsigned-alpha-${{ github.sha }}

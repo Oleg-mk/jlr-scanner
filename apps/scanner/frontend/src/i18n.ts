@@ -324,6 +324,7 @@ const uk: Record<string, string> = {
   "Connect and verify MongoosePro JLR to enable listening.":
     "Підключіть і перевірте MongoosePro JLR, щоб прослуховування стало доступним.",
   "Capture did not complete": "Захоплення не завершилось",
+  "Build: quote it when you report": "Збірка: назвіть її у звіті",
   Frames: "Кадрів",
   Identifiers: "Ідентифікаторів",
   "{distinct} distinct — {standard} standard, {extended} extended frames":
@@ -637,6 +638,7 @@ const ru: Record<string, string> = {
   "Connect and verify MongoosePro JLR to enable listening.":
     "Подключите и проверьте MongoosePro JLR, чтобы прослушивание стало доступным.",
   "Capture did not complete": "Захват не завершился",
+  "Build: quote it when you report": "Сборка: назовите её в отчёте",
   Frames: "Кадров",
   Identifiers: "Идентификаторов",
   "{distinct} distinct — {standard} standard, {extended} extended frames":

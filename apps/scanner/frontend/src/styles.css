@@ -2275,3 +2275,10 @@ body,
   --border: #a9cdb4;
   --border-strong: #8dbb9b;
 }
+
+/* The build's identity at the foot: version and commit, for reports. */
+.app-build {
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+  white-space: nowrap;
+}

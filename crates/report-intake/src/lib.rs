@@ -47,6 +47,9 @@ struct SessionReport {
     schema_version: u32,
     #[serde(default)]
     application_version: Option<String>,
+    /// The commit CI built, since build 0.9.1; older reports carry none.
+    #[serde(default)]
+    application_build: Option<String>,
     #[serde(default)]
     saved_unix_ms: Option<u64>,
     #[serde(default)]
@@ -142,8 +145,13 @@ pub fn intake(
         title: format!("Tester session report {short}"),
         source_type: SourceType::Captured,
         origin: format!(
-            "JLR Scanner {} session report saved by a tester",
-            report.application_version.as_deref().unwrap_or("(version not recorded)")
+            "JLR Scanner {}{} session report saved by a tester",
+            report.application_version.as_deref().unwrap_or("(version not recorded)"),
+            report
+                .application_build
+                .as_deref()
+                .map(|build| format!(" ({build})"))
+                .unwrap_or_default()
         ),
         source_locator: report_file_name.to_string(),
         content_fingerprint: Some(fingerprint),

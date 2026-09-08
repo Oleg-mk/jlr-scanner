@@ -49,7 +49,7 @@ checksum = "330a5ed07fa54e4702c9d6c4174f74427fc0ef6e214bbd677ae50a5099946470"
 
 [[package]]
 name = "app-contracts"
-version = "0.9.0"
+version = "0.9.1"
 dependencies = [
  "serde",
 ]
@@ -402,7 +402,7 @@ dependencies = [
 
 [[package]]
 name = "core-types"
-version = "0.9.0"
+version = "0.9.1"
 dependencies = [
  "serde",
 ]
@@ -634,14 +634,14 @@ dependencies = [
 
 [[package]]
 name = "diagnostic-environment"
-version = "0.9.0"
+version = "0.9.1"
 dependencies = [
  "knowledge",
 ]
 
 [[package]]
 name = "diagnostic-execution"
-version = "0.9.0"
+version = "0.9.1"
 dependencies = [
  "diagnostic-environment",
  "diagnostic-simulator",
@@ -655,7 +655,7 @@ dependencies = [
 
 [[package]]
 name = "diagnostic-session"
-version = "0.9.0"
+version = "0.9.1"
 dependencies = [
  "app-contracts",
  "diagnostic-environment",
@@ -670,7 +670,7 @@ dependencies = [
 
 [[package]]
 name = "diagnostic-simulator"
-version = "0.9.0"
+version = "0.9.1"
 dependencies = [
  "isotp",
  "transport-api",
@@ -679,7 +679,7 @@ dependencies = [
 
 [[package]]
 name = "diagnostics-core"
-version = "0.9.0"
+version = "0.9.1"
 dependencies = [
  "diagnostic-simulator",
  "isotp",
@@ -1666,7 +1666,7 @@ checksum = "6a756c3fac73139e83f14c2d742155dd2b78d3ee56597b419a0579b7bdd6dd78"
 
 [[package]]
 name = "isotp"
-version = "0.9.0"
+version = "0.9.1"
 
 [[package]]
 name = "itoa"
@@ -1752,7 +1752,7 @@ dependencies = [
 
 [[package]]
 name = "jlr-profiles"
-version = "0.9.0"
+version = "0.9.1"
 dependencies = [
  "diagnostic-environment",
  "knowledge",
@@ -1760,7 +1760,7 @@ dependencies = [
 
 [[package]]
 name = "jlr-scanner-shell"
-version = "0.9.0"
+version = "0.9.1"
 dependencies = [
  "app-contracts",
  "diagnostic-environment",
@@ -1873,7 +1873,7 @@ dependencies = [
 
 [[package]]
 name = "knowledge"
-version = "0.9.0"
+version = "0.9.1"
 dependencies = [
  "serde",
  "serde_json",
@@ -2033,7 +2033,7 @@ dependencies = [
 
 [[package]]
 name = "mongoose-jlr"
-version = "0.9.0"
+version = "0.9.1"
 dependencies = [
  "core-types",
  "diagnostic-environment",
@@ -2047,7 +2047,7 @@ dependencies = [
 
 [[package]]
 name = "mongoose-jlr-probe"
-version = "0.9.0"
+version = "0.9.1"
 dependencies = [
  "mongoose-jlr",
  "transport-serial",
@@ -2154,7 +2154,7 @@ dependencies = [
 
 [[package]]
 name = "obd-j1979"
-version = "0.9.0"
+version = "0.9.1"
 
 [[package]]
 name = "objc2"
@@ -2746,7 +2746,7 @@ checksum = "d6f6ff9a378485b298a5286656da665ba74413d36db0979633275d2e708145d4"
 
 [[package]]
 name = "report-intake"
-version = "0.9.0"
+version = "0.9.1"
 dependencies = [
  "app-contracts",
  "diagnostic-session",
@@ -2909,7 +2909,7 @@ checksum = "94143f37725109f92c262ed2cf5e59bce7498c01bcc1502d7b9afe439a4e9f49"
 
 [[package]]
 name = "sdd-ingest"
-version = "0.9.0"
+version = "0.9.1"
 dependencies = [
  "knowledge",
  "roxmltree",
@@ -4003,14 +4003,14 @@ dependencies = [
 
 [[package]]
 name = "transport-api"
-version = "0.9.0"
+version = "0.9.1"
 dependencies = [
  "core-types",
 ]
 
 [[package]]
 name = "transport-replay"
-version = "0.9.0"
+version = "0.9.1"
 dependencies = [
  "serde",
  "serde_json",
@@ -4019,7 +4019,7 @@ dependencies = [
 
 [[package]]
 name = "transport-serial"
-version = "0.9.0"
+version = "0.9.1"
 dependencies = [
  "serialport",
  "transport-api",
@@ -4069,11 +4069,11 @@ checksum = "b6f5e870be6c3b371b77fe0ee0bafb859fa4964b4404c27de1d380043c4dda20"
 
 [[package]]
 name = "uds"
-version = "0.9.0"
+version = "0.9.1"
 
 [[package]]
 name = "uds-execution"
-version = "0.9.0"
+version = "0.9.1"
 dependencies = [
  "diagnostic-environment",
  "diagnostic-simulator",

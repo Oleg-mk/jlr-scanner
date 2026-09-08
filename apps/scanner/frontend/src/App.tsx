@@ -425,6 +425,9 @@ export function App({
                 : t("Adapter not detected.")}
         </span>
         <span>{t("Live vehicle status: not yet externally validated.")}</span>
+        <span className="app-build" title={t("Build: quote it when you report")}>
+          {`${__APP_VERSION__} · ${__BUILD_SHA__}`}
+        </span>
       </footer>
     </div>
     </LanguageContext.Provider>
