@@ -476,6 +476,23 @@ reached through a gateway routine, which is `ROUTINE_CONTROL` and therefore
 stage 2. They are the bulk of what stays dark on the older cars: ten of
 X250 MY10's eleven unreachable modules are `SUB_MOST`.
 
+*What the gateway needs, looked up 2026-09-08 without writing code.* The
+X250 platform document names the mechanism and the doorman for each
+sub-network: SUB_MOST hangs off CAN_MS behind ICM_SYSTEM_A, SUB_CAN1 off
+CAN_HS behind CCM_SYSTEM_A, both with access_method ROUTINE_CONTROL. It
+does not name the routine. The MDX documents of ICM and CCM declare only
+two routines each, "VIN learn" 0x0404 and "Self Test" 0x0202, neither of
+which opens a gate, and SDD's runtime configuration trees mention gateways
+only in the module list. So the routine number, its parameters and its
+session live in SDD's program logic, not in the data this project holds.
+The cleanest source is a listen-only capture, on pins 3/11 and 6/14, taken
+while a genuine SDD session reads one MOST module and the radar on a
+tester's car: it records the exact RoutineControl request, at no risk,
+with the tooling that already exists. Until that is known, no ADR can name
+what stage 2 would send, and the map's wording stays exact: the addresses
+are known and nothing else is missing on our side, but the door's key is
+not in our hands yet.
+
 ### The weak point, stated plainly
 
 The binding of `CAN_MS` to `ms-can` on J1962 pins 3/11 is recorded as
