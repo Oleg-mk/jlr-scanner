@@ -103,6 +103,17 @@ fn unix_ms() -> u128 {
         .unwrap_or(0)
 }
 
+/// The commit CI built, seven characters, or "local" for a build made by
+/// hand; set through `JLR_BUILD_SHA` at compile time. With the version it
+/// names the build a report came from.
+fn build_id() -> &'static str {
+    match option_env!("JLR_BUILD_SHA") {
+        Some(sha) if sha.len() >= 7 => &sha[..7],
+        Some(sha) => sha,
+        None => "local",
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -155,16 +166,5 @@ mod tests {
             .as_str()
             .unwrap()
             .contains("none is vehicle-confirmed"));
-    }
-}
-
-/// The commit CI built, seven characters, or "local" for a build made by
-/// hand; set through `JLR_BUILD_SHA` at compile time. With the version it
-/// names the build a report came from.
-fn build_id() -> &'static str {
-    match option_env!("JLR_BUILD_SHA") {
-        Some(sha) if sha.len() >= 7 => &sha[..7],
-        Some(sha) => sha,
-        None => "local",
     }
 }
