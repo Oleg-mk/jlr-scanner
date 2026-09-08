@@ -493,6 +493,10 @@ SDD does not declare.
 
 ### What settles it, cheapest first
 
+0. *Done 2026-09-08 on the bench:* the diagnostic open of resource 21 with
+   pins 3/11 and the application's outbound record are accepted by the
+   firmware exactly as on resource 5 (evidence, Part 4). Nothing in the
+   adapter path distinguishes the two buses any more.
 1. A listen-only capture on pins 3/11 of a tester's SDD-era car. Traffic at
    125 kbit/s confirms the pair carries a live medium-speed bus. Zero risk,
    the path is already hardware-confirmed on the bench.

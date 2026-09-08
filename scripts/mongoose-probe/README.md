@@ -21,7 +21,8 @@ flash, unprotect, reset or serial-number command. See
   firmware's refusal texts and a summary. The resource map of ADR-0018.
 - `mongoose_jump_timing.py COM3` — right after plugging the adapter in:
   how many milliseconds after `cJumpToFirmware` the firmware answers
-  board-info. Not yet measured (the adapter was already in firmware).
+  board-info. Measured 2026-09-08: the first poll 241 ms after the jump
+  already answered from the firmware.
 - `usbpcap_capture.ps1 -Control \.\USBPcap1 -Out file.pcap -Seconds 30`
   — an elevated USBPcap capture of one root hub for a fixed time.
 - `usbpcap_frames.py file.pcap [device]` — decodes the Mongoose frames in a

@@ -190,3 +190,39 @@ replugging it (bootloader → jump → firmware, inside the application).
 Screenshots in the session; the command sequence of ADR-0018 is thereby
 `HARDWARE_CONFIRMED` in the product on both buses.
 
+## Part 4 — the diagnostic open and an outbound record on CAN2, and how long the jump takes (2026-09-08)
+
+Bench, adapter on COM3, no vehicle. Asked before any tester reads a
+medium-speed module: does the firmware accept on resource 21 what it accepted
+on resource 5 on 2026-09-06 — an open *without* the listen-only flag, the pin
+selection, and the application's own `cOutboundData` record?
+
+**It does, identically.** Resource 21 opened with flags 0 at 125000 (status
+0), took `cSetPin(1, 3, 11)` (status 0), and answered the application's
+record for `0x733` `03 19 02 FF 00 00 00 00` — ReadDTCInformation to the X250
+HVAC, as the module read would send it — with `0x8008`, status `0x00000100`,
+the same word resource 5 gave on 2026-09-06 and gave again in the same
+session as the control (`0x7E0`, same data). On a bench with no other CAN
+node nothing can acknowledge the frame, so `0x100` is the firmware's answer
+to an unacknowledged transmit; what it says with a car listening is still
+for the first car. Transcript:
+`mongoose-probe-2026-09-08/diagnostic_open_and_outbound_resources_21_and_5.txt`.
+
+**A protocol fact found on the way.** The record's header word after the
+sequence number must be `1`, as `passive::outbound_data_request` writes it.
+A first attempt today built the record with the generic probe helper, which
+zeroes that word, and the firmware answered nothing at all — not an error,
+silence — on both resources, for six seconds, twice, while the channel
+stayed alive and closed normally afterwards. The application has always
+written the `1`; the probe had not. Recorded so nobody mistakes that silence
+for a bus problem again.
+
+**The jump takes about a quarter of a second.** The adapter had been
+replugged and answered board-info from the bootloader; after
+`cJumpToFirmware` the first board-info poll, 241 ms later, already carried
+the firmware's running tick. The transport polls every 100 ms with a
+five-second cap (`ADR-0018`), which leaves room.
+
+Validation: the medium-speed diagnostic path — resource 21, pins 3/11, the
+outbound record — is `HARDWARE_CONFIRMED` on the bench to the same extent
+as the high-speed one. `VEHICLE_CONFIRMED` remains empty for both.
