@@ -89,8 +89,8 @@ node scripts/bump-version.mjs 0.9.2
 - Якщо GitHub пише, що джоби не стартували через оплату: Settings →
   Billing and plans, підняти spending limit або дочекатися нового місяця.
   Після цього збірку перезапускає `gh run rerun <id>` без нового коміту.
-- Готові інсталятори: `Downloads\jlr-scanner-build-<sha>\`, хеші записані
-  в `CURRENT_STATE.md`.
+- Готові інсталятори: від 0.9.1 у `Downloads\jlr-scanner-build-<версія>\`, раніше за хешем коміту; хеші файлів записані в `CURRENT_STATE.md`.
+- Пуш тегу `v…` запускав збірку вдруге; з 0.9.1 workflow збирає лише гілки, тег збірки не запускає.
 - Перша збірка після `b3fa55d` приймає лише штамповані копії: стару
   папку `jlr-scanner-library` вона відхилить, бери копію з
   `jlr-scanner-issued\Oleg`.

@@ -32,7 +32,7 @@ powershell -File scripts/stamp-library.ps1 -IssuedTo "Іван Іваненко"
 
 5. Надіслати приватним каналом, лише цій людині, три речі:
    - zip її копії бібліотеки;
-   - інсталятор під її систему з `Downloads\jlr-scanner-build-<sha>\`:
+   - інсталятор під її систему з `Downloads\jlr-scanner-build-<версія>\` (зараз 0.9.1):
      `JLR Scanner_0.9.0_x64-setup.exe` для Windows або
      `JLR Scanner_0.9.0_universal.dmg` для Mac (хеші — у
      `CURRENT_STATE.md`);

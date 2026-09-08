@@ -7,6 +7,9 @@ name: Baseline validation
 # run of the older one.
 on:
   push:
+    # Branches only: a tag push would otherwise build the same commit twice.
+    branches:
+      - "**"
     paths-ignore:
       - "docs/**"
       - "**/*.md"
