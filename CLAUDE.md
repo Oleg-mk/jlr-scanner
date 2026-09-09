@@ -37,6 +37,23 @@ constructors, and new frontend access to execution crates. Read
 
 ## Commands
 
+**Before pushing, run this and nothing less.** It is everything CI runs, in
+one command: the architecture boundaries, the frontend lint, tests and build,
+then Rust `fmt`, `clippy` and the tests for the portable crates and for the
+Tauri shell, both in Docker.
+
+```powershell
+powershell -File scripts/preflight.ps1
+```
+
+It exists because on 2026-09-09 two pushes failed CI on `cargo fmt --check`,
+a step that was in the CI job and in none of the local checks — the local
+checks being whatever anyone remembered to type. Add a step to CI, add it
+here. `-SkipShell` leaves out the slow Tauri crate; use it only for a change
+that cannot reach the shell.
+
+The pieces, when one of them is all you need:
+
 ```bash
 node scripts/check-architecture.mjs
 ```
@@ -48,6 +65,11 @@ pnpm lint
 ```bash
 pnpm test
 ```
+
+The `pnpm` scripts filter the frontend **by path**, not by package name: the
+name filter matched nothing after the product was renamed and passed anyway,
+so three builds shipped with the interface unchecked. Do not put a package
+name back into those filters.
 
 Rust tests run cross-platform except for two crates. Smart App Control on the
 Windows host blocks freshly linked unsigned test binaries with error `4551`, so
