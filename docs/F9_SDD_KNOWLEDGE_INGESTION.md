@@ -572,3 +572,31 @@ slices.
 Worth knowing beside this: the vehicle pictures added on 2026-09-06 cover
 X-Type, XK8 and S-Type, so those cars can now be chosen, drawn, surveyed,
 and truthfully told which of their modules cannot be reached and why.
+
+## 2026-09-09 — read a second time, independently
+
+The corpus was read again by `scripts/xml-crosscheck/crosscheck.py`, a
+separate program in another language that shares no code with this crate, and
+its reading compared with the exported library. The method, the counts and
+the findings are in `docs/evidence/xml-crosscheck-2026-09-09.md`. Two things
+belong here, in the ingest's own document:
+
+- **Field widths are confirmed.** Every one of the 3,799 byte ranges and
+  masks the library carries is one a DID-formatting document declares. The
+  parser does not misread a width.
+- **Qualified addresses collapse.** A platform document may declare the same
+  module acronym several times under a `<qualifier>` naming an engine type, a
+  build year or a market, each with its own diagnostic address. The record id
+  this crate writes is `sdd-169-platform-<document>.module.<FAMILY>.addressing`,
+  which carries no qualifier, and the qualifier does not reach
+  `applicability` either; so the rows collide and only the last address in
+  the document survives. Nine module rows in the corpus are affected,
+  including the X250 of 2010, whose instrument cluster and parking-brake
+  module answer at different addresses on the V6 and 4.2 V8 than on the 5.0
+  and the diesel.
+
+  The dimensions needed to hold the distinction already exist —
+  `powertrain`, `market`, and `other` for anything SDD qualifies by that has
+  no dimension of its own. What is missing is that the platform adapter reads
+  `<qualifier>` at all. Fixing it re-exports the library, so it is a decision
+  and not just a patch.
