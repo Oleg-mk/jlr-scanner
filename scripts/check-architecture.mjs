@@ -149,6 +149,8 @@ const manifestRules = [
   ["crates/isotp/Cargo.toml", ["tauri", "react", "frontend", "mongoose-jlr", "diagnostics-core", "uds", "knowledge", "windows"]],
   ["crates/uds/Cargo.toml", ["tauri", "react", "frontend", "mongoose-jlr", "diagnostics-core", "isotp", "knowledge", "windows"]],
   ["crates/diagnostic-simulator/Cargo.toml", ["tauri", "react", "frontend", "mongoose-jlr", "diagnostics-core", "knowledge", "windows"]],
+  // ADR-0020: the vehicle on the bench answers from the library and never sees the adapter protocol or the shell.
+  ["crates/bench-vehicle/Cargo.toml", ["tauri", "react", "frontend", "mongoose-jlr", "transport-serial", "serialport", "windows", "winreg"]],
   ["crates/diagnostics-core/Cargo.toml", ["tauri", "react", "frontend", "mongoose-jlr", "knowledge", "windows"]],
   ["crates/sdd-ingest/Cargo.toml", [
     "tauri",

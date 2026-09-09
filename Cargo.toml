@@ -2,6 +2,7 @@
 members = [
   "apps/scanner/src-tauri",
   "crates/app-contracts",
+  "crates/bench-vehicle",
   "crates/core-types",
   "crates/diagnostics-core",
   "crates/diagnostic-execution",
@@ -32,6 +33,7 @@ rust-version = "1.77"
 
 [workspace.dependencies]
 app-contracts = { path = "crates/app-contracts" }
+bench-vehicle = { path = "crates/bench-vehicle" }
 core-types = { path = "crates/core-types" }
 diagnostics-core = { path = "crates/diagnostics-core" }
 diagnostic-execution = { path = "crates/diagnostic-execution" }

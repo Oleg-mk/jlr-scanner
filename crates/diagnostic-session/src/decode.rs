@@ -90,6 +90,18 @@ fn parse_encoding(text: &str) -> Encoding {
     encoding
 }
 
+/// How many data bytes an identifier's parameters span, by the catalogue's
+/// byte ranges; `None` when no parameter records a range. The bench answers
+/// an identifier with exactly this many bytes (ADR-0020).
+pub fn parameters_span(parameters: &[ReadableParameter]) -> Option<usize> {
+    parameters
+        .iter()
+        .filter_map(|parameter| parameter.encoding.as_deref())
+        .filter_map(|text| parse_encoding(text).bytes)
+        .map(|(_, to)| to + 1)
+        .max()
+}
+
 /// Decode every parameter of an identifier from the data bytes a module
 /// returned for it.
 pub fn decode_parameters(parameters: &[ReadableParameter], data: &[u8]) -> Vec<DecodedParameter> {

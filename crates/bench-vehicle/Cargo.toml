@@ -1,0 +1,18 @@
+[package]
+name = "bench-vehicle"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+app-contracts.workspace = true
+diagnostic-environment.workspace = true
+diagnostic-session.workspace = true
+isotp.workspace = true
+transport-api.workspace = true
+
+[dev-dependencies]
+knowledge.workspace = true
+sdd-ingest.workspace = true
+serde_json.workspace = true
