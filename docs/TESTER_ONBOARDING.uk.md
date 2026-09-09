@@ -1,7 +1,7 @@
 # Як підключити тестувальника: покроково
 
 Що робить власник і що отримує людина, яка хоче протестувати. Стан на
-2026-09-09, збірка 0.9.2 (перша зі стендом). Ширший довідник власника —
+2026-09-09, збірка 0.9.3 (перша під назвою ProwlOne). Ширший довідник власника —
 `OWNER_GUIDE.uk.md`; інструкція для самого тестувальника —
 `TESTER_GUIDE.uk.md` та англійська `TESTER_GUIDE.md`.
 
@@ -32,9 +32,9 @@ powershell -File scripts/stamp-library.ps1 -IssuedTo "Іван Іваненко"
 
 5. Надіслати приватним каналом, лише цій людині, три речі:
    - zip її копії бібліотеки;
-   - інсталятор під її систему з `Downloads\jlr-scanner-build-<версія>\` (зараз 0.9.2):
-     `JLR Scanner_0.9.2_x64-setup.exe` для Windows або
-     `JLR Scanner_0.9.2_universal.dmg` для Mac (хеші — у
+   - інсталятор під її систему з `Downloads\jlr-scanner-build-<версія>\` (зараз 0.9.3):
+     `ProwlOne_0.9.3_x64-setup.exe` для Windows або
+     `ProwlOne_0.9.3_universal.dmg` для Mac (хеші — у
      `CURRENT_STATE.md`);
    - інструкцію тестувальника `docs\TESTER_GUIDE.uk.md` (або
      англійську `TESTER_GUIDE.md`).

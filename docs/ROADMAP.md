@@ -9,7 +9,7 @@ If an entry has no open gate and no pending owner action, it is ready to start.
 
 ## What this product is
 
-**JLR Scanner replaces SDD. It is not a scanner.**
+**ProwlOne replaces SDD. It is not a scanner.**
 
 That distinction decides almost every downstream question, so state it plainly.
 A generic OBD-II scanner is a commodity: any inexpensive Wi-Fi or Bluetooth

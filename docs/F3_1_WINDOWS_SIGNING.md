@@ -142,7 +142,7 @@ Required `windows-signing` GitHub environment values:
 | Secret | `AZURE_CLIENT_SECRET` | client secret for that application |
 | Secret | `AZURE_TENANT_ID` | tenant ID |
 | Variable | `JLR_ARTIFACT_SIGNING_ENDPOINT` | regional `https://...codesigning.azure.net` endpoint |
-| Variable | `JLR_ARTIFACT_SIGNING_ACCOUNT` | JLR Scanner Artifact Signing account name |
+| Variable | `JLR_ARTIFACT_SIGNING_ACCOUNT` | ProwlOne Artifact Signing account name |
 | Variable | `JLR_ARTIFACT_SIGNING_PROFILE` | RSA Public Trust certificate profile name |
 | Variable | `JLR_EXPECTED_PUBLISHER` | exact Authenticode certificate Subject returned by the approved profile |
 
@@ -152,7 +152,7 @@ The principal needs the minimum `Artifact Signing Certificate Profile Signer` ro
 
 Current Windows release payload decisions:
 
-- `target/release/jlr-scanner-shell.exe`: signed and uploaded as the standalone product executable;
+- `target/release/prowlone-shell.exe`: signed and uploaded as the standalone product executable;
 - `target/release/bundle/nsis/*-setup.exe`: contains the already signed application executable, is itself signed, verified, and uploaded;
 - sidecars: none configured;
 - application-shipped DLLs: none currently configured;
@@ -178,7 +178,7 @@ disabling SAC as a one-way action. See the
 Toggling per build is still the worst available workflow. Preferred order:
 
 1. **Run platform-independent crates off Windows.** Only `transport-serial` and
-   the `jlr-scanner-shell` Tauri crate are Windows-bound; `mongoose-jlr` carries
+   the `prowlone-shell` Tauri crate are Windows-bound; `mongoose-jlr` carries
    no OS-specific dependency and is portable despite owning the device
    protocol. `core-types`, `app-contracts`, `knowledge`,
    `diagnostic-environment`, `diagnostic-execution`, `isotp`, `uds`,
@@ -188,7 +188,7 @@ Toggling per build is still the worst available workflow. Preferred order:
    golden test, including the F8 transport-fake Mongoose exchange:
 
    ```
-   cargo test --workspace --exclude jlr-scanner-shell --exclude transport-serial
+   cargo test --workspace --exclude prowlone-shell --exclude transport-serial
    ```
 
 2. **Treat CI as the source of record**, as the existing phase documents already
@@ -210,11 +210,11 @@ The deferred validation workflow, when explicitly reactivated, is:
 4. confirm its Authenticode signature locally;
 5. launch that exact signed application and complete F3 USB-only Mongoose acceptance with the vehicle disconnected.
 
-The unsigned local development build completed the real UI detection/connect/`0x8109`/disconnect/hotplug/replug sequence with no vehicle; see `docs/evidence/F3_NATIVE_USB_ACCEPTANCE_2026-08-31.md`. Signed-product execution remains unclaimed because no trusted signing identity or signed release artifact exists. Production users must not disable SAC to run JLR Scanner. PR merge and tag decisions remain separate owner actions.
+The unsigned local development build completed the real UI detection/connect/`0x8109`/disconnect/hotplug/replug sequence with no vehicle; see `docs/evidence/F3_NATIVE_USB_ACCEPTANCE_2026-08-31.md`. Signed-product execution remains unclaimed because no trusted signing identity or signed release artifact exists. Production users must not disable SAC to run ProwlOne. PR merge and tag decisions remain separate owner actions.
 
 ## Requirements if trusted distribution is reactivated
 
-No JLR Scanner Artifact Signing account/profile or credentials exist. No immediate owner action is required while F3.1 remains deferred. If trusted distribution is explicitly reactivated later, the owner must choose one of these legitimate paths:
+No ProwlOne Artifact Signing account/profile or credentials exist. No immediate owner action is required while F3.1 remains deferred. If trusted distribution is explicitly reactivated later, the owner must choose one of these legitimate paths:
 
 0. **Resolve the region gate first.** Record the signing legal entity type and its
    registered country, then compare against the "Region eligibility gate" table.

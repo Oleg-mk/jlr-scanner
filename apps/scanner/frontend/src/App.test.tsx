@@ -166,7 +166,7 @@ class ControlledDiagnosticClient implements DiagnosticClient {
   }
 }
 
-describe("JLR Scanner application shell", () => {
+describe("ProwlOne application shell", () => {
   it("renders the real no-adapter state without fake vehicle data", async () => {
     const client = new ControlledClient({
       discoveries: [createEmptySnapshot()],

@@ -41,11 +41,11 @@ describe("saving files and choosing folders", () => {
     });
 
     expect(hasTauriRuntime()).toBe(false);
-    await expect(saveTextFile("jlr-scanner-session-1.json", "{}")).resolves.toBe(
-      "jlr-scanner-session-1.json",
+    await expect(saveTextFile("prowlone-session-1.json", "{}")).resolves.toBe(
+      "prowlone-session-1.json",
     );
     expect(click).toHaveBeenCalledTimes(1);
-    expect(downloadName).toBe("jlr-scanner-session-1.json");
+    expect(downloadName).toBe("prowlone-session-1.json");
   });
 
   it("cannot choose a folder in the browser, and the panel does not offer to", async () => {

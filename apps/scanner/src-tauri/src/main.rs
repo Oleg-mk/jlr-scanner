@@ -4,5 +4,5 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 fn main() {
-    jlr_scanner_shell::run();
+    prowlone_shell::run();
 }

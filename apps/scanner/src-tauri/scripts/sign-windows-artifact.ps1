@@ -35,7 +35,7 @@ if (-not $resolved.StartsWith($targetRoot, [StringComparison]::OrdinalIgnoreCase
     -e $env:JLR_ARTIFACT_SIGNING_ENDPOINT `
     -a $env:JLR_ARTIFACT_SIGNING_ACCOUNT `
     -c $env:JLR_ARTIFACT_SIGNING_PROFILE `
-    -d 'JLR Scanner' `
+    -d 'ProwlOne' `
     $resolved
 
 if ($LASTEXITCODE -ne 0) {

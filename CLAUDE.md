@@ -54,11 +54,11 @@ Windows host blocks freshly linked unsigned test binaries with error `4551`, so
 prefer running the portable majority under WSL2 or Linux:
 
 ```bash
-cargo test --workspace --exclude jlr-scanner-shell --exclude transport-serial
+cargo test --workspace --exclude prowlone-shell --exclude transport-serial
 ```
 
 That covers every F4–F8 golden test, including the F8 transport-fake Mongoose
-exchange. Only `transport-serial` and `jlr-scanner-shell` genuinely require
+exchange. Only `transport-serial` and `prowlone-shell` genuinely require
 Windows. See `docs/F3_1_WINDOWS_SIGNING.md` for the Smart App Control details.
 
 ## Working discipline

@@ -60,7 +60,7 @@ export const defaultSessionReportClient: SessionReportClient = hasTauriRuntime()
 export function saveSessionReportFile(json: string) {
   const parsed = JSON.parse(json) as { saved_unix_ms?: number };
   const stamp = parsed.saved_unix_ms ?? Date.now();
-  return saveTextFile(`jlr-scanner-session-${stamp}.json`, json);
+  return saveTextFile(`prowlone-session-${stamp}.json`, json);
 }
 
 export type SessionStepState = "done" | "next" | "todo";

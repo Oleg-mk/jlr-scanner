@@ -64,7 +64,7 @@ jobs:
           cargo fmt --all -- --check
           cargo clippy --workspace --all-targets -- -D warnings
           cargo test --workspace
-          cargo check -p jlr-scanner-shell
+          cargo check -p prowlone-shell
 
       - name: Install pinned Artifact Signing CLI
         run: cargo install artifact-signing-cli --version 0.11.0 --locked
@@ -79,7 +79,7 @@ jobs:
       - name: Upload verified signed artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: jlr-scanner-windows-signed-${{ github.sha }}
+          name: prowlone-windows-signed-${{ github.sha }}
           path: dist/windows-signed/
           if-no-files-found: error
           retention-days: 14

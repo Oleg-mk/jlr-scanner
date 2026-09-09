@@ -154,5 +154,5 @@ export const defaultCaptureClient: CaptureClient = hasTauriRuntime()
 export function saveCaptureFile(json: string) {
   const parsed = JSON.parse(json) as { name?: string };
   const name = parsed.name ?? "capture";
-  return saveTextFile(`jlr-scanner-${name}.json`, json);
+  return saveTextFile(`prowlone-${name}.json`, json);
 }

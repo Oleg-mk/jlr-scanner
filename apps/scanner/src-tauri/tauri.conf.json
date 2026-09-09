@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "JLR Scanner",
+  "productName": "ProwlOne",
   "version": "0.9.2",
-  "identifier": "com.jlrscanner.desktop",
+  "identifier": "com.prowlone.desktop",
   "build": {
     "beforeDevCommand": "pnpm --dir apps/scanner/frontend dev",
     "beforeBuildCommand": "pnpm --dir apps/scanner/frontend build",
@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "JLR Scanner",
+        "title": "ProwlOne",
         "width": 1280,
         "height": 860,
         "minWidth": 320,
@@ -24,6 +24,14 @@
     }
   },
   "bundle": {
-    "active": false
+    "active": false,
+    "icon": [
+      "icons/32x32.png",
+      "icons/64x64.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ]
   }
 }

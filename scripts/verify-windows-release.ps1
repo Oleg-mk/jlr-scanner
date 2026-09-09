@@ -5,7 +5,7 @@ if ([string]::IsNullOrWhiteSpace($env:JLR_EXPECTED_PUBLISHER)) {
 }
 
 $releaseRoot = (Resolve-Path -LiteralPath 'target\release').Path
-$mainExecutable = Join-Path $releaseRoot 'jlr-scanner-shell.exe'
+$mainExecutable = Join-Path $releaseRoot 'prowlone-shell.exe'
 $bundleRoot = Join-Path $releaseRoot 'bundle'
 
 if (-not (Test-Path -LiteralPath $mainExecutable -PathType Leaf)) {

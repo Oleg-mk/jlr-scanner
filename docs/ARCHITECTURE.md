@@ -192,7 +192,7 @@ The architecture checker enforces:
 
 ## SDD-era protocol scope
 
-JLR Scanner targets Jaguar, Land Rover, and Range Rover across the JLR SDD era.
+ProwlOne targets Jaguar, Land Rover, and Range Rover across the JLR SDD era.
 That era is not UDS-only. F4 establishes the ISO-TP/UDS foundation without
 assuming that future KWP, ISO 9141, or other legacy protocol support will pass
 through UDS.

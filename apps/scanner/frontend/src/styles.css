@@ -2323,3 +2323,19 @@ body,
   line-height: 1.45;
   white-space: pre;
 }
+
+/* The product's own name and what it is, at the top left: the name over the
+   line that says what it does, with anything else in the brand beside them. */
+.brand-name {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.brand-tagline {
+  margin: 0.1rem 0 0;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 560;
+  letter-spacing: 0.01em;
+}

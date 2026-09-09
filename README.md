@@ -1,6 +1,6 @@
-# JLR Scanner
+# ProwlOne
 
-Independent, read-only diagnostics for Jaguar and Land Rover of the SDD era —
+**Multi-platform vehicle diagnostics.** Independent, read-only diagnostics for Jaguar and Land Rover of the SDD era —
 every module on every bus, manufacturer-specific identifiers and fault codes
 with the manufacturer's own wording — through a MongoosePro JLR adapter,
 without SDD's Windows 7, virtual machine and install misery.
@@ -57,7 +57,7 @@ node scripts/check-architecture.mjs
 pnpm install --frozen-lockfile
 pnpm lint
 pnpm test
-cargo test --workspace --exclude jlr-scanner-shell --exclude transport-serial
+cargo test --workspace --exclude prowlone-shell --exclude transport-serial
 ```
 
 The two excluded crates need Windows; everything else builds and tests on
@@ -87,7 +87,7 @@ SDD files, and do not send captures of vehicles you do not own.
 Copyright © 2026 Oleg-mk. Licensed under the GNU Affero General Public
 License, version 3 ([LICENSE](LICENSE)): use, study, change and share freely;
 a changed version that others use, including over a network, must be shared
-under the same terms with its source. The name "JLR Scanner" and the
+under the same terms with its source. The name "ProwlOne" and the
 project's marks are not covered by the license. Jaguar, Land Rover, Range
 Rover and SDD are trademarks of Jaguar Land Rover Limited; this project is
 not affiliated with or endorsed by it.

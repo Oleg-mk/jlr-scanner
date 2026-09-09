@@ -21,7 +21,7 @@ const issued = {
   issueCode: "AB12-CD34",
   validUntil: "2026-10-05",
   daysLeft: 29,
-  issuer: "JLR Scanner",
+  issuer: "ProwlOne",
 };
 
 describe("the issue stamp on a library copy", () => {

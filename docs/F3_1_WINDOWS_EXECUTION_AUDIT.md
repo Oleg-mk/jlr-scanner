@@ -6,7 +6,7 @@ Audit date: 2026-08-30. Host: Windows 11 Pro 64-bit, version `10.0.26200`, build
 
 The F3 native launch failure is a Smart App Control Code Integrity denial. The active policy identifies itself as `VerifiedAndReputableDesktop`; it rejects newly produced, unsigned PE files with Code Integrity status `0xc0e90002`, surfaced to Cargo/Tauri as Windows error `4551`.
 
-The failures do not all name the same file type. They include the JLR Scanner application, Rust tests, Cargo build scripts, and a proc-macro DLL. In the sampled events they do share the same active Code Integrity policy and status. No matching AppLocker blocking event was found.
+The failures do not all name the same file type. They include the ProwlOne application, Rust tests, Cargo build scripts, and a proc-macro DLL. In the sampled events they do share the same active Code Integrity policy and status. No matching AppLocker blocking event was found.
 
 No Smart App Control, Defender, Secure Boot, Code Integrity, driver-policy, or exclusion setting was changed.
 
@@ -32,7 +32,7 @@ All listed files are PE executable code, have Authenticode status `NotSigned`, h
 
 | Class | File | SHA-256 flat/file hash | CI evidence |
 | --- | --- | --- | --- |
-| A — product application | `target/debug/jlr-scanner-shell.exe` | `4575F2CF991D90978860636A5235F0B039916A55C002A559D613C0F533521772` | event 3077, record 4769 |
+| A — product application | `target/debug/prowlone-shell.exe` | `4575F2CF991D90978860636A5235F0B039916A55C002A559D613C0F533521772` | event 3077, record 4769 |
 | D — Rust test | `target/debug/deps/jlr_scanner_shell-884f4e3f479ec17d.exe` | `F6A50268781F44B5AA9DD97A14E732CA62B1495360E758E1A3D2C994F8331F93` | event 3077, record 4774 |
 | C — Cargo build script | `target/release/build/icu_normalizer_data-28623ffab73afea6/build-script-build.exe` | `CA400FE55835BDC2BFE781F3EE5D8A6CD69CF6377FF7386D14169383252DA398` | event 3077, record 4744 |
 | C — Cargo build script | `target/release/build/serde_core-ac5dac6de05cef64/build-script-build.exe` | `0345ABE8A1928C18DDF069CC19C429865AF1657982A51D94F0471A4DDBEE4693` | matching 4551/CI sample |
@@ -47,13 +47,13 @@ No separate Tauri helper/bootstrapper was the observed launch blocker because bu
 
 ## Authenticode before F3.1
 
-- JLR Scanner debug executable: `NotSigned`.
+- ProwlOne debug executable: `NotSigned`.
 - sampled Cargo/test executables and proc-macro DLLs: `NotSigned`.
 - signer: none.
 - installed verification tool: Windows SDK SignTool `10.0.26100.0` (x64/x86/arm64 variants present).
 - Azure CLI: not installed locally.
 - repository GitHub Actions signing secrets/environments: none found at audit time.
-- trusted signing account/profile belonging to JLR Scanner: not found.
+- trusted signing account/profile belonging to ProwlOne: not found.
 
 ## Development versus product distribution
 

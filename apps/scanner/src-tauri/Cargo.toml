@@ -1,12 +1,12 @@
 [package]
-name = "jlr-scanner-shell"
+name = "prowlone-shell"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 rust-version.workspace = true
 
 [lib]
-name = "jlr_scanner_shell"
+name = "prowlone_shell"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]

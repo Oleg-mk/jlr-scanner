@@ -2,7 +2,7 @@
 
 ## Product
 
-JLR Scanner is a modern, independent diagnostic scanner for Jaguar and Land Rover vehicles of the SDD generation. It owns its diagnostic engine, JLR knowledge base, protocol stack, transport abstraction, and adaptive UI.
+ProwlOne is a modern, independent diagnostic scanner for Jaguar and Land Rover vehicles of the SDD generation. It owns its diagnostic engine, JLR knowledge base, protocol stack, transport abstraction, and adaptive UI.
 
 It is not an SDD clone or frontend, a Mongoose-only program, a generic ELM scanner, or an ECU flasher. SDD may later serve only as a research/reference source for verification and is never a runtime dependency.
 

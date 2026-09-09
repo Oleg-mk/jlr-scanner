@@ -279,7 +279,10 @@ export function App({
     <div className={bench ? "app-shell app-shell--bench" : "app-shell"} lang={language}>
       <header className="app-header">
         <div className="brand">
-          <h1>JLR Scanner</h1>
+          <div className="brand-name">
+            <h1>ProwlOne</h1>
+            <p className="brand-tagline">{t("Multi-platform vehicle diagnostics")}</p>
+          </div>
           {demoPreview ? <span className="demo-badge">{t("Simulator UI preview")}</span> : null}
         </div>
         <div className="header-status">

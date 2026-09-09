@@ -58,14 +58,14 @@ exclusions.
 
 ## Installing on a Mac
 
-Open the disk image and drag JLR Scanner into Applications. The application
+Open the disk image and drag ProwlOne into Applications. The application
 is **not signed or notarised** with Apple, so the first launch is refused
 with "Apple could not verify … is free of malware". What to do:
 
 - **macOS 14 and earlier:** right-click the application, choose "Open",
   then "Open" again in the dialog. Once.
 - **macOS 15:** try to open it once, then open System Settings → Privacy &
-  Security, scroll to the message about JLR Scanner and click "Open
+  Security, scroll to the message about ProwlOne and click "Open
   Anyway". Once.
 - If macOS only says "cannot be opened" with an OK button and offers
   nothing else, the bundle's seal did not survive the download. Two
@@ -74,11 +74,11 @@ with "Apple could not verify … is free of malware". What to do:
   ad-hoc signature (no Apple account involved) — then open it again:
 
 ```bash
-xattr -cr "/Applications/JLR Scanner.app"
+xattr -cr "/Applications/ProwlOne.app"
 ```
 
 ```bash
-codesign --force --deep --sign - "/Applications/JLR Scanner.app"
+codesign --force --deep --sign - "/Applications/ProwlOne.app"
 ```
 
 The MongoosePro JLR appears on a Mac as a USB modem port with no driver
@@ -155,7 +155,7 @@ that stays silent is evidence too.
 
 ## What to send
 
-The build you run is written at the foot of the window, for example `0.9.1 · a1b2c3d`; quote it in every message, and it is also inside the report file.
+The build you run is written at the foot of the window, for example `0.9.3 · a1b2c3d`; quote it in every message, and it is also inside the report file.
 
 
 The session report file, the capture file, and a few lines: the car

@@ -156,7 +156,7 @@ pub fn intake(
         title: format!("Tester session report {short}"),
         source_type: SourceType::Captured,
         origin: format!(
-            "JLR Scanner {}{} session report saved by a tester",
+            "ProwlOne {}{} session report saved by a tester",
             report.application_version.as_deref().unwrap_or("(version not recorded)"),
             report
                 .application_build

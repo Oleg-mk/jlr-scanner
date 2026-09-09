@@ -140,5 +140,5 @@ export const defaultDiagnosticClient: DiagnosticClient = hasTauriRuntime()
 export function saveDiagnosticReportFile(json: string) {
   const parsed = JSON.parse(json) as { sessionId?: string };
   const session = parsed.sessionId ?? "diagnostic-report";
-  return saveTextFile(`jlr-scanner-${session}.json`, json);
+  return saveTextFile(`prowlone-${session}.json`, json);
 }

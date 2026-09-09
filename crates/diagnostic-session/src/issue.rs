@@ -21,8 +21,10 @@ pub const ISSUE_SCHEMA_VERSION: u64 = 2;
 pub const DEFAULT_VALIDITY_DAYS: i64 = 30;
 /// The marker the stamping tool writes into every manifest's source notes.
 pub const ISSUE_MARKER: &str = "[issued ";
-/// Who signs the copies, as written into every stamp.
-pub const ISSUER_NAME: &str = "JLR Scanner";
+/// Who signs the copies, as written into every stamp. A stamp is verified
+/// against the name inside its own file, so copies issued under the former
+/// name stay valid until their date.
+pub const ISSUER_NAME: &str = "ProwlOne";
 
 /// Hex-encoded Ed25519 public keys whose stamps the application trusts.
 /// The matching private keys live on the owner's machine, never here. To

@@ -1773,35 +1773,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "jlr-scanner-shell"
-version = "0.9.2"
-dependencies = [
- "app-contracts",
- "bench-vehicle",
- "diagnostic-environment",
- "diagnostic-execution",
- "diagnostic-session",
- "diagnostic-simulator",
- "diagnostics-core",
- "jlr-profiles",
- "knowledge",
- "mongoose-jlr",
- "obd-j1979",
- "report-intake",
- "sdd-ingest",
- "serde",
- "serde_json",
- "tauri",
- "tauri-build",
- "tauri-plugin-dialog",
- "transport-api",
- "transport-replay",
- "transport-serial",
- "uds-execution",
- "winreg",
-]
-
-[[package]]
 name = "jni"
 version = "0.21.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2646,6 +2617,35 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "985e7ec9bb745e6ce6535b544d84d6cd6f7ad8bd711c398938ae983b91a766d9"
 dependencies = [
  "unicode-ident",
+]
+
+[[package]]
+name = "prowlone-shell"
+version = "0.9.2"
+dependencies = [
+ "app-contracts",
+ "bench-vehicle",
+ "diagnostic-environment",
+ "diagnostic-execution",
+ "diagnostic-session",
+ "diagnostic-simulator",
+ "diagnostics-core",
+ "jlr-profiles",
+ "knowledge",
+ "mongoose-jlr",
+ "obd-j1979",
+ "report-intake",
+ "sdd-ingest",
+ "serde",
+ "serde_json",
+ "tauri",
+ "tauri-build",
+ "tauri-plugin-dialog",
+ "transport-api",
+ "transport-replay",
+ "transport-serial",
+ "uds-execution",
+ "winreg",
 ]
 
 [[package]]

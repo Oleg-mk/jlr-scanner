@@ -15,7 +15,7 @@ import { createContext, useContext } from "react";
  */
 export type Language = "en" | "ru" | "uk";
 
-export const LANGUAGE_STORAGE_KEY = "jlr-scanner.language";
+export const LANGUAGE_STORAGE_KEY = "prowlone.language";
 
 export const languages: Array<{ id: Language; label: string }> = [
   { id: "en", label: "English" },
@@ -51,6 +51,7 @@ export function dataText(
 
 const uk: Record<string, string> = {
   // Header and session
+  "Multi-platform vehicle diagnostics": "Кросплатформна діагностика автомобілів",
   "Simulator UI preview": "Попередній перегляд інтерфейсу (симулятор)",
   "Development preview only — no Mongoose or vehicle communication.":
     "Лише попередній перегляд для розробки — без Mongoose і без звʼязку з автомобілем.",
@@ -390,6 +391,7 @@ const uk: Record<string, string> = {
 
 const ru: Record<string, string> = {
   // Header and session
+  "Multi-platform vehicle diagnostics": "Кроссплатформенная диагностика автомобилей",
   "Simulator UI preview": "Предпросмотр интерфейса (симулятор)",
   "Development preview only — no Mongoose or vehicle communication.":
     "Только предпросмотр для разработки — без Mongoose и без связи с автомобилем.",

@@ -1,4 +1,4 @@
-//! Tauri composition root for JLR Scanner.
+//! Tauri composition root for ProwlOne.
 
 mod adapter_service;
 mod capture_service;
@@ -591,7 +591,7 @@ pub fn run() {
             start_new_session
         ])
         .run(tauri::generate_context!())
-        .expect("failed to run JLR Scanner");
+        .expect("failed to run ProwlOne");
 }
 
 #[cfg(test)]

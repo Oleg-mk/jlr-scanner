@@ -143,5 +143,5 @@ export const defaultModuleReadClient: ModuleReadClient = hasTauriRuntime()
 export function saveModuleReadReportFile(json: string) {
   const parsed = JSON.parse(json) as { sessionId?: string };
   const session = parsed.sessionId ?? "module-read";
-  return saveTextFile(`jlr-scanner-${session}.json`, json);
+  return saveTextFile(`prowlone-${session}.json`, json);
 }

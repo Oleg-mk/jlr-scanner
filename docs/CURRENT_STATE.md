@@ -8,6 +8,34 @@ Status: **2026-09-09 — build 0.9.2 is the bench build, the one the club tester
 
 Capability validation states are recorded independently. `IMPLEMENTED`, `FIXTURE_TESTED`, `HARDWARE_CONFIRMED`, and `VEHICLE_CONFIRMED` are not interchangeable.
 
+## 2026-09-09 — the product is named ProwlOne
+
+The owner chose the name and drew the mark. Nothing of Jaguar Land Rover's
+is in either: the name is our own, the icon is a spotted big cat lying on a
+generic boxy off-roader with a green pulse beside it, drawn for us. The old
+name put a manufacturer's marks in the product's own identity, which is
+exactly what a public launch cannot carry (`ADR-0021`).
+
+What the name reaches: the product and window title, the bundle identifier
+(`com.prowlone.desktop`), the shell crate and therefore the binary inside
+the macOS bundle (`prowlone-shell`), the installer and disk-image names, the
+saved report file names, the issuer written into new library stamps, the
+signing description, the CI artifact names, and the icon set for Windows and
+macOS. The interface's title line now reads ProwlOne with
+"Multi-platform vehicle diagnostics" under it, translated; the marks are
+named in prose, where the README's disclaimer already stands.
+
+What the name deliberately does not reach, because it is data and not
+branding: the session-report schema id `jlr-scanner.session-report`, which
+the copies already in testers' hands write and the intake checks; the
+recorded source ids of evidence such as
+`jlr-scanner-mongoose-jlr-route-bindings`; the crates named after what they
+hold (`jlr-profiles`, `mongoose-jlr`); and the dated history in these
+documents, which names files that really were called that. Library copies
+issued under the former name stay valid: a stamp is verified against the
+issuer written inside its own signed file, and the check was run against the
+owner's own copy after the rename.
+
 ## 2026-09-09 — the bench: a virtual vehicle behind a stand-in adapter
 
 Decided in the morning (`ADR-0020`), built the same day, with the owner's
@@ -409,7 +437,7 @@ eight seconds.
 
 ```bash
 # workspace lint and tests (207 tests, 55 suites)
-docker run --rm -v "C:/Users/<you>/Desktop/jlr-scanner:/w" -w /w -v jlr-cargo-registry:/usr/local/cargo/registry rust:1.98-slim sh -c 'cargo fmt --all; cargo clippy --workspace --exclude jlr-scanner-shell --exclude transport-serial --all-targets; cargo test --workspace --exclude jlr-scanner-shell --exclude transport-serial'
+docker run --rm -v "C:/Users/<you>/Desktop/jlr-scanner:/w" -w /w -v jlr-cargo-registry:/usr/local/cargo/registry rust:1.98-slim sh -c 'cargo fmt --all; cargo clippy --workspace --exclude prowlone-shell --exclude transport-serial --all-targets; cargo test --workspace --exclude prowlone-shell --exclude transport-serial'
 ```
 
 ```bash
@@ -936,7 +964,7 @@ reversible toggle in the March 2026 update (`KB5079391`, superseded by
 `26200.9278` is past both, which is why the 2026-08-31 disable/restore worked and
 `VerifiedAndReputablePolicyState` reads `1` today. Toggling per build is still
 discouraged. Only `transport-serial` and `jlr-scanner-shell` require Windows, so
-`cargo test --workspace --exclude jlr-scanner-shell --exclude transport-serial`
+`cargo test --workspace --exclude prowlone-shell --exclude transport-serial`
 runs every F4–F8 golden test, including the F8 transport-fake Mongoose exchange,
 under WSL2 or Linux with Smart App Control uninvolved.
 

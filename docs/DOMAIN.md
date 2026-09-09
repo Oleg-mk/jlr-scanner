@@ -2,7 +2,7 @@
 
 ## Product scope
 
-JLR Scanner targets the whole Jaguar, Land Rover, and Range Rover SDD era.
+ProwlOne targets the whole Jaguar, Land Rover, and Range Rover SDD era.
 No single vehicle program defines the product architecture. X250 remains one
 reference vehicle program, not the root of a knowledge tree and not a protocol
 special case.
