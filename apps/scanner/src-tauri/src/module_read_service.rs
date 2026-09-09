@@ -232,6 +232,7 @@ impl ModuleReadService {
                                     description_scope: described.description_scope,
                                     failure_type_text: described.failure_type_text,
                                     failure_type_texts: described.failure_type_texts,
+                                    description_texts: described.description_texts,
                                 }
                             })
                             .collect();

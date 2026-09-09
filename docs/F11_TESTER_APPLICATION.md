@@ -436,3 +436,32 @@ records. The converter arithmetic is copied verbatim from
 the DID catalogue. The J1979 agreement on `0xF40C` is a corroboration noted
 here, not a record: it will become one when a tester's read is compared with
 a known engine speed (F13 intake).
+
+## 2026-09-09 — fault-code wording in the interface's language
+
+SDD holds a fault code's description in English only, and holds nothing at
+all in Ukrainian, so translation cannot come from the data. It comes from
+us, and only for the codes SAE J2012 defines: the table
+`crates/diagnostic-session/data/dtc_standard_text.tsv` maps a standard code
+to our own Ukrainian and Russian wording, written from what the standard
+says the code means rather than translated from any manufacturer's phrasing.
+Nothing derived from SDD enters the repository this way.
+
+- `dtc_text::standard_texts` parses the table once and answers by code;
+  `describe_dtc` fills `DtcDescription::description_texts` with it and never
+  touches `description`, which stays the loaded library's English.
+- `DtcSummary::description_texts` carries it to the interface, where
+  `codeText` picks our wording for Ukrainian or Russian and keeps the
+  English beside it. In English nothing is repeated.
+- The session report is unchanged: it carries the English wording whatever
+  the interface language is. A report is evidence.
+- A manufacturer-specific code has no entry and falls back to the library's
+  English. Its wording is the manufacturer's, and translating it would put
+  their text, in another language, into ours.
+
+First pass: 271 codes — misfires, mixture, air and coolant temperature,
+throttle, oxygen sensors, injectors, fuel pressure, camshaft and crankshaft,
+knock, boost, recirculation, catalyst, evaporative emissions, road speed,
+supply voltage, control modules and the communication codes. The library
+holds 1,664 standard-range codes with a wording, so the table grows from
+here in batches.

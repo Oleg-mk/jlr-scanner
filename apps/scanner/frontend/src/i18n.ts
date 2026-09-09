@@ -38,6 +38,39 @@ export function dataLanguage(language: Language): "eng" | "rus" | null {
   }
 }
 
+/**
+ * Our own wording's language code for the interface language, or null for
+ * English, which is the loaded data's own. Unlike `dataLanguage` this knows
+ * Ukrainian, because the text is ours and not SDD's.
+ */
+export function productLanguage(language: Language): "ukr" | "rus" | null {
+  switch (language) {
+    case "uk":
+      return "ukr";
+    case "ru":
+      return "rus";
+    default:
+      return null;
+  }
+}
+
+/**
+ * A fault code's wording for the interface language: ours when we have it,
+ * otherwise the loaded data's English. The English is returned as well, so
+ * the caller can show it beside the translation — a tester quotes the
+ * English, and every report carries only that.
+ */
+export function codeText(
+  texts: Record<string, string> | undefined,
+  english: string | null,
+  language: Language,
+): { shown: string | null; original: string | null } {
+  const code = productLanguage(language);
+  const ours = code !== null ? texts?.[code] : undefined;
+  if (ours === undefined) return { shown: english, original: null };
+  return { shown: ours, original: english };
+}
+
 /** Pick the data text for the interface language, English when SDD has none. */
 export function dataText(
   texts: Record<string, string> | undefined,

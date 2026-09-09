@@ -470,6 +470,11 @@ pub struct DtcSummary {
     /// language code.
     #[serde(default)]
     pub failure_type_texts: BTreeMap<String, String>,
+    /// The code's own wording in the interface's languages, by the same
+    /// language codes; the English stays in `description`. Empty when the
+    /// code has no wording of ours.
+    #[serde(default)]
+    pub description_texts: BTreeMap<String, String>,
 }
 
 /// One decoded parameter of an identifier read.

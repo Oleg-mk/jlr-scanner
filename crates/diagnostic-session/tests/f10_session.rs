@@ -321,9 +321,21 @@ fn the_catalogue_offers_the_programmes_markers_years_and_engines_the_data_is_qua
 #[test]
 fn fault_code_wording_is_joined_by_code_and_module_and_never_invented() {
     let library = library();
-    // The fixtures carry no DTC index, so nothing is described.
+    // The fixtures carry no DTC index, so the library describes nothing.
     let described = library.describe_dtc("P0301", 0, "SYNTHMOD");
-    assert_eq!(described, diagnostic_session::DtcDescription::default());
+    assert!(described.description.is_none());
+    assert!(described.description_scope.is_none());
+    assert!(described.failure_type_text.is_none());
+    assert!(described.failure_type_texts.is_empty());
+    // Our own wording for a code the standard defines is not the library's
+    // and does not depend on it; it is not an invention either, because the
+    // standard says what P0301 means.
+    assert!(described.description_texts["ukr"].contains("циліндрі 1"));
+    assert!(described.description_texts["rus"].contains("цилиндре 1"));
+    // A manufacturer-specific code gets nothing from us: that wording is the
+    // manufacturer's, and it lives in the issued library or nowhere.
+    let specific = library.describe_dtc("P1234", 0, "SYNTHMOD");
+    assert_eq!(specific, diagnostic_session::DtcDescription::default());
 }
 
 #[test]

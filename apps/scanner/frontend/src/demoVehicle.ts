@@ -191,7 +191,11 @@ const failureType = {
   rus: "Сведения об общей неисправности - нет сведений о подтипе.",
 };
 
-function dtc(code: string, description: string): DtcSummary {
+function dtc(
+  code: string,
+  description: string,
+  descriptionTexts: Record<string, string> = {},
+): DtcSummary {
   return {
     code,
     failureType: "00",
@@ -200,11 +204,25 @@ function dtc(code: string, description: string): DtcSummary {
     descriptionScope: "module",
     failureTypeText: failureType.eng,
     failureTypeTexts: failureType,
+    descriptionTexts,
   };
 }
 
+// The two standard codes below carry our own wording, copied from the
+// application's table so that the browser preview shows what the desktop
+// build shows; the third has none, and falls back to English, which is also
+// what a manufacturer-specific code does.
 const FAULTS: Record<string, DtcSummary[]> = {
-  PCM: [dtc("P0301", "Cylinder 1 misfire detected"), dtc("P0171", "System too lean (bank 1)")],
+  PCM: [
+    dtc("P0301", "Cylinder 1 misfire detected", {
+      ukr: "Пропуски запалювання в циліндрі 1",
+      rus: "Пропуски зажигания в цилиндре 1",
+    }),
+    dtc("P0171", "System too lean (bank 1)", {
+      ukr: "Надто бідна суміш (ряд 1)",
+      rus: "Слишком бедная смесь (ряд 1)",
+    }),
+  ],
   ABS: [dtc("C0035", "Left front wheel speed sensor circuit")],
   BCM: [dtc("B1318", "Battery voltage low")],
   DDM: [dtc("B1D01", "Window motor circuit")],

@@ -1,4 +1,4 @@
-import { dataText, t, useLanguage } from "../i18n";
+import { codeText, dataText, t, useLanguage } from "../i18n";
 import type { ModuleSurveyEntry } from "../library";
 import type { ModuleReadKind, ModuleReadSnapshot } from "../moduleRead";
 import { moduleReasons, moduleRoute, nodeStatus, routeText } from "../networkMap";
@@ -268,13 +268,18 @@ export function ModuleDetails({
                 </tr>
               </thead>
               <tbody>
-                {outcome.dtcs.map((dtc) => (
+                {outcome.dtcs.map((dtc) => {
+                  const wording = codeText(dtc.descriptionTexts, dtc.description, language);
+                  return (
                   <tr key={`${dtc.code}-${dtc.failureType}`}>
                     <td>
                       <strong>{dtc.code}</strong>
                     </td>
                     <td>
-                      {dtc.description ?? t("No wording in the loaded data")}
+                      {wording.shown ?? t("No wording in the loaded data")}
+                      {wording.original !== null ? (
+                        <div className="module-validation">{wording.original}</div>
+                      ) : null}
                       {dtc.descriptionScope === "generic" ? (
                         <div className="module-validation">{t("generic wording")}</div>
                       ) : null}
@@ -291,7 +296,8 @@ export function ModuleDetails({
                       <code>{dtc.status}</code>
                     </td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           ) : outcome.negativeResponse === null && outcome.dataHex === null ? (

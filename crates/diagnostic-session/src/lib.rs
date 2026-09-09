@@ -11,6 +11,7 @@
 //! repository are built in.
 
 pub mod decode;
+pub mod dtc_text;
 pub mod issue;
 pub mod vin;
 
@@ -112,6 +113,11 @@ pub struct DtcDescription {
     /// The failure type wording by SDD language code, from the text
     /// database (`eng`, `rus`, …).
     pub failure_type_texts: BTreeMap<String, String>,
+    /// The code's own wording in the interface's languages, by the same
+    /// language codes. SDD holds fault-code descriptions in English only, so
+    /// for the standard codes this is our own text (`dtc_text`); `eng` is
+    /// never here, because English stays `description`.
+    pub description_texts: BTreeMap<String, String>,
 }
 
 /// Fault-code wording indexed at load: descriptions by `DTC-<code>` entity,
@@ -377,6 +383,10 @@ impl KnowledgeLibrary {
                 description.failure_type_text = texts.get("eng").cloned();
             }
         }
+        // Our own wording for the codes the standard defines. It never
+        // replaces `description`, which stays the loaded data's English and
+        // is what every report carries.
+        description.description_texts = dtc_text::standard_texts(code);
         description
     }
 

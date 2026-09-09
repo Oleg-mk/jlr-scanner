@@ -24,6 +24,8 @@ export interface DtcSummary {
   failureTypeText: string | null;
   /** The failure type wording by SDD language code, when the data has it. */
   failureTypeTexts: Record<string, string>;
+  /** Our own wording for the code in the interface's languages; English stays in `description`. */
+  descriptionTexts: Record<string, string>;
 }
 
 export interface DecodedParameterSummary {
