@@ -36,7 +36,10 @@ const catalogue: VehicleCatalogueSnapshot = {
   ],
 };
 
-function card(described: VehicleDescription, onVehicleChange = () => {}) {
+function card(
+  described: VehicleDescription,
+  onVehicleChange: (next: VehicleDescription) => void = () => {},
+) {
   return render(
     <VehicleCard
       vehicle={described}
