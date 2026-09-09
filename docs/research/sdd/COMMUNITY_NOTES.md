@@ -215,3 +215,24 @@ What this project can do with it, in order of what it costs:
 Whether the failure is really lost firmware or a lost key
 synchronisation is itself unknown; the read-only diagnosis of step 1 is
 what would tell.
+
+## 2026-09-09 — what third-party tooling reaches, relayed by the owner
+
+The owner's statement, recorded as a statement and not as measurement:
+
+- On the SDD-era Ford-derived cars, professional third-party scanners —
+  Launch and Autel with their JLR software — read body and comfort modules
+  through the OBD connector, which on those cars means the 3/11 pair, since
+  those modules are not on the high-speed bus.
+- ELM327-class dongles read the powertrain and nothing else, because they
+  speak only pins 6/14.
+- His conclusion, and it is sound: the presence of a medium-speed bus on
+  3/11 is ordinary trade practice on these cars, not a hypothesis of ours.
+  Thousands of people plug arbitrary devices into that connector and get
+  from a few generic values to full diagnostics, depending only on what the
+  device can speak.
+
+This does not promote the binding to `CaptureValidated` — nothing but a
+capture does — but it is why the record no longer calls it a weak point.
+It says nothing about the 2014-and-later cars, where the gateway question
+stands untouched.

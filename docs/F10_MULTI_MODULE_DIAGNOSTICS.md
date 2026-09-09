@@ -493,20 +493,38 @@ what stage 2 would send, and the map's wording stays exact: the addresses
 are known and nothing else is missing on our side, but the door's key is
 not in our hands yet.
 
-### The weak point, stated plainly
+### What is known, and what is actually open
 
-The binding of `CAN_MS` to `ms-can` on J1962 pins 3/11 is recorded as
-`documented`, but its evidence is two separate facts joined by an inference:
-this repository's own route descriptor, and the MongoosePro user guide's
-pinout, which says pin 3 is CAN 2+ and pin 11 CAN 2-. Neither states that a
-given car brings its medium-speed bus to that pair. The inference is almost
-certainly right and is what the trade assumes, but no wiring diagram and no
-vehicle has confirmed it in this record.
+*Reworded 2026-09-09 at the owner's insistence, and he was right: the
+earlier heading called this a weak point, which overstated it.*
 
-For the 2014-and-later cars the open question is larger and already written
-down in `COMMUNITY_NOTES.md`: whether the gateway relays a request from pins
-3/11 to the BO or CO branch transparently, or switches per request in a way
-SDD does not declare.
+For the SDD-era cars on the Ford-derived architecture — X250, X350, X400,
+L319, L320, L322 — that a car brings its medium-speed bus to J1962 pins
+3/11 at 125 kbit/s is known from the architecture and from the adapter's
+own documentation, and it is what the whole trade works on:
+
+- the MongoosePro JLR user guide's own pinout, JLR column, gives pin 3 as
+  CAN 2+ and pin 11 as CAN 2- (`F2_JLR_NETWORK_INVENTORY.md`);
+- the adapter path is `HARDWARE_CONFIRMED` on the bench: resource 21 opens
+  with those pins and takes the application's outbound record exactly as
+  resource 5 does (2026-09-08, evidence Part 4);
+- third-party tooling reaches body modules on these cars through that pair,
+  while ELM-class dongles reach only the powertrain because they speak only
+  6/14 — the owner's statement, 2026-09-09, recorded in `COMMUNITY_NOTES.md`.
+
+What is missing is therefore not a doubt but a signature: no capture from a
+car is in this record yet. One listen on pins 3/11 of any SDD-era car
+supplies it, and it is the first step of the tester guide. Until then the
+survey says `Documented`, not `CaptureValidated`, which is exactly what
+those two words mean.
+
+For the 2014-and-later cars the question is different and genuinely open,
+and it is written down in `COMMUNITY_NOTES.md`: those cars carry two
+medium-speed buses, `BO_MSCAN` and `CO_MSCAN`, behind a gateway, and
+whether the gateway relays a request from pins 3/11 to either branch
+transparently, or switches per request in a way SDD does not declare, is
+not known. That is what 25 of L405 MY14's modules and 22 of L494 MY16's
+depend on.
 
 ### What settles it, cheapest first
 

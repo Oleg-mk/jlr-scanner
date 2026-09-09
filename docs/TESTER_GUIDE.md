@@ -143,9 +143,13 @@ connected.
 Ignition on, engine off (position II). Plug the adapter into the diagnostic
 socket. Then, in order:
 
-1. **Capture** the high-speed bus for the default few seconds and save the
-   file. This is listen-only and cannot disturb anything; it is also the
-   most valuable thing you can send us from a car we have not seen.
+1. **Capture both pairs.** The high-speed bus first (pins 6/14), then the
+   medium-speed one (3/11), a few seconds each; save both files and send
+   them. This is listen-only and cannot disturb anything, and it is the
+   most valuable thing you can send us from a car we have not seen. We
+   need the 3/11 pair in its own right: traffic on it confirms that this
+   car brings its medium-speed bus to the connector. Silence is an answer
+   too, so save that as well.
 2. **VIN.** Enter the VIN; the application decodes it with SDD's tables and
    offers the matching programme and model year. Correct them if you know
    better.
