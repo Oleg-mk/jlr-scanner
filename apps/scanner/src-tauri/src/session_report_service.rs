@@ -25,6 +25,9 @@ pub struct SessionReportService {
     module_reads: Vec<Value>,
     calibration_reads: Vec<Value>,
     mode: Option<String>,
+    /// The bench scenario this session was connected on (ADR-0020), so the
+    /// bundle can say which picture it holds even after the bench is gone.
+    bench_scenario: Option<u32>,
 }
 
 impl SessionReportService {
@@ -35,6 +38,7 @@ impl SessionReportService {
             module_reads: Vec::new(),
             calibration_reads: Vec::new(),
             mode: None,
+            bench_scenario: None,
         }
     }
 
@@ -46,6 +50,14 @@ impl SessionReportService {
 
     pub fn set_mode(&mut self, mode: &str) {
         self.mode = Some(mode.to_string());
+        if mode != SESSION_MODE_BENCH {
+            self.bench_scenario = None;
+        }
+    }
+
+    /// The scenario the bench answered on, kept for the bundle.
+    pub fn set_bench_scenario(&mut self, scenario: u32) {
+        self.bench_scenario = Some(scenario);
     }
 
     /// Whether this session is on the bench, in which case nothing it holds
@@ -96,6 +108,10 @@ impl SessionReportService {
             "application_version": env!("CARGO_PKG_VERSION"),
             "application_build": build_id(),
             "session_mode": self.mode.as_deref().unwrap_or(SESSION_MODE_REAL),
+            // Which picture the bench painted: null for a real session, and
+            // for a bench one the number that reproduces exactly these codes
+            // from the same library.
+            "bench_scenario": self.bench_scenario,
             "session_started_unix_ms": self.started_unix_ms,
             "saved_unix_ms": unix_ms(),
             "validation": "session bundle; every item carries its own validation state and none is vehicle-confirmed by being here",

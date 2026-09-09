@@ -177,14 +177,21 @@ connecting: the **scenario**.
 - The seed is the number mixed with the family name, so two modules of one
   scenario draw differently, and one module draws the same on every run, on
   every machine, from the same library.
-- The number is shown in the BENCH band and on the adapter card, and a tester
-  who quotes it can be shown the same screen again.
+- The number is shown in the BENCH band and on the adapter card, travels in
+  the session bundle as `bench_scenario` beside `session_mode`, and a tester
+  who sends either can be shown the same screen again.
 
 `KnowledgeLibrary::dtc_codes_for` is the new seam: the list of codes the
 loaded data describes for a family, in a fixed order. It is the library
 answering what it holds, which is where that question belongs; the bench only
 draws from it.
 
+The session remembers the number from the connection rather than reading it
+back off the adapter, because the adapter snapshot loses it the moment the
+bench is disconnected, and a bundle saying `session_mode: bench` with no
+number would be a bundle nobody can reproduce.
+
 What does not change: the codes are still not a car's, every value is still
-marked synthetic, a bench session is still refused by `report-intake`, and the
-picture is still illustration, never evidence.
+marked synthetic, a bench session is still refused by `report-intake` —
+`bench_scenario` gives that refusal nothing to reconsider — and the picture is
+still illustration, never evidence.

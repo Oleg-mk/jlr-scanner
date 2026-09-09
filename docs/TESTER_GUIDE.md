@@ -139,7 +139,8 @@ reports. `0` is a vehicle in good order: every module answers and none has a
 fault code. Any other number gives the modules codes drawn from the library's
 own wording for them, so every code shown has a description. The same number
 always paints the same picture, so «scenario 7» in an e-mail is enough for us
-to see exactly what you saw.
+to see exactly what you saw. The report carries it too, as `bench_scenario`,
+so there is nothing extra to send.
 
 Click **Disconnect** to leave the bench; if you recorded anything
 on it, the application asks for a new session before a real adapter is

@@ -156,7 +156,9 @@ fn connect_bench(
     refresh_bench(&bench, &lock_session(&session_state), scenario);
     let snapshot = service.connect_bench(scenario);
     if snapshot.state == AdapterState::Connected {
-        lock_session_report(&report_state).set_mode(SESSION_MODE_BENCH);
+        let mut report = lock_session_report(&report_state);
+        report.set_mode(SESSION_MODE_BENCH);
+        report.set_bench_scenario(scenario);
     }
     snapshot
 }

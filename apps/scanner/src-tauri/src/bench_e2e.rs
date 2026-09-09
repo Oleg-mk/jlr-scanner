@@ -209,6 +209,7 @@ fn the_bench_connects_without_a_port_reads_the_surveyed_vehicle_and_marks_everyt
     assert!(report.accepts(SESSION_MODE_BENCH));
     assert!(report.accepts(SESSION_MODE_REAL));
     report.set_mode(SESSION_MODE_BENCH);
+    report.set_bench_scenario(bench_vehicle::SCENARIO_DEFAULT);
     assert!(
         report.accepts(SESSION_MODE_REAL),
         "an empty session may still switch"
@@ -226,6 +227,8 @@ fn the_bench_connects_without_a_port_reads_the_surveyed_vehicle_and_marks_everyt
         )
         .unwrap();
     assert!(bundle.contains("\"session_mode\": \"bench\""));
+    // The number that reproduces this session's codes travels with it.
+    assert!(bundle.contains("\"bench_scenario\": 1"), "{bundle}");
     let refused = report_intake::intake(&bundle, "bench-session.json", session.library())
         .expect_err("the intake refuses a bench session");
     assert!(refused.to_string().contains("bench session"), "{refused}");
