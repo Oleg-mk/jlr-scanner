@@ -78,6 +78,12 @@ with "Apple could not verify … is free of malware". What to do:
 - **macOS 15:** try to open it once, then open System Settings → Privacy &
   Security, scroll to the message about ProwlOne and click "Open
   Anyway". Once.
+- **If the message says the application was not downloaded from the App
+  Store**, the signature is not the point: Privacy & Security is set to allow
+  App Store applications only, and macOS then offers no "Open Anyway" at all.
+  Either set "Allow applications downloaded from" to "App Store and identified
+  developers" and repeat the step above, or use the commands below, which work
+  whatever that setting says.
 - If macOS only says "cannot be opened" with an OK button and offers
   nothing else, the bundle's seal did not survive the download. Two
   commands in Terminal repair it on your Mac — the first removes the
