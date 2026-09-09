@@ -32,7 +32,7 @@ powershell -File scripts/stamp-library.ps1 -IssuedTo "Іван Іваненко"
 
 5. Надіслати приватним каналом, лише цій людині, три речі:
    - zip її копії бібліотеки;
-   - інсталятор під її систему з `Downloads\jlr-scanner-build-<версія>\` (зараз 0.9.3):
+   - інсталятор під її систему з `Downloads\prowlone-build-<версія>\` (зараз 0.9.3):
      `ProwlOne_0.9.3_x64-setup.exe` для Windows або
      `ProwlOne_0.9.3_universal.dmg` для Mac (хеші — у
      `CURRENT_STATE.md`);
