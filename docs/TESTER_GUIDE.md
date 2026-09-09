@@ -56,7 +56,10 @@ so Windows shows a prompt. What to expect:
   hand. Smart App Control is switched off in Windows Security under App &
   browser control, Smart App Control settings, and since the April 2026
   Windows update it can be switched back on in the same place, without
-  reinstalling; before that it was a one-way decision. Your call: turn it
+  reinstalling; before that it was a one-way decision. If the installer
+  says the application is already installed and cannot remove it, or if
+  you want it gone, write to us: it is one folder, two shortcuts and two
+  registry entries, and we will send the exact lines. Your call: turn it
   off while you work with the application and put it back afterwards, or
   use another PC. We are not asking you to. The real answer is a signed
   installer, and that is planned.
