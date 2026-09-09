@@ -85,7 +85,7 @@ magnitude; source 2 makes it trustworthy.
 
 | Gate | State | Blocks | What closes it |
 | --- | --- | --- | --- |
-| `G2` signing identity | `DECIDED 2026-09-03 — Ukraine, individual entrepreneur (ФОП)`; certificate not yet obtained | nothing since 2026-09-05: the tester programme runs on the unsigned build, the certificate improves it later | the owner obtains an RSA code-signing certificate from a Microsoft Trusted Root CA — OV under the sole-proprietor procedure or IV in his own name — then F12 wires it into CI; see `F3_1_WINDOWS_SIGNING.md` |
+| `G2` signing identity | `DECIDED 2026-09-03 — Ukraine, individual entrepreneur (ФОП)`; certificate not obtained and, since 2026-09-09, not being sought at all — the free route included | nothing since 2026-09-05: the tester programme runs on the unsigned build, the certificate improves it later | the owner obtains an RSA code-signing certificate from a Microsoft Trusted Root CA — OV under the sole-proprietor procedure or IV in his own name — then F12 wires it into CI; see `F3_1_WINDOWS_SIGNING.md` |
 | `G1` owner vehicle access | `DECLINED_BY_OWNER` | nothing; superseded by the tester programme | closed by decision |
 | `G3` adapter class | `DECIDED — J2534 / MongoosePro JLR class` | nothing | closed by the SDD-replacement thesis |
 | `G4` distributing SDD-derived knowledge | `DECIDED 2026-09-03 — named testers only, separate from the installer`; every copy stamped since 2026-09-05 | nothing; the tester programme hands the library to each named tester | closed by decision, see below |
@@ -221,13 +221,18 @@ tester address. The medium-speed buses were hypothesised on
 module rows now sit on hypothesised routes, 14 on unbound sub-networks;
 confirmation waits on a tester's read (M6).*
 
-**M4 — a signed installer (F12, gate `G2` decided; deferred until first real results).** The owner obtains the
+**M4 — a signed installer (F12, gate `G2` decided; set aside 2026-09-09).** The owner obtains the
 certificate as a Ukrainian ФОП — OV under the sole-proprietor procedure or IV
 in his own name, from a Microsoft Trusted Root CA — following
-`F3_1_WINDOWS_SIGNING.md`; CI signs. From
-then on the installer runs on Windows 10 and 11 with Smart App Control on,
-with no prompt asked of anyone. macOS packaging follows the same pipeline
-later. Since 2026-09-05 M4 no longer gates the tester programme.
+`F3_1_WINDOWS_SIGNING.md`; CI signs. What that earns, stated correctly since
+2026-09-09: Smart App Control gets an identity to trust and the uninstaller
+can run. It does not silence SmartScreen — for an OV certificate, for Azure
+Artifact Signing and, since 2024, for EV alike, reputation accumulates over
+downloads and the first prompts are expected. macOS packaging follows the same
+pipeline later. Since 2026-09-05 M4 no longer gates the tester programme, and
+since 2026-09-09 it is not being pursued: the owner set the certificate aside,
+free route included, and `F3_1_WINDOWS_SIGNING.md` records what would reopen
+it.
 
 **M5 — the library reaches testers (gate `G4` decided).** Each named tester
 receives the exported library as a folder under the programme's terms; the
