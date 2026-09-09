@@ -1,5 +1,7 @@
 //! Transport abstractions without hardware- or protocol-specific behavior.
 
+pub mod bench;
+pub use bench::{BenchBus, BenchRoute, EmptyBench};
 mod byte_stream;
 mod can;
 pub use byte_stream::{ByteTransport, TransportError};

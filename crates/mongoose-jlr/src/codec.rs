@@ -247,7 +247,6 @@ fn validate_sequence(sequence: u16) -> Result<(), ProtocolError> {
     }
 }
 
-#[cfg(test)]
 pub(crate) fn encode_board_info_response(sequence: u16, body: &[u8]) -> Vec<u8> {
     let packet = MongoosePacket {
         route_a: 0,

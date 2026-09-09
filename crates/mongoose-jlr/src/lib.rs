@@ -1,5 +1,6 @@
 //! Safe MongoosePro JLR identity and passive raw-CAN receive subset.
 
+pub mod bench;
 mod capture;
 mod codec;
 mod device;

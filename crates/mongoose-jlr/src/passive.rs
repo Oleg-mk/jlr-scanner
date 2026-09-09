@@ -20,17 +20,18 @@ pub(crate) const CAN2_RESOURCE_ROUTE: u16 = 0x1501;
 /// nothing; a power cycle returns the adapter to the bootloader. The
 /// reflash, unprotect, reset and serial-number commands of the same family
 /// are deliberately absent from this crate.
-const JUMP_TO_FIRMWARE: u16 = 0x0103;
+pub(crate) const JUMP_TO_FIRMWARE: u16 = 0x0103;
 pub(crate) const JUMP_TO_FIRMWARE_RESPONSE: u16 = 0x8103;
-const DT_LISTEN_ONLY: u32 = 0x1000_0000;
+pub(crate) const DT_LISTEN_ONLY: u32 = 0x1000_0000;
 pub(crate) const CAN_29BIT_ID: u32 = 0x0000_0100;
-const OPEN_CHANNEL: u16 = 0x0006;
+pub(crate) const OPEN_CHANNEL: u16 = 0x0006;
 pub(crate) const OPEN_CHANNEL_RESPONSE: u16 = 0x8006;
-const CLOSE_CHANNEL: u16 = 0x0007;
+pub(crate) const CLOSE_CHANNEL: u16 = 0x0007;
 pub(crate) const CLOSE_CHANNEL_RESPONSE: u16 = 0x8007;
+pub(crate) const OUTBOUND_DATA: u16 = 0x0008;
 const INBOUND_DATA: u16 = 0x0009;
 pub(crate) const OUTBOUND_DATA_RESPONSE: u16 = 0x8008;
-const SET_PIN: u16 = 0x0012;
+pub(crate) const SET_PIN: u16 = 0x0012;
 pub(crate) const SET_PIN_RESPONSE: u16 = 0x8012;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -487,7 +488,6 @@ fn read_u32(bytes: &[u8], offset: usize) -> Option<u32> {
     ]))
 }
 
-#[cfg(test)]
 pub(crate) fn command_response(
     channel_id: u16,
     command: u16,
@@ -505,7 +505,30 @@ pub(crate) fn command_response(
     outer_frame(&payload)
 }
 
-#[cfg(test)]
+/// A command response with text after the status and tick words, the way
+/// the firmware refuses: `SetPins: ... only supports CAN on pins 6 and 14`.
+pub(crate) fn command_response_with_text(
+    channel_id: u16,
+    command: u16,
+    sequence: u16,
+    status: u32,
+    tick: u32,
+    text: &str,
+) -> Vec<u8> {
+    let mut payload = Vec::with_capacity(24 + text.len());
+    payload.extend_from_slice(&0_u16.to_le_bytes());
+    payload.extend_from_slice(&channel_id.to_le_bytes());
+    payload.extend_from_slice(&command.to_le_bytes());
+    payload.extend_from_slice(&sequence.to_le_bytes());
+    payload.extend_from_slice(&0_u16.to_le_bytes());
+    payload.extend_from_slice(&0_u16.to_le_bytes());
+    payload.extend_from_slice(&status.to_le_bytes());
+    payload.extend_from_slice(&tick.to_le_bytes());
+    payload.extend_from_slice(text.as_bytes());
+    payload.push(0);
+    outer_frame(&payload)
+}
+
 pub(crate) fn inbound_can_frame(
     channel_id: u16,
     rx_status: u32,
