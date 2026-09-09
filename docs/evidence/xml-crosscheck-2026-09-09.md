@@ -35,7 +35,19 @@ declares: the byte range and the mask, against the `identifier_definition`
 encoding the library carries. Compared as sets, because the four formatting
 documents can define the same parameter more than once.
 
-## Result
+## Result, after the fix
+
+```
+addresses     agree 742 | disagree 0 | only in the xml 0 | only in the library 0
+field widths  agree 3799 | disagree 0 | only in the xml 328 | only in the library 0
+```
+
+Every module row and every diagnostic address the corpus declares is in the
+library, with the same values, and nothing is in the library that the corpus
+does not declare. The first run did not say that; what it took to get here is
+below.
+
+## Result, first run
 
 ```
 addresses     agree 711 | disagree 8 | only in the xml 51 | only in the library 23
@@ -76,38 +88,52 @@ What this costs, concretely:
 - **X404** loses three rows the same way, but X404 is not ingested at all
   (see below), so nothing depends on it today.
 
-The fix is not architectural: `applicability` already carries `powertrain`,
-`market` and `other`, which is where the qualifier belongs, and the record id
-needs the qualifier so that two rows no longer collide. It changes the
-exported library, so it changes what issued copies contain.
+**Fixed the same day.** The platform adapter now reads a module's own
+`<qualifier>`: `type` narrows the powertrain, a test naming a market narrows
+the market, and anything else keeps SDD's own name under `other`. The record
+id gains a short digest of those tests, so two rows for one acronym no longer
+collide, and an unqualified module keeps the id it always had. The library
+was re-exported: 131,501 records against 130,388, nothing rejected, and the
+1,113 new records are the rows that used to be lost. `f9_platform_golden`
+covers it by asking the store for an address the way the application does —
+for a described car — and by refusing to answer when the car does not say
+which engine it has.
 
 ## The differences that are not errors
 
-- **51 module rows only in the XML.** They belong to `X101`, `X103`, `X206`,
-  `X356`, `X358` and `X404` — platform documents whose own `platform_name`
-  declares a programme the ingest does not carry. `X404` is folded into
-  `X400` deliberately (`F9`, 2026-09-07); the other five are a coverage gap,
-  not a misreading. Worth a decision of its own, separately from this check.
-- **23 module rows only in the library.** `X100`, `X202`, `X350` and `X400`
-  rows whose source is one of those variant documents, recorded under the
-  base programme; plus modules the project derives rather than reads.
+- **The 51 rows only in the XML, and the 23 only in the library, were the
+  checker's fault and are gone.** Which programme a document is about has
+  three answers and they disagree: the file name, the `<platform_name>` it
+  declares, and the `model` its qualifiers name. `PLATFORM_X356.xml` calls
+  itself `X356` and qualifies every module with `model="X350"`. The ingest
+  reads the qualifier, which is the applicability statement — this module
+  applies to that model — and the checker now does too. The programme is only
+  the key the two readings are joined on; the addresses under test are still
+  read from scratch on each side. Nothing was uningested after all.
 - **60 derived rows set aside.** The 29-bit `normal_fixed` identifiers of
   `ADR-0017`. The XML is not their source, so comparing them would only
   manufacture noise.
 - **328 parameters only in the XML.** Read parameters the library does not
-  carry. Not examined in this pass; none of them contradicts the library.
+  carry — 315 of them with a sub-byte mask, so overwhelmingly bit-level
+  values, and 228 of them not scoped to any module. None contradicts the
+  library; it is a coverage number, and the one thing this check leaves
+  open.
 
-## Two mistakes in the checker itself, corrected during the run
+## Three mistakes in the checker itself, corrected during the run
 
-Recorded because they are the kind of thing that makes a cross-check lie:
+Recorded because they are the kind of thing that makes a cross-check lie —
+and because two of the three looked exactly like defects in the library:
 
-1. The programme was first taken from the file name. `PLATFORM_X204.xml`
-   declares `X206`; the document names itself and the file name does not
-   always agree. Now the declaration wins.
+1. The programme was first taken from the file name, then from
+   `<platform_name>`, and only finally from the `model` its qualifiers name,
+   which is what the ingest reads. The first two spellings invented 74
+   differences that were not there.
 2. Addressing records whose entity is a whole vehicle programme rather than a
-   module were compared as if they were modules, and the derived 29-bit rows
-   were compared against an XML that never held them. Both are now set aside
-   explicitly.
+   module were compared as if they were modules.
+3. The 29-bit identifiers this project derives itself were compared against
+   an XML that never held them. Both are now set aside explicitly.
+
+Only one finding survived all three corrections, and it was real.
 
 ## Reproducing
 

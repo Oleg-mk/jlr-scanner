@@ -65,12 +65,24 @@ def read_platform_addresses(paths: list[Path]) -> dict[tuple[str, str], set]:
         except ET.ParseError as error:
             print(f"  ! {path.name}: {error}", file=sys.stderr)
             continue
-        # The document names itself; the file name does not always agree.
-        # `PLATFORM_X204.xml` declares `X206`, and `X250_10MY` is the X250 of
-        # 2010. Trust the declaration, and fall back to the file name only
-        # when there is none.
+        # Which programme a document is about has three answers, and they
+        # disagree: the file name, the `<platform_name>` it declares, and the
+        # `model` its qualifiers name. `PLATFORM_X356.xml` calls itself X356
+        # and qualifies every module with `model="X350"`. The qualifier wins,
+        # because it is the applicability statement — this module applies to
+        # that model — and it is what the ingest reads. The programme is only
+        # the key the two readings are joined on; the facts under test are the
+        # addresses, and those are still read here from scratch.
+        models = {
+            qualifier.get("model", "").strip()
+            for qualifier in root.iter("qualifier")
+            if qualifier.get("model", "").strip()
+        }
         declared = (root.findtext("platform_name") or "").strip()
-        programme = (declared or name[len("PLATFORM_") :]).split("_")[0].upper()
+        programme = (
+            models.pop() if len(models) == 1 else (declared or name[len("PLATFORM_") :])
+        )
+        programme = programme.split("_")[0].upper()
         for module in root.iter("module"):
             code_name = module.find("module_code_name")
             if code_name is None:

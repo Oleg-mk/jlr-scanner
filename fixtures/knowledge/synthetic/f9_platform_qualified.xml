@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Synthetic fixture reproducing one SDD shape only: a module acronym
+     declared several times under different <qualifier> tests, each with its
+     own diagnostic address. Real documents do this to say that one acronym
+     means different hardware depending on the engine, the build year or the
+     market. No JLR content: the names and the addresses are invented. -->
+<platform xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="platform.xsd">
+	<platform_name>SYNTHQ</platform_name>
+	<network_architecture>
+		<network net_id="CAN_HS" main_net="CAN_HS">
+			<protocol type="diagnostic">ISO14229</protocol>
+			<protocol type="network">ISO15765</protocol>
+			<can>
+				<rate>500</rate>
+				<identifier>11</identifier>
+			</can>
+			<addressing>
+				<can_iso15765>
+					<normal/>
+				</can_iso15765>
+			</addressing>
+		</network>
+	</network_architecture>
+	<module_fitment>
+		<module>
+			<qualifier model="SYNTHQ" year="MY10">
+				<qual type="type" value="SMALLENGINE" />
+			</qualifier>
+			<module_code_name acronym="QUALMOD" ISOName="QUALMOD">QUALMOD_SYSTEM_A</module_code_name>
+			<address type="can_tx" session="diag">0x7B2</address>
+			<address type="can_rx" session="diag">0x7BA</address>
+			<network>CAN_HS</network>
+			<fitment>mandatory</fitment>
+		</module>
+		<module>
+			<qualifier model="SYNTHQ" year="MY10">
+				<qual type="type" value="BIGENGINE" />
+				<qual type="SubType" value="5L" />
+				<qual type="CM_QUAL_SYNTH_MARKET" value="VAL_SYNTH_USA" />
+			</qualifier>
+			<module_code_name acronym="QUALMOD" ISOName="QUALMOD">QUALMOD_SYSTEM_A</module_code_name>
+			<address type="can_tx" session="diag">0x720</address>
+			<address type="can_rx" session="diag">0x728</address>
+			<network>CAN_HS</network>
+			<fitment>mandatory</fitment>
+		</module>
+		<module>
+			<qualifier model="SYNTHQ" year="MY10">
+				<qual type="CM_QUAL_SYNTH_BUILD" value="VAL_SYNTH_2014" />
+			</qualifier>
+			<module_code_name acronym="BUILDMOD" ISOName="BUILDMOD">BUILDMOD_SYSTEM_A</module_code_name>
+			<address type="can_tx" session="diag">0x760</address>
+			<address type="can_rx" session="diag">0x768</address>
+			<network>CAN_HS</network>
+			<fitment>mandatory</fitment>
+		</module>
+		<module>
+			<qualifier model="SYNTHQ" year="MY10">
+				<qual type="CM_QUAL_SYNTH_BUILD" value="VAL_SYNTH_2015" />
+			</qualifier>
+			<module_code_name acronym="BUILDMOD" ISOName="BUILDMOD">BUILDMOD_SYSTEM_A</module_code_name>
+			<address type="can_tx" session="diag">0x7E6</address>
+			<address type="can_rx" session="diag">0x7EE</address>
+			<network>CAN_HS</network>
+			<fitment>mandatory</fitment>
+		</module>
+		<module>
+			<qualifier model="SYNTHQ" year="MY10"/>
+			<module_code_name acronym="PLAINMOD" ISOName="PLAINMOD">PLAINMOD_SYSTEM_A</module_code_name>
+			<address type="can_tx" session="diag">0x7E0</address>
+			<address type="can_rx" session="diag">0x7E8</address>
+			<network>CAN_HS</network>
+			<fitment>mandatory</fitment>
+		</module>
+	</module_fitment>
+</platform>

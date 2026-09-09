@@ -595,8 +595,23 @@ belong here, in the ingest's own document:
   module answer at different addresses on the V6 and 4.2 V8 than on the 5.0
   and the diesel.
 
-  The dimensions needed to hold the distinction already exist —
-  `powertrain`, `market`, and `other` for anything SDD qualifies by that has
-  no dimension of its own. What is missing is that the platform adapter reads
-  `<qualifier>` at all. Fixing it re-exports the library, so it is a decision
-  and not just a patch.
+  **Fixed the same day, at the owner's decision.** `module_quals` reads the
+  module's own `<qualifier>`; `qualified_by_module` narrows the applicability
+  with it — `type` to the powertrain, `SubType` to the variant, a test naming
+  a market to the market, everything else to `other` under SDD's own name —
+  and `qual_suffix` adds a short digest of those tests to every record the
+  module produces, so two rows stop colliding. A module with no test of its
+  own keeps the id it always had, which is most of them. The digest is used
+  rather than the words because a stable id may be 128 characters and an
+  evidence id repeats the source id inside itself; the words stay in the
+  evidence note. Re-exported: 131,501 records against 130,388, nothing
+  rejected, and the cross-check then agreed on every one of 742 module rows
+  in both directions.
+
+  Two consequences worth stating. A module whose address depends on the
+  engine is now unresolved for a car that does not state one, rather than
+  answered with one engine's address; that is the intended direction, and the
+  survey shows the reason. And SDD splits the naturally aspirated V8 of the
+  X250 by displacement, which lands in `variant` — a dimension the interface
+  does not yet offer a field for, so on that car those modules stay
+  unresolved until it does.

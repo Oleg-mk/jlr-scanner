@@ -406,6 +406,7 @@ impl PlatformAdapter {
     fn derive_normal_fixed_addressing(
         &self,
         segment: &str,
+        suffix: &str,
         acronym: &str,
         program: &str,
         physical: &str,
@@ -429,9 +430,9 @@ impl PlatformAdapter {
         let request = (prefix << 16) | (address << 8) | NORMAL_FIXED_TESTER_ADDRESS;
         let response = (prefix << 16) | (NORMAL_FIXED_TESTER_ADDRESS << 8) | address;
 
-        let record_id = format!("{}.module.{segment}.addressing", self.source.id.0);
+        let record_id = format!("{}.module.{segment}.addressing{suffix}", self.source.id.0);
         let own_evidence_id = format!(
-            "{}.ev.{}.module.{segment}.physical_address",
+            "{}.ev.{}.module.{segment}.physical_address{suffix}",
             self.source.id.0, self.source.id.0
         );
         if !evidence.contains_key(&own_evidence_id) {
@@ -493,6 +494,17 @@ impl PlatformAdapter {
             };
             let acronym = require_attribute(code_name, "acronym")?;
             let segment = preferred_segment(acronym, "module acronym")?;
+            // One acronym can appear several times under different tests, each
+            // with its own address; the suffix keeps the rows apart and the
+            // narrowed applicability says which car each row is for.
+            let quals = module_quals(module);
+            let suffix = qual_suffix(&quals);
+            let qualifier_note = if quals.is_empty() {
+                "none".to_string()
+            } else {
+                qual_text(&quals)
+            };
+            let base = &qualified_by_module(base, &quals)?;
             let network_id = child_text(module, "network").unwrap_or_default();
             let network = networks.get(network_id);
 
@@ -512,10 +524,10 @@ impl PlatformAdapter {
 
             if request.is_some() || response.is_some() {
                 self.push(
-                format!("{}.module.{segment}.addressing", self.source.id.0),
+                format!("{}.module.{segment}.addressing{suffix}", self.source.id.0),
                 format!("module_fitment/module[module_code_name/@acronym='{acronym}']"),
                 format!(
-                    "{program} {acronym} tx={request:?} rx={response:?} net={network_id} fitment={fitment_note}"
+                    "{program} {acronym} tx={request:?} rx={response:?} net={network_id} fitment={fitment_note} qualifier={qualifier_note}"
                 ),
                 entity.clone(),
                 ClaimKey::DiagnosticAddressing,
@@ -533,7 +545,7 @@ impl PlatformAdapter {
             }
             if let Some(physical) = physical.as_deref() {
                 self.push(
-                    format!("{}.module.{segment}.physical_address", self.source.id.0),
+                    format!("{}.module.{segment}.physical_address{suffix}", self.source.id.0),
                     format!(
                         "module_fitment/module[module_code_name/@acronym='{acronym}']/address[@type='phys'][@session='diag']"
                     ),
@@ -555,15 +567,15 @@ impl PlatformAdapter {
             if self.derive_normal_fixed && request.is_none() && response.is_none() {
                 if let (Some(physical), Some(network)) = (physical.as_deref(), network) {
                     self.derive_normal_fixed_addressing(
-                        &segment, acronym, program, physical, network, &entity, base, evidence,
-                        records,
+                        &segment, &suffix, acronym, program, physical, network, &entity, base,
+                        evidence, records,
                     )?;
                 }
             }
 
             if !network_id.is_empty() {
                 self.push(
-                    format!("{}.module.{segment}.network", self.source.id.0),
+                    format!("{}.module.{segment}.network{suffix}", self.source.id.0),
                     format!("module_fitment/module[module_code_name/@acronym='{acronym}']/network"),
                     format!("{program} {acronym} on {network_id}"),
                     entity.clone(),
@@ -580,7 +592,7 @@ impl PlatformAdapter {
             }
             if let Some(network) = network {
                 self.add_module_bus_facts(
-                    network, &entity, acronym, program, base, evidence, records,
+                    network, &entity, acronym, &suffix, program, base, evidence, records,
                 )?;
             }
         }
@@ -599,6 +611,7 @@ impl PlatformAdapter {
         network: &Network,
         entity: &KnowledgeEntity,
         acronym: &str,
+        variant: &str,
         program: &str,
         base: &Applicability,
         evidence: &mut BTreeMap<String, EvidenceRecord>,
@@ -610,7 +623,7 @@ impl PlatformAdapter {
         let network_locator = format!("network_architecture/network[@net_id='{}']", network.id);
 
         self.push(
-            format!("{}.module.{segment}.bus", self.source.id.0),
+            format!("{}.module.{segment}.bus{variant}", self.source.id.0),
             format!("{module_locator}; {network_locator}"),
             format!("{program} {acronym} on {}", network.id),
             entity.clone(),
@@ -630,7 +643,7 @@ impl PlatformAdapter {
             return Ok(());
         };
         self.push(
-            format!("{}.module.{segment}.protocol", self.source.id.0),
+            format!("{}.module.{segment}.protocol{variant}", self.source.id.0),
             format!("{module_locator}; {network_locator}/protocol[@type='diagnostic']"),
             format!(
                 "{program} {acronym} on {} diagnostic protocol {protocol}",
@@ -657,7 +670,10 @@ impl PlatformAdapter {
             ("read_dtc_information", UDS_READ_DTC_INFORMATION_CAPABILITY),
         ] {
             self.push(
-                format!("{}.module.{segment}.capability.{suffix}", self.source.id.0),
+                format!(
+                    "{}.module.{segment}.capability.{suffix}{variant}",
+                    self.source.id.0
+                ),
                 format!("{module_locator}; {network_locator}/protocol[@type='diagnostic']"),
                 format!("{program} {acronym}: {protocol} read service {capability}"),
                 entity.clone(),
@@ -678,6 +694,99 @@ impl PlatformAdapter {
         }
         Ok(())
     }
+}
+
+/// The `<qual>` tests a module's own `<qualifier>` carries, in document order.
+///
+/// SDD uses these to say that one acronym means different hardware depending
+/// on the engine, the build year or the market — and gives each its own
+/// diagnostic address. They must reach the record, or the rows collide and
+/// only one address of several survives.
+fn module_quals(module: roxmltree::Node<'_, '_>) -> Vec<(String, String)> {
+    let Some(qualifier) = child_element(module, "qualifier") else {
+        return Vec::new();
+    };
+    qualifier
+        .children()
+        .filter(|node| node.is_element() && node.tag_name().name() == "qual")
+        .filter_map(|qual| {
+            let kind = qual.attribute("type")?.trim();
+            let value = qual.attribute("value")?.trim();
+            (!kind.is_empty() && !value.is_empty()).then(|| (kind.to_string(), value.to_string()))
+        })
+        .collect()
+}
+
+/// The tests as one canonical line, for the evidence note and the digest.
+fn qual_text(quals: &[(String, String)]) -> String {
+    let mut parts: Vec<String> = quals
+        .iter()
+        .map(|(kind, value)| format!("{kind}={value}"))
+        .collect();
+    parts.sort();
+    parts.dedup();
+    parts.join(",")
+}
+
+/// The record-id suffix that keeps two qualified rows apart; empty when the
+/// module carries no test, so the ids of the unqualified majority do not move.
+///
+/// A digest rather than the words themselves: a stable id may be 128
+/// characters and an evidence id repeats the source id inside itself, so the
+/// readable form pushed the longest rows over the limit. The words stay in
+/// the evidence note, where they cost nothing.
+fn qual_suffix(quals: &[(String, String)]) -> String {
+    if quals.is_empty() {
+        return String::new();
+    }
+    let digest = knowledge::sha256_bytes(qual_text(quals).as_bytes());
+    format!(".q{}", &digest[..8])
+}
+
+fn slug(value: &str) -> String {
+    value
+        .chars()
+        .map(|character| {
+            if character.is_ascii_alphanumeric() {
+                character.to_ascii_lowercase()
+            } else {
+                '_'
+            }
+        })
+        .collect()
+}
+
+/// `base` narrowed by the module's own qualifier.
+///
+/// SDD's `type` is the powertrain and its `SubType` refines it — 4.2L against
+/// 5L of the same V8 — which is what `variant` is for. Anything naming a
+/// market is the market. Everything else keeps SDD's own name under `other`,
+/// because inventing a dimension for it would claim to understand more than
+/// the document says.
+fn qualified_by_module(
+    base: &Applicability,
+    quals: &[(String, String)],
+) -> Result<Applicability, KnowledgeError> {
+    if quals.is_empty() {
+        return Ok(base.clone());
+    }
+    let mut applicability = base.clone();
+    for (kind, value) in quals {
+        let constraint = DimensionConstraint::one_of([value.to_string()])?;
+        if kind.eq_ignore_ascii_case("type") {
+            applicability.powertrain = constraint;
+        } else if kind.eq_ignore_ascii_case("subtype") {
+            applicability.variant = constraint;
+        } else if kind.to_ascii_uppercase().contains("MARKET") {
+            applicability.market = constraint;
+        } else {
+            applicability
+                .other
+                .insert(format!("sdd_qual_{}", slug(kind)), constraint);
+        }
+    }
+    applicability.validate()?;
+    Ok(applicability)
 }
 
 /// Vehicle program and model-year marker, taken from the document's qualifiers.
@@ -826,4 +935,33 @@ fn address(
             KnowledgeError::Parse(format!("address '{text}' is not a usable identifier"))
         })?;
     Ok(Some(parsed))
+}
+
+#[cfg(test)]
+mod qualifier_tests {
+    use super::*;
+
+    #[test]
+    fn the_suffix_is_short_stable_and_order_independent() {
+        let one = vec![
+            ("type".to_string(), "V6DIESEL".to_string()),
+            ("SubType".to_string(), "2.7L".to_string()),
+        ];
+        let other = vec![
+            ("SubType".to_string(), "2.7L".to_string()),
+            ("type".to_string(), "V6DIESEL".to_string()),
+        ];
+        let suffix = qual_suffix(&one);
+        assert_eq!(suffix, qual_suffix(&other), "attribute order cannot matter");
+        assert_eq!(suffix.len(), 10, "short enough for a stable id: {suffix}");
+        assert!(
+            qual_suffix(&[]).is_empty(),
+            "an unqualified module keeps its id"
+        );
+        assert_ne!(
+            suffix,
+            qual_suffix(&[("type".to_string(), "V8SC".to_string())]),
+            "different tests, different rows"
+        );
+    }
 }

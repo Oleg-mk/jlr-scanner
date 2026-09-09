@@ -13,6 +13,11 @@ use knowledge::{
 use sdd_ingest::{ModelYearTimeline, PlatformAdapter, NETWORK_CLAIM};
 
 const FIXTURE: &str = include_str!("../../../fixtures/knowledge/synthetic/f9_platform.xml");
+/// A document that declares one acronym several times, each under its own
+/// `<qualifier>`, which is how SDD says the same module sits at a different
+/// address depending on the engine, the build year or the market.
+const QUALIFIED: &str =
+    include_str!("../../../fixtures/knowledge/synthetic/f9_platform_qualified.xml");
 
 fn source(source_type: SourceType) -> SourceRecord {
     SourceRecord {
@@ -487,4 +492,147 @@ fn normal_fixed_identifiers_are_derived_only_on_request_and_stay_unverified() {
             .validation_state,
         ValidationState::SourceBacked
     );
+}
+
+/// A qualified module keeps every address the document gives it, and the
+/// described car chooses between them.
+///
+/// Before 2026-09-09 the record id held no qualifier and the applicability
+/// carried none, so two rows for one acronym collided and only the last
+/// address in the document survived. On an X250 of 2010 that cost the
+/// instrument cluster and the parking-brake module their address on the V6
+/// and the 4.2 V8; on L405 and L494 it cost the ABS module its address on
+/// cars built in 2014. The cross-check recorded in `docs/evidence/` found it.
+#[test]
+fn a_module_qualified_by_engine_build_or_market_keeps_every_address() {
+    let adapter = PlatformAdapter::new(SourceRecord {
+        id: SourceId::new("f9-qual").unwrap(),
+        source_locator: "fixtures/knowledge/synthetic/f9_platform_qualified.xml".into(),
+        content_fingerprint: Some(
+            ContentFingerprint::sha256(sha256_bytes(QUALIFIED.as_bytes())).unwrap(),
+        ),
+        ..source(SourceType::Documented)
+    })
+    .unwrap();
+    let mut store = KnowledgeStore::new();
+    store.ingest(&adapter, QUALIFIED).unwrap();
+
+    fn address_for(
+        store: &KnowledgeStore,
+        family: &str,
+        powertrain: Option<&str>,
+        variant: Option<&str>,
+        market: Option<&str>,
+        other: &[(&str, &str)],
+    ) -> Vec<(Option<u32>, Option<u32>)> {
+        let context = knowledge::VehicleContext {
+            vehicle_program: Some("SYNTHQ".into()),
+            model_year: None,
+            powertrain: powertrain.map(str::to_string),
+            variant: variant.map(str::to_string),
+            market: market.map(str::to_string),
+            // The document qualifies every claim by its own marker, so a car
+            // that does not state one is not this car.
+            other: std::iter::once(("sdd_year_breakpoint".to_string(), "MY10".to_string()))
+                .chain(
+                    other
+                        .iter()
+                        .map(|(key, value)| (key.to_string(), value.to_string())),
+                )
+                .collect(),
+            ..knowledge::VehicleContext::default()
+        };
+        let result = store.query(
+            // Indeterminate is included because this fixture has no
+            // timeline, so the model year stays unknown; a row for the wrong
+            // engine is still refused, which is what is being tested.
+            &KnowledgeQuery::for_vehicle(context)
+                .with_ecu_family(family)
+                .include_indeterminate(true),
+        );
+        result
+            .records
+            .iter()
+            .filter(|resolved| resolved.record.key == ClaimKey::DiagnosticAddressing)
+            .map(|resolved| match &resolved.record.value {
+                KnowledgeValue::DiagnosticAddressing {
+                    request_id,
+                    response_id,
+                    ..
+                } => (*request_id, *response_id),
+                other => panic!("addressing expected, found {other:?}"),
+            })
+            .collect()
+    }
+
+    // The engine decides. Each car gets one address, and it is its own.
+    assert_eq!(
+        address_for(&store, "QUALMOD", Some("SMALLENGINE"), None, None, &[]),
+        vec![(Some(0x7B2), Some(0x7BA))]
+    );
+    assert_eq!(
+        address_for(
+            &store,
+            "QUALMOD",
+            Some("BIGENGINE"),
+            Some("5L"),
+            Some("VAL_SYNTH_USA"),
+            &[]
+        ),
+        vec![(Some(0x720), Some(0x728))]
+    );
+    // The bigger engine outside that market, or of another displacement,
+    // matches nothing rather than borrowing the other engine's address.
+    assert!(address_for(
+        &store,
+        "QUALMOD",
+        Some("BIGENGINE"),
+        Some("5L"),
+        Some("VAL_SYNTH_ROW"),
+        &[]
+    )
+    .is_empty());
+    assert!(address_for(
+        &store,
+        "QUALMOD",
+        Some("BIGENGINE"),
+        Some("4_2L"),
+        Some("VAL_SYNTH_USA"),
+        &[]
+    )
+    .is_empty());
+
+    // A test SDD has no dimension for keeps SDD's own name, and still selects.
+    assert_eq!(
+        address_for(
+            &store,
+            "BUILDMOD",
+            None,
+            None,
+            None,
+            &[("sdd_qual_cm_qual_synth_build", "VAL_SYNTH_2014")]
+        ),
+        vec![(Some(0x760), Some(0x768))]
+    );
+    assert_eq!(
+        address_for(
+            &store,
+            "BUILDMOD",
+            None,
+            None,
+            None,
+            &[("sdd_qual_cm_qual_synth_build", "VAL_SYNTH_2015")]
+        ),
+        vec![(Some(0x7E6), Some(0x7EE))]
+    );
+
+    // A module with no test of its own keeps the id it always had: the fix
+    // must not move the unqualified majority.
+    let plain = store
+        .get_record("f9-qual.module.PLAINMOD.addressing")
+        .unwrap();
+    assert_eq!(plain.applicability.powertrain, DimensionConstraint::Any);
+    assert!(store
+        .get_record("f9-qual.module.PLAINMOD.network")
+        .is_some());
 }
