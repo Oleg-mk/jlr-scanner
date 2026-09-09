@@ -10,6 +10,8 @@ export function useSessionReportController(client: SessionReportClient) {
   const [snapshot, setSnapshot] = useState<SessionReportSnapshot>(createSessionReportSnapshot);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // The bench (ADR-0020): the report is read for the screen, never for a file.
+  const [preview, setPreview] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     try {
@@ -35,5 +37,16 @@ export function useSessionReportController(client: SessionReportClient) {
     }
   }, [client]);
 
-  return { snapshot, saving, error, refresh, save };
+  const showPreview = useCallback(async () => {
+    setError(null);
+    try {
+      setPreview(await client.getReportJson());
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : String(caught));
+    }
+  }, [client]);
+
+  const hidePreview = useCallback(() => setPreview(null), []);
+
+  return { snapshot, saving, error, preview, refresh, save, showPreview, hidePreview };
 }

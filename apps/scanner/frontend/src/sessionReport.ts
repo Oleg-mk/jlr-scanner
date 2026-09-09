@@ -7,6 +7,8 @@ export interface SessionReportSnapshot {
   moduleReads: number;
   calibrationReads: number;
   reportAvailable: boolean;
+  /** "bench" or "real" once the session holds records of either kind (ADR-0020). */
+  mode: "bench" | "real" | null;
 }
 
 export interface SessionReportClient {
@@ -19,6 +21,7 @@ export const createSessionReportSnapshot = (): SessionReportSnapshot => ({
   moduleReads: 0,
   calibrationReads: 0,
   reportAvailable: false,
+  mode: null,
 });
 
 class TauriSessionReportClient implements SessionReportClient {
@@ -78,6 +81,8 @@ export interface SessionProgress {
   captures: number;
   moduleReads: number;
   reportAvailable: boolean;
+  /** On the bench the last step is a look at the report, not a file. */
+  bench?: boolean;
 }
 
 /**
@@ -133,8 +138,10 @@ export function sessionSteps(progress: SessionProgress): SessionStep[] {
   });
   push({
     id: "save",
-    title: t("Save the session report"),
-    hint: t("One file with everything recorded, for the tester programme."),
+    title: progress.bench ? t("Review the report on screen") : t("Save the session report"),
+    hint: progress.bench
+      ? t("Bench: the report is shown on screen, never saved.")
+      : t("One file with everything recorded, for the tester programme."),
     optional: false,
     done: false,
   });

@@ -1927,6 +1927,7 @@ body {
 
 .app-header,
 .demo-banner,
+.bench-band,
 .app-footer {
   flex: 0 0 auto;
 }
@@ -2281,4 +2282,44 @@ body,
   font-variant-numeric: tabular-nums;
   color: var(--muted);
   white-space: nowrap;
+}
+
+/* The bench (ADR-0020): another JLR colour for the whole screen, so that a
+   screenshot of synthetic data cannot pass for a car, and a band that names
+   it at the top and at the bottom. */
+.app-shell--bench {
+  --background: #f6e3d3;
+  --surface-subtle: #f0d6c2;
+  --border: #e2c1a6;
+  --border-strong: #cfa585;
+}
+
+.bench-band {
+  padding: 0.45rem var(--content-pad);
+  background: #c8763a;
+  color: #fff;
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.bench-offer {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border);
+}
+
+.report-preview {
+  max-height: 24rem;
+  overflow: auto;
+  margin: 1rem 0 0;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-subtle);
+  font-size: 0.78rem;
+  line-height: 1.45;
+  white-space: pre;
 }

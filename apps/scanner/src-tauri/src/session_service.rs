@@ -13,14 +13,28 @@ use std::path::Path;
 pub struct SessionService {
     library: KnowledgeLibrary,
     last_survey: Option<VehicleSurveySnapshot>,
+    last_context: Option<VehicleContextInput>,
 }
 
 impl SessionService {
     pub fn new() -> Self {
+        Self::with_library(KnowledgeLibrary::built_in())
+    }
+
+    /// A session over a given library; the application starts with the
+    /// built-in one, tests with whatever they build.
+    pub fn with_library(library: KnowledgeLibrary) -> Self {
         Self {
-            library: KnowledgeLibrary::built_in(),
+            library,
             last_survey: None,
+            last_context: None,
         }
+    }
+
+    /// The vehicle the last survey described, for whoever must follow it —
+    /// the bench, which answers for that vehicle (ADR-0020).
+    pub fn last_context(&self) -> Option<VehicleContextInput> {
+        self.last_context.clone()
     }
 
     pub fn library(&self) -> &KnowledgeLibrary {
@@ -49,18 +63,21 @@ impl SessionService {
         self.library = KnowledgeLibrary::load_issued_directory(Path::new(directory.trim()));
         // A survey answered by the previous library must not outlive it.
         self.last_survey = None;
+        self.last_context = None;
         self.library_snapshot()
     }
 
     pub fn survey(&mut self, context: &VehicleContextInput) -> VehicleSurveySnapshot {
         let survey = self.library.survey(context);
         self.last_survey = Some(survey.clone());
+        self.last_context = Some(context.clone());
         survey
     }
 
     /// Forget the survey of a session that ended; the library stays.
     pub fn clear_session(&mut self) {
         self.last_survey = None;
+        self.last_context = None;
     }
 
     /// The survey the session report bundles: the last one answered by the

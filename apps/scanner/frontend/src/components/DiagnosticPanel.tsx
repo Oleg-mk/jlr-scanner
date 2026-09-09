@@ -8,6 +8,8 @@ interface DiagnosticPanelProps {
   saving: boolean;
   onRead: () => void;
   onSaveReport: () => void;
+  /** On the bench (ADR-0020) nothing is saved. */
+  bench?: boolean;
 }
 
 function badge(snapshot: DiagnosticSnapshot) {
@@ -35,6 +37,7 @@ export function DiagnosticPanel({
   saving,
   onRead,
   onSaveReport,
+  bench = false,
 }: DiagnosticPanelProps) {
   useLanguage();
   const running = snapshot.state === "RUNNING";
@@ -96,11 +99,12 @@ export function DiagnosticPanel({
           className="button button--secondary"
           type="button"
           onClick={onSaveReport}
-          disabled={!snapshot.reportAvailable || saving}
+          disabled={bench || !snapshot.reportAvailable || saving}
         >
           {saving ? t("Saving…") : t("Save Diagnostic Report")}
         </button>
       </div>
+      {bench ? <p className="button-hint">{t("Bench: nothing is saved.")}</p> : null}
       {!adapterReady ? (
         <p className="button-hint">{t("Connect and verify MongoosePro JLR to enable the read.")}</p>
       ) : null}

@@ -15,11 +15,16 @@ use std::time::{SystemTime, UNIX_EPOCH};
 pub const SESSION_REPORT_SCHEMA: &str = "jlr-scanner.session-report";
 pub const SESSION_REPORT_SCHEMA_VERSION: u32 = 1;
 
+/// A session is either on the bench or on a real adapter, never both.
+pub const SESSION_MODE_BENCH: &str = "bench";
+pub const SESSION_MODE_REAL: &str = "real";
+
 pub struct SessionReportService {
     started_unix_ms: u128,
     captures: Vec<Value>,
     module_reads: Vec<Value>,
     calibration_reads: Vec<Value>,
+    mode: Option<String>,
 }
 
 impl SessionReportService {
@@ -29,7 +34,24 @@ impl SessionReportService {
             captures: Vec::new(),
             module_reads: Vec::new(),
             calibration_reads: Vec::new(),
+            mode: None,
         }
+    }
+
+    /// Whether a record of `wanted` kind may join this session: yes while
+    /// it is empty or already of that kind (ADR-0020).
+    pub fn accepts(&self, wanted: &str) -> bool {
+        !self.snapshot().report_available || self.mode.as_deref() == Some(wanted)
+    }
+
+    pub fn set_mode(&mut self, mode: &str) {
+        self.mode = Some(mode.to_string());
+    }
+
+    /// Whether this session is on the bench, in which case nothing it holds
+    /// may be written to disk.
+    pub fn is_bench(&self) -> bool {
+        self.mode.as_deref() == Some(SESSION_MODE_BENCH)
     }
 
     pub fn snapshot(&self) -> SessionReportSnapshot {
@@ -39,6 +61,7 @@ impl SessionReportService {
             module_reads: self.module_reads.len() as u32,
             calibration_reads: self.calibration_reads.len() as u32,
             report_available: total > 0,
+            mode: self.mode.clone(),
         }
     }
 
@@ -72,6 +95,7 @@ impl SessionReportService {
             "schema_version": SESSION_REPORT_SCHEMA_VERSION,
             "application_version": env!("CARGO_PKG_VERSION"),
             "application_build": build_id(),
+            "session_mode": self.mode.as_deref().unwrap_or(SESSION_MODE_REAL),
             "session_started_unix_ms": self.started_unix_ms,
             "saved_unix_ms": unix_ms(),
             "validation": "session bundle; every item carries its own validation state and none is vehicle-confirmed by being here",

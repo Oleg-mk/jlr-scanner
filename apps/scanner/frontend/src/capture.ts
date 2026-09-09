@@ -29,6 +29,8 @@ export interface CaptureSnapshot {
   verdict: string;
   error: string | null;
   captureAvailable: boolean;
+  /** Heard on the bench (ADR-0020): synthetic, never evidence. */
+  synthetic: boolean;
 }
 
 export interface CaptureClient {
@@ -60,6 +62,7 @@ export const createCaptureSnapshot = (): CaptureSnapshot => ({
   verdict: "",
   error: null,
   captureAvailable: false,
+  synthetic: false,
 });
 
 class TauriCaptureClient implements CaptureClient {
@@ -118,6 +121,7 @@ class BrowserCaptureClient implements CaptureClient {
         "Synthetic preview: traffic present. A live bus is on this pair. Which of the vehicle's buses it is cannot be told from listening alone.",
       error: null,
       captureAvailable: true,
+      synthetic: false,
     };
     return Promise.resolve(this.last);
   }

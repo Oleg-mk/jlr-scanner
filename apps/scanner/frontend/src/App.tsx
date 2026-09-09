@@ -8,7 +8,7 @@ import {
   type Language,
 } from "./i18n";
 import type { AdapterClient } from "./adapter";
-import { browserDemoEnabled, defaultAdapterClient } from "./adapter";
+import { browserDemoEnabled, defaultAdapterClient, isBench } from "./adapter";
 import type { CaptureClient } from "./capture";
 import { defaultCaptureClient } from "./capture";
 import { AdapterPanel } from "./components/AdapterPanel";
@@ -125,6 +125,9 @@ export function App({
     controller.snapshot.boardCommunication === "VERIFIED";
   const diagnostic = useDiagnosticController(diagnosticClient, adapterReady);
   const session = useSessionReportController(sessionReportClient);
+  // The bench (ADR-0020): a virtual vehicle behind a stand-in adapter. The
+  // whole screen says so, and the session is bench-only or real-only.
+  const bench = isBench(controller.snapshot);
   const beginNewSession = useCallback(async () => {
     const confirmed = await startNewSession({
       title: t("Start a new session?"),
@@ -138,6 +141,40 @@ export function App({
     if (onNewSession) onNewSession();
     else window.location.reload();
   }, [onNewSession]);
+  const sessionMode = session.snapshot.mode;
+  const sessionHasRecords = session.snapshot.reportAvailable;
+  const { connect: connectReal, connectBench: connectBenchAdapter } = controller;
+  /**
+   * A session is on the bench or on a car, never both: switching while the
+   * session holds records of the other kind starts a new session first, on
+   * the user's confirmation, and the shell refuses the switch regardless.
+   */
+  const switchMode = useCallback(
+    async (wanted: "bench" | "real", connect: () => Promise<void>) => {
+      if (sessionHasRecords && sessionMode !== wanted) {
+        const confirmed = await startNewSession({
+          title: t("Start a new session?"),
+          message: t(
+            "A session is either on the bench or on a car, never both. The report, the survey and the reads of this session are dropped unless saved.",
+          ),
+          confirmLabel: t("Start"),
+          cancelLabel: t("Cancel"),
+        });
+        if (!confirmed) return;
+        await connect();
+        if (onNewSession) onNewSession();
+        else window.location.reload();
+        return;
+      }
+      await connect();
+    },
+    [onNewSession, sessionHasRecords, sessionMode],
+  );
+  const connectAdapter = useCallback(() => switchMode("real", connectReal), [connectReal, switchMode]);
+  const connectBench = useCallback(
+    () => switchMode("bench", connectBenchAdapter),
+    [connectBenchAdapter, switchMode],
+  );
 
   // Every module's latest read, from single reads and from the network check
   // alike; what the map colours its nodes by.
@@ -185,6 +222,7 @@ export function App({
     captures: session.snapshot.captures,
     moduleReads: session.snapshot.moduleReads,
     reportAvailable: session.snapshot.reportAvailable,
+    bench,
   });
   const demoPreview = browserDemoEnabled();
   const railVehicle: RailVehicle | null = (() => {
@@ -210,8 +248,9 @@ export function App({
   );
   const readingModule = check.current ?? (moduleRead.busy ? selectedModule : null);
 
-  const adapterPill =
-    controller.snapshot.state === "CONNECTED" && adapterReady ? (
+  const adapterPill = bench ? (
+    <StatusBadge tone="pending">{t("Bench: virtual vehicle")}</StatusBadge>
+  ) : controller.snapshot.state === "CONNECTED" && adapterReady ? (
       <StatusBadge tone="positive">{t("Adapter ready")}</StatusBadge>
     ) : controller.snapshot.state === "CONNECTED" ? (
       <StatusBadge tone="pending">{t("Adapter connected, board unverified")}</StatusBadge>
@@ -237,7 +276,7 @@ export function App({
 
   return (
     <LanguageContext.Provider value={language}>
-    <div className="app-shell" lang={language}>
+    <div className={bench ? "app-shell app-shell--bench" : "app-shell"} lang={language}>
       <header className="app-header">
         <div className="brand">
           <h1>JLR Scanner</h1>
@@ -269,6 +308,11 @@ export function App({
           </label>
         </div>
       </header>
+      {bench ? (
+        <div className="bench-band" role="status">
+          {t("BENCH · virtual vehicle · synthetic data")}
+        </div>
+      ) : null}
       {demoPreview ? (
         <div className="demo-banner" role="status">
           {t("Development preview only — no Mongoose or vehicle communication.")}
@@ -314,7 +358,8 @@ export function App({
                       selectedPort={controller.selectedPort}
                       onSelectPort={controller.setSelectedPort}
                       onDetect={() => void controller.refresh()}
-                      onConnect={() => void controller.connect()}
+                      onConnect={() => void connectAdapter()}
+                      onConnectBench={() => void connectBench()}
                       onDisconnect={() => void controller.disconnect()}
                     />
                     <LibraryPanel
@@ -371,6 +416,7 @@ export function App({
                       adapterReady={adapterReady}
                       busy={moduleRead.busy || check.current === selectedModule}
                       saving={moduleRead.saving}
+                      bench={bench}
                       onKindChange={moduleRead.setKind}
                       onIdentifierChange={moduleRead.setIdentifier}
                       onRead={() => void moduleRead.read()}
@@ -387,6 +433,7 @@ export function App({
                       adapterReady={adapterReady}
                       busy={capture.busy}
                       saving={capture.saving}
+                      bench={bench}
                       onRouteChange={capture.setRouteId}
                       onSecondsChange={capture.setSeconds}
                       onListen={() => void capture.listen()}
@@ -396,6 +443,7 @@ export function App({
                       snapshot={diagnostic.snapshot}
                       adapterReady={adapterReady}
                       saving={diagnostic.saving}
+                      bench={bench}
                       onRead={() => void diagnostic.read()}
                       onSaveReport={() => void diagnostic.saveReport()}
                     />
@@ -406,7 +454,11 @@ export function App({
                     snapshot={session.snapshot}
                     error={session.error}
                     saving={session.saving}
+                    bench={bench}
+                    preview={session.preview}
                     onSave={() => void session.save()}
+                    onPreview={() => void session.showPreview()}
+                    onHidePreview={session.hidePreview}
                   />
                 ) : null}
               </section>
@@ -414,9 +466,14 @@ export function App({
           })}
         </div>
       </main>
+      {bench ? (
+        <div className="bench-band">{t("BENCH · virtual vehicle · synthetic data")}</div>
+      ) : null}
       <footer className="app-footer">
         <span>
-          {controller.snapshot.state === "CONNECTED"
+          {bench
+            ? t("Bench: virtual vehicle from the library; every value is synthetic.")
+            : controller.snapshot.state === "CONNECTED"
             ? t("Adapter connected and board communication verified.")
             : controller.snapshot.state === "ADAPTER_DETECTED"
               ? t("Adapter detected.")

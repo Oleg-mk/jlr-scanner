@@ -80,6 +80,24 @@ export function useAdapterController(
     }
   }, [client, selectedPort]);
 
+  const connectBench = useCallback(async () => {
+    if (inFlightRef.current) return;
+    inFlightRef.current = true;
+    setSnapshot((current) => ({
+      ...current,
+      state: "CONNECTING",
+      boardCommunication: "PENDING",
+      error: null,
+    }));
+    try {
+      setSnapshot(await client.connectBench());
+    } catch (error) {
+      setSnapshot((current) => frontendFailure(current, error));
+    } finally {
+      inFlightRef.current = false;
+    }
+  }, [client]);
+
   const disconnect = useCallback(async () => {
     if (inFlightRef.current) return;
     inFlightRef.current = true;
@@ -98,6 +116,7 @@ export function useAdapterController(
     setSelectedPort,
     refresh,
     connect,
+    connectBench,
     disconnect,
   };
 }

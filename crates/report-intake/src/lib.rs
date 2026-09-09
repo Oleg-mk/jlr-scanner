@@ -50,6 +50,9 @@ struct SessionReport {
     /// The commit CI built, since build 0.9.1; older reports carry none.
     #[serde(default)]
     application_build: Option<String>,
+    /// `bench` or `real` (ADR-0020); a bench report is refused by construction.
+    #[serde(default)]
+    session_mode: Option<String>,
     #[serde(default)]
     saved_unix_ms: Option<u64>,
     #[serde(default)]
@@ -127,6 +130,14 @@ pub fn intake(
             "expected a {SESSION_REPORT_SCHEMA} version {SESSION_REPORT_SCHEMA_VERSION} report, found '{}' version {}",
             report.schema, report.schema_version
         )));
+    }
+    // A bench session (ADR-0020) holds synthetic values only: refused here,
+    // by construction, whatever else the report says about itself.
+    if report.session_mode.as_deref() == Some("bench") {
+        return Err(KnowledgeError::Parse(
+            "this is a bench session: every value in it is synthetic, so the intake refuses it"
+                .into(),
+        ));
     }
 
     let digest = sha256_bytes(report_text.as_bytes());

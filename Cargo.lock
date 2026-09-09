@@ -1777,14 +1777,18 @@ name = "jlr-scanner-shell"
 version = "0.9.1"
 dependencies = [
  "app-contracts",
+ "bench-vehicle",
  "diagnostic-environment",
  "diagnostic-execution",
  "diagnostic-session",
  "diagnostic-simulator",
  "diagnostics-core",
  "jlr-profiles",
+ "knowledge",
  "mongoose-jlr",
  "obd-j1979",
+ "report-intake",
+ "sdd-ingest",
  "serde",
  "serde_json",
  "tauri",

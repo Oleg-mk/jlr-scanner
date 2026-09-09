@@ -477,7 +477,7 @@ gate selects.
 
 ### F13 — tester programme (gated on F11 and F12)
 
-*2026-09-09, ADR-0020:* the bench — a virtual vehicle answering on the adapter's own protocol from the loaded library — joins this phase, before the hand-out: it lowers the cost of deciding to take part to one installation, lets a tester walk the flow before the car, and gives CI an end-to-end test of the live path. It proves software only; VEHICLE_CONFIRMED still comes from cars.
+*2026-09-09, ADR-0020:* the bench — a virtual vehicle answering on the adapter's own protocol from the loaded library — joins this phase, before the hand-out: it lowers the cost of deciding to take part to one installation, lets a tester walk the flow before the car, and gives CI an end-to-end test of the live path. It proves software only; VEHICLE_CONFIRMED still comes from cars. *Built the same day:* `IMPLEMENTED / FIXTURE_TESTED`, see `CURRENT_STATE.md`.
 
 Tester-facing safety documentation and consent, a plain statement of what the
 application does and does not do, report submission, and the intake path that

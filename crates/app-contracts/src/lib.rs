@@ -49,6 +49,9 @@ pub enum AdapterErrorCode {
     BoardCommunicationFailed,
     DiscoveryFailed,
     DisconnectFailed,
+    /// The session already holds records of the other kind (bench or real);
+    /// start a new session before switching (ADR-0020).
+    SessionModeMismatch,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -420,6 +423,9 @@ pub struct CaptureSnapshot {
     pub verdict: String,
     pub error: Option<String>,
     pub capture_available: bool,
+    /// Heard on the bench, not on a car (ADR-0020): every count is synthetic.
+    #[serde(default)]
+    pub synthetic: bool,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -503,6 +509,10 @@ pub struct SessionReportSnapshot {
     pub module_reads: u32,
     pub calibration_reads: u32,
     pub report_available: bool,
+    /// `bench` or `real`, once an adapter of either kind took part; a session
+    /// is one or the other, never both (ADR-0020).
+    #[serde(default)]
+    pub mode: Option<String>,
 }
 
 /// One attribute SDD's VIN tables read off a VIN, by the table's own name.

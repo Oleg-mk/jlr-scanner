@@ -33,6 +33,10 @@ class IdleAdapterClient implements AdapterClient {
   connect(): Promise<AdapterSnapshot> {
     return Promise.resolve(createEmptySnapshot());
   }
+  connectBench() {
+    return this.getState();
+  }
+
   disconnect(): Promise<AdapterSnapshot> {
     return Promise.resolve(createEmptySnapshot());
   }
@@ -165,6 +169,7 @@ describe("session flow", () => {
       moduleReads: 2,
       calibrationReads: 0,
       reportAvailable: true,
+      mode: "real",
     });
     Object.assign(URL, { createObjectURL: vi.fn(() => "blob:session"), revokeObjectURL: vi.fn() });
     // jsdom cannot navigate; the download anchor's click is observed, not followed.

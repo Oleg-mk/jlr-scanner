@@ -4,6 +4,7 @@ use app_contracts::{
     VehicleInterfaceCapability, VehicleValidationState,
 };
 use diagnostic_execution::PreparedDiagnosticTransaction;
+use mongoose_jlr::bench::{BenchTransport, SharedBenchBus};
 use mongoose_jlr::{list_vehicle_routes, MongooseJlrDevice, VehicleRouteId};
 use mongoose_jlr::{MongooseCalibrationIdentificationResult, MongooseDiagnosticError};
 use mongoose_jlr::{
@@ -21,6 +22,12 @@ const ADAPTER_NAME: &str = "MongoosePro JLR";
 const TRANSPORT_NAME: &str = "USB CDC / Serial";
 const BACKEND_NAME: &str = "mongoose-jlr";
 const VEHICLE_MESSAGE: &str = "No vehicle connected";
+/// The bench (ADR-0020) as the adapter panel knows it: a port name no serial
+/// device can have, and a transport name the whole interface keys on.
+pub const BENCH_PORT: &str = "bench";
+pub const BENCH_TRANSPORT: &str = "bench";
+const BENCH_NAME: &str = "Virtual vehicle (bench)";
+const BENCH_BACKEND: &str = "bench-vehicle";
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum BackendFailure {
@@ -30,6 +37,8 @@ pub enum BackendFailure {
     Disconnected(String),
     BoardCommunication(String),
     Disconnect(String),
+    /// The session holds records of the other kind; a new session comes first.
+    SessionMode(String),
 }
 
 pub trait AdapterBackend {
@@ -43,11 +52,97 @@ pub trait AdapterBackend {
     fn disconnect(&self, connection: &mut Self::Connection) -> Result<(), BackendFailure>;
 }
 
-#[derive(Clone, Copy, Debug, Default)]
-pub struct SystemAdapterBackend;
+/// The system's adapters: the serial MongoosePro JLR, and the bench, whose
+/// vehicle is shared with the session that describes it (ADR-0020).
+#[derive(Clone)]
+pub struct SystemAdapterBackend {
+    bench: SharedBenchBus,
+}
+
+impl SystemAdapterBackend {
+    pub fn new(bench: SharedBenchBus) -> Self {
+        Self { bench }
+    }
+}
+
+impl Default for SystemAdapterBackend {
+    fn default() -> Self {
+        Self::new(mongoose_jlr::bench::share_bus(Box::new(
+            transport_api::EmptyBench,
+        )))
+    }
+}
+
+/// One connection, to the adapter or to the bench; the device code above
+/// the transport is the same either way.
+pub enum Link {
+    Serial(MongooseJlrDevice<SerialTransport>),
+    Bench(MongooseJlrDevice<BenchTransport>),
+}
+
+impl Link {
+    fn close(&mut self) -> Result<(), ProtocolError> {
+        match self {
+            Self::Serial(device) => device.close(),
+            Self::Bench(device) => device.close(),
+        }
+    }
+
+    fn execute_prepared_calibration_identification(
+        &mut self,
+        transaction: &PreparedDiagnosticTransaction,
+        timeout: Duration,
+    ) -> Result<MongooseCalibrationIdentificationResult, MongooseDiagnosticError> {
+        match self {
+            Self::Serial(device) => {
+                device.execute_prepared_calibration_identification(transaction, timeout)
+            }
+            Self::Bench(device) => {
+                device.execute_prepared_calibration_identification(transaction, timeout)
+            }
+        }
+    }
+
+    fn capture_route(
+        &mut self,
+        route_id: VehicleRouteId,
+        duration: Duration,
+    ) -> Result<RouteCapture, ProtocolError> {
+        match self {
+            Self::Serial(device) => {
+                device.capture_route(route_id, duration, CAPTURE_IDLE_TIMEOUT, CAPTURE_MAX_FRAMES)
+            }
+            Self::Bench(device) => {
+                device.capture_route(route_id, duration, CAPTURE_IDLE_TIMEOUT, CAPTURE_MAX_FRAMES)
+            }
+        }
+    }
+
+    fn execute_prepared_uds_read(
+        &mut self,
+        transaction: &PreparedUdsTransaction,
+        timeout: Duration,
+    ) -> Result<MongooseUdsReadResult, MongooseDiagnosticError> {
+        match self {
+            Self::Serial(device) => device.execute_prepared_uds_read(transaction, timeout),
+            Self::Bench(device) => device.execute_prepared_uds_read(transaction, timeout),
+        }
+    }
+}
 
 pub struct SystemConnection {
-    device: MongooseJlrDevice<SerialTransport>,
+    device: Link,
+}
+
+fn bench_summary() -> AdapterSummary {
+    AdapterSummary {
+        name: BENCH_NAME.to_owned(),
+        port: BENCH_PORT.to_owned(),
+        usb_vid: 0,
+        usb_pid: 0,
+        serial_number: None,
+        driver: None,
+    }
 }
 
 impl AdapterBackend for SystemAdapterBackend {
@@ -68,6 +163,22 @@ impl AdapterBackend for SystemAdapterBackend {
         &self,
         adapter: &AdapterSummary,
     ) -> Result<(Self::Connection, BoardInfoEvidence), BackendFailure> {
+        if adapter.port == BENCH_PORT {
+            let mut mongoose = MongooseJlrDevice::open(BenchTransport::new(self.bench.clone()));
+            let response = mongoose
+                .get_board_info()
+                .map_err(|error| BackendFailure::BoardCommunication(error.to_string()))?;
+            let evidence = BoardInfoEvidence {
+                response_command: format!("0x{:04X}", response.response_command),
+                raw_response_hex: encode_hex(&response.raw_board_info),
+            };
+            return Ok((
+                SystemConnection {
+                    device: Link::Bench(mongoose),
+                },
+                evidence,
+            ));
+        }
         let device = SerialDevice {
             port_name: adapter.port.clone(),
             usb_vid: adapter.usb_vid,
@@ -97,7 +208,12 @@ impl AdapterBackend for SystemAdapterBackend {
             response_command: format!("0x{:04X}", response.response_command),
             raw_response_hex: encode_hex(&response.raw_board_info),
         };
-        Ok((SystemConnection { device: mongoose }, evidence))
+        Ok((
+            SystemConnection {
+                device: Link::Serial(mongoose),
+            },
+            evidence,
+        ))
     }
 
     fn disconnect(&self, connection: &mut Self::Connection) -> Result<(), BackendFailure> {
@@ -150,6 +266,11 @@ impl<B: AdapterBackend> AdapterService<B> {
     }
 
     pub fn discover(&mut self) -> AdapterSnapshot {
+        // The bench is not on any port: while it is connected, the serial
+        // enumeration has nothing to say about it.
+        if self.is_bench() {
+            return self.snapshot();
+        }
         let discovered = match self.backend.discover() {
             Ok(adapters) => adapters,
             Err(error) => {
@@ -202,6 +323,15 @@ impl<B: AdapterBackend> AdapterService<B> {
     }
 
     pub fn connect(&mut self, requested_port: Option<String>) -> AdapterSnapshot {
+        // Leaving the bench for a real adapter: the bench link goes first,
+        // so that no state of it survives whatever the enumeration finds.
+        if self.is_bench() {
+            if let Some(mut connection) = self.connection.take() {
+                let _ = self.backend.disconnect(&mut connection);
+            }
+            self.adapter = None;
+            self.board_communication = BoardCommunicationState::Unavailable;
+        }
         let discovered = match self.backend.discover() {
             Ok(adapters) => adapters,
             Err(error) => {
@@ -316,6 +446,78 @@ impl<B: AdapterBackend> AdapterService<B> {
 
 pub type SharedAdapterService = Mutex<AdapterService<SystemAdapterBackend>>;
 
+impl<B: AdapterBackend> AdapterService<B> {
+    /// Whether the connection, if any, is the bench rather than an adapter.
+    pub fn is_bench(&self) -> bool {
+        self.connection.is_some()
+            && self
+                .adapter
+                .as_ref()
+                .is_some_and(|adapter| adapter.transport == BENCH_TRANSPORT)
+    }
+
+    /// Refuse a switch between the bench and an adapter while the session
+    /// holds records of the other kind (ADR-0020).
+    pub fn refuse_session_switch(&mut self, wanted: &str) -> AdapterSnapshot {
+        // Whatever is connected stays connected: refusing a switch is not a
+        // failure of the connection.
+        self.error = Some(user_error(BackendFailure::SessionMode(format!(
+            "this session already holds {} records; start a new session before connecting the {wanted}",
+            if wanted == BENCH_TRANSPORT { "adapter" } else { "bench" }
+        ))));
+        self.snapshot()
+    }
+
+    /// Forget a refused switch once a new session has made it moot.
+    pub fn clear_session_error(&mut self) {
+        if self
+            .error
+            .as_ref()
+            .is_some_and(|error| error.code == AdapterErrorCode::SessionModeMismatch)
+        {
+            self.error = None;
+        }
+    }
+
+    /// Connect the bench (ADR-0020): no port, no discovery, the vehicle the
+    /// session describes behind a stand-in adapter that answers with the
+    /// firmware's own frames. Whatever was connected is closed first.
+    pub fn connect_bench(&mut self) -> AdapterSnapshot {
+        if let Some(mut connection) = self.connection.take() {
+            let _ = self.backend.disconnect(&mut connection);
+        }
+        let summary = bench_summary();
+        self.state = AdapterState::Connecting;
+        self.selected_adapter_port = Some(summary.port.clone());
+        self.board_communication = BoardCommunicationState::Pending;
+        self.error = None;
+        match self.backend.connect(&summary) {
+            Ok((connection, board_info)) => {
+                self.connection = Some(connection);
+                self.adapter = Some(AdapterInfo {
+                    name: summary.name.clone(),
+                    connection_status: "Connected".to_owned(),
+                    port: summary.port.clone(),
+                    usb_vid: 0,
+                    usb_pid: 0,
+                    serial_number: None,
+                    transport: BENCH_TRANSPORT.to_owned(),
+                    driver: None,
+                    backend: BENCH_BACKEND.to_owned(),
+                    board_info,
+                });
+                self.board_communication = BoardCommunicationState::Verified;
+                self.state = AdapterState::Connected;
+            }
+            Err(error) => {
+                self.board_communication = BoardCommunicationState::Failed;
+                self.set_error(error);
+            }
+        }
+        self.snapshot()
+    }
+}
+
 impl AdapterService<SystemAdapterBackend> {
     pub fn connected_adapter(&self) -> Option<AdapterInfo> {
         (self.state == AdapterState::Connected)
@@ -345,14 +547,9 @@ impl AdapterService<SystemAdapterBackend> {
         route_id: VehicleRouteId,
         duration: Duration,
     ) -> Option<Result<RouteCapture, ProtocolError>> {
-        self.connection.as_mut().map(|connection| {
-            connection.device.capture_route(
-                route_id,
-                duration,
-                CAPTURE_IDLE_TIMEOUT,
-                CAPTURE_MAX_FRAMES,
-            )
-        })
+        self.connection
+            .as_mut()
+            .map(|connection| connection.device.capture_route(route_id, duration))
     }
 }
 
@@ -372,8 +569,8 @@ impl AdapterService<SystemAdapterBackend> {
     }
 }
 
-pub fn shared_service() -> SharedAdapterService {
-    Mutex::new(AdapterService::new(SystemAdapterBackend))
+pub fn shared_service(bench: SharedBenchBus) -> SharedAdapterService {
+    Mutex::new(AdapterService::new(SystemAdapterBackend::new(bench)))
 }
 
 pub fn lock_service<'a>(
@@ -485,6 +682,12 @@ fn user_error(failure: BackendFailure) -> UserFacingError {
         BackendFailure::Disconnect(details) => UserFacingError {
             code: AdapterErrorCode::DisconnectFailed,
             message: "Unable to disconnect adapter cleanly".to_owned(),
+            technical_details: Some(details),
+        },
+        BackendFailure::SessionMode(details) => UserFacingError {
+            code: AdapterErrorCode::SessionModeMismatch,
+            message: "Start a new session before switching between the bench and an adapter"
+                .to_owned(),
             technical_details: Some(details),
         },
     }

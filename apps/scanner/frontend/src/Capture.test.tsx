@@ -58,6 +58,10 @@ class FixedAdapterClient implements AdapterClient {
   connect() {
     return Promise.resolve(this.fixed);
   }
+  connectBench() {
+    return this.getState();
+  }
+
   disconnect() {
     return Promise.resolve(this.fixed);
   }
@@ -142,6 +146,7 @@ class ControlledCaptureClient implements CaptureClient {
       verdict: `Traffic present on ${routeId}. A live bus is on this pair.`,
       error: null,
       captureAvailable: true,
+      synthetic: false,
     });
   }
 

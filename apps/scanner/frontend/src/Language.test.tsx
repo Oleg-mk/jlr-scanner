@@ -28,6 +28,10 @@ class IdleAdapterClient implements AdapterClient {
   connect(): Promise<AdapterSnapshot> {
     return Promise.resolve(createEmptySnapshot());
   }
+  connectBench() {
+    return this.getState();
+  }
+
   disconnect(): Promise<AdapterSnapshot> {
     return Promise.resolve(createEmptySnapshot());
   }

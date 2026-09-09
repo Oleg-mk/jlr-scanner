@@ -49,7 +49,7 @@ This must never become `knowledge -> protocol hacks`.
 - app-contracts: serializable DTO/event contracts between core and UI.
 - transport-api: protocol-neutral byte stream plus validated raw CAN frame and read-only source contracts.
 - transport-serial: Windows/serial device adapter.
-- mongoose-jlr: MongoosePro JLR identity and passive raw-CAN receive subset; no diagnostic knowledge.
+- mongoose-jlr: MongoosePro JLR identity and passive raw-CAN receive subset; no diagnostic knowledge. Its `bench` module (ADR-0020) is the bench transport: the same framing, answered from a `transport_api::BenchBus` instead of a device.
 - transport-replay: machine-readable CAN fixture validation and deterministic or real-time playback; no ISO-TP or UDS logic.
 - diagnostic-simulator: deterministic offline UDS behavior plus a protocol-neutral fixture-payload seam rendered through the existing ISO-TP implementation; no vehicle knowledge or live transport.
 - isotp: vehicle-independent ISO 15765-2 framing, segmentation, flow control, timing, and reassembly.
@@ -70,6 +70,7 @@ This must never become `knowledge -> protocol hacks`.
   ReadDTCInformation by typed status mask — from a family-level or
   implementation-level F6 plan over the same ISO-TP reassembler; simulator and
   replay sources only; retains provenance.
+- bench-vehicle: the bench's vehicle (ADR-0020) — a `BenchBus` built from the loaded library and the session's context, answering the reads the library makes readable with synthetic values; depends on the session layer, isotp and transport-api, never on an adapter, a serial port or the UI.
 - diagnostic-session: the F10 composition layer (ADR-0014) — loads the
   knowledge library from F5 manifests and surveys a vehicle into app-contracts
   snapshots; since F11 it also indexes the vehicle catalogue and fault-code

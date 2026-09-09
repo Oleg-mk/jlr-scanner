@@ -269,6 +269,17 @@ impl ModuleReadService {
         snapshot
     }
 
+    /// The last read was answered by the bench (ADR-0020): its validation is
+    /// `SYNTHETIC`, in the snapshot and in the report, whatever the route's
+    /// own state was.
+    pub fn mark_synthetic(&mut self) -> ModuleReadSnapshot {
+        if let Some((snapshot, report)) = self.last.as_mut() {
+            snapshot.route_validation = "SYNTHETIC".into();
+            report.route_validation = "SYNTHETIC".into();
+        }
+        self.snapshot()
+    }
+
     pub fn report_json(&self) -> Result<String, String> {
         let (_, report) = self
             .last

@@ -112,6 +112,21 @@ notes, and tell us the macOS version and whether the adapter was found.
    is opened. Nothing is written to the adapter; unplugging it returns it
    to the loader.
 
+## Try the bench first
+
+Before the car — or without one — click **Connect the bench (virtual
+vehicle)** in the adapter panel. No adapter is needed. A virtual vehicle,
+built from the library for the programme and model year you choose,
+answers the same commands the real path sends: survey it, check all
+modules, read a module, listen to a bus, look at the report. The whole
+window turns orange-sand with a BENCH band top and bottom while the bench is
+connected, every value is marked synthetic, and nothing from a bench
+session can be saved: the report is shown on screen only. Bench data
+proves the software, never a car; do not send us bench screenshots as
+evidence. Click **Disconnect** to leave the bench; if you recorded anything
+on it, the application asks for a new session before a real adapter is
+connected.
+
 ## In the car
 
 Ignition on, engine off (position II). Plug the adapter into the diagnostic

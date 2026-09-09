@@ -34,6 +34,9 @@ pub enum ExecutionSource {
     LiveMongoose,
     Simulator,
     Replay,
+    /// The bench (ADR-0020): the live path over a stand-in adapter, so the
+    /// answer is synthetic whatever it decodes to.
+    Bench,
 }
 
 impl ExecutionSource {
@@ -42,6 +45,7 @@ impl ExecutionSource {
             Self::LiveMongoose => "LIVE_MONGOOSE",
             Self::Simulator => "SIMULATOR",
             Self::Replay => "REPLAY",
+            Self::Bench => "BENCH_SYNTHETIC",
         }
     }
 }
@@ -140,6 +144,21 @@ impl DiagnosticService {
         self.finish(
             Some(adapter),
             ExecutionSource::LiveMongoose,
+            result.map(Observation::from).map_err(map_mongoose_error),
+        );
+        self.snapshot(true)
+    }
+
+    /// The bench answered (ADR-0020): decoded like a live answer, recorded
+    /// under a source that says synthetic.
+    pub fn finish_bench(
+        &mut self,
+        adapter: &AdapterInfo,
+        result: Result<MongooseCalibrationIdentificationResult, MongooseDiagnosticError>,
+    ) -> DiagnosticSnapshot {
+        self.finish(
+            Some(adapter),
+            ExecutionSource::Bench,
             result.map(Observation::from).map_err(map_mongoose_error),
         );
         self.snapshot(true)

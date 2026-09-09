@@ -274,6 +274,31 @@ const uk: Record<string, string> = {
   "Connecting…": "Підключення…",
   Connect: "Підключити",
   "Detect again": "Шукати знову",
+  // The bench (ADR-0020)
+  "Connect the bench (virtual vehicle)": "Підʼєднати стенд (віртуальне авто)",
+  "No adapter and no car needed: a virtual vehicle built from the library answers instead. Every value is synthetic.":
+    "Без адаптера і без авто: замість них відповідає віртуальне авто, зібране з бібліотеки. Усі значення синтетичні.",
+  "Virtual vehicle (bench)": "Віртуальне авто (стенд)",
+  Bench: "Стенд",
+  "Bench: virtual vehicle": "Стенд: віртуальне авто",
+  "BENCH · virtual vehicle · synthetic data": "СТЕНД · віртуальне авто · дані синтетичні",
+  "Every answer comes from the library, not from a car. Nothing from this session is written to disk.":
+    "Кожна відповідь походить із бібліотеки, а не з авто. Нічого з цієї сесії не записується на диск.",
+  "Show the report on screen": "Показати звіт на екрані",
+  "Hide the report": "Сховати звіт",
+  "Bench session: the report is shown on screen only and never saved. Bench data is illustrative, never evidence.":
+    "Сесія на стенді: звіт лише показується на екрані й ніколи не зберігається. Дані стенда ілюстративні, а не доказові.",
+  "Session report (bench, not saved)": "Звіт сесії (стенд, не збережено)",
+  "Bench: nothing is saved.": "Стенд: нічого не зберігається.",
+  "Bench: virtual vehicle from the library; every value is synthetic.":
+    "Стенд: віртуальне авто з бібліотеки; усі значення синтетичні.",
+  "Start a new session before switching between the bench and an adapter":
+    "Перш ніж перемикатися між стендом і адаптером, почніть нову сесію",
+  "A session is either on the bench or on a car, never both. The report, the survey and the reads of this session are dropped unless saved.":
+    "Сесія або на стенді, або на авто — ніколи разом. Звіт, огляд і читання цієї сесії буде втрачено, якщо їх не збережено.",
+  "Review the report on screen": "Переглянути звіт на екрані",
+  "Bench: the report is shown on screen, never saved.": "Стенд: звіт показується на екрані й не зберігається.",
+  Synthetic: "Синтетичні дані",
 
   // Tools: library
   Loaded: "Завантажено",
@@ -588,6 +613,31 @@ const ru: Record<string, string> = {
   "Connecting…": "Подключение…",
   Connect: "Подключить",
   "Detect again": "Искать снова",
+  // The bench (ADR-0020)
+  "Connect the bench (virtual vehicle)": "Подключить стенд (виртуальный автомобиль)",
+  "No adapter and no car needed: a virtual vehicle built from the library answers instead. Every value is synthetic.":
+    "Без адаптера и без автомобиля: вместо них отвечает виртуальный автомобиль, собранный из библиотеки. Все значения синтетические.",
+  "Virtual vehicle (bench)": "Виртуальный автомобиль (стенд)",
+  Bench: "Стенд",
+  "Bench: virtual vehicle": "Стенд: виртуальный автомобиль",
+  "BENCH · virtual vehicle · synthetic data": "СТЕНД · виртуальный автомобиль · данные синтетические",
+  "Every answer comes from the library, not from a car. Nothing from this session is written to disk.":
+    "Каждый ответ приходит из библиотеки, а не из автомобиля. Ничего из этого сеанса не записывается на диск.",
+  "Show the report on screen": "Показать отчёт на экране",
+  "Hide the report": "Скрыть отчёт",
+  "Bench session: the report is shown on screen only and never saved. Bench data is illustrative, never evidence.":
+    "Сеанс на стенде: отчёт только показывается на экране и никогда не сохраняется. Данные стенда иллюстративные, а не доказательные.",
+  "Session report (bench, not saved)": "Отчёт сеанса (стенд, не сохранён)",
+  "Bench: nothing is saved.": "Стенд: ничего не сохраняется.",
+  "Bench: virtual vehicle from the library; every value is synthetic.":
+    "Стенд: виртуальный автомобиль из библиотеки; все значения синтетические.",
+  "Start a new session before switching between the bench and an adapter":
+    "Прежде чем переключаться между стендом и адаптером, начните новый сеанс",
+  "A session is either on the bench or on a car, never both. The report, the survey and the reads of this session are dropped unless saved.":
+    "Сеанс либо на стенде, либо на автомобиле — никогда вместе. Отчёт, обзор и чтения этого сеанса будут потеряны, если их не сохранить.",
+  "Review the report on screen": "Просмотреть отчёт на экране",
+  "Bench: the report is shown on screen, never saved.": "Стенд: отчёт показывается на экране и не сохраняется.",
+  Synthetic: "Синтетические данные",
 
   // Tools: library
   Loaded: "Загружено",

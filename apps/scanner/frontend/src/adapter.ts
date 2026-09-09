@@ -21,7 +21,8 @@ export type AdapterErrorCode =
   | "ADAPTER_DISCONNECTED"
   | "BOARD_COMMUNICATION_FAILED"
   | "DISCOVERY_FAILED"
-  | "DISCONNECT_FAILED";
+  | "DISCONNECT_FAILED"
+  | "SESSION_MODE_MISMATCH";
 
 export interface AdapterSummary {
   name: string;
@@ -78,6 +79,8 @@ export interface AdapterClient {
   discover(): Promise<AdapterSnapshot>;
   connect(port: string | null): Promise<AdapterSnapshot>;
   disconnect(): Promise<AdapterSnapshot>;
+  /** The bench (ADR-0020): a virtual vehicle behind a stand-in adapter, no port. */
+  connectBench(): Promise<AdapterSnapshot>;
 }
 
 export const createEmptySnapshot = (): AdapterSnapshot => ({
@@ -90,6 +93,35 @@ export const createEmptySnapshot = (): AdapterSnapshot => ({
   selectionRequired: false,
   error: null,
   vehicleMessage: "No vehicle connected",
+});
+
+/** The transport name the shell gives the bench (ADR-0020). */
+export const BENCH_TRANSPORT = "bench";
+
+/** Whether the connection is the bench rather than an adapter. */
+export function isBench(snapshot: AdapterSnapshot) {
+  return snapshot.state === "CONNECTED" && snapshot.adapter?.transport === BENCH_TRANSPORT;
+}
+
+/** The bench as the shell reports it; the browser preview shows the same shape without hardware. */
+export const createBenchSnapshot = (): AdapterSnapshot => ({
+  ...createEmptySnapshot(),
+  state: "CONNECTED",
+  selectedAdapterPort: "bench",
+  adapter: {
+    name: "Virtual vehicle (bench)",
+    port: "bench",
+    usbVid: 0,
+    usbPid: 0,
+    serialNumber: null,
+    driver: null,
+    connectionStatus: "Connected",
+    transport: BENCH_TRANSPORT,
+    backend: "bench-vehicle",
+    boardInfo: { responseCommand: "0x8109", rawResponseHex: "BENCH — NO HARDWARE I/O" },
+  },
+  boardCommunication: "VERIFIED",
+  vehicleMessage: "Virtual vehicle on the bench",
 });
 
 class TauriAdapterClient implements AdapterClient {
@@ -108,10 +140,17 @@ class TauriAdapterClient implements AdapterClient {
   disconnect() {
     return invoke<AdapterSnapshot>("disconnect_adapter");
   }
+
+  connectBench() {
+    return invoke<AdapterSnapshot>("connect_bench");
+  }
 }
 
 class BrowserAdapterClient implements AdapterClient {
+  private bench = false;
+
   getState() {
+    if (this.bench) return Promise.resolve(createBenchSnapshot());
     return Promise.resolve(browserDemoEnabled() ? createDemoSnapshot() : createEmptySnapshot());
   }
 
@@ -120,10 +159,17 @@ class BrowserAdapterClient implements AdapterClient {
   }
 
   connect() {
+    this.bench = false;
+    return this.getState();
+  }
+
+  connectBench() {
+    this.bench = true;
     return this.getState();
   }
 
   disconnect() {
+    this.bench = false;
     return Promise.resolve(createEmptySnapshot());
   }
 }

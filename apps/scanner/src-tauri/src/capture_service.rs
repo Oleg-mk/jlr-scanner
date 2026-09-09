@@ -52,6 +52,20 @@ impl CaptureService {
         snapshot
     }
 
+    /// The last capture was heard on the bench (ADR-0020): say so in the
+    /// snapshot and in the fixture, which becomes synthetic and stops being
+    /// vehicle evidence of any kind.
+    pub fn mark_synthetic(&mut self) -> CaptureSnapshot {
+        if let Some(stored) = self.last.as_mut() {
+            stored.snapshot.synthetic = true;
+            stored.fixture.fixture_class = FixtureClass::Synthetic;
+            stored.fixture.name = format!("bench-{}", stored.fixture.name);
+            stored.fixture.metadata.validation =
+                Some("synthetic_bench_capture_not_vehicle_evidence".into());
+        }
+        self.snapshot()
+    }
+
     pub fn record_failure(&mut self, route_id: &str, message: String) -> CaptureSnapshot {
         let snapshot = CaptureSnapshot {
             state: CaptureState::Failed,
@@ -91,6 +105,7 @@ fn idle() -> CaptureSnapshot {
         verdict: String::new(),
         error: None,
         capture_available: false,
+        synthetic: false,
     }
 }
 
@@ -186,6 +201,7 @@ pub fn summarise(capture: &RouteCapture, requested: Duration) -> CaptureSnapshot
         verdict,
         error: None,
         capture_available: true,
+        synthetic: false,
     }
 }
 

@@ -16,6 +16,8 @@ interface ModuleDetailsProps {
   onIdentifierChange: (identifier: string) => void;
   onRead: () => void;
   onSaveReport: () => void;
+  /** On the bench (ADR-0020) nothing is saved. */
+  bench?: boolean;
 }
 
 function tone(state: string): "positive" | "pending" | "negative" | "neutral" {
@@ -47,6 +49,7 @@ export function ModuleDetails({
   onIdentifierChange,
   onRead,
   onSaveReport,
+  bench = false,
 }: ModuleDetailsProps) {
   const language = useLanguage();
   if (module === null) {
@@ -176,11 +179,16 @@ export function ModuleDetails({
               className="button button--secondary"
               type="button"
               onClick={onSaveReport}
-              disabled={outcome === undefined || !outcome.reportAvailable || saving || busy}
+              disabled={bench || outcome === undefined || !outcome.reportAvailable || saving || busy}
             >
               {saving ? t("Saving…") : t("Save read report")}
             </button>
           </div>
+          {bench ? (
+            <p className="button-hint" role="note">
+              {t("Bench: nothing is saved.")}
+            </p>
+          ) : null}
           {route === "hypothesis" ? (
             <p className="button-hint" role="note">
               {t(

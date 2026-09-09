@@ -13,6 +13,8 @@ interface CapturePanelProps {
   onSecondsChange: (seconds: number) => void;
   onListen: () => void;
   onSave: () => void;
+  /** On the bench (ADR-0020): the capture is synthetic and nothing is saved. */
+  bench?: boolean;
 }
 
 /// The verdict in the interface language, composed from the snapshot's
@@ -56,6 +58,9 @@ function verdictText(snapshot: CaptureSnapshot): string {
 
 function badge(snapshot: CaptureSnapshot, busy: boolean) {
   if (busy) return <StatusBadge tone="pending">{t("Listening…")}</StatusBadge>;
+  if (snapshot.synthetic && snapshot.state === "COMPLETED") {
+    return <StatusBadge tone="pending">{t("Synthetic")}</StatusBadge>;
+  }
   switch (snapshot.state) {
     case "COMPLETED":
       return snapshot.frames > 0 ? (
@@ -81,6 +86,7 @@ export function CapturePanel({
   onSecondsChange,
   onListen,
   onSave,
+  bench = false,
 }: CapturePanelProps) {
   useLanguage();
   return (
@@ -139,11 +145,12 @@ export function CapturePanel({
           className="button button--secondary"
           type="button"
           onClick={onSave}
-          disabled={!snapshot.captureAvailable || saving || busy}
+          disabled={bench || !snapshot.captureAvailable || saving || busy}
         >
           {saving ? t("Saving…") : t("Save capture")}
         </button>
       </div>
+      {bench ? <p className="button-hint">{t("Bench: nothing is saved.")}</p> : null}
       {!adapterReady ? (
         <p className="button-hint">{t("Connect and verify MongoosePro JLR to enable listening.")}</p>
       ) : null}

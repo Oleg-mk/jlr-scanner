@@ -132,6 +132,10 @@ class ControlledClient implements AdapterClient {
     return Promise.resolve(this.connectResult);
   }
 
+  connectBench() {
+    return this.getState();
+  }
+
   disconnect() {
     return Promise.resolve(this.disconnectResult);
   }

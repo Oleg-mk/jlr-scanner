@@ -65,6 +65,10 @@ class FixedAdapterClient implements AdapterClient {
   connect() {
     return Promise.resolve(this.fixed);
   }
+  connectBench() {
+    return this.getState();
+  }
+
   disconnect() {
     return Promise.resolve(this.fixed);
   }

@@ -95,3 +95,54 @@ a second evidence model, a second catalogue.
   already works; it is covered by the existing shell tests.
 - The tester guides gain a step: try the bench before the car.
 - Digital Jaguar X250 remains an idea source; nothing of it is copied.
+
+## Amendment at implementation (2026-09-09)
+
+The bench was built the same day, and three points of the decision met the
+code differently from the text above; the decision stands, the text is
+corrected here rather than rewritten.
+
+1. **The bench transport lives in `mongoose-jlr`, not in a crate of its
+   own.** Decision 1 named a `transport-bench` crate. The framing it must
+   speak is the MongoosePro JLR protocol, and the architecture forbids a
+   transport crate to know an adapter protocol — that knowledge belongs to
+   `mongoose-jlr` alone. So the bench transport is
+   `mongoose_jlr::bench::BenchTransport`, a `ByteTransport` that answers
+   the device code with the firmware's own records (board-info from the
+   bootloader until the jump, resources 5 and 21 with their pins, close,
+   outbound answered with inbound frames), and hands each CAN frame to a
+   `transport_api::BenchBus` — the trait is in `transport-api`, where a
+   protocol-neutral contract belongs. `bench-vehicle` implements the trait
+   from the library and depends on no transport crate and no adapter
+   crate; `scripts/check-architecture.mjs` names it.
+2. **The shell keeps one device type per transport.** Decision 3 spoke of
+   the device becoming generic; it already was. The shell holds a `Link`
+   of either `MongooseJlrDevice<SerialTransport>` or
+   `MongooseJlrDevice<BenchTransport>` and calls the same methods on both;
+   the bench is connected by one command, `connect_bench`, with no port
+   and no discovery, and appears in the adapter panel as transport `bench`,
+   backend `bench-vehicle`. The vehicle on the bench follows the session's
+   survey: every survey rebuilds it from the loaded library.
+3. **The colour is the owner's choice B, not the proposed sand.** The
+   ground while the bench is connected is a warm Namib Orange tint,
+   `#f6e3d3`, with surfaces `#f0d6c2` and borders `#e2c1a6` / `#cfa585`,
+   and the band is `#c8763a` with the words «СТЕНД · віртуальне авто ·
+   дані синтетичні» in the interface language, in the header and at the
+   foot.
+
+The session rule of decision 4 is enforced twice: the interface asks for a
+new session before connecting the other kind while records exist, and the
+shell's `connect_adapter` and `connect_bench` refuse the switch on their
+own (`SESSION_MODE_MISMATCH`), keeping whatever is connected. Decision 5
+holds in the one command that writes, `save_text_file`, which returns an
+error for a bench session; the report step shows the bundle on screen
+instead. Decision 6 holds in three places: captures become `Synthetic`
+fixtures named `bench-…` with the validation
+`synthetic_bench_capture_not_vehicle_evidence`, module reads carry
+`route_validation: SYNTHETIC`, calibration reads carry the execution source
+`BENCH_SYNTHETIC`, the session bundle carries `session_mode: bench`, and
+`report-intake` refuses that bundle. Decision 9 is the shell test
+`bench_e2e`: connect, survey, an identifier read and a fault-code read
+through the real UDS stack, a listen, the bundle, the intake's refusal and
+the refused switch — 22 shell tests in all, plus four interface tests and
+the crates' own.

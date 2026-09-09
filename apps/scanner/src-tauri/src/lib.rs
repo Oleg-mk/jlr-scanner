@@ -9,25 +9,47 @@ mod session_service;
 
 use adapter_service::{lock_service, shared_service, SharedAdapterService};
 use app_contracts::{
-    AdapterSnapshot, CaptureSnapshot, DiagnosticSnapshot, LibrarySnapshot, ModuleReadRequest,
-    ModuleReadSnapshot, SessionReportSnapshot, VehicleCatalogueSnapshot, VehicleContextInput,
-    VehicleSurveySnapshot, VinDecodeSnapshot,
+    AdapterSnapshot, AdapterState, CaptureSnapshot, DiagnosticSnapshot, LibrarySnapshot,
+    ModuleReadRequest, ModuleReadSnapshot, SessionReportSnapshot, VehicleCatalogueSnapshot,
+    VehicleContextInput, VehicleSurveySnapshot, VinDecodeSnapshot,
 };
+use bench_vehicle::BenchVehicle;
 use capture_service::CaptureService;
 use diagnostic_service::DiagnosticService;
 use module_read_service::{adapter_unavailable, map_live_error, ModuleReadService};
+use mongoose_jlr::bench::{share_bus, SharedBenchBus};
 use mongoose_jlr::VehicleRouteId;
 use session_report_service::SessionReportService;
+use session_report_service::{SESSION_MODE_BENCH, SESSION_MODE_REAL};
 use session_service::SessionService;
 use std::sync::{Mutex, MutexGuard};
 use std::time::Duration;
 use tauri::State;
+use transport_api::{BenchBus, EmptyBench};
 
 type SharedDiagnosticService = Mutex<DiagnosticService>;
 type SharedSessionService = Mutex<SessionService>;
 type SharedCaptureService = Mutex<CaptureService>;
 type SharedModuleReadService = Mutex<ModuleReadService>;
 type SharedSessionReportService = Mutex<SessionReportService>;
+/// The vehicle on the bench (ADR-0020), shared between the bench transport
+/// and the session that describes it.
+type SharedBench = SharedBenchBus;
+
+/// Put the vehicle the session last described on the bench, or nothing.
+fn refresh_bench(bench: &SharedBench, session: &SessionService) {
+    let vehicle: Box<dyn BenchBus> = match session.last_context() {
+        Some(context) => Box::new(BenchVehicle::from_library(
+            session.library(),
+            &context,
+            None,
+        )),
+        None => Box::new(EmptyBench),
+    };
+    *bench
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner) = vehicle;
+}
 
 fn lock_module_read<'a>(
     state: &'a State<'a, SharedModuleReadService>,
@@ -82,9 +104,39 @@ fn discover_adapters(state: State<'_, SharedAdapterService>) -> AdapterSnapshot 
 #[tauri::command]
 fn connect_adapter(
     state: State<'_, SharedAdapterService>,
+    report_state: State<'_, SharedSessionReportService>,
     port: Option<String>,
 ) -> AdapterSnapshot {
-    lock_service(&state).connect(port)
+    let mut service = lock_service(&state);
+    if !lock_session_report(&report_state).accepts(SESSION_MODE_REAL) {
+        return service.refuse_session_switch(SESSION_MODE_REAL);
+    }
+    let snapshot = service.connect(port);
+    if snapshot.state == AdapterState::Connected {
+        lock_session_report(&report_state).set_mode(SESSION_MODE_REAL);
+    }
+    snapshot
+}
+
+/// Connect the bench (ADR-0020): the vehicle the session describes, behind
+/// a stand-in adapter. A session that already holds real records refuses.
+#[tauri::command]
+fn connect_bench(
+    state: State<'_, SharedAdapterService>,
+    session_state: State<'_, SharedSessionService>,
+    report_state: State<'_, SharedSessionReportService>,
+    bench: State<'_, SharedBench>,
+) -> AdapterSnapshot {
+    let mut service = lock_service(&state);
+    if !lock_session_report(&report_state).accepts(SESSION_MODE_BENCH) {
+        return service.refuse_session_switch(SESSION_MODE_BENCH);
+    }
+    refresh_bench(&bench, &lock_session(&session_state));
+    let snapshot = service.connect_bench();
+    if snapshot.state == AdapterState::Connected {
+        lock_session_report(&report_state).set_mode(SESSION_MODE_BENCH);
+    }
+    snapshot
 }
 
 #[tauri::command]
@@ -113,7 +165,7 @@ fn read_calibration_identification(
         diagnostic.transaction()
     };
 
-    let (adapter, result) = {
+    let (adapter, result, bench) = {
         let mut service = lock_service(&adapter_state);
         let Some(adapter) = service.connected_adapter() else {
             return lock_diagnostic(&diagnostic_state).finish_adapter_unavailable();
@@ -123,16 +175,26 @@ fn read_calibration_identification(
         else {
             return lock_diagnostic(&diagnostic_state).finish_adapter_unavailable();
         };
-        (adapter, result)
+        (adapter, result, service.is_bench())
     };
 
     let (snapshot, report) = {
         let mut diagnostic = lock_diagnostic(&diagnostic_state);
-        let snapshot = diagnostic.finish_live(&adapter, result);
+        let snapshot = if bench {
+            diagnostic.finish_bench(&adapter, result)
+        } else {
+            diagnostic.finish_live(&adapter, result)
+        };
         (snapshot, diagnostic.report_json())
     };
     if let Ok(json) = report {
-        let _ = lock_session_report(&report_state).add_calibration_read(&json);
+        let mut session_report = lock_session_report(&report_state);
+        session_report.set_mode(if bench {
+            SESSION_MODE_BENCH
+        } else {
+            SESSION_MODE_REAL
+        });
+        let _ = session_report.add_calibration_read(&json);
     }
     snapshot
 }
@@ -153,8 +215,16 @@ fn get_data_library(state: State<'_, SharedSessionService>) -> LibrarySnapshot {
 }
 
 #[tauri::command]
-fn load_data_library(state: State<'_, SharedSessionService>, directory: String) -> LibrarySnapshot {
-    lock_session(&state).load_directory(&directory)
+fn load_data_library(
+    state: State<'_, SharedSessionService>,
+    bench: State<'_, SharedBench>,
+    directory: String,
+) -> LibrarySnapshot {
+    let mut session = lock_session(&state);
+    let snapshot = session.load_directory(&directory);
+    // A new library means no surveyed vehicle: the bench empties with it.
+    refresh_bench(&bench, &session);
+    snapshot
 }
 
 #[tauri::command]
@@ -170,9 +240,14 @@ fn decode_vin(state: State<'_, SharedSessionService>, vin: String) -> VinDecodeS
 #[tauri::command]
 fn survey_vehicle(
     state: State<'_, SharedSessionService>,
+    bench: State<'_, SharedBench>,
     context: VehicleContextInput,
 ) -> VehicleSurveySnapshot {
-    lock_session(&state).survey(&context)
+    let mut session = lock_session(&state);
+    let survey = session.survey(&context);
+    // The bench follows the session: it answers for the vehicle just described.
+    refresh_bench(&bench, &session);
+    survey
 }
 
 /// Longest listen the UI may ask for. The adapter service is held for the
@@ -203,7 +278,7 @@ fn capture_bus(
     };
     let duration = Duration::from_secs(u64::from(seconds.clamp(1, CAPTURE_MAX_SECONDS)));
 
-    let (adapter, result) = {
+    let (adapter, result, bench) = {
         let mut service = lock_service(&adapter_state);
         let Some(adapter) = service.connected_adapter() else {
             return lock_capture(&capture_state).record_failure(
@@ -217,19 +292,28 @@ fn capture_bus(
                 "Connect and verify the adapter before listening.".into(),
             );
         };
-        (adapter, result)
+        (adapter, result, service.is_bench())
     };
 
     let (snapshot, json) = {
         let mut capture = lock_capture(&capture_state);
-        let snapshot = match result {
+        let mut snapshot = match result {
             Ok(captured) => capture.record(&captured, duration, &context, &adapter),
             Err(error) => capture.record_failure(route.as_str(), error.to_string()),
         };
+        if bench {
+            snapshot = capture.mark_synthetic();
+        }
         (snapshot, capture.capture_json())
     };
     if let Ok(json) = json {
-        let _ = lock_session_report(&report_state).add_capture(&json);
+        let mut session_report = lock_session_report(&report_state);
+        session_report.set_mode(if bench {
+            SESSION_MODE_BENCH
+        } else {
+            SESSION_MODE_REAL
+        });
+        let _ = session_report.add_capture(&json);
     }
     snapshot
 }
@@ -275,7 +359,7 @@ fn read_module(
         }
     };
 
-    let (adapter, result) = {
+    let (adapter, result, bench) = {
         let mut service = lock_service(&adapter_state);
         let Some(adapter) = service.connected_adapter() else {
             return lock_module_read(&module_read_state).finish(
@@ -296,23 +380,32 @@ fn read_module(
                 Err(adapter_unavailable()),
             );
         };
-        (adapter, result.map_err(map_live_error))
+        (adapter, result.map_err(map_live_error), service.is_bench())
     };
 
     let (snapshot, report) = {
         let session = lock_session(&session_state);
         let mut reads = lock_module_read(&module_read_state);
-        let snapshot = reads.finish(
+        let mut snapshot = reads.finish(
             &request,
             Some(&prepared),
             Some(&adapter),
             Some(session.library()),
             result,
         );
+        if bench {
+            snapshot = reads.mark_synthetic();
+        }
         (snapshot, reads.report_json())
     };
     if let Ok(json) = report {
-        let _ = lock_session_report(&report_state).add_module_read(&json);
+        let mut session_report = lock_session_report(&report_state);
+        session_report.set_mode(if bench {
+            SESSION_MODE_BENCH
+        } else {
+            SESSION_MODE_REAL
+        });
+        let _ = session_report.add_module_read(&json);
     }
     snapshot
 }
@@ -357,7 +450,21 @@ async fn save_text_file(
     suggested_name: String,
     contents: String,
 ) -> Result<Option<String>, String> {
+    use tauri::Manager;
     use tauri_plugin_dialog::DialogExt;
+    // On the bench nothing is written to disk (ADR-0020): the refusal lives
+    // here, in the command that writes, not in a button.
+    if app
+        .state::<SharedSessionReportService>()
+        .inner()
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+        .is_bench()
+    {
+        return Err(
+            "bench session: nothing is written to disk; the report is shown on screen only".into(),
+        );
+    }
     let Some(chosen) = app
         .dialog()
         .file()
@@ -425,6 +532,12 @@ async fn start_new_session(
         .lock()
         .unwrap_or_else(std::sync::PoisonError::into_inner)
         .clear_session();
+    // A refused bench/adapter switch was about the old session.
+    app.state::<SharedAdapterService>()
+        .inner()
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+        .clear_session_error();
     true
 }
 
@@ -441,9 +554,11 @@ async fn pick_directory(app: tauri::AppHandle) -> Result<Option<String>, String>
 }
 
 pub fn run() {
+    let bench: SharedBench = share_bus(Box::new(EmptyBench));
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
-        .manage(shared_service())
+        .manage(bench.clone())
+        .manage(shared_service(bench))
         .manage(Mutex::new(DiagnosticService::new()))
         .manage(Mutex::new(SessionService::new()))
         .manage(Mutex::new(CaptureService::new()))
@@ -453,6 +568,7 @@ pub fn run() {
             get_adapter_state,
             discover_adapters,
             connect_adapter,
+            connect_bench,
             disconnect_adapter,
             get_diagnostic_state,
             read_calibration_identification,
@@ -477,3 +593,6 @@ pub fn run() {
         .run(tauri::generate_context!())
         .expect("failed to run JLR Scanner");
 }
+
+#[cfg(test)]
+mod bench_e2e;
