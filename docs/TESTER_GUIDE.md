@@ -50,11 +50,16 @@ so Windows shows a prompt. What to expect:
   build is a new file, so it asks again. If there is no "More info" button:
   right-click the file, Properties, tick "Unblock" at the bottom, Apply,
   and run it again.
-- **Windows 11 with Smart App Control on:** the file is blocked with no
-  "Run anyway". Smart App Control can be turned off in Windows Security
-  under App & browser control, but Windows does not let you turn it back on
-  without reinstalling. If you would rather keep it, use another PC; do not
-  turn it off for our sake.
+- **Windows 11 with Smart App Control on:** the application is blocked with
+  no "Run anyway", and Microsoft provides no per-app exception. The
+  uninstaller is blocked as well, so the application has to be removed by
+  hand. Smart App Control is switched off in Windows Security under App &
+  browser control, Smart App Control settings, and since the April 2026
+  Windows update it can be switched back on in the same place, without
+  reinstalling; before that it was a one-way decision. Your call: turn it
+  off while you work with the application and put it back afterwards, or
+  use another PC. We are not asking you to. The real answer is a signed
+  installer, and that is planned.
 
 Nothing else is asked of you. Do not disable Defender, do not add
 exclusions.
