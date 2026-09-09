@@ -233,6 +233,8 @@ pub struct AdapterService<B: AdapterBackend> {
     board_communication: BoardCommunicationState,
     error: Option<UserFacingError>,
     connection: Option<B::Connection>,
+    /// The scenario the bench was connected on, while it is the bench.
+    bench_scenario: Option<u32>,
 }
 
 impl<B: AdapterBackend> AdapterService<B> {
@@ -246,6 +248,7 @@ impl<B: AdapterBackend> AdapterService<B> {
             board_communication: BoardCommunicationState::Unavailable,
             error: None,
             connection: None,
+            bench_scenario: None,
         }
     }
 
@@ -262,6 +265,9 @@ impl<B: AdapterBackend> AdapterService<B> {
                 && self.connection.is_none(),
             error: self.error.clone(),
             vehicle_message: VEHICLE_MESSAGE.to_owned(),
+            // Only while the bench is what is connected: a number left from an
+            // earlier bench must not travel with a real adapter.
+            bench_scenario: self.is_bench().then_some(self.bench_scenario).flatten(),
         }
     }
 
@@ -482,10 +488,11 @@ impl<B: AdapterBackend> AdapterService<B> {
     /// Connect the bench (ADR-0020): no port, no discovery, the vehicle the
     /// session describes behind a stand-in adapter that answers with the
     /// firmware's own frames. Whatever was connected is closed first.
-    pub fn connect_bench(&mut self) -> AdapterSnapshot {
+    pub fn connect_bench(&mut self, scenario: u32) -> AdapterSnapshot {
         if let Some(mut connection) = self.connection.take() {
             let _ = self.backend.disconnect(&mut connection);
         }
+        self.bench_scenario = Some(scenario);
         let summary = bench_summary();
         self.state = AdapterState::Connecting;
         self.selected_adapter_port = Some(summary.port.clone());
@@ -511,6 +518,7 @@ impl<B: AdapterBackend> AdapterService<B> {
             }
             Err(error) => {
                 self.board_communication = BoardCommunicationState::Failed;
+                self.bench_scenario = None;
                 self.set_error(error);
             }
         }

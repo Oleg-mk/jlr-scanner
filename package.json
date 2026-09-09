@@ -7,11 +7,11 @@
     "node": ">=20"
   },
   "scripts": {
-    "build": "pnpm --filter @jlr-scanner/frontend build",
+    "build": "pnpm --filter @prowlone/frontend build",
     "check:architecture": "node scripts/check-architecture.mjs",
-    "lint": "pnpm --filter @jlr-scanner/frontend lint && pnpm check:architecture",
+    "lint": "pnpm --filter @prowlone/frontend lint && pnpm check:architecture",
     "tauri": "tauri",
-    "test": "pnpm --filter @jlr-scanner/frontend test"
+    "test": "pnpm --filter @prowlone/frontend test"
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2.0.0"

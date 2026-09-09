@@ -109,7 +109,7 @@ fn the_bench_connects_without_a_port_reads_the_surveyed_vehicle_and_marks_everyt
     let mut adapter = AdapterService::new(SystemAdapterBackend::new(bench.clone()));
 
     // Connect: no port, no discovery, the stand-in adapter's own board info.
-    let connected = adapter.connect_bench();
+    let connected = adapter.connect_bench(bench_vehicle::SCENARIO_DEFAULT);
     assert_eq!(
         connected.state,
         AdapterState::Connected,
@@ -127,7 +127,7 @@ fn the_bench_connects_without_a_port_reads_the_surveyed_vehicle_and_marks_everyt
     // The session describes SYNTHA; the bench follows the session.
     let mut session = SessionService::with_library(library());
     let survey = session.survey(&vehicle());
-    refresh_bench(&bench, &session);
+    refresh_bench(&bench, &session, bench_vehicle::SCENARIO_DEFAULT);
     assert!(bench.lock().unwrap().describe().contains("SYNTHA"));
 
     // One identifier read through the real stack: prepared from the library,

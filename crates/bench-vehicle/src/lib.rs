@@ -10,12 +10,21 @@
 //! to ask: a module the library does not mount does not exist here, a bus the
 //! library binds to no pins is silent here, and an identifier the catalogue
 //! does not list draws the negative response a real module would give.
+//!
+//! The fault codes follow a **scenario number** the session connects with.
+//! `0` is the healthy vehicle: every module answers and none reports a code,
+//! which is the case a car in good order presents and which the application
+//! must show as plainly as a broken one. Any other number seeds the draw:
+//! each module gets none, one or two codes taken from those the library
+//! describes for that very family, so one number always paints one picture,
+//! a different number paints a different one, and a tester who quotes the
+//! number can be shown the same screen again.
 
 use app_contracts::VehicleContextInput;
 use diagnostic_environment::DiagnosticEnvironmentResolver;
 use diagnostic_session::decode::parameters_span;
 use diagnostic_session::{vehicle_context, KnowledgeLibrary};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use transport_api::{BenchBus, BenchRoute, CanFrame, CanId};
 
 /// ISO-TP padding, as the application pads its own requests.
@@ -28,10 +37,16 @@ const UNKNOWN_IDENTIFIER_LENGTH: usize = 4;
 const BENCH_VIN: &str = "SAJBENCH000000001";
 /// The calibration identification the bench's powertrain module reports.
 const BENCH_CALIBRATION_ID: &[u8; 16] = b"BENCH-SYNTH-CAL1";
-/// Fault codes tried on every module, as text and failure type; the ones the
-/// library describes for that module are the ones it reports. Generic
-/// enough to exist in most catalogues, so the fault-code wording join has
-/// something to show.
+/// The scenario on which every module is healthy and reports nothing.
+pub const SCENARIO_HEALTHY: u32 = 0;
+/// The scenario a session starts on, when nobody chose another.
+pub const SCENARIO_DEFAULT: u32 = 1;
+/// Draws attempted per module before the fixed list is fallen back on; a
+/// draw that lands on a code no wire format can carry is spent.
+const DRAW_ATTEMPTS: usize = 24;
+/// Fault codes tried on a module the library describes nothing for, as text
+/// and failure type. Generic enough to exist in most catalogues, so even a
+/// thin library shows that the read path works.
 const CANDIDATE_FAULTS: &[(&str, u8)] = &[
     ("P0300", 0x00),
     ("P0171", 0x00),
@@ -79,6 +94,7 @@ impl BenchVehicle {
         library: &KnowledgeLibrary,
         input: &VehicleContextInput,
         vin: Option<&str>,
+        scenario: u32,
     ) -> Self {
         let survey = library.survey(input);
         let context = vehicle_context(input);
@@ -115,7 +131,7 @@ impl BenchVehicle {
                 response_id: response,
                 extended: request > 0x7FF,
                 identifiers,
-                faults: choose_faults(library, &entry.ecu_family),
+                faults: choose_faults(library, &entry.ecu_family, scenario),
                 pending: Vec::new(),
             });
         }
@@ -276,20 +292,80 @@ fn parse_route(text: &str) -> Option<BenchRoute> {
     }
 }
 
-/// The faults a module reports: those of the candidates the library
-/// describes for it, else the fallback.
-fn choose_faults(library: &KnowledgeLibrary, family: &str) -> Vec<[u8; 3]> {
-    let mut faults: Vec<[u8; 3]> = CANDIDATE_FAULTS
-        .iter()
-        .filter(|(code, failure_type)| {
-            library
-                .describe_dtc(code, *failure_type, family)
-                .description
-                .is_some()
-        })
-        .take(FAULTS_PER_MODULE)
-        .filter_map(|(code, failure_type)| fault_bytes(code, *failure_type))
-        .collect();
+/// The seed a module's faults are drawn from: the scenario number mixed with
+/// the family name, so two modules of one scenario draw differently and one
+/// module draws the same on every run.
+fn scenario_seed(scenario: u32, family: &str) -> u32 {
+    let mut seed = 0x9E37_79B9u32 ^ scenario.wrapping_mul(2_654_435_761);
+    for byte in family.bytes() {
+        seed = seed.wrapping_mul(31).wrapping_add(u32::from(byte));
+    }
+    seed
+}
+
+/// The next draw. The low bits of a linear congruential sequence are the
+/// weakest, so the value handed out is the sequence shifted past them.
+fn next_draw(seed: &mut u32) -> u32 {
+    *seed = seed.wrapping_mul(1_664_525).wrapping_add(1_013_904_223);
+    *seed >> 8
+}
+
+/// The failure type a drawn code is reported with, read from the code's own
+/// letter: the pairing the fixed list used, so the failure-type wording joins
+/// as it did.
+fn failure_type_for(code: &str) -> u8 {
+    match code.as_bytes().first() {
+        Some(b'U') => 0x87,
+        Some(b'B' | b'C') => 0x11,
+        _ => 0x00,
+    }
+}
+
+/// The faults a module reports on this scenario. `SCENARIO_HEALTHY` leaves
+/// every module quiet. Any other number gives the module none, one or two
+/// codes drawn from those the library describes for its family — so every
+/// code reported has wording, that being what it was drawn from — and the
+/// same number always draws the same ones.
+fn choose_faults(library: &KnowledgeLibrary, family: &str, scenario: u32) -> Vec<[u8; 3]> {
+    if scenario == SCENARIO_HEALTHY {
+        return Vec::new();
+    }
+    let mut seed = scenario_seed(scenario, family);
+    let wanted = next_draw(&mut seed) as usize % (FAULTS_PER_MODULE + 1);
+    if wanted == 0 {
+        return Vec::new();
+    }
+    let codes = library.dtc_codes_for(family);
+    let mut drawn: BTreeSet<usize> = BTreeSet::new();
+    let mut faults: Vec<[u8; 3]> = Vec::new();
+    for _ in 0..DRAW_ATTEMPTS {
+        if codes.is_empty() || faults.len() == wanted {
+            break;
+        }
+        let index = next_draw(&mut seed) as usize % codes.len();
+        if !drawn.insert(index) {
+            continue;
+        }
+        let code = codes[index];
+        if let Some(bytes) = fault_bytes(code, failure_type_for(code)) {
+            faults.push(bytes);
+        }
+    }
+    // A library that describes nothing for this family still has to show that
+    // the read path works, so the fixed list answers for it.
+    if faults.is_empty() {
+        faults = CANDIDATE_FAULTS
+            .iter()
+            .filter(|(code, failure_type)| {
+                library
+                    .describe_dtc(code, *failure_type, family)
+                    .description
+                    .is_some()
+            })
+            .take(wanted)
+            .filter_map(|(code, failure_type)| fault_bytes(code, *failure_type))
+            .collect();
+    }
     if faults.is_empty() {
         faults.extend(fault_bytes(FALLBACK_FAULT.0, FALLBACK_FAULT.1));
     }

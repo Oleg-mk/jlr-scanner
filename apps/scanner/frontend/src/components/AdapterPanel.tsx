@@ -1,5 +1,11 @@
+import { useState } from "react";
 import { t, useLanguage } from "../i18n";
-import { BENCH_TRANSPORT, type AdapterSnapshot, type UserFacingError } from "../adapter";
+import {
+  BENCH_SCENARIO_DEFAULT,
+  BENCH_TRANSPORT,
+  type AdapterSnapshot,
+  type UserFacingError,
+} from "../adapter";
 import { StatusBadge } from "./StatusBadge";
 
 interface AdapterPanelProps {
@@ -10,7 +16,7 @@ interface AdapterPanelProps {
   onConnect: () => void;
   onDisconnect: () => void;
   /** The bench (ADR-0020): a virtual vehicle from the library, no adapter and no car. */
-  onConnectBench: () => void;
+  onConnectBench: (scenario: number) => void;
 }
 
 function hexId(value: number) {
@@ -32,15 +38,40 @@ function ErrorBanner({ error, hint }: { error: UserFacingError; hint: string | n
   );
 }
 
-function BenchOffer({ onConnectBench }: { onConnectBench: () => void }) {
+function BenchOffer({ onConnectBench }: { onConnectBench: (scenario: number) => void }) {
+  const [scenario, setScenario] = useState(String(BENCH_SCENARIO_DEFAULT));
+  const chosen = Number.parseInt(scenario, 10);
+  const valid = Number.isInteger(chosen) && chosen >= 0 && chosen <= 999;
   return (
     <div className="bench-offer">
-      <button className="button button--quiet" type="button" onClick={onConnectBench}>
-        {t("Connect the bench (virtual vehicle)")}
-      </button>
+      <div className="bench-offer-row">
+        <button
+          className="button button--quiet"
+          type="button"
+          disabled={!valid}
+          onClick={() => onConnectBench(chosen)}
+        >
+          {t("Connect the bench (virtual vehicle)")}
+        </button>
+        <label className="bench-scenario">
+          <span>{t("Scenario")}</span>
+          <input
+            type="number"
+            min={0}
+            max={999}
+            value={scenario}
+            onChange={(event) => setScenario(event.target.value)}
+          />
+        </label>
+      </div>
       <p className="button-hint">
         {t(
           "No adapter and no car needed: a virtual vehicle built from the library answers instead. Every value is synthetic.",
+        )}
+      </p>
+      <p className="button-hint">
+        {t(
+          "The scenario decides the fault codes: 0 is a vehicle in good order with none at all, and any other number draws codes the library describes for each module — the same number always draws the same ones.",
         )}
       </p>
     </div>
@@ -115,6 +146,15 @@ export function AdapterPanel({
               )}
             </p>
             <dl className="detail-list">
+              <div>
+                <dt>{t("Scenario")}</dt>
+                <dd>
+                  {snapshot.benchScenario ?? BENCH_SCENARIO_DEFAULT}
+                  {(snapshot.benchScenario ?? BENCH_SCENARIO_DEFAULT) === 0
+                    ? ` — ${t("a vehicle in good order, no fault codes")}`
+                    : ""}
+                </dd>
+              </div>
               <div><dt>{t("Transport")}</dt><dd>{adapter.transport}</dd></div>
               <div><dt>{t("Driver / backend")}</dt><dd>{adapter.backend}</dd></div>
               <div><dt>{t("Board-info response")}</dt><dd>{adapter.boardInfo.responseCommand}</dd></div>

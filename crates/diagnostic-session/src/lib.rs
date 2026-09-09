@@ -390,6 +390,32 @@ impl KnowledgeLibrary {
         description
     }
 
+    /// Every fault code the loaded data describes for this module family:
+    /// those SDD scopes to the family itself first, then the ones it states
+    /// without a module, each code once and in a fixed order. `describe_dtc`
+    /// answers for all of them, which is what makes the list worth drawing
+    /// from — the bench picks its codes here so that whatever it reports has
+    /// wording to show.
+    pub fn dtc_codes_for(&self, module: &str) -> Vec<&str> {
+        let mut scoped = Vec::new();
+        let mut generic = Vec::new();
+        for (id, entries) in &self.indexes.dtc_index.descriptions {
+            let Some(code) = id.strip_prefix("DTC-") else {
+                continue;
+            };
+            if entries
+                .iter()
+                .any(|(scope, _)| scope.as_deref() == Some(module))
+            {
+                scoped.push(code);
+            } else if entries.iter().any(|(scope, _)| scope.is_none()) {
+                generic.push(code);
+            }
+        }
+        scoped.append(&mut generic);
+        scoped
+    }
+
     /// What the loaded knowledge says a vehicle carries and how far each
     /// module can be reached over the adapter.
     pub fn survey(&self, input: &VehicleContextInput) -> VehicleSurveySnapshot {

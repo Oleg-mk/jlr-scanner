@@ -317,6 +317,10 @@ const uk: Record<string, string> = {
   Bench: "Стенд",
   "Bench: virtual vehicle": "Стенд: віртуальне авто",
   "BENCH · virtual vehicle · synthetic data": "СТЕНД · віртуальне авто · дані синтетичні",
+  Scenario: "Сценарій",
+  "a vehicle in good order, no fault codes": "справне авто, жодного коду",
+  "The scenario decides the fault codes: 0 is a vehicle in good order with none at all, and any other number draws codes the library describes for each module — the same number always draws the same ones.":
+    "Сценарій визначає коди помилок: 0 — справне авто без жодного коду, будь-яке інше число бере для кожного модуля коди, які описує бібліотека — і одне число завжди дає ті самі.",
   "Every answer comes from the library, not from a car. Nothing from this session is written to disk.":
     "Кожна відповідь походить із бібліотеки, а не з авто. Нічого з цієї сесії не записується на диск.",
   "Show the report on screen": "Показати звіт на екрані",
@@ -658,6 +662,10 @@ const ru: Record<string, string> = {
   Bench: "Стенд",
   "Bench: virtual vehicle": "Стенд: виртуальный автомобиль",
   "BENCH · virtual vehicle · synthetic data": "СТЕНД · виртуальный автомобиль · данные синтетические",
+  Scenario: "Сценарий",
+  "a vehicle in good order, no fault codes": "исправный автомобиль, ни одного кода",
+  "The scenario decides the fault codes: 0 is a vehicle in good order with none at all, and any other number draws codes the library describes for each module — the same number always draws the same ones.":
+    "Сценарий задаёт коды ошибок: 0 — исправный автомобиль без единого кода, любое другое число берёт для каждого модуля коды, которые описывает библиотека — и одно число всегда даёт те же самые.",
   "Every answer comes from the library, not from a car. Nothing from this session is written to disk.":
     "Каждый ответ приходит из библиотеки, а не из автомобиля. Ничего из этого сеанса не записывается на диск.",
   "Show the report on screen": "Показать отчёт на экране",

@@ -72,6 +72,12 @@ export interface AdapterSnapshot {
   selectionRequired: boolean;
   error: UserFacingError | null;
   vehicleMessage: string;
+  /**
+   * The bench scenario in force (ADR-0020): 0 is the healthy vehicle, any
+   * other number a picture of faults that number always repeats. Null unless
+   * the bench is what is connected.
+   */
+  benchScenario?: number | null;
 }
 
 export interface AdapterClient {
@@ -80,7 +86,7 @@ export interface AdapterClient {
   connect(port: string | null): Promise<AdapterSnapshot>;
   disconnect(): Promise<AdapterSnapshot>;
   /** The bench (ADR-0020): a virtual vehicle behind a stand-in adapter, no port. */
-  connectBench(): Promise<AdapterSnapshot>;
+  connectBench(scenario: number): Promise<AdapterSnapshot>;
 }
 
 export const createEmptySnapshot = (): AdapterSnapshot => ({
@@ -93,10 +99,16 @@ export const createEmptySnapshot = (): AdapterSnapshot => ({
   selectionRequired: false,
   error: null,
   vehicleMessage: "No vehicle connected",
+  benchScenario: null,
 });
 
 /** The transport name the shell gives the bench (ADR-0020). */
 export const BENCH_TRANSPORT = "bench";
+
+/** The scenario on which no module reports a fault: the healthy vehicle. */
+export const BENCH_SCENARIO_HEALTHY = 0;
+/** The scenario the bench starts on when nobody chose another. */
+export const BENCH_SCENARIO_DEFAULT = 1;
 
 /** Whether the connection is the bench rather than an adapter. */
 export function isBench(snapshot: AdapterSnapshot) {
@@ -104,7 +116,9 @@ export function isBench(snapshot: AdapterSnapshot) {
 }
 
 /** The bench as the shell reports it; the browser preview shows the same shape without hardware. */
-export const createBenchSnapshot = (): AdapterSnapshot => ({
+export const createBenchSnapshot = (
+  scenario: number = BENCH_SCENARIO_DEFAULT,
+): AdapterSnapshot => ({
   ...createEmptySnapshot(),
   state: "CONNECTED",
   selectedAdapterPort: "bench",
@@ -122,6 +136,7 @@ export const createBenchSnapshot = (): AdapterSnapshot => ({
   },
   boardCommunication: "VERIFIED",
   vehicleMessage: "Virtual vehicle on the bench",
+  benchScenario: scenario,
 });
 
 class TauriAdapterClient implements AdapterClient {
@@ -141,16 +156,17 @@ class TauriAdapterClient implements AdapterClient {
     return invoke<AdapterSnapshot>("disconnect_adapter");
   }
 
-  connectBench() {
-    return invoke<AdapterSnapshot>("connect_bench");
+  connectBench(scenario: number) {
+    return invoke<AdapterSnapshot>("connect_bench", { scenario });
   }
 }
 
 class BrowserAdapterClient implements AdapterClient {
   private bench = false;
+  private scenario = BENCH_SCENARIO_DEFAULT;
 
   getState() {
-    if (this.bench) return Promise.resolve(createBenchSnapshot());
+    if (this.bench) return Promise.resolve(createBenchSnapshot(this.scenario));
     return Promise.resolve(browserDemoEnabled() ? createDemoSnapshot() : createEmptySnapshot());
   }
 
@@ -163,8 +179,9 @@ class BrowserAdapterClient implements AdapterClient {
     return this.getState();
   }
 
-  connectBench() {
+  connectBench(scenario: number) {
     this.bench = true;
+    this.scenario = scenario;
     return this.getState();
   }
 

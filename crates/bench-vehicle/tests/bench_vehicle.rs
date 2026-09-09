@@ -10,8 +10,8 @@ use knowledge::{
     SourceRecord, SourceType,
 };
 use sdd_ingest::{
-    ConverterCatalogue, DidFormattingAdapter, ModelYearTimeline, ModuleTextAdapter,
-    PlatformAdapter, VinDecodeAdapter,
+    ConverterCatalogue, DidFormattingAdapter, DtcDescriptionAdapter, ModelYearTimeline,
+    ModuleTextAdapter, PlatformAdapter, VinDecodeAdapter,
 };
 use transport_api::{BenchBus, BenchRoute, CanFrame, CanId};
 
@@ -20,6 +20,10 @@ const DIDS: &str = include_str!("../../../fixtures/knowledge/synthetic/f9_did_fo
 const CONVERTER: &str = include_str!("../../../fixtures/knowledge/synthetic/f9_converter.xml");
 const MODULE_TEXT: &str = include_str!("../../../fixtures/knowledge/synthetic/f9_module_text.xml");
 const VIN_DECODE: &str = include_str!("../../../fixtures/knowledge/synthetic/f9_vin_decode.xml");
+/// Fault-code wording, so the bench has something to draw its codes from:
+/// `P0100` stated for any module, `B1250` stated for SYNTHMOD.
+const DTC_DESCRIPTIONS: &str =
+    include_str!("../../../fixtures/knowledge/synthetic/f9_dtc_descriptions.xml");
 
 fn synthetic_source(id: &str, text: &str) -> SourceRecord {
     SourceRecord {
@@ -62,6 +66,10 @@ fn library() -> KnowledgeLibrary {
         .unwrap()
         .parse(VIN_DECODE)
         .unwrap();
+    let dtc_batch = DtcDescriptionAdapter::new(synthetic_source("bench-dtc", DTC_DESCRIPTIONS))
+        .unwrap()
+        .parse(DTC_DESCRIPTIONS)
+        .unwrap();
     let manifests = [
         (
             "platform.json".to_string(),
@@ -69,7 +77,7 @@ fn library() -> KnowledgeLibrary {
         ),
         (
             "bundle.json".to_string(),
-            serde_json::to_string(&vec![did_batch, text_batch, vin_batch]).unwrap(),
+            serde_json::to_string(&vec![did_batch, text_batch, vin_batch, dtc_batch]).unwrap(),
         ),
     ];
     KnowledgeLibrary::from_manifests(
@@ -99,7 +107,12 @@ fn request(route: BenchRoute, id: u16, data: &[u8]) -> CanFrame {
 #[test]
 fn the_vehicle_holds_the_modules_the_survey_can_reach_and_names_itself() {
     let library = library();
-    let bench = BenchVehicle::from_library(&library, &vehicle(), Some("SAJTEST0000000001"));
+    let bench = BenchVehicle::from_library(
+        &library,
+        &vehicle(),
+        Some("SAJTEST0000000001"),
+        bench_vehicle::SCENARIO_DEFAULT,
+    );
     let families = bench.families();
     assert!(families.contains(&"SYNTHMOD"), "{families:?}");
     assert!(families.contains(&"OTHERMOD"), "{families:?}");
@@ -112,7 +125,12 @@ fn the_vehicle_holds_the_modules_the_survey_can_reach_and_names_itself() {
 #[test]
 fn a_known_identifier_answers_with_the_catalogue_width_on_its_own_route_only() {
     let library = library();
-    let mut bench = BenchVehicle::from_library(&library, &vehicle(), None);
+    let mut bench = BenchVehicle::from_library(
+        &library,
+        &vehicle(),
+        None,
+        bench_vehicle::SCENARIO_DEFAULT,
+    );
     // SYNTHMOD sits on CAN_HS at 0x7E0/0x7E8; ask for the first identifier
     // the survey lists as readable for it, whatever the fixture names.
     let survey = library.survey(&vehicle());
@@ -152,7 +170,12 @@ fn a_known_identifier_answers_with_the_catalogue_width_on_its_own_route_only() {
 #[test]
 fn an_unknown_identifier_draws_request_out_of_range_and_an_unknown_service_not_supported() {
     let library = library();
-    let mut bench = BenchVehicle::from_library(&library, &vehicle(), None);
+    let mut bench = BenchVehicle::from_library(
+        &library,
+        &vehicle(),
+        None,
+        bench_vehicle::SCENARIO_DEFAULT,
+    );
     let answers = bench.on_frame(
         BenchRoute::HsCan,
         &request(BenchRoute::HsCan, 0x7E0, &[0x03, 0x22, 0xDE, 0xAD]),
@@ -168,7 +191,12 @@ fn an_unknown_identifier_draws_request_out_of_range_and_an_unknown_service_not_s
 #[test]
 fn the_vin_comes_as_a_first_frame_and_the_rest_after_flow_control() {
     let library = library();
-    let mut bench = BenchVehicle::from_library(&library, &vehicle(), Some("SAJTEST0000000001"));
+    let mut bench = BenchVehicle::from_library(
+        &library,
+        &vehicle(),
+        Some("SAJTEST0000000001"),
+        bench_vehicle::SCENARIO_DEFAULT,
+    );
     let first = bench.on_frame(
         BenchRoute::HsCan,
         &request(BenchRoute::HsCan, 0x7E0, &[0x03, 0x22, 0xF1, 0x90]),
@@ -194,22 +222,117 @@ fn the_vin_comes_as_a_first_frame_and_the_rest_after_flow_control() {
 #[test]
 fn fault_codes_answer_as_confirmed_records_and_calibration_as_one_id() {
     let library = library();
-    let mut bench = BenchVehicle::from_library(&library, &vehicle(), None);
-    let answers = bench.on_frame(
-        BenchRoute::HsCan,
-        &request(BenchRoute::HsCan, 0x7E0, &[0x03, 0x19, 0x02, 0x08]),
+    let mut bench = BenchVehicle::from_library(
+        &library,
+        &vehicle(),
+        None,
+        bench_vehicle::SCENARIO_DEFAULT,
     );
-    let data = &answers[0].data;
-    // Single frame: 59 02 FF then one four-byte record at least.
-    assert_eq!(&data[1..4], &[0x59, 0x02, 0xFF]);
-    let length = usize::from(data[0] & 0x0F);
-    assert_eq!((length - 3) % 4, 0);
-    assert!(length >= 7);
-    assert_eq!(data[7], 0x09, "test failed and confirmed");
+    let faults = reported_faults(&mut bench, 0x7E0);
+    assert!(!faults.is_empty(), "SYNTHMOD reports codes on scenario 1");
+    assert!(
+        faults.iter().all(|(.., status)| *status == 0x09),
+        "every record: test failed and confirmed"
+    );
 
     let first = bench.on_frame(
         BenchRoute::HsCan,
         &request(BenchRoute::HsCan, 0x7E0, &[0x02, 0x09, 0x04]),
     );
     assert_eq!(&first[0].data[..5], &[0x10, 0x13, 0x49, 0x04, 0x01]);
+}
+
+/// The fault codes a module answers with, read off the wire as the tester's
+/// own stack reads them — a single frame, or a first frame and the
+/// consecutive ones that follow the flow control, because two codes no longer
+/// fit in eight bytes. Code, failure type and status per record.
+fn reported_faults(bench: &mut BenchVehicle, request_id: u16) -> Vec<(String, u8, u8)> {
+    let answers = bench.on_frame(
+        BenchRoute::HsCan,
+        &request(BenchRoute::HsCan, request_id, &[0x03, 0x19, 0x02, 0x08]),
+    );
+    let first = &answers[0].data;
+    let payload = match first[0] >> 4 {
+        0x0 => first[1..1 + usize::from(first[0] & 0x0F)].to_vec(),
+        0x1 => {
+            let length = (usize::from(first[0] & 0x0F) << 8) | usize::from(first[1]);
+            let mut payload = first[2..].to_vec();
+            for frame in bench.on_frame(
+                BenchRoute::HsCan,
+                &request(BenchRoute::HsCan, request_id, &[0x30, 0x00, 0x00]),
+            ) {
+                payload.extend_from_slice(&frame.data[1..]);
+            }
+            payload.truncate(length);
+            payload
+        }
+        other => panic!("neither a single nor a first frame: {other:#X}"),
+    };
+    assert_eq!(
+        &payload[..3],
+        &[0x59, 0x02, 0xFF],
+        "the module answered at all"
+    );
+    payload[3..]
+        .chunks(4)
+        .map(|record| {
+            let value = u16::from_be_bytes([record[0], record[1]]);
+            let letter = ["P", "C", "B", "U"][usize::from(value >> 14)];
+            (
+                format!("{letter}{:04X}", value & 0x3FFF),
+                record[2],
+                record[3],
+            )
+        })
+        .collect()
+}
+
+#[test]
+fn the_healthy_scenario_leaves_every_module_quiet_and_still_answering() {
+    let library = library();
+    let mut bench = BenchVehicle::from_library(
+        &library,
+        &vehicle(),
+        None,
+        bench_vehicle::SCENARIO_HEALTHY,
+    );
+    // Not silence: the module replies, and the reply carries no code. A car in
+    // good order looks like this, and the application has to show it.
+    assert!(reported_faults(&mut bench, 0x7E0).is_empty());
+}
+
+#[test]
+fn a_number_paints_one_picture_every_time_and_another_number_a_different_one() {
+    let library = library();
+    let picture = |scenario| {
+        let mut bench = BenchVehicle::from_library(&library, &vehicle(), None, scenario);
+        reported_faults(&mut bench, 0x7E0)
+    };
+    assert_eq!(picture(1), picture(1), "the same number draws the same codes");
+    assert!(
+        (2..=8).any(|scenario| picture(scenario) != picture(1)),
+        "another number draws something else"
+    );
+}
+
+#[test]
+fn every_code_the_bench_reports_is_one_the_library_describes_for_that_module() {
+    let library = library();
+    let mut bench = BenchVehicle::from_library(
+        &library,
+        &vehicle(),
+        None,
+        bench_vehicle::SCENARIO_DEFAULT,
+    );
+    let faults = reported_faults(&mut bench, 0x7E0);
+    assert!(!faults.is_empty(), "scenario 1 gives SYNTHMOD codes");
+    for (code, failure_type, _) in faults {
+        assert!(
+            library
+                .describe_dtc(&code, failure_type, "SYNTHMOD")
+                .description
+                .is_some(),
+            "{code} reported with no wording to show"
+        );
+    }
 }

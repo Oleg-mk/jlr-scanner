@@ -80,7 +80,7 @@ export function useAdapterController(
     }
   }, [client, selectedPort]);
 
-  const connectBench = useCallback(async () => {
+  const connectBench = useCallback(async (scenario: number) => {
     if (inFlightRef.current) return;
     inFlightRef.current = true;
     setSnapshot((current) => ({
@@ -90,7 +90,7 @@ export function useAdapterController(
       error: null,
     }));
     try {
-      setSnapshot(await client.connectBench());
+      setSnapshot(await client.connectBench(scenario));
     } catch (error) {
       setSnapshot((current) => frontendFailure(current, error));
     } finally {

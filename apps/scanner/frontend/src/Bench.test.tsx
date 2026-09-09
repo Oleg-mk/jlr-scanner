@@ -17,9 +17,12 @@ import {
 class BenchAdapterClient implements AdapterClient {
   bench = false;
   benchRequests = 0;
+  scenario: number | null = null;
 
   getState(): Promise<AdapterSnapshot> {
-    return Promise.resolve(this.bench ? createBenchSnapshot() : createEmptySnapshot());
+    return Promise.resolve(
+      this.bench ? createBenchSnapshot(this.scenario ?? 1) : createEmptySnapshot(),
+    );
   }
   discover() {
     return this.getState();
@@ -28,9 +31,10 @@ class BenchAdapterClient implements AdapterClient {
     this.bench = false;
     return this.getState();
   }
-  connectBench() {
+  connectBench(scenario: number) {
     this.bench = true;
     this.benchRequests += 1;
+    this.scenario = scenario;
     return this.getState();
   }
   disconnect() {
@@ -62,8 +66,12 @@ describe("the bench (ADR-0020)", () => {
     );
     await waitFor(() => expect(container.querySelector(".app-shell--bench")).not.toBeNull());
     expect(client.benchRequests).toBe(1);
-    // The band at the top and at the bottom, the pill, the panel.
-    expect(screen.getAllByText("BENCH · virtual vehicle · synthetic data")).toHaveLength(2);
+    // The band at the top and at the bottom, the pill, the panel. The band
+    // names the scenario, because what the screen shows depends on it.
+    expect(client.scenario).toBe(1);
+    expect(
+      screen.getAllByText("BENCH · virtual vehicle · synthetic data · Scenario 1"),
+    ).toHaveLength(2);
     expect(screen.getByText("Bench: virtual vehicle")).toBeInTheDocument();
     expect(screen.getByText("Virtual vehicle (bench)")).toBeInTheDocument();
     expect(
@@ -73,6 +81,20 @@ describe("the bench (ADR-0020)", () => {
     fireEvent.click(screen.getByRole("button", { name: "Disconnect" }));
     await waitFor(() => expect(container.querySelector(".app-shell--bench")).toBeNull());
     expect(screen.getByText("Adapter not detected")).toBeInTheDocument();
+  });
+
+  it("connects on the scenario the tester chose, and 0 says the vehicle is healthy", async () => {
+    const client = new BenchAdapterClient();
+    render(<App client={client} pollIntervalMs={100_000} />);
+    fireEvent.change(await screen.findByLabelText("Scenario"), { target: { value: "0" } });
+    fireEvent.click(screen.getByRole("button", { name: "Connect the bench (virtual vehicle)" }));
+    await waitFor(() => expect(client.scenario).toBe(0));
+    expect(
+      await screen.findByText("0 — a vehicle in good order, no fault codes"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getAllByText("BENCH · virtual vehicle · synthetic data · Scenario 0"),
+    ).toHaveLength(2);
   });
 
   it("shows the report on screen and offers no file while on the bench", async () => {

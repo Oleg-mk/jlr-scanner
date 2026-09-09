@@ -8,7 +8,12 @@ import {
   type Language,
 } from "./i18n";
 import type { AdapterClient } from "./adapter";
-import { browserDemoEnabled, defaultAdapterClient, isBench } from "./adapter";
+import {
+  BENCH_SCENARIO_DEFAULT,
+  browserDemoEnabled,
+  defaultAdapterClient,
+  isBench,
+} from "./adapter";
 import type { CaptureClient } from "./capture";
 import { defaultCaptureClient } from "./capture";
 import { AdapterPanel } from "./components/AdapterPanel";
@@ -172,7 +177,7 @@ export function App({
   );
   const connectAdapter = useCallback(() => switchMode("real", connectReal), [connectReal, switchMode]);
   const connectBench = useCallback(
-    () => switchMode("bench", connectBenchAdapter),
+    (scenario: number) => switchMode("bench", () => connectBenchAdapter(scenario)),
     [connectBenchAdapter, switchMode],
   );
 
@@ -313,7 +318,8 @@ export function App({
       </header>
       {bench ? (
         <div className="bench-band" role="status">
-          {t("BENCH · virtual vehicle · synthetic data")}
+          {t("BENCH · virtual vehicle · synthetic data")} · {t("Scenario")}{" "}
+          {controller.snapshot.benchScenario ?? BENCH_SCENARIO_DEFAULT}
         </div>
       ) : null}
       {demoPreview ? (
@@ -362,7 +368,7 @@ export function App({
                       onSelectPort={controller.setSelectedPort}
                       onDetect={() => void controller.refresh()}
                       onConnect={() => void connectAdapter()}
-                      onConnectBench={() => void connectBench()}
+                      onConnectBench={(scenario) => void connectBench(scenario)}
                       onDisconnect={() => void controller.disconnect()}
                     />
                     <LibraryPanel
@@ -470,7 +476,10 @@ export function App({
         </div>
       </main>
       {bench ? (
-        <div className="bench-band">{t("BENCH · virtual vehicle · synthetic data")}</div>
+        <div className="bench-band">
+          {t("BENCH · virtual vehicle · synthetic data")} · {t("Scenario")}{" "}
+          {controller.snapshot.benchScenario ?? BENCH_SCENARIO_DEFAULT}
+        </div>
       ) : null}
       <footer className="app-footer">
         <span>

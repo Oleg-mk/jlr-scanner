@@ -146,3 +146,45 @@ fixtures named `bench-…` with the validation
 through the real UDS stack, a listen, the bundle, the intake's refusal and
 the refused switch — 22 shell tests in all, plus four interface tests and
 the crates' own.
+
+
+## Amendment, 2026-09-09: the fault codes follow a scenario number
+
+The first bench reported one or two codes per module from a list of eight
+written into the crate, filtered by whether the library described them. That
+proved the read path and nothing else: one picture, every time, out of eight
+codes. The owner asked for variety — draw two or three at random from the
+whole library — and named the reason: a bench that never reports anything
+leaves you unable to tell a working bench from a broken one.
+
+Random alone would have cost two things. A drawn code that the library does
+not describe for that module shows as a code with no wording, which reads on
+screen as a hole in the application rather than as variety. And nothing would
+be reproducible: a tester's «I saw this» could not be repeated, and the
+shell's end-to-end test could not assert anything.
+
+So the draw is seeded, and the seed is a number the tester chooses when
+connecting: the **scenario**.
+
+- `0` is the healthy vehicle. Every module answers and none reports a code.
+  This is the case a car in good order presents, and the application has to
+  show it as plainly as a broken one; nothing else in the product could
+  produce it before.
+- Any other number gives each module none, one or two codes, drawn from
+  those the library describes **for that module's own family** — module-scoped
+  wording first, the programme-independent wording after. Every code reported
+  therefore has wording, because that is what it was drawn from.
+- The seed is the number mixed with the family name, so two modules of one
+  scenario draw differently, and one module draws the same on every run, on
+  every machine, from the same library.
+- The number is shown in the BENCH band and on the adapter card, and a tester
+  who quotes it can be shown the same screen again.
+
+`KnowledgeLibrary::dtc_codes_for` is the new seam: the list of codes the
+loaded data describes for a family, in a fixed order. It is the library
+answering what it holds, which is where that question belongs; the bench only
+draws from it.
+
+What does not change: the codes are still not a car's, every value is still
+marked synthetic, a bench session is still refused by `report-intake`, and the
+picture is still illustration, never evidence.

@@ -120,6 +120,11 @@ pub struct AdapterSnapshot {
     pub selection_required: bool,
     pub error: Option<UserFacingError>,
     pub vehicle_message: String,
+    /// The bench scenario the session is connected on (ADR-0020): `0` is the
+    /// healthy vehicle, any other number a picture of faults that number
+    /// always paints. Absent unless the bench is what is connected.
+    #[serde(default)]
+    pub bench_scenario: Option<u32>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]

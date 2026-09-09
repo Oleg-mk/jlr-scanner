@@ -134,7 +134,14 @@ window turns orange-sand with a BENCH band top and bottom while the bench is
 connected, every value is marked synthetic, and nothing from a bench
 session can be saved: the report is shown on screen only. Bench data
 proves the software, never a car; do not send us bench screenshots as
-evidence. Click **Disconnect** to leave the bench; if you recorded anything
+Beside the button is a **Scenario** number, which decides what the bench
+reports. `0` is a vehicle in good order: every module answers and none has a
+fault code. Any other number gives the modules codes drawn from the library's
+own wording for them, so every code shown has a description. The same number
+always paints the same picture, so «scenario 7» in an e-mail is enough for us
+to see exactly what you saw.
+
+Click **Disconnect** to leave the bench; if you recorded anything
 on it, the application asks for a new session before a real adapter is
 connected.
 
