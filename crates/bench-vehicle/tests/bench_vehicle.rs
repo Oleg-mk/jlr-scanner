@@ -125,12 +125,8 @@ fn the_vehicle_holds_the_modules_the_survey_can_reach_and_names_itself() {
 #[test]
 fn a_known_identifier_answers_with_the_catalogue_width_on_its_own_route_only() {
     let library = library();
-    let mut bench = BenchVehicle::from_library(
-        &library,
-        &vehicle(),
-        None,
-        bench_vehicle::SCENARIO_DEFAULT,
-    );
+    let mut bench =
+        BenchVehicle::from_library(&library, &vehicle(), None, bench_vehicle::SCENARIO_DEFAULT);
     // SYNTHMOD sits on CAN_HS at 0x7E0/0x7E8; ask for the first identifier
     // the survey lists as readable for it, whatever the fixture names.
     let survey = library.survey(&vehicle());
@@ -170,12 +166,8 @@ fn a_known_identifier_answers_with_the_catalogue_width_on_its_own_route_only() {
 #[test]
 fn an_unknown_identifier_draws_request_out_of_range_and_an_unknown_service_not_supported() {
     let library = library();
-    let mut bench = BenchVehicle::from_library(
-        &library,
-        &vehicle(),
-        None,
-        bench_vehicle::SCENARIO_DEFAULT,
-    );
+    let mut bench =
+        BenchVehicle::from_library(&library, &vehicle(), None, bench_vehicle::SCENARIO_DEFAULT);
     let answers = bench.on_frame(
         BenchRoute::HsCan,
         &request(BenchRoute::HsCan, 0x7E0, &[0x03, 0x22, 0xDE, 0xAD]),
@@ -222,12 +214,8 @@ fn the_vin_comes_as_a_first_frame_and_the_rest_after_flow_control() {
 #[test]
 fn fault_codes_answer_as_confirmed_records_and_calibration_as_one_id() {
     let library = library();
-    let mut bench = BenchVehicle::from_library(
-        &library,
-        &vehicle(),
-        None,
-        bench_vehicle::SCENARIO_DEFAULT,
-    );
+    let mut bench =
+        BenchVehicle::from_library(&library, &vehicle(), None, bench_vehicle::SCENARIO_DEFAULT);
     let faults = reported_faults(&mut bench, 0x7E0);
     assert!(!faults.is_empty(), "SYNTHMOD reports codes on scenario 1");
     assert!(
@@ -290,12 +278,8 @@ fn reported_faults(bench: &mut BenchVehicle, request_id: u16) -> Vec<(String, u8
 #[test]
 fn the_healthy_scenario_leaves_every_module_quiet_and_still_answering() {
     let library = library();
-    let mut bench = BenchVehicle::from_library(
-        &library,
-        &vehicle(),
-        None,
-        bench_vehicle::SCENARIO_HEALTHY,
-    );
+    let mut bench =
+        BenchVehicle::from_library(&library, &vehicle(), None, bench_vehicle::SCENARIO_HEALTHY);
     // Not silence: the module replies, and the reply carries no code. A car in
     // good order looks like this, and the application has to show it.
     assert!(reported_faults(&mut bench, 0x7E0).is_empty());
@@ -308,7 +292,11 @@ fn a_number_paints_one_picture_every_time_and_another_number_a_different_one() {
         let mut bench = BenchVehicle::from_library(&library, &vehicle(), None, scenario);
         reported_faults(&mut bench, 0x7E0)
     };
-    assert_eq!(picture(1), picture(1), "the same number draws the same codes");
+    assert_eq!(
+        picture(1),
+        picture(1),
+        "the same number draws the same codes"
+    );
     assert!(
         (2..=8).any(|scenario| picture(scenario) != picture(1)),
         "another number draws something else"
@@ -318,12 +306,8 @@ fn a_number_paints_one_picture_every_time_and_another_number_a_different_one() {
 #[test]
 fn every_code_the_bench_reports_is_one_the_library_describes_for_that_module() {
     let library = library();
-    let mut bench = BenchVehicle::from_library(
-        &library,
-        &vehicle(),
-        None,
-        bench_vehicle::SCENARIO_DEFAULT,
-    );
+    let mut bench =
+        BenchVehicle::from_library(&library, &vehicle(), None, bench_vehicle::SCENARIO_DEFAULT);
     let faults = reported_faults(&mut bench, 0x7E0);
     assert!(!faults.is_empty(), "scenario 1 gives SYNTHMOD codes");
     for (code, failure_type, _) in faults {
