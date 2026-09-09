@@ -46,7 +46,10 @@ so Windows shows a prompt. What to expect:
 
 - **Windows 10, and Windows 11 without Smart App Control:** SmartScreen
   shows "Windows protected your PC". Click "More info", then "Run anyway".
-  Nothing is switched off; Windows asks once, for this file.
+  Nothing is switched off; Windows asks once, for this file. Every later
+  build is a new file, so it asks again. If there is no "More info" button:
+  right-click the file, Properties, tick "Unblock" at the bottom, Apply,
+  and run it again.
 - **Windows 11 with Smart App Control on:** the file is blocked with no
   "Run anyway". Smart App Control can be turned off in Windows Security
   under App & browser control, but Windows does not let you turn it back on

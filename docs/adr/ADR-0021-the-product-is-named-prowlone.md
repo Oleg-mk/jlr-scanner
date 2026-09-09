@@ -33,12 +33,14 @@ whether it was traced.
    compatible with, beside the disclaimer the README already carries. That
    is how a marked product may be named by an independent tool, and it
    keeps the marks out of the badge, the title bar and the installer.
-3. **The icon is our own drawing:** a spotted big cat lying on the bonnet
-   of a generic boxy off-roader, a green pulse beside it, on the project's
-   dark green. It says which cars this is for without borrowing a mark: the
-   animal is not the leaper and not the growler, and the vehicle silhouette
-   is generic. The owner produced the artwork; the source file and the
-   prompt that made it are kept as the mark's provenance.
+3. **The icon is a mark of our own:** a white ring on the project's dark
+   green, open on the right, with a trace crossing it and one leaf-green
+   beat — the vehicle held, and the sign of life read out of it. Flat,
+   geometric, four parts, which is what survives at 32 and 16 pixels where
+   a picture does not. The owner's first drawing, a spotted cat on an
+   off-roader, was rejected by him on the desktop for reading cheaply at
+   size; that judgement is recorded here because it was right, and because
+   the same trap waits for any illustrative mark.
 4. **The name reaches everything a user sees or installs:** product and
    window title, bundle identifier `com.prowlone.desktop`, the shell crate
    and therefore the binary inside the macOS bundle (`prowlone-shell`),
