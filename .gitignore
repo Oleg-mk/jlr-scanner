@@ -9,6 +9,7 @@
 Thumbs.db
 .idea/
 .vscode/
+.claude/
 apps/scanner/src-tauri/gen/
 
 # Python probe caches
