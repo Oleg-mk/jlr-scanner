@@ -10,7 +10,7 @@
 1. Docker Desktop запущений (іконка в треї). Без нього команда видачі
    не працює.
 2. Ключ видачі лежить у `C:\Users\<you>\.jlr-scanner\library-issuer.key`,
-   бібліотека-джерело — у `Downloads\jlr-scanner-library`.
+   бібліотека-джерело — у `Downloads\prowlone-library`.
 
 ## На кожного тестувальника
 
@@ -22,7 +22,7 @@ powershell -File scripts/stamp-library.ps1 -IssuedTo "Іван Іваненко"
 ```
 
    Дочекатися рядка `verified: the application accepts this copy`.
-   Результат: `Downloads\jlr-scanner-issued\jlr-scanner-library-Іван_Іваненко.zip`,
+   Результат: `Downloads\prowlone-issued\prowlone-library-Іван_Іваненко.zip`,
    дійсний 30 днів. Якщо рядка немає — копію не віддавати, команда сама
    скаже, що не так.
 

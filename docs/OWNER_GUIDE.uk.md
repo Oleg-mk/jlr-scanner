@@ -31,14 +31,14 @@ docker run --rm -v "C:/Users/<you>/Desktop/jlr-scanner:/w" -w /w -v jlr-cargo-re
 powershell -File scripts/stamp-library.ps1 -IssuedTo "Ім'я Прізвище"
 ```
 
-Що вона робить: бере бібліотеку з `Downloads\jlr-scanner-library`,
-пише копію в `Downloads\jlr-scanner-issued\<ім'я>`, ставить штамп на 30
+Що вона робить: бере бібліотеку з `Downloads\prowlone-library`,
+пише копію в `Downloads\prowlone-issued\<ім'я>`, ставить штамп на 30
 днів із підписом, читає копію так, як прочитає застосунок, і лише тоді
-пакує в `Downloads\jlr-scanner-issued\jlr-scanner-library-<ім'я>.zip`.
+пакує в `Downloads\prowlone-issued\prowlone-library-<ім'я>.zip`.
 Якщо перевірка не пройшла, команда зупиняється і zip не створюється.
 
 - Інший термін: `-Days 60`. Собі: `-IssuedTo "Oleg" -Days 365` (уже
-  видано до 2027-09-06, код `5050-F8EF`, папка `jlr-scanner-issued\Oleg`).
+  видано до 2027-09-06, код `5050-F8EF`, папка `prowlone-issued\Oleg`).
 - Тестувальнику надіслати три речі, одним каналом на одну людину:
   1. zip його копії;
   2. інсталятор потрібної системи з останньої збірки
@@ -55,7 +55,7 @@ powershell -File scripts/stamp-library.ps1 -IssuedTo "Ім'я Прізвище"
 - Перевірити будь-яку папку так, як це зробить застосунок:
 
 ```bash
-docker run --rm -v "C:/Users/<you>/Desktop/jlr-scanner:/w" -w /w -v jlr-cargo-registry:/usr/local/cargo/registry -v "C:/Users/<you>/Downloads:/downloads" rust:1.98-slim sh -c 'cargo run --release -q -p diagnostic-session --example stamp_library -- --check "/downloads/jlr-scanner-issued/Ім_я"'
+docker run --rm -v "C:/Users/<you>/Desktop/jlr-scanner:/w" -w /w -v jlr-cargo-registry:/usr/local/cargo/registry -v "C:/Users/<you>/Downloads:/downloads" rust:1.98-slim sh -c 'cargo run --release -q -p diagnostic-session --example stamp_library -- --check "/downloads/prowlone-issued/Ім_я"'
 ```
 
 Відповідь `state: Loaded` і `issue: Matches` означає, що копія дійсна.
@@ -66,7 +66,7 @@ docker run --rm -v "C:/Users/<you>/Desktop/jlr-scanner:/w" -w /w -v jlr-cargo-re
 про авто. Звіт перетворюється на захоплений маніфест бібліотеки:
 
 ```bash
-docker run --rm -v "C:/Users/<you>/Desktop/jlr-scanner:/w" -w /w -v jlr-cargo-registry:/usr/local/cargo/registry -v "C:/Users/<you>/Downloads:/downloads" rust:1.98-slim sh -c 'cargo run --release -q -p report-intake --example intake -- /downloads/reports/report.json /downloads/jlr-scanner-library'
+docker run --rm -v "C:/Users/<you>/Desktop/jlr-scanner:/w" -w /w -v jlr-cargo-registry:/usr/local/cargo/registry -v "C:/Users/<you>/Downloads:/downloads" rust:1.98-slim sh -c 'cargo run --release -q -p report-intake --example intake -- /downloads/reports/report.json /downloads/prowlone-library'
 ```
 
 Результат `captured-<id>.json` лягає в папку бібліотеки. Наступні копії
@@ -92,8 +92,8 @@ node scripts/bump-version.mjs 0.9.2
 - Готові інсталятори: від 0.9.3 у `Downloads\prowlone-build-<версія>\`, 0.9.1 і 0.9.2 у `Downloads\jlr-scanner-build-<версія>\`, раніше за хешем коміту; хеші файлів записані в `CURRENT_STATE.md`.
 - Пуш тегу `v…` запускав збірку вдруге; з 0.9.1 workflow збирає лише гілки, тег збірки не запускає.
 - Перша збірка після `b3fa55d` приймає лише штамповані копії: стару
-  папку `jlr-scanner-library` вона відхилить, бери копію з
-  `jlr-scanner-issued\Oleg`.
+  папку `prowlone-library` вона відхилить, бери копію з
+  `prowlone-issued\Oleg`.
 
 ## 6. Якщо щось не так
 
@@ -216,11 +216,18 @@ Remove-Item -LiteralPath "HKCU:\Software\prowlone" -Recurse -Force
 
 ## 10. Бібліотека після виправлення кваліфікаторів (2026-09-09)
 
+- **Папки перейменовані під назву продукту** того ж дня. Де тепер що:
+  `Downloads\prowlone-library` — сирий експорт без штампа, застосунок його
+  не прийме; `Downloads\prowlone-issued\<ім'я>` і zip поруч — видані
+  копії; `Downloads\prowlone-library-Oleg` — твоя робоча копія, її і
+  вибирай у застосунку. Стара назва `jlr-scanner-*` не лишилася ніде, окрім
+  архівного zip від 2026-09-04. Каталог ключа видачі не чіпали: він і далі
+  `%USERPROFILE%\.jlr-scanner`.
 - Стару бібліотеку збережено як
-  `Downloads\jlr-scanner-library-2026-09-07-before-qualifier-fix`. Нова
-  лежить на штатному місці, `Downloads\jlr-scanner-library`.
+  `Downloads\prowlone-library-2026-09-07-before-qualifier-fix`. Нова
+  лежить на штатному місці, `Downloads\prowlone-library`.
 - Твоя копія перевидана: код `BE5E-E564`, чинна до 2027-09-09, zip у
-  `Downloads\jlr-scanner-issued\jlr-scanner-library-Oleg.zip`.
+  `Downloads\prowlone-issued\prowlone-library-Oleg.zip`.
 - **Копія, видана першому тестувальнику 2026-09-06, старіша за виправлення.**
   Вона працює, але на частині авто веде до трьох модулів за хибними
   адресами. Перед тим як та людина поїде до авто, видай копію заново

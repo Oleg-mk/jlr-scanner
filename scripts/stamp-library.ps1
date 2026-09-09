@@ -18,8 +18,8 @@
 param(
   [Parameter(Mandatory = $true)][string]$IssuedTo,
   [int]$Days = 30,
-  [string]$Library = "$env:USERPROFILE\Downloads\jlr-scanner-library",
-  [string]$OutRoot = "$env:USERPROFILE\Downloads\jlr-scanner-issued",
+  [string]$Library = "$env:USERPROFILE\Downloads\prowlone-library",
+  [string]$OutRoot = "$env:USERPROFILE\Downloads\prowlone-issued",
   [string]$KeyDir = "$env:USERPROFILE\.jlr-scanner"
 )
 
@@ -39,7 +39,7 @@ docker run --rm `
   rust:1.98-slim sh -c "cargo run --release -q -p diagnostic-session --example stamp_library -- /library /out `"$IssuedTo`" $Days"
 if ($LASTEXITCODE -ne 0) { throw "stamping failed (exit $LASTEXITCODE)" }
 
-$zip = Join-Path $OutRoot "jlr-scanner-library-$slug.zip"
+$zip = Join-Path $OutRoot "prowlone-library-$slug.zip"
 Compress-Archive -Path "$out\*" -DestinationPath $zip -Force
 Get-Content (Join-Path $out 'issued_to.json') -TotalCount 7
 "zip: $zip ({0:N1} MB)" -f ((Get-Item $zip).Length / 1MB)
