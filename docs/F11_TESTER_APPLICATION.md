@@ -459,9 +459,9 @@ Nothing derived from SDD enters the repository this way.
   English. Its wording is the manufacturer's, and translating it would put
   their text, in another language, into ours.
 
-First pass: 271 codes — misfires, mixture, air and coolant temperature,
-throttle, oxygen sensors, injectors, fuel pressure, camshaft and crankshaft,
-knock, boost, recirculation, catalyst, evaporative emissions, road speed,
-supply voltage, control modules and the communication codes. The library
-holds 1,664 standard-range codes with a wording, so the table grows from
-here in batches.
+The table is filled in passes. After five, 1,022 of the library's 1,664
+standard-range codes are covered: the whole powertrain P0 range except the
+hybrid and electric families, the transmission P07 range, the restraints B0
+range, the chassis and brake C0 range, and the communication U0 range. What
+is left is mostly P2, the hybrid and electric P0A-P0E families, and the rest
+of the transmission actuators in P08 and P09.
