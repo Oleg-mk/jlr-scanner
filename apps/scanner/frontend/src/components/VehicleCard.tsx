@@ -62,6 +62,7 @@ export function VehicleCard({
               yearBreakpoint: null,
               modelYear: null,
               powertrain: null,
+              variant: null,
             })
           }
         >
@@ -114,6 +115,26 @@ export function VehicleCard({
           ))}
         </select>
       </label>
+      {(programme?.variants ?? []).length > 0 ? (
+        <label className="field">
+          <span>{t("Engine variant")}</span>
+          <select
+            name="variant"
+            value={vehicle.variant ?? ""}
+            disabled={programme === undefined}
+            onChange={(event) =>
+              onVehicleChange({ ...vehicle, variant: optionalText(event.target.value) })
+            }
+          >
+            <option value="">{t("Not stated")}</option>
+            {(programme?.variants ?? []).map((entry) => (
+              <option key={entry} value={entry}>
+                {entry}
+              </option>
+            ))}
+          </select>
+        </label>
+      ) : null}
     </>
   ) : (
     <>

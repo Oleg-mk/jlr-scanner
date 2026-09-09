@@ -504,6 +504,11 @@ pub struct ProgrammeEntry {
     pub program: String,
     pub markers: Vec<MarkerEntry>,
     pub powertrains: Vec<String>,
+    /// What SDD splits an engine into where it does — the naturally aspirated
+    /// V8 of an X250 by displacement, for one — because those halves answer at
+    /// different addresses. Empty when the programme's data splits nothing.
+    #[serde(default)]
+    pub variants: Vec<String>,
 }
 
 /// What one session has recorded so far and whether a report can be saved.

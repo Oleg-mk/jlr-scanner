@@ -437,6 +437,21 @@ the DID catalogue. The J1979 agreement on `0xF40C` is a corroboration noted
 here, not a record: it will become one when a tester's read is compared with
 a known engine speed (F13 intake).
 
+## 2026-09-09 — the engine variant
+
+Some engines are split further by the data, and each half answers at its own
+diagnostic address: the naturally aspirated V8 of an X250 is 4.2L or 5L, and
+the instrument cluster and the parking-brake module sit at different
+addresses on the two. `ProgrammeEntry` therefore carries `variants` beside
+`powertrains`, filled from the `variant` dimension the ingest writes, and the
+vehicle card offers an **Engine variant** field — only for a programme whose
+loaded data splits something, so the description of an ordinary car gains no
+extra question. Choosing a programme clears it, as it clears the engine.
+
+Without it those modules are not guessed at: they resolve to nothing and the
+map says why. That is the same rule as everywhere else — a car that has not
+said enough gets a reason, not an answer.
+
 ## 2026-09-09 — fault-code wording in the interface's language
 
 SDD holds a fault code's description in English only, and holds nothing at

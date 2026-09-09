@@ -612,6 +612,6 @@ belong here, in the ingest's own document:
   engine is now unresolved for a car that does not state one, rather than
   answered with one engine's address; that is the intended direction, and the
   survey shows the reason. And SDD splits the naturally aspirated V8 of the
-  X250 by displacement, which lands in `variant` — a dimension the interface
-  does not yet offer a field for, so on that car those modules stay
-  unresolved until it does.
+  X250 by displacement, which lands in `variant`; the catalogue now carries
+  the variants a programme declares, beside its engines, and the interface
+  offers them, so that car can say which half it is.

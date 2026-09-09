@@ -166,6 +166,7 @@ export const demoCatalogue: VehicleCatalogueSnapshot = {
         { marker: "MY14", modelYearFrom: 2014, modelYearTo: 2016 },
       ],
       powertrains: ["SYNTHENGINE", "5.0L Supercharged"],
+      variants: [],
     },
   ],
 };

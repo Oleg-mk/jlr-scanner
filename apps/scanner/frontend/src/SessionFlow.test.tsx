@@ -76,6 +76,7 @@ class CataloguedLibraryClient implements LibraryClient {
           program: "SYNTHA",
           markers: [{ marker: "MY10", modelYearFrom: 2010, modelYearTo: 2011 }],
           powertrains: [],
+      variants: [],
         },
       ],
     });

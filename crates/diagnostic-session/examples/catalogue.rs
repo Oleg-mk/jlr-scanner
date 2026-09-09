@@ -51,6 +51,15 @@ fn main() {
                 programme.powertrains.join(", ")
             );
         }
+        // Only where the data splits an engine further; most programmes
+        // split nothing and print nothing.
+        if !programme.variants.is_empty() {
+            println!(
+                "         {} variant(s): {}",
+                programme.variants.len(),
+                programme.variants.join(", ")
+            );
+        }
     }
 
     let mut pairs: Vec<String> = args.collect();

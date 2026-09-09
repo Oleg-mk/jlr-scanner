@@ -1,7 +1,7 @@
 //! Load a directory of exported manifests and survey one vehicle, exactly as
 //! the application does. Opens no transport; prints what the UI would show.
 //!
-//! Usage: `cargo run -p diagnostic-session --example survey -- <library dir> <programme> [model year] [breakpoint] [powertrain]`
+//! Usage: `cargo run -p diagnostic-session --example survey -- <library dir> <programme> [model year] [breakpoint] [powertrain] [variant]`
 
 use app_contracts::{RouteStatus, VehicleContextInput};
 use diagnostic_session::KnowledgeLibrary;
@@ -10,7 +10,7 @@ use std::path::Path;
 fn main() {
     let args: Vec<String> = std::env::args().skip(1).collect();
     let (Some(directory), Some(program)) = (args.first(), args.get(1)) else {
-        eprintln!("usage: survey <library dir> <programme> [model year] [breakpoint] [powertrain]");
+        eprintln!("usage: survey <library dir> <programme> [model year] [breakpoint] [powertrain] [variant]");
         std::process::exit(2);
     };
     let started = std::time::Instant::now();
@@ -31,7 +31,7 @@ fn main() {
         model_year: args.get(2).and_then(|value| value.parse().ok()),
         year_breakpoint: args.get(3).cloned(),
         powertrain: args.get(4).cloned(),
-        variant: None,
+        variant: args.get(5).cloned(),
         market: None,
     };
     let survey = library.survey(&input);

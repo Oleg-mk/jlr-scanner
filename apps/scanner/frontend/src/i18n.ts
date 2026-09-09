@@ -308,6 +308,7 @@ const uk: Record<string, string> = {
   "Connecting…": "Підключення…",
   Connect: "Підключити",
   "Detect again": "Шукати знову",
+  "Engine variant": "Варіант двигуна",
   // The bench (ADR-0020)
   "Connect the bench (virtual vehicle)": "Підʼєднати стенд (віртуальне авто)",
   "No adapter and no car needed: a virtual vehicle built from the library answers instead. Every value is synthetic.":
@@ -648,6 +649,7 @@ const ru: Record<string, string> = {
   "Connecting…": "Подключение…",
   Connect: "Подключить",
   "Detect again": "Искать снова",
+  "Engine variant": "Вариант двигателя",
   // The bench (ADR-0020)
   "Connect the bench (virtual vehicle)": "Подключить стенд (виртуальный автомобиль)",
   "No adapter and no car needed: a virtual vehicle built from the library answers instead. Every value is synthetic.":

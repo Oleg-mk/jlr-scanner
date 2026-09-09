@@ -115,6 +115,8 @@ export interface ProgrammeEntry {
   program: string;
   markers: MarkerEntry[];
   powertrains: string[];
+  /** What SDD splits an engine into, where it does; empty for most programmes. */
+  variants: string[];
 }
 
 export interface VehicleCatalogueSnapshot {

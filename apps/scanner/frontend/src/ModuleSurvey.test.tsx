@@ -235,6 +235,7 @@ describe("data library and module survey", () => {
               program: "SYNTHA",
               markers: [{ marker: "MY10", modelYearFrom: 2010, modelYearTo: 2011 }],
               powertrains: ["SYNTHENGINE"],
+      variants: [],
             },
           ],
         });
@@ -294,6 +295,7 @@ describe("data library and module survey", () => {
                 { marker: "MY10", modelYearFrom: 2010, modelYearTo: 2011 },
               ],
               powertrains: ["SYNTHENGINE"],
+      variants: [],
             },
           ],
         });

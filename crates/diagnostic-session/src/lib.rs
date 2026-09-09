@@ -498,7 +498,8 @@ fn base_mnemonic(mnemonic: &str) -> &str {
 /// their engines; and the fault-code wording a read will be joined to.
 fn build_indexes(store: &KnowledgeStore) -> Indexes {
     type Markers = BTreeMap<String, (Option<u16>, Option<u16>)>;
-    let mut programmes: BTreeMap<String, (Markers, BTreeSet<String>)> = BTreeMap::new();
+    let mut programmes: BTreeMap<String, (Markers, BTreeSet<String>, BTreeSet<String>)> =
+        BTreeMap::new();
     let mut dtc_index = DtcIndex::default();
     let mut module_names: BTreeMap<String, BTreeMap<String, String>> = BTreeMap::new();
     let mut legacy_names: BTreeMap<String, BTreeMap<String, String>> = BTreeMap::new();
@@ -597,6 +598,9 @@ fn build_indexes(store: &KnowledgeStore) -> Indexes {
                 if let DimensionConstraint::OneOf { values } = &record.applicability.powertrain {
                     slot.1.extend(values.iter().cloned());
                 }
+                if let DimensionConstraint::OneOf { values } = &record.applicability.variant {
+                    slot.2.extend(values.iter().cloned());
+                }
             }
             EntityKind::DiagnosticTroubleCode => {
                 let KnowledgeValue::Text { value } = &record.value else {
@@ -650,19 +654,22 @@ fn build_indexes(store: &KnowledgeStore) -> Indexes {
     let catalogue = VehicleCatalogueSnapshot {
         programmes: programmes
             .into_iter()
-            .filter(|(_, (markers, _))| !markers.is_empty())
-            .map(|(program, (markers, powertrains))| ProgrammeEntry {
-                program,
-                markers: markers
-                    .into_iter()
-                    .map(|(marker, (from, to))| MarkerEntry {
-                        marker,
-                        model_year_from: from,
-                        model_year_to: to,
-                    })
-                    .collect(),
-                powertrains: powertrains.into_iter().collect(),
-            })
+            .filter(|(_, (markers, _, _))| !markers.is_empty())
+            .map(
+                |(program, (markers, powertrains, variants))| ProgrammeEntry {
+                    program,
+                    markers: markers
+                        .into_iter()
+                        .map(|(marker, (from, to))| MarkerEntry {
+                            marker,
+                            model_year_from: from,
+                            model_year_to: to,
+                        })
+                        .collect(),
+                    powertrains: powertrains.into_iter().collect(),
+                    variants: variants.into_iter().collect(),
+                },
+            )
             .collect(),
     };
     Indexes {
