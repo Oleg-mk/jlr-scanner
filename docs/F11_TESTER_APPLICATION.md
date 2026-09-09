@@ -459,9 +459,17 @@ Nothing derived from SDD enters the repository this way.
   English. Its wording is the manufacturer's, and translating it would put
   their text, in another language, into ours.
 
-The table is filled in passes. After five, 1,022 of the library's 1,664
-standard-range codes are covered: the whole powertrain P0 range except the
-hybrid and electric families, the transmission P07 range, the restraints B0
-range, the chassis and brake C0 range, and the communication U0 range. What
-is left is mostly P2, the hybrid and electric P0A-P0E families, and the rest
-of the transmission actuators in P08 and P09.
+The table was filled in nine passes and now covers **all 1,664
+standard-range codes the library holds**: the powertrain P0 and P2 ranges
+including the hybrid and electric families, the whole transmission range,
+the restraints B0 range, the chassis and brake C0 range, and the
+communication U0 range. A code outside those ranges is manufacturer-specific
+and deliberately has no entry.
+
+Terms are kept uniform across the table so that a reader learns them once:
+`коло` for a circuit, `діапазон або робота` for range/performance, `низький`
+and `високий рівень` for a low and a high circuit, `переривчастий сигнал`
+for intermittent/erratic, `ряд`/`датчик` for bank and sensor. The repetitive
+families — the traction battery's dozen voltage senses, the cell-balancing
+circuits — are generated from that vocabulary rather than typed out, so a
+typo cannot hide in one row of forty.
