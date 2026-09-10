@@ -247,3 +247,30 @@ fn a_folder_without_any_stamp_is_refused_by_the_application_and_loaded_by_tools(
     assert_eq!(tooling.snapshot().state, LibraryState::Loaded);
     assert!(tooling.snapshot().issue.is_none());
 }
+
+/// A copy carried to a Mac through a stick or a share comes back with
+/// AppleDouble sidecars beside every file: `._platform.json`, invisible in
+/// Finder and ending in `.json`. The stamp counts the files it covers, so
+/// before 2026-09-09 those sidecars refused a copy that had lost nothing —
+/// which is what the owner met on the first Mac to load a library.
+#[test]
+fn a_copy_that_travelled_through_a_mac_still_matches_its_stamp() {
+    let text = bundle(Some("[issued AB12-CD34]"));
+    let stamp = signed_stamp(&fields(&text, "2026-10-05"), TEST_SEED, |_| {});
+    let dir = write_copy("applestamp", &text, Some(&stamp));
+    std::fs::write(dir.join("._platform.json"), "AppleDouble").unwrap();
+    std::fs::write(dir.join("._issued_to.json"), "AppleDouble").unwrap();
+    std::fs::write(dir.join(".DS_Store"), "Finder").unwrap();
+
+    let library = load(&dir, true);
+    let snapshot = library.snapshot();
+    assert_eq!(snapshot.state, LibraryState::Loaded, "{}", snapshot.message);
+    assert_eq!(
+        snapshot.issue.as_ref().map(|issue| issue.integrity),
+        Some(LibraryIssueIntegrity::Matches)
+    );
+    // Nothing failed: the sidecars were never read as manifests, and the
+    // bundle beside them loaded.
+    assert_eq!(snapshot.manifests_failed, 0);
+    assert!(snapshot.manifests_loaded > 0);
+}

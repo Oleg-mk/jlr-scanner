@@ -239,6 +239,18 @@ impl KnowledgeLibrary {
             .filter(|path| {
                 path.file_name().and_then(|value| value.to_str()) != Some(ISSUE_STAMP_FILE)
             })
+            // Not ours and not a manifest: a name beginning with a dot is
+            // something the filesystem left behind. macOS writes an
+            // AppleDouble sidecar — `._platform.json` beside `platform.json` —
+            // whenever a folder crosses a stick or a share, invisible in
+            // Finder and ending in `.json` all the same. Counting one as a
+            // manifest refuses a copy that has not lost a byte.
+            .filter(|path| {
+                !path
+                    .file_name()
+                    .and_then(|value| value.to_str())
+                    .is_some_and(|name| name.starts_with('.'))
+            })
             .collect();
         files.sort();
         let stamp = std::fs::read_to_string(directory.join(ISSUE_STAMP_FILE))

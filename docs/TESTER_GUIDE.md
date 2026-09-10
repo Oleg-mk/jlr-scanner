@@ -98,6 +98,26 @@ xattr -cr "/Applications/ProwlOne.app"
 codesign --force --deep --sign - "/Applications/ProwlOne.app"
 ```
 
+**If the application on a Mac says the data does not match the stamp of your
+copy**, and you have just carried that copy on a stick or over a share, the
+data is almost certainly fine. macOS writes a sidecar beside every file
+(`._platform.json` next to `platform.json`), invisible in Finder and ending in
+`.json` all the same, and the check counts them as files that should not be
+there. In Terminal, in the library folder:
+
+```bash
+dot_clean .
+```
+
+Then choose the folder in the application again. If `dot_clean` does not do
+it:
+
+```bash
+find . -name '._*' -delete
+```
+
+Builds after 0.9.6 ignore such files; this note is for 0.9.6 and earlier.
+
 The MongoosePro JLR appears on a Mac as a USB modem port with no driver
 to install; a clone with a different chip may need its maker's driver.
 Nobody has run the Mac build yet: if you are the first, say so in your
