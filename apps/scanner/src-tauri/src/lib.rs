@@ -106,17 +106,17 @@ fn lock_diagnostic<'a>(
 }
 
 #[tauri::command]
-fn get_adapter_state(state: State<'_, SharedAdapterService>) -> AdapterSnapshot {
-    lock_service(&state).snapshot()
+async fn get_adapter_state(
+    state: State<'_, SharedAdapterService>,
+) -> Result<AdapterSnapshot, String> {
+    Ok(lock_service(&state).snapshot())
 }
 
-#[tauri::command]
-fn discover_adapters(state: State<'_, SharedAdapterService>) -> AdapterSnapshot {
+fn discover_adapters_now(state: State<'_, SharedAdapterService>) -> AdapterSnapshot {
     lock_service(&state).discover()
 }
 
-#[tauri::command]
-fn connect_adapter(
+fn connect_adapter_now(
     state: State<'_, SharedAdapterService>,
     report_state: State<'_, SharedSessionReportService>,
     port: Option<String>,
@@ -134,8 +134,7 @@ fn connect_adapter(
 
 /// Connect the bench (ADR-0020): the vehicle the session describes, behind
 /// a stand-in adapter. A session that already holds real records refuses.
-#[tauri::command]
-fn connect_bench(
+fn connect_bench_now(
     state: State<'_, SharedAdapterService>,
     session_state: State<'_, SharedSessionService>,
     report_state: State<'_, SharedSessionReportService>,
@@ -163,22 +162,20 @@ fn connect_bench(
     snapshot
 }
 
-#[tauri::command]
-fn disconnect_adapter(state: State<'_, SharedAdapterService>) -> AdapterSnapshot {
+fn disconnect_adapter_now(state: State<'_, SharedAdapterService>) -> AdapterSnapshot {
     lock_service(&state).disconnect()
 }
 
 #[tauri::command]
-fn get_diagnostic_state(
+async fn get_diagnostic_state(
     adapter_state: State<'_, SharedAdapterService>,
     diagnostic_state: State<'_, SharedDiagnosticService>,
-) -> DiagnosticSnapshot {
+) -> Result<DiagnosticSnapshot, String> {
     let adapter_ready = lock_service(&adapter_state).connected_adapter().is_some();
-    lock_diagnostic(&diagnostic_state).snapshot(adapter_ready)
+    Ok(lock_diagnostic(&diagnostic_state).snapshot(adapter_ready))
 }
 
-#[tauri::command]
-fn read_calibration_identification(
+fn read_calibration_identification_now(
     adapter_state: State<'_, SharedAdapterService>,
     diagnostic_state: State<'_, SharedDiagnosticService>,
     report_state: State<'_, SharedSessionReportService>,
@@ -224,7 +221,7 @@ fn read_calibration_identification(
 }
 
 #[tauri::command]
-fn get_diagnostic_report_json(
+async fn get_diagnostic_report_json(
     diagnostic_state: State<'_, SharedDiagnosticService>,
 ) -> Result<String, String> {
     lock_diagnostic(&diagnostic_state).report_json()
@@ -234,12 +231,13 @@ fn get_diagnostic_report_json(
 // knowledge and compute plans; they open no transport and transmit nothing.
 
 #[tauri::command]
-fn get_data_library(state: State<'_, SharedSessionService>) -> LibrarySnapshot {
-    lock_session(&state).library_snapshot()
+async fn get_data_library(
+    state: State<'_, SharedSessionService>,
+) -> Result<LibrarySnapshot, String> {
+    Ok(lock_session(&state).library_snapshot())
 }
 
-#[tauri::command]
-fn load_data_library(
+fn load_data_library_now(
     state: State<'_, SharedSessionService>,
     bench: State<'_, SharedBench>,
     scenario_state: State<'_, BenchScenario>,
@@ -253,17 +251,21 @@ fn load_data_library(
 }
 
 #[tauri::command]
-fn get_vehicle_catalogue(state: State<'_, SharedSessionService>) -> VehicleCatalogueSnapshot {
-    lock_session(&state).catalogue()
+async fn get_vehicle_catalogue(
+    state: State<'_, SharedSessionService>,
+) -> Result<VehicleCatalogueSnapshot, String> {
+    Ok(lock_session(&state).catalogue())
 }
 
 #[tauri::command]
-fn decode_vin(state: State<'_, SharedSessionService>, vin: String) -> VinDecodeSnapshot {
-    lock_session(&state).decode_vin(&vin)
+async fn decode_vin(
+    state: State<'_, SharedSessionService>,
+    vin: String,
+) -> Result<VinDecodeSnapshot, String> {
+    Ok(lock_session(&state).decode_vin(&vin))
 }
 
-#[tauri::command]
-fn survey_vehicle(
+fn survey_vehicle_now(
     state: State<'_, SharedSessionService>,
     bench: State<'_, SharedBench>,
     scenario_state: State<'_, BenchScenario>,
@@ -285,12 +287,13 @@ const CAPTURE_MAX_SECONDS: u32 = 15;
 // `captured` replay fixture with its provenance.
 
 #[tauri::command]
-fn get_capture_state(state: State<'_, SharedCaptureService>) -> CaptureSnapshot {
-    lock_capture(&state).snapshot()
+async fn get_capture_state(
+    state: State<'_, SharedCaptureService>,
+) -> Result<CaptureSnapshot, String> {
+    Ok(lock_capture(&state).snapshot())
 }
 
-#[tauri::command]
-fn capture_bus(
+fn capture_bus_now(
     adapter_state: State<'_, SharedAdapterService>,
     capture_state: State<'_, SharedCaptureService>,
     report_state: State<'_, SharedSessionReportService>,
@@ -345,7 +348,7 @@ fn capture_bus(
 }
 
 #[tauri::command]
-fn get_capture_json(state: State<'_, SharedCaptureService>) -> Result<String, String> {
+async fn get_capture_json(state: State<'_, SharedCaptureService>) -> Result<String, String> {
     lock_capture(&state).capture_json()
 }
 
@@ -356,12 +359,13 @@ const MODULE_READ_TIMEOUT: Duration = Duration::from_secs(2);
 // read-only transaction, execute it live, decode, report.
 
 #[tauri::command]
-fn get_module_read_state(state: State<'_, SharedModuleReadService>) -> ModuleReadSnapshot {
-    lock_module_read(&state).snapshot()
+async fn get_module_read_state(
+    state: State<'_, SharedModuleReadService>,
+) -> Result<ModuleReadSnapshot, String> {
+    Ok(lock_module_read(&state).snapshot())
 }
 
-#[tauri::command]
-fn read_module(
+fn read_module_now(
     adapter_state: State<'_, SharedAdapterService>,
     session_state: State<'_, SharedSessionService>,
     module_read_state: State<'_, SharedModuleReadService>,
@@ -437,7 +441,7 @@ fn read_module(
 }
 
 #[tauri::command]
-fn get_module_read_report_json(
+async fn get_module_read_report_json(
     state: State<'_, SharedModuleReadService>,
 ) -> Result<String, String> {
     lock_module_read(&state).report_json()
@@ -447,12 +451,14 @@ fn get_module_read_report_json(
 // recorded; interprets nothing.
 
 #[tauri::command]
-fn get_session_report_state(state: State<'_, SharedSessionReportService>) -> SessionReportSnapshot {
-    lock_session_report(&state).snapshot()
+async fn get_session_report_state(
+    state: State<'_, SharedSessionReportService>,
+) -> Result<SessionReportSnapshot, String> {
+    Ok(lock_session_report(&state).snapshot())
 }
 
 #[tauri::command]
-fn get_session_report_json(
+async fn get_session_report_json(
     adapter_state: State<'_, SharedAdapterService>,
     session_state: State<'_, SharedSessionService>,
     report_state: State<'_, SharedSessionReportService>,
@@ -577,6 +583,135 @@ async fn pick_directory(app: tauri::AppHandle) -> Result<Option<String>, String>
     };
     let path = chosen.into_path().map_err(|error| error.to_string())?;
     Ok(Some(path.display().to_string()))
+}
+
+// ---------------------------------------------------------------------------
+// The slow commands, off the window's thread
+//
+// Tauri runs a synchronous command on the thread that owns the window, so the
+// window answers nothing while one works: macOS draws its spinning wheel, and
+// Windows says "not responding". A 177 MB library takes seconds even on a
+// fast machine and tens of seconds on an old one, and a bus listen holds the
+// thread for up to fifteen. Each of these is `async`, which makes Tauri spawn
+// it on the runtime instead; the body itself still blocks, on a runtime
+// worker rather than on the window. An async command that borrows state has
+// to return a `Result`, so these return one and never fail.
+// ---------------------------------------------------------------------------
+
+#[tauri::command]
+async fn discover_adapters(
+    state: State<'_, SharedAdapterService>,
+) -> Result<AdapterSnapshot, String> {
+    Ok(discover_adapters_now(state))
+}
+
+#[tauri::command]
+async fn connect_adapter(
+    state: State<'_, SharedAdapterService>,
+    report_state: State<'_, SharedSessionReportService>,
+    port: Option<String>,
+) -> Result<AdapterSnapshot, String> {
+    Ok(connect_adapter_now(state, report_state, port))
+}
+
+#[tauri::command]
+async fn connect_bench(
+    state: State<'_, SharedAdapterService>,
+    session_state: State<'_, SharedSessionService>,
+    report_state: State<'_, SharedSessionReportService>,
+    bench: State<'_, SharedBench>,
+    scenario_state: State<'_, BenchScenario>,
+    scenario: Option<u32>,
+) -> Result<AdapterSnapshot, String> {
+    Ok(connect_bench_now(
+        state,
+        session_state,
+        report_state,
+        bench,
+        scenario_state,
+        scenario,
+    ))
+}
+
+#[tauri::command]
+async fn disconnect_adapter(
+    state: State<'_, SharedAdapterService>,
+) -> Result<AdapterSnapshot, String> {
+    Ok(disconnect_adapter_now(state))
+}
+
+#[tauri::command]
+async fn read_calibration_identification(
+    adapter_state: State<'_, SharedAdapterService>,
+    diagnostic_state: State<'_, SharedDiagnosticService>,
+    report_state: State<'_, SharedSessionReportService>,
+) -> Result<DiagnosticSnapshot, String> {
+    Ok(read_calibration_identification_now(
+        adapter_state,
+        diagnostic_state,
+        report_state,
+    ))
+}
+
+#[tauri::command]
+async fn load_data_library(
+    state: State<'_, SharedSessionService>,
+    bench: State<'_, SharedBench>,
+    scenario_state: State<'_, BenchScenario>,
+    directory: String,
+) -> Result<LibrarySnapshot, String> {
+    Ok(load_data_library_now(
+        state,
+        bench,
+        scenario_state,
+        directory,
+    ))
+}
+
+#[tauri::command]
+async fn survey_vehicle(
+    state: State<'_, SharedSessionService>,
+    bench: State<'_, SharedBench>,
+    scenario_state: State<'_, BenchScenario>,
+    context: VehicleContextInput,
+) -> Result<VehicleSurveySnapshot, String> {
+    Ok(survey_vehicle_now(state, bench, scenario_state, context))
+}
+
+#[tauri::command]
+async fn capture_bus(
+    adapter_state: State<'_, SharedAdapterService>,
+    capture_state: State<'_, SharedCaptureService>,
+    report_state: State<'_, SharedSessionReportService>,
+    route_id: String,
+    seconds: u32,
+    context: VehicleContextInput,
+) -> Result<CaptureSnapshot, String> {
+    Ok(capture_bus_now(
+        adapter_state,
+        capture_state,
+        report_state,
+        route_id,
+        seconds,
+        context,
+    ))
+}
+
+#[tauri::command]
+async fn read_module(
+    adapter_state: State<'_, SharedAdapterService>,
+    session_state: State<'_, SharedSessionService>,
+    module_read_state: State<'_, SharedModuleReadService>,
+    report_state: State<'_, SharedSessionReportService>,
+    request: ModuleReadRequest,
+) -> Result<ModuleReadSnapshot, String> {
+    Ok(read_module_now(
+        adapter_state,
+        session_state,
+        module_read_state,
+        report_state,
+        request,
+    ))
 }
 
 pub fn run() {

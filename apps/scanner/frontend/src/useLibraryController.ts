@@ -11,6 +11,31 @@ import {
   type VinDecodeSnapshot,
 } from "./library";
 
+/**
+ * Where the library folder is remembered between launches. The path only:
+ * the stamp is verified on every start, so an expired copy stops working on
+ * its own date, and no second copy of the data is written anywhere.
+ */
+const LIBRARY_DIRECTORY_KEY = "prowlone.libraryDirectory";
+
+function readStoredDirectory(): string {
+  try {
+    return window.localStorage.getItem(LIBRARY_DIRECTORY_KEY) ?? "";
+  } catch {
+    // A browser that refuses storage is not a reason to fail to start.
+    return "";
+  }
+}
+
+function storeDirectory(directory: string) {
+  try {
+    if (directory.trim() === "") window.localStorage.removeItem(LIBRARY_DIRECTORY_KEY);
+    else window.localStorage.setItem(LIBRARY_DIRECTORY_KEY, directory);
+  } catch {
+    // Nothing to do: the folder is simply asked for again next time.
+  }
+}
+
 function failedLibrary(error: unknown): LibrarySnapshot {
   return {
     ...createLibrarySnapshot(),
@@ -34,7 +59,7 @@ function failedSurvey(vehicle: VehicleDescription, error: unknown): VehicleSurve
 
 export function useLibraryController(client: LibraryClient) {
   const [library, setLibrary] = useState<LibrarySnapshot>(createLibrarySnapshot);
-  const [directory, setDirectory] = useState("");
+  const [directory, setDirectory] = useState(readStoredDirectory);
   const [vehicle, setVehicle] = useState<VehicleDescription>(createVehicleDescription);
   const [survey, setSurvey] = useState<VehicleSurveySnapshot | null>(null);
   const [catalogue, setCatalogue] = useState<VehicleCatalogueSnapshot>({ programmes: [] });
@@ -69,7 +94,11 @@ export function useLibraryController(client: LibraryClient) {
   const load = useCallback(async () => {
     setBusy(true);
     try {
-      setLibrary(await client.loadDirectory(directory));
+      const loaded = await client.loadDirectory(directory);
+      setLibrary(loaded);
+      // Remember a folder that worked, and forget one that did not: the next
+      // launch reads it by itself rather than asking again.
+      storeDirectory(loaded.state === "LOADED" ? directory : "");
       // A different library can answer differently; do not keep an old answer.
       setSurvey(null);
       setCatalogue(await client.getCatalogue());
@@ -79,6 +108,17 @@ export function useLibraryController(client: LibraryClient) {
       setBusy(false);
     }
   }, [client, directory]);
+
+  // The folder that worked last time is read on start, without being asked
+  // for again. The window stays usable while it reads, and the panel counts
+  // the seconds; a folder that has gone, or a copy whose date has passed,
+  // says so in the same words it would say them at any other time.
+  const [restored, setRestored] = useState(false);
+  useEffect(() => {
+    if (restored) return;
+    setRestored(true);
+    if (readStoredDirectory().trim() !== "") void load();
+  }, [load, restored]);
 
   const chooseDirectory = useCallback(async () => {
     const chosen = await pickDirectory();

@@ -370,6 +370,10 @@ const uk: Record<string, string> = {
     "За шлюзом: SDD відкриває його командою запуску процедури, якої цей етап лише читання не надсилає. Заплановано на другий етап; адреса відома.",
   "Connection": "З'єднання",
   "Choose folder…": "Обрати папку…",
+  "Reading the library…": "Читаю бібліотеку…",
+  sec: "с",
+  "A large library takes seconds on a fast machine and tens of seconds on an old one. Nothing is wrong; wait for the count to stop.":
+    "Велика бібліотека читається кілька секунд на швидкій машині і десятки — на старій. Нічого не зависло: зачекайте, поки лічильник зупиниться.",
   "Load library": "Завантажити бібліотеку",
 
   // Tools: capture
@@ -715,6 +719,10 @@ const ru: Record<string, string> = {
     "За шлюзом: SDD открывает его командой запуска процедуры, которую этот этап только чтения не посылает. Запланировано на второй этап; адрес известен.",
   "Connection": "Подключение",
   "Choose folder…": "Выбрать папку…",
+  "Reading the library…": "Читаю библиотеку…",
+  sec: "с",
+  "A large library takes seconds on a fast machine and tens of seconds on an old one. Nothing is wrong; wait for the count to stop.":
+    "Большая библиотека читается несколько секунд на быстрой машине и десятки — на старой. Ничего не зависло: подождите, пока счётчик не остановится.",
   "Load library": "Загрузить библиотеку",
 
   // Tools: capture

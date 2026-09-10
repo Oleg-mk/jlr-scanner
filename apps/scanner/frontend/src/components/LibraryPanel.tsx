@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { t, useLanguage } from "../i18n";
 import type { LibraryIssue } from "../library";
 import type { LibrarySnapshot } from "../library";
@@ -120,6 +121,23 @@ export function LibraryPanel({
   onLoad,
 }: LibraryPanelProps) {
   useLanguage();
+  // Seconds since the load began. A disabled button is not enough on a slow
+  // machine: the owner's 2016 Mac read a 177 MB library with nothing moving
+  // on screen, and he took it for a hang (2026-09-10).
+  const [elapsed, setElapsed] = useState(0);
+  useEffect(() => {
+    if (!busy) {
+      setElapsed(0);
+      return;
+    }
+    const started = Date.now();
+    setElapsed(0);
+    const timer = window.setInterval(
+      () => setElapsed(Math.round((Date.now() - started) / 1000)),
+      1000,
+    );
+    return () => window.clearInterval(timer);
+  }, [busy]);
   return (
     <section className="library-panel" aria-labelledby="library-title">
       <div className="section-heading section-heading--action">
@@ -167,9 +185,21 @@ export function LibraryPanel({
         </button>
       </div>
 
-      <p className="library-status" role="status">
-        {snapshot.message}
-      </p>
+      {busy ? (
+        <p className="library-status" role="status">
+          {t("Reading the library…")} {elapsed}&nbsp;{t("sec")}
+          <br />
+          <span className="button-hint">
+            {t(
+              "A large library takes seconds on a fast machine and tens of seconds on an old one. Nothing is wrong; wait for the count to stop.",
+            )}
+          </span>
+        </p>
+      ) : (
+        <p className="library-status" role="status">
+          {snapshot.message}
+        </p>
+      )}
       {snapshot.issue !== null ? issueNotice(snapshot.issue) : null}
       {snapshot.failures.length > 0 ? (
         <ul className="library-failures">

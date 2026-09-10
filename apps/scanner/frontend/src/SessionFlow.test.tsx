@@ -1,5 +1,5 @@
 import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { App } from "./App";
 import { createEmptySnapshot, type AdapterClient, type AdapterSnapshot } from "./adapter";
 import {
@@ -22,6 +22,11 @@ import {
   type SessionReportClient,
   type SessionReportSnapshot,
 } from "./sessionReport";
+// The application remembers the library folder that worked, so a test that
+// loads one would leave it for the next test in this file (2026-09-10).
+beforeEach(() => {
+  window.localStorage.clear();
+});
 
 class IdleAdapterClient implements AdapterClient {
   getState(): Promise<AdapterSnapshot> {
