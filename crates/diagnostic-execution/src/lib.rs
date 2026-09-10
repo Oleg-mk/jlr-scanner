@@ -114,7 +114,7 @@ pub struct PreparedDiagnosticTransaction {
     capability_id: String,
     observed_calibration: String,
     request: J1979Request,
-    encoded_payload: [u8; 2],
+    encoded_payload: Vec<u8>,
     provenance: ExecutionProvenance,
 }
 
