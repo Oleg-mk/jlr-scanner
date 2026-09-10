@@ -177,3 +177,16 @@ that runs for minutes while a person watches.
 - Whether any of this works on a car is learned the way everything else is:
   from a tester's report. The bench proves the software; a vehicle proves
   the vehicle.
+
+## Measured, 2026-09-10
+
+Decision 3 asked for numbers before a gauge; they are in
+`docs/evidence/mongoose-link-cadence-2026-09-10.md`. The link to the
+adapter answers a request in a median 15.6 ms; opening and closing a route
+costs about 50 ms; the product's own read path costs 0.01 ms a read on the
+real library. The cadence is therefore the link and the module, never the
+software. Two things follow for the service of decision 8: it keeps the
+route open for the run and closes it on stop, and the 100 ms floor of
+decision 3 is the binding limit by choice — a courtesy to the bus, ten
+requests a second, below what the link would carry. The module's own answer
+time waits for a car.

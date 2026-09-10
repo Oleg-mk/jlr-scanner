@@ -4,13 +4,13 @@
 
 use super::adapter_service::{AdapterService, SystemAdapterBackend, BENCH_PORT, BENCH_TRANSPORT};
 use super::capture_service::CaptureService;
-use super::module_read_service::{map_live_error, ModuleReadService};
+use super::module_read_service::{map_live_error, ModuleReadService, PreparedModuleRead};
 use super::refresh_bench;
 use super::session_report_service::{SessionReportService, SESSION_MODE_BENCH, SESSION_MODE_REAL};
 use super::session_service::SessionService;
 use app_contracts::{
-    AdapterErrorCode, AdapterState, ModuleReadKind, ModuleReadRequest, ModuleReadState,
-    VehicleContextInput,
+    AdapterErrorCode, AdapterInfo, AdapterState, ModuleReadKind, ModuleReadRequest,
+    ModuleReadState, VehicleContextInput,
 };
 use diagnostic_session::KnowledgeLibrary;
 use knowledge::{
@@ -247,4 +247,172 @@ fn the_bench_connects_without_a_port_reads_the_surveyed_vehicle_and_marks_everyt
     // enumeration then finds on this machine.
     adapter.connect(None);
     assert!(!adapter.is_bench());
+}
+
+// ---------------------------------------------------------------------------
+// The cadence on the bench (ADR-0022, decision 3)
+// ---------------------------------------------------------------------------
+
+fn env_or(key: &str, default: &str) -> String {
+    std::env::var(key).unwrap_or_else(|_| default.to_string())
+}
+
+/// Rounds over the set for `seconds`, through the very path a live read
+/// would take: the prepared transaction executed over the adapter protocol,
+/// the answer decoded and marked. Requests made, requests that succeeded,
+/// rounds completed, time spent.
+fn rounds_for(
+    adapter: &mut AdapterService<SystemAdapterBackend>,
+    reads: &mut ModuleReadService,
+    info: &AdapterInfo,
+    library: &KnowledgeLibrary,
+    set: &[(ModuleReadRequest, PreparedModuleRead)],
+    seconds: u64,
+) -> (u64, u64, u32, Duration) {
+    let started = std::time::Instant::now();
+    let (mut requests, mut succeeded, mut rounds) = (0u64, 0u64, 0u32);
+    while started.elapsed() < Duration::from_secs(seconds) {
+        for (request, prepared) in set {
+            let result = adapter
+                .execute_uds_read(&prepared.transaction, Duration::from_secs(2))
+                .expect("the bench is connected")
+                .map_err(map_live_error);
+            let read = reads.finish(request, Some(prepared), Some(info), Some(library), result);
+            requests += 1;
+            if read.state == ModuleReadState::Succeeded {
+                succeeded += 1;
+            }
+        }
+        rounds += 1;
+    }
+    (requests, succeeded, rounds, started.elapsed())
+}
+
+fn report(
+    label: &str,
+    entries: usize,
+    (requests, succeeded, rounds, elapsed): (u64, u64, u32, Duration),
+) {
+    let seconds = elapsed.as_secs_f64();
+    println!(
+        "{label}: {entries} entr{} — {requests} requests in {seconds:.1} s, {succeeded} succeeded; \
+         {:.1} requests/s, {:.2} ms per request, {rounds} rounds of {:.0} ms",
+        if entries == 1 { "y" } else { "ies" },
+        requests as f64 / seconds,
+        seconds * 1000.0 / requests.max(1) as f64,
+        seconds * 1000.0 / rounds.max(1) as f64,
+    );
+}
+
+/// Not a test but a measurement, run on purpose: how many reads a second the
+/// product's own path carries — prepare once, execute over the adapter
+/// protocol, decode — with the bench answering. ADR-0022 decides that the
+/// cadence is measured before any gauge is drawn; this is the bench half, a
+/// ceiling set by the software alone. The hardware half is a live session.
+///
+///   cargo test -p prowlone-shell cadence_on_the_bench -- --ignored --nocapture
+///
+/// With `PROWLONE_LIBRARY` naming an issued copy, `PROWLONE_PROGRAM`,
+/// `PROWLONE_MODEL_YEAR`, `PROWLONE_POWERTRAIN`, `PROWLONE_VARIANT` and
+/// `PROWLONE_BREAKPOINT` describe the car; without them, the SYNTHA fixtures.
+#[test]
+#[ignore]
+fn cadence_on_the_bench() {
+    let (library, context) = match std::env::var("PROWLONE_LIBRARY") {
+        Ok(directory) => (
+            KnowledgeLibrary::load_issued_directory(std::path::Path::new(&directory)),
+            VehicleContextInput {
+                vehicle_program: env_or("PROWLONE_PROGRAM", "X250"),
+                model_year: std::env::var("PROWLONE_MODEL_YEAR")
+                    .ok()
+                    .and_then(|year| year.parse().ok()),
+                powertrain: std::env::var("PROWLONE_POWERTRAIN").ok(),
+                variant: std::env::var("PROWLONE_VARIANT").ok(),
+                market: None,
+                year_breakpoint: std::env::var("PROWLONE_BREAKPOINT").ok(),
+            },
+        ),
+        Err(_) => (library(), vehicle()),
+    };
+    let loaded = library.snapshot();
+    println!(
+        "library: {:?}, {} records — {}",
+        loaded.state, loaded.records, loaded.message
+    );
+
+    let bench = share_bus(Box::new(EmptyBench));
+    let mut adapter = AdapterService::new(SystemAdapterBackend::new(bench.clone()));
+    let connected = adapter.connect_bench(bench_vehicle::SCENARIO_DEFAULT);
+    assert_eq!(
+        connected.state,
+        AdapterState::Connected,
+        "{:?}",
+        connected.error
+    );
+    let info = adapter.connected_adapter().expect("the bench is connected");
+
+    let mut session = SessionService::with_library(library);
+    let survey = session.survey(&context);
+    refresh_bench(&bench, &session, bench_vehicle::SCENARIO_DEFAULT);
+    println!(
+        "vehicle: {} {} — {} modules surveyed, {} reachable; bench: {}",
+        context.vehicle_program,
+        context.year_breakpoint.as_deref().unwrap_or(""),
+        survey.modules.len(),
+        survey.reachable,
+        bench.lock().unwrap().describe()
+    );
+
+    // The set the ADR allows at most: one identifier per module first, then
+    // a second one per module, until sixteen.
+    let mut requests: Vec<ModuleReadRequest> = Vec::new();
+    for pass in 0..8 {
+        for module in &survey.modules {
+            if requests.len() >= 16 {
+                break;
+            }
+            if let Some(entry) = module.readable_identifiers.get(pass) {
+                requests.push(ModuleReadRequest {
+                    ecu_family: module.ecu_family.clone(),
+                    kind: ModuleReadKind::Identifier,
+                    identifier: Some(entry.identifier.clone()),
+                    context: context.clone(),
+                });
+            }
+        }
+    }
+    let mut set: Vec<(ModuleReadRequest, PreparedModuleRead)> = Vec::new();
+    for request in requests {
+        match ModuleReadService::prepare(session.library(), &request) {
+            Ok(prepared) => set.push((request, prepared)),
+            Err(error) => println!(
+                "  not in the set: {} {} — {error:?}",
+                request.ecu_family,
+                request.identifier.as_deref().unwrap_or("")
+            ),
+        }
+    }
+    assert!(!set.is_empty(), "nothing to read");
+    for (request, _) in &set {
+        println!(
+            "  {} {}",
+            request.ecu_family,
+            request.identifier.as_deref().unwrap_or("")
+        );
+    }
+
+    let mut reads = ModuleReadService::new();
+    // A warm-up round, so the first allocations do not count.
+    rounds_for(&mut adapter, &mut reads, &info, session.library(), &set, 1);
+    report(
+        "full set",
+        set.len(),
+        rounds_for(&mut adapter, &mut reads, &info, session.library(), &set, 5),
+    );
+    let one = &set[..1];
+    report(
+        "one identifier",
+        1,
+        rounds_for(&mut adapter, &mut reads, &info, session.library(), one, 3),
+    );
 }
