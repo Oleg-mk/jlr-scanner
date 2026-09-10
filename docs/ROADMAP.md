@@ -515,7 +515,10 @@ mode 01 and 02 follow as their own slice. Order: the ADR, the cadence on
 the bench, the service with a plain table, then the visual layer — and the
 first real tester report outranks the last two, because they build over a
 read path that has never met a vehicle. The owner names this the start of
-the 1.1 line.
+the 1.1 line. *Measured 2026-09-10:* the link costs ~16 ms a round trip, the
+software 0.01 ms, so the cadence is the link and the module. *Decision 7
+built the same day:* the legislated services, codec to screen, on the
+standard's own addressing, `IMPLEMENTED / FIXTURE_TESTED`.
 
 ### Beyond stage 1
 

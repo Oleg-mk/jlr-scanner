@@ -2364,3 +2364,36 @@ body,
   font-weight: 560;
   letter-spacing: 0.01em;
 }
+
+/* Standard OBD-II (ADR-0022, decision 7) */
+.standard-obd-panel {
+  margin-top: 1.5rem;
+}
+
+.standard-obd-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 1rem;
+  margin: 1rem 0;
+}
+
+.standard-obd-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.standard-obd-operation {
+  margin: 0.75rem 0 0.25rem;
+}
+
+.standard-obd-refusal {
+  margin: 0.5rem 0;
+  color: var(--pending);
+}
+
+.standard-obd-subtitle {
+  margin: 1rem 0 0.25rem;
+  font-size: 1rem;
+}

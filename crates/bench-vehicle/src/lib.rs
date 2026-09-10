@@ -330,7 +330,28 @@ impl BenchVehicle {
                     .collect();
                 current_data_response(&pairs)
             }
+            // Frame 0 only. Its maps and the code that froze it answer whether
+            // a frame is stored or not, as a real controller's do; the frame's
+            // own values exist only once a code has frozen one. Monitor status
+            // is no part of a frame, the freezing code is.
             0x02 => match (request.get(1), request.get(2)) {
+                (Some(pid), Some(&0)) if is_support_item(*pid) => {
+                    let mut supported = Self::obd_supported(*pid);
+                    supported.retain(|item| *item != 0x01);
+                    if *pid == 0x00 {
+                        supported.insert(0, 0x02);
+                    }
+                    freeze_frame_response(
+                        *pid,
+                        0,
+                        &obd_j1979::support::encode_support_bitmap(*pid, &supported),
+                    )
+                }
+                (Some(&0x02), Some(&0)) => freeze_frame_response(
+                    0x02,
+                    0,
+                    &Self::obd_pid_bytes(module, 0x02).unwrap_or_else(|| vec![0, 0]),
+                ),
                 (Some(pid), Some(&0)) if !module.faults.is_empty() => {
                     match Self::obd_pid_bytes(module, *pid) {
                         Some(bytes) => freeze_frame_response(*pid, 0, &bytes),

@@ -523,6 +523,9 @@ pub struct SessionReportSnapshot {
     pub captures: u32,
     pub module_reads: u32,
     pub calibration_reads: u32,
+    /// Legislated OBD-II reads (ADR-0022, decision 7).
+    #[serde(default)]
+    pub standard_obd_reads: u32,
     pub report_available: bool,
     /// `bench` or `real`, once an adapter of either kind took part; a session
     /// is one or the other, never both (ADR-0020).
@@ -659,4 +662,116 @@ mod tests {
             VehicleValidationState::NotYetValidated
         );
     }
+}
+
+// ---------------------------------------------------------------------------
+// The legislated OBD-II services (ADR-0022, decision 7)
+// ---------------------------------------------------------------------------
+
+/// Which legislated service to ask for. Two of the standard's services are
+/// absent by design: clearing codes (04) changes the vehicle, and control of
+/// on-board systems (08) is not a read.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum StandardObdReadKind {
+    /// Mode 01: the PIDs given, or the support map when none is given.
+    CurrentData,
+    /// Mode 02: one PID of freeze frame 0.
+    FreezeFrame,
+    /// Mode 03.
+    StoredDtcs,
+    /// Mode 07.
+    PendingDtcs,
+    /// Mode 0A.
+    PermanentDtcs,
+    /// Mode 06: the monitors given, or the support map when none is given.
+    MonitorResults,
+    /// Mode 09: one InfoType.
+    VehicleInformation,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct StandardObdRequest {
+    pub kind: StandardObdReadKind,
+    /// Which of the standard's eight responders, 0–7; 0 is the engine
+    /// controller on nearly every car.
+    pub responder: u8,
+    /// Hexadecimal bytes such as `0x0C`: PIDs for current data and the freeze
+    /// frame, MIDs for monitors, the InfoType for vehicle information. Empty
+    /// asks for the support map where the service has one.
+    pub items: Vec<String>,
+    /// The car the tester described, for the report; the request itself does
+    /// not depend on it.
+    pub context: VehicleContextInput,
+}
+
+/// One value of a legislated answer, as the standard decodes it.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct StandardObdValue {
+    pub pid: String,
+    pub name: String,
+    pub unit: String,
+    /// The value as text; `None` for a PID whose layout the codec does not
+    /// carry, whose bytes are in `raw_hex`.
+    pub value: Option<String>,
+    /// The same value as a number, for a gauge or a trend, when it is one.
+    pub number: Option<f64>,
+    pub raw_hex: String,
+    /// `number`, `text`, `flag`, `supported` or `raw`.
+    pub kind: String,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct StandardObdMonitor {
+    pub mid: String,
+    pub monitor: String,
+    pub tid: String,
+    pub uas: String,
+    pub unit: String,
+    pub value: Option<f64>,
+    pub minimum: Option<f64>,
+    pub maximum: Option<f64>,
+    pub raw_value: u16,
+    pub raw_minimum: u16,
+    pub raw_maximum: u16,
+    pub passed: bool,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LabelledValue {
+    pub label: String,
+    pub value: String,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct StandardObdSnapshot {
+    pub state: ModuleReadState,
+    pub kind: Option<StandardObdReadKind>,
+    /// `0x7E0 → 0x7E8`: the responder asked and the one that answers.
+    pub responder: String,
+    pub operation: String,
+    /// `SOURCE_BACKED` for a live answer — the standard is the source — or
+    /// `SYNTHETIC` on the bench.
+    pub route_validation: String,
+    pub request_hex: String,
+    pub raw_response_hex: Option<String>,
+    /// From a support map: the PIDs, MIDs or InfoTypes the module answers.
+    pub supported: Vec<String>,
+    pub values: Vec<StandardObdValue>,
+    /// `stored`, `pending` or `permanent` when `dtcs` is a list.
+    pub dtc_kind: Option<String>,
+    pub dtcs: Vec<DtcSummary>,
+    pub freeze_frame: Option<u8>,
+    pub monitors: Vec<StandardObdMonitor>,
+    pub information: Vec<LabelledValue>,
+    /// The module's refusal, code and meaning; an answer, not a failure.
+    pub negative_response: Option<String>,
+    pub pending_responses: u32,
+    pub error: Option<DiagnosticError>,
+    pub report_available: bool,
 }

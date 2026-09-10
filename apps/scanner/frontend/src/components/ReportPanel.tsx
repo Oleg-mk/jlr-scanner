@@ -29,11 +29,12 @@ export function ReportPanel({
     <div className="report-panel">
       <p className="session-recorded">
         {t(
-          "Recorded in this session: {captures} capture(s), {reads} module read(s), {calibrations} calibration read(s).",
+          "Recorded in this session: {captures} capture(s), {reads} module read(s), {calibrations} calibration read(s), {standard} standard OBD-II read(s).",
           {
             captures: snapshot.captures,
             reads: snapshot.moduleReads,
             calibrations: snapshot.calibrationReads,
+            standard: snapshot.standardObdReads,
           },
         )}
       </p>

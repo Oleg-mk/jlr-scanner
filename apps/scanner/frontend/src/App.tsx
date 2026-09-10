@@ -19,6 +19,7 @@ import { defaultCaptureClient } from "./capture";
 import { AdapterPanel } from "./components/AdapterPanel";
 import { CapturePanel } from "./components/CapturePanel";
 import { DiagnosticPanel } from "./components/DiagnosticPanel";
+import { StandardObdPanel } from "./components/StandardObdPanel";
 import { LibraryPanel } from "./components/LibraryPanel";
 import { hasTauriRuntime } from "./files";
 import { ModuleDetails } from "./components/ModuleDetails";
@@ -44,6 +45,8 @@ import { bodyFor, vehicleImageUrl } from "./vehicleBody";
 import { useCaptureController } from "./useCaptureController";
 import { useDiagnosticController } from "./useDiagnosticController";
 import { useLibraryController } from "./useLibraryController";
+import { useStandardObdController } from "./useStandardObdController";
+import { defaultStandardObdClient, type StandardObdClient } from "./standardObd";
 import { useModuleReadController } from "./useModuleReadController";
 import { useNetworkCheckController } from "./useNetworkCheckController";
 import { useSessionReportController } from "./useSessionReportController";
@@ -53,6 +56,7 @@ interface AppProps {
   client?: AdapterClient;
   diagnosticClient?: DiagnosticClient;
   libraryClient?: LibraryClient;
+  standardObdClient?: StandardObdClient;
   captureClient?: CaptureClient;
   moduleReadClient?: ModuleReadClient;
   sessionReportClient?: SessionReportClient;
@@ -105,6 +109,7 @@ export function App({
   client = defaultAdapterClient,
   diagnosticClient = defaultDiagnosticClient,
   libraryClient = defaultLibraryClient,
+  standardObdClient = defaultStandardObdClient,
   captureClient = defaultCaptureClient,
   moduleReadClient = defaultModuleReadClient,
   sessionReportClient = defaultSessionReportClient,
@@ -129,6 +134,7 @@ export function App({
     controller.snapshot.state === "CONNECTED" &&
     controller.snapshot.boardCommunication === "VERIFIED";
   const diagnostic = useDiagnosticController(diagnosticClient, adapterReady);
+  const standardObd = useStandardObdController(standardObdClient, library.vehicle);
   const session = useSessionReportController(sessionReportClient);
   // The bench (ADR-0020): a virtual vehicle behind a stand-in adapter. The
   // whole screen says so, and the session is bench-only or real-only.
@@ -457,6 +463,26 @@ export function App({
                       onSaveReport={() => void diagnostic.saveReport()}
                     />
                   </div>
+                ) : null}
+                {section.id === "listen" ? (
+                  <StandardObdPanel
+                    snapshot={standardObd.snapshot}
+                    values={standardObd.values}
+                    frameValues={standardObd.frameValues}
+                    monitors={standardObd.monitors}
+                    information={standardObd.information}
+                    busy={standardObd.busy}
+                    adapterReady={adapterReady}
+                    responder={standardObd.responder}
+                    bench={bench}
+                    onResponderChange={standardObd.setResponder}
+                    onRead={(kind, items) => void standardObd.read(kind, items)}
+                    onReadEverything={() => void standardObd.readEverything()}
+                    onReadFreezeFrame={() => void standardObd.readFreezeFrame()}
+                    onReadMonitors={() => void standardObd.readMonitors()}
+                    onReadVehicleInformation={() => void standardObd.readVehicleInformation()}
+                    onClear={standardObd.clear}
+                  />
                 ) : null}
                 {section.id === "report" ? (
                   <ReportPanel

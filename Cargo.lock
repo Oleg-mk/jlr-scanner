@@ -116,6 +116,7 @@ dependencies = [
  "diagnostic-session",
  "isotp",
  "knowledge",
+ "obd-j1979",
  "sdd-ingest",
  "serde_json",
  "transport-api",

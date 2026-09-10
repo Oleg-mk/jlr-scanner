@@ -6,12 +6,14 @@ mod diagnostic_service;
 mod module_read_service;
 mod session_report_service;
 mod session_service;
+mod standard_obd_service;
 
 use adapter_service::{lock_service, shared_service, SharedAdapterService};
 use app_contracts::{
     AdapterSnapshot, AdapterState, CaptureSnapshot, DiagnosticSnapshot, LibrarySnapshot,
-    ModuleReadRequest, ModuleReadSnapshot, SessionReportSnapshot, VehicleCatalogueSnapshot,
-    VehicleContextInput, VehicleSurveySnapshot, VinDecodeSnapshot,
+    ModuleReadRequest, ModuleReadSnapshot, SessionReportSnapshot, StandardObdRequest,
+    StandardObdSnapshot, VehicleCatalogueSnapshot, VehicleContextInput, VehicleSurveySnapshot,
+    VinDecodeSnapshot,
 };
 use bench_vehicle::BenchVehicle;
 use capture_service::CaptureService;
@@ -22,6 +24,7 @@ use mongoose_jlr::VehicleRouteId;
 use session_report_service::SessionReportService;
 use session_report_service::{SESSION_MODE_BENCH, SESSION_MODE_REAL};
 use session_service::SessionService;
+use standard_obd_service::{StandardObdService, STANDARD_OBD_TIMEOUT};
 use std::sync::{Mutex, MutexGuard};
 use std::time::Duration;
 use tauri::State;
@@ -31,6 +34,16 @@ type SharedDiagnosticService = Mutex<DiagnosticService>;
 type SharedSessionService = Mutex<SessionService>;
 type SharedCaptureService = Mutex<CaptureService>;
 type SharedModuleReadService = Mutex<ModuleReadService>;
+type SharedStandardObdService = Mutex<StandardObdService>;
+
+fn lock_standard_obd<'a>(
+    state: &'a State<'a, SharedStandardObdService>,
+) -> MutexGuard<'a, StandardObdService> {
+    state
+        .inner()
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+}
 type SharedSessionReportService = Mutex<SessionReportService>;
 /// The vehicle on the bench (ADR-0020), shared between the bench transport
 /// and the session that describes it.
@@ -714,6 +727,108 @@ async fn read_module(
     ))
 }
 
+// ---------------------------------------------------------------------------
+// The legislated OBD-II services (ADR-0022, decision 7)
+// ---------------------------------------------------------------------------
+
+/// One legislated read: prepared from the standard alone, executed over the
+/// adapter, decoded by the codec, worded from the library, recorded in the
+/// session bundle. The shape of a module read, without the resolver.
+fn read_standard_obd_now(
+    adapter_state: State<'_, SharedAdapterService>,
+    session_state: State<'_, SharedSessionService>,
+    standard_obd_state: State<'_, SharedStandardObdService>,
+    report_state: State<'_, SharedSessionReportService>,
+    request: StandardObdRequest,
+) -> StandardObdSnapshot {
+    let prepared = match StandardObdService::prepare(&request) {
+        Ok(prepared) => prepared,
+        Err(error) => {
+            return lock_standard_obd(&standard_obd_state).finish(
+                &request,
+                None,
+                None,
+                None,
+                Err(error),
+            )
+        }
+    };
+
+    let (adapter, result, bench) = {
+        let mut service = lock_service(&adapter_state);
+        let Some(adapter) = service.connected_adapter() else {
+            return lock_standard_obd(&standard_obd_state).finish(
+                &request,
+                Some(&prepared),
+                None,
+                None,
+                Err(adapter_unavailable()),
+            );
+        };
+        let Some(result) = service.execute_j1979_read(&prepared.transaction, STANDARD_OBD_TIMEOUT)
+        else {
+            return lock_standard_obd(&standard_obd_state).finish(
+                &request,
+                Some(&prepared),
+                None,
+                None,
+                Err(adapter_unavailable()),
+            );
+        };
+        (adapter, result.map_err(map_live_error), service.is_bench())
+    };
+
+    let (snapshot, report) = {
+        let session = lock_session(&session_state);
+        let mut reads = lock_standard_obd(&standard_obd_state);
+        let mut snapshot = reads.finish(
+            &request,
+            Some(&prepared),
+            Some(&adapter),
+            Some(session.library()),
+            result,
+        );
+        if bench {
+            snapshot = reads.mark_synthetic();
+        }
+        (snapshot, reads.report_json())
+    };
+    if let Ok(json) = report {
+        let mut session_report = lock_session_report(&report_state);
+        session_report.set_mode(if bench {
+            SESSION_MODE_BENCH
+        } else {
+            SESSION_MODE_REAL
+        });
+        let _ = session_report.add_standard_obd_read(&json);
+    }
+    snapshot
+}
+
+#[tauri::command]
+async fn get_standard_obd_state(
+    state: State<'_, SharedStandardObdService>,
+) -> Result<StandardObdSnapshot, String> {
+    Ok(lock_standard_obd(&state).snapshot())
+}
+
+#[tauri::command]
+async fn read_standard_obd(
+    adapter_state: State<'_, SharedAdapterService>,
+    session_state: State<'_, SharedSessionService>,
+    standard_obd_state: State<'_, SharedStandardObdService>,
+    report_state: State<'_, SharedSessionReportService>,
+    request: StandardObdRequest,
+) -> Result<StandardObdSnapshot, String> {
+    Ok(read_standard_obd_now(
+        adapter_state,
+        session_state,
+        standard_obd_state,
+        report_state,
+        request,
+    ))
+}
+
 pub fn run() {
     let bench: SharedBench = share_bus(Box::new(EmptyBench));
     tauri::Builder::default()
@@ -725,6 +840,7 @@ pub fn run() {
         .manage(Mutex::new(SessionService::new()))
         .manage(Mutex::new(CaptureService::new()))
         .manage(Mutex::new(ModuleReadService::new()))
+        .manage(Mutex::new(StandardObdService::new()))
         .manage(Mutex::new(SessionReportService::new()))
         .invoke_handler(tauri::generate_handler![
             get_adapter_state,
@@ -745,6 +861,8 @@ pub fn run() {
             get_capture_json,
             get_module_read_state,
             read_module,
+            get_standard_obd_state,
+            read_standard_obd,
             get_module_read_report_json,
             get_session_report_state,
             get_session_report_json,

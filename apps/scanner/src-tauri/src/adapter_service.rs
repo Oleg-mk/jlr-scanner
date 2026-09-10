@@ -5,6 +5,7 @@ use app_contracts::{
 };
 use diagnostic_execution::PreparedDiagnosticTransaction;
 use mongoose_jlr::bench::{BenchTransport, SharedBenchBus};
+use mongoose_jlr::MongooseJ1979ReadResult;
 use mongoose_jlr::{list_vehicle_routes, MongooseJlrDevice, VehicleRouteId};
 use mongoose_jlr::{MongooseCalibrationIdentificationResult, MongooseDiagnosticError};
 use mongoose_jlr::{
@@ -126,6 +127,17 @@ impl Link {
         match self {
             Self::Serial(device) => device.execute_prepared_uds_read(transaction, timeout),
             Self::Bench(device) => device.execute_prepared_uds_read(transaction, timeout),
+        }
+    }
+
+    fn execute_prepared_j1979_read(
+        &mut self,
+        transaction: &PreparedDiagnosticTransaction,
+        timeout: Duration,
+    ) -> Result<MongooseJ1979ReadResult, MongooseDiagnosticError> {
+        match self {
+            Self::Serial(device) => device.execute_prepared_j1979_read(transaction, timeout),
+            Self::Bench(device) => device.execute_prepared_j1979_read(transaction, timeout),
         }
     }
 }
@@ -573,6 +585,21 @@ impl AdapterService<SystemAdapterBackend> {
             connection
                 .device
                 .execute_prepared_uds_read(transaction, timeout)
+        })
+    }
+
+    /// One prepared legislated OBD-II read, live (ADR-0022, decision 7).
+    /// The device method accepts nothing but a transaction prepared from the
+    /// standard.
+    pub fn execute_j1979_read(
+        &mut self,
+        transaction: &PreparedDiagnosticTransaction,
+        timeout: Duration,
+    ) -> Option<Result<MongooseJ1979ReadResult, MongooseDiagnosticError>> {
+        self.connection.as_mut().map(|connection| {
+            connection
+                .device
+                .execute_prepared_j1979_read(transaction, timeout)
         })
     }
 }

@@ -172,6 +172,29 @@ Click **Disconnect** to leave the bench; if you recorded anything
 on it, the application asks for a new session before a real adapter is
 connected.
 
+## Standard OBD-II
+
+The "Listening and standard OBD-II" section has a **Standard OBD-II** panel:
+what every OBD-II car answers at the same addresses, JLR or not, by SAE
+J1979 rather than by the library — current data (engine speed, vehicle
+speed, temperatures, fuel trims, voltage…), the three kinds of fault code,
+the freeze frame, monitors, VIN, calibration, ECU name. Read-only: there is
+no "clear codes" button here and there will not be.
+
+**Read everything supported** asks the module which parameters it knows and
+reads them six to a request; the table fills as the answers come. The
+responder is the engine controller by default; the standard's other seven
+addresses can be chosen if something else on the car answers. A parameter
+whose layout we do not carry is shown as raw bytes and labelled so — we do
+not invent values. All of it works on the bench too, marked synthetic.
+
+**Freeze frame** reads the whole frame: first the code that froze it, then
+every parameter the frame carries. **Vehicle information** reads all of
+mode 09 that is a read: VIN, calibrations and their verification numbers,
+the in-use monitor counters, the ECU's name and serial number. Parameter
+names are in the interface language where we carry a translation, else
+the standard's English.
+
 ## In the car
 
 Ignition on, engine off (position II). Plug the adapter into the diagnostic

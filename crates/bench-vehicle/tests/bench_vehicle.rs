@@ -518,3 +518,55 @@ fn the_healthy_scenario_has_no_codes_no_lamp_and_no_freeze_frame() {
     )
     .is_err());
 }
+
+#[test]
+fn the_freeze_frame_answers_its_map_and_its_code_whether_or_not_a_code_froze_one() {
+    use obd_j1979::{J1979Request, J1979Response, ParameterValue};
+    let library = library();
+    let frame = |bench: &mut BenchVehicle, pid: u8| match legislated(
+        bench,
+        BenchRoute::HsCan,
+        0x7E0,
+        J1979Request::freeze_frame(pid, 0),
+    ) {
+        Ok(J1979Response::FreezeFrame {
+            frame,
+            mut parameters,
+        }) => {
+            assert_eq!(frame, 0);
+            Some(parameters.remove(0).value)
+        }
+        Ok(other) => panic!("{other:?}"),
+        Err(_) => None,
+    };
+
+    // Healthy: the map and "no code" answer; the frame's values do not exist.
+    let mut bench =
+        BenchVehicle::from_library(&library, &vehicle(), None, bench_vehicle::SCENARIO_HEALTHY);
+    match frame(&mut bench, 0x00) {
+        Some(ParameterValue::Supported(items)) => {
+            assert!(items.contains(&0x02) && items.contains(&0x0C), "{items:?}");
+            assert!(
+                !items.contains(&0x01),
+                "monitor status is no part of a frame"
+            );
+        }
+        other => panic!("{other:?}"),
+    }
+    assert_eq!(
+        frame(&mut bench, 0x02),
+        Some(ParameterValue::Text("none".into()))
+    );
+    assert_eq!(frame(&mut bench, 0x0C), None);
+
+    // With a code: the code itself, then the standing engine behind it.
+    let mut bench =
+        BenchVehicle::from_library(&library, &vehicle(), None, bench_vehicle::SCENARIO_DEFAULT);
+    match frame(&mut bench, 0x02) {
+        Some(ParameterValue::Text(code)) => {
+            assert!(code.starts_with(['P', 'C', 'B', 'U']), "{code}")
+        }
+        other => panic!("{other:?}"),
+    }
+    assert_eq!(frame(&mut bench, 0x0C), Some(ParameterValue::Number(750.0)));
+}

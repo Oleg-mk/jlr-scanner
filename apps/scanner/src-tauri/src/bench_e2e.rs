@@ -8,9 +8,10 @@ use super::module_read_service::{map_live_error, ModuleReadService, PreparedModu
 use super::refresh_bench;
 use super::session_report_service::{SessionReportService, SESSION_MODE_BENCH, SESSION_MODE_REAL};
 use super::session_service::SessionService;
+use super::standard_obd_service::{StandardObdService, STANDARD_OBD_TIMEOUT};
 use app_contracts::{
     AdapterErrorCode, AdapterInfo, AdapterState, ModuleReadKind, ModuleReadRequest,
-    ModuleReadState, VehicleContextInput,
+    ModuleReadState, StandardObdReadKind, StandardObdRequest, VehicleContextInput,
 };
 use diagnostic_session::KnowledgeLibrary;
 use knowledge::{
@@ -190,6 +191,66 @@ fn the_bench_connects_without_a_port_reads_the_surveyed_vehicle_and_marks_everyt
     );
     assert_eq!(faults.state, ModuleReadState::Succeeded, "{faults:?}");
 
+    // The legislated services (ADR-0022, decision 7): prepared from the
+    // standard, executed over the adapter protocol, decoded by the codec —
+    // engine speed and vehicle speed from the engine controller at 0x7E0 —
+    // then marked synthetic like everything the bench answers.
+    let legislated = StandardObdRequest {
+        kind: StandardObdReadKind::CurrentData,
+        responder: 0,
+        items: vec!["0x0C".into(), "0x0D".into()],
+        context: vehicle(),
+    };
+    let prepared = StandardObdService::prepare(&legislated).expect("the standard prepares it");
+    assert_eq!(prepared.transaction.encoded_payload(), [0x01, 0x0C, 0x0D]);
+    let result = adapter
+        .execute_j1979_read(&prepared.transaction, STANDARD_OBD_TIMEOUT)
+        .expect("the bench is connected")
+        .map_err(map_live_error);
+    let mut standard = StandardObdService::new();
+    let read = standard.finish(
+        &legislated,
+        Some(&prepared),
+        Some(&info),
+        Some(session.library()),
+        result,
+    );
+    assert_eq!(read.state, ModuleReadState::Succeeded, "{read:?}");
+    assert_eq!(read.responder, "0x7E0 → 0x7E8");
+    assert_eq!(read.values[0].name, "engine speed");
+    assert_eq!(read.values[0].number, Some(750.0));
+    assert_eq!(read.values[0].unit, "rpm");
+    assert_eq!(read.values[1].name, "vehicle speed");
+    assert_eq!(read.route_validation, "SOURCE_BACKED");
+    assert_eq!(standard.mark_synthetic().route_validation, "SYNTHETIC");
+    let standard_json = standard.report_json().unwrap();
+    assert!(standard_json.contains("\"route_validation\": \"SYNTHETIC\""));
+    // The stored codes are the scenario's, worded in the tester's languages.
+    let codes = StandardObdRequest {
+        kind: StandardObdReadKind::StoredDtcs,
+        responder: 0,
+        items: Vec::new(),
+        context: vehicle(),
+    };
+    let prepared = StandardObdService::prepare(&codes).unwrap();
+    let result = adapter
+        .execute_j1979_read(&prepared.transaction, STANDARD_OBD_TIMEOUT)
+        .unwrap()
+        .map_err(map_live_error);
+    let read = standard.finish(
+        &codes,
+        Some(&prepared),
+        Some(&info),
+        Some(session.library()),
+        result,
+    );
+    assert_eq!(read.state, ModuleReadState::Succeeded, "{read:?}");
+    assert_eq!(read.dtc_kind.as_deref(), Some("stored"));
+    assert!(
+        !read.dtcs.is_empty(),
+        "scenario 1 gives the engine controller codes"
+    );
+
     // A listen on the bench hears nothing, and is synthetic all the same.
     let listened = adapter
         .capture_route(VehicleRouteId::HsCan, Duration::from_millis(100))
@@ -216,6 +277,8 @@ fn the_bench_connects_without_a_port_reads_the_surveyed_vehicle_and_marks_everyt
     );
     report.add_module_read(&read_json).unwrap();
     report.add_capture(&capture_json).unwrap();
+    report.add_standard_obd_read(&standard_json).unwrap();
+    assert_eq!(report.snapshot().standard_obd_reads, 1);
     assert!(report.is_bench());
     assert!(report.accepts(SESSION_MODE_BENCH));
     assert!(!report.accepts(SESSION_MODE_REAL));
