@@ -10,6 +10,7 @@ app-contracts.workspace = true
 diagnostic-environment.workspace = true
 diagnostic-session.workspace = true
 isotp.workspace = true
+obd-j1979.workspace = true
 transport-api.workspace = true
 
 [dev-dependencies]

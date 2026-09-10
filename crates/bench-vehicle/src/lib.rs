@@ -24,6 +24,13 @@ use app_contracts::VehicleContextInput;
 use diagnostic_environment::DiagnosticEnvironmentResolver;
 use diagnostic_session::decode::parameters_span;
 use diagnostic_session::{vehicle_context, KnowledgeLibrary};
+use obd_j1979::bench::{
+    current_data_response, cvn_response, dtc_list_response, ecu_name_response,
+    freeze_frame_response, in_use_performance_response, monitor_result_response, negative_response,
+    support_response, vin_response,
+};
+use obd_j1979::dtc::{dtc_text, DtcKind};
+use obd_j1979::support::is_support_item;
 use std::collections::{BTreeMap, BTreeSet};
 use transport_api::{BenchBus, BenchRoute, CanFrame, CanId};
 
@@ -37,6 +44,38 @@ const UNKNOWN_IDENTIFIER_LENGTH: usize = 4;
 const BENCH_VIN: &str = "SAJBENCH000000001";
 /// The calibration identification the bench's powertrain module reports.
 const BENCH_CALIBRATION_ID: &[u8; 16] = b"BENCH-SYNTH-CAL1";
+/// ISO 15765-4: the request every legislated responder hears, and the eight
+/// addresses those responders sit at. A module at one of them speaks the
+/// legislated services on the bench; any other module refuses them, as a
+/// module outside the standard does.
+const OBD_FUNCTIONAL_REQUEST_ID: u32 = 0x7DF;
+const OBD_RESPONDER_REQUEST_IDS: std::ops::RangeInclusive<u32> = 0x7E0..=0x7E7;
+/// The PIDs the bench's engine controller reports, with their standing-engine
+/// values: idle, warm, at rest. Real enough to draw, synthetic all the same.
+const OBD_CURRENT_DATA: &[(u8, &[u8])] = &[
+    (0x03, &[0x02, 0x00]),
+    (0x04, &[0x40]),
+    (0x05, &[0x7B]),
+    (0x06, &[0x82]),
+    (0x07, &[0x7E]),
+    (0x0B, &[0x21]),
+    (0x0C, &[0x0B, 0xB8]),
+    (0x0D, &[0x00]),
+    (0x0E, &[0x90]),
+    (0x0F, &[0x3C]),
+    (0x10, &[0x01, 0x90]),
+    (0x11, &[0x2A]),
+    (0x1C, &[0x06]),
+    (0x1F, &[0x00, 0x78]),
+    (0x21, &[0x00, 0x00]),
+    (0x2F, &[0x80]),
+    (0x31, &[0x03, 0xE8]),
+    (0x33, &[0x65]),
+    (0x42, &[0x36, 0xB0]),
+    (0x46, &[0x3F]),
+    (0x5C, &[0x5A]),
+    (0x5E, &[0x00, 0x64]),
+];
 /// The scenario on which every module is healthy and reports nothing.
 pub const SCENARIO_HEALTHY: u32 = 0;
 /// The scenario a session starts on, when nobody chose another.
@@ -166,6 +205,9 @@ impl BenchVehicle {
 
     fn answer(vin: &str, module: &mut ModuleResponder, request: &[u8]) -> Option<Vec<u8>> {
         let service = *request.first()?;
+        if (0x01..=0x0A).contains(&service) && service != 0x09 {
+            return Some(Self::answer_legislated(module, request));
+        }
         Some(match service {
             0x22 => {
                 let identifier = u16::from_be_bytes([*request.get(1)?, *request.get(2)?]);
@@ -199,6 +241,9 @@ impl BenchVehicle {
                     payload.extend_from_slice(BENCH_CALIBRATION_ID);
                     payload
                 }
+                Some(&info_type) if Self::speaks_legislated(module) => {
+                    Self::answer_vehicle_information(vin, module, info_type)
+                }
                 _ => vec![0x7F, 0x09, 0x12],
             },
             0x3E => match request.get(1) {
@@ -207,6 +252,146 @@ impl BenchVehicle {
             },
             other => vec![0x7F, other, 0x11],
         })
+    }
+
+    /// Whether a module sits at one of the standard's eight addresses.
+    fn speaks_legislated(module: &ModuleResponder) -> bool {
+        !module.extended && OBD_RESPONDER_REQUEST_IDS.contains(&module.request_id)
+    }
+
+    /// Mode 01's support map for the values the bench reports.
+    fn obd_supported(base: u8) -> Vec<u8> {
+        let mut supported: Vec<u8> = OBD_CURRENT_DATA
+            .iter()
+            .map(|(pid, _)| *pid)
+            .filter(|pid| *pid > base && *pid <= base.saturating_add(32))
+            .collect();
+        // PID 01 is computed, and each map says whether the next one exists.
+        if base == 0x00 {
+            supported.insert(0, 0x01);
+        }
+        if base < 0x40 {
+            supported.push(base + 0x20);
+        }
+        supported
+    }
+
+    /// Monitor status: the lamp and the count follow the scenario's codes;
+    /// the monitors of a spark engine are all complete.
+    fn obd_monitor_status(module: &ModuleResponder) -> [u8; 4] {
+        let count = module.faults.len().min(0x7F) as u8;
+        let mil = if count > 0 { 0x80 } else { 0x00 };
+        [mil | count, 0x07, 0xEF, 0x00]
+    }
+
+    fn obd_pid_bytes(module: &ModuleResponder, pid: u8) -> Option<Vec<u8>> {
+        if is_support_item(pid) {
+            return Some(
+                obd_j1979::support::encode_support_bitmap(pid, &Self::obd_supported(pid)).to_vec(),
+            );
+        }
+        if pid == 0x01 {
+            return Some(Self::obd_monitor_status(module).to_vec());
+        }
+        if pid == 0x02 {
+            return Some(
+                module
+                    .faults
+                    .first()
+                    .map(|fault| fault[..2].to_vec())
+                    .unwrap_or_else(|| vec![0, 0]),
+            );
+        }
+        OBD_CURRENT_DATA
+            .iter()
+            .find(|(known, _)| *known == pid)
+            .map(|(_, bytes)| bytes.to_vec())
+    }
+
+    /// The legislated services at a standard address; a refusal with the
+    /// standard's own reason everywhere else.
+    fn answer_legislated(module: &ModuleResponder, request: &[u8]) -> Vec<u8> {
+        let service = request[0];
+        if !Self::speaks_legislated(module) {
+            return negative_response(service, 0x11);
+        }
+        match service {
+            0x01 => {
+                let answered: Vec<(u8, Vec<u8>)> = request[1..]
+                    .iter()
+                    .filter_map(|pid| Self::obd_pid_bytes(module, *pid).map(|bytes| (*pid, bytes)))
+                    .collect();
+                if answered.is_empty() {
+                    return negative_response(0x01, 0x31);
+                }
+                let pairs: Vec<(u8, &[u8])> = answered
+                    .iter()
+                    .map(|(pid, bytes)| (*pid, bytes.as_slice()))
+                    .collect();
+                current_data_response(&pairs)
+            }
+            0x02 => match (request.get(1), request.get(2)) {
+                (Some(pid), Some(&0)) if !module.faults.is_empty() => {
+                    match Self::obd_pid_bytes(module, *pid) {
+                        Some(bytes) => freeze_frame_response(*pid, 0, &bytes),
+                        None => negative_response(0x02, 0x31),
+                    }
+                }
+                _ => negative_response(0x02, 0x31),
+            },
+            0x03 => {
+                let codes: Vec<String> = module
+                    .faults
+                    .iter()
+                    .map(|fault| dtc_text(fault[0], fault[1]))
+                    .collect();
+                let codes: Vec<&str> = codes.iter().map(String::as_str).collect();
+                dtc_list_response(DtcKind::Stored, &codes)
+            }
+            0x07 => dtc_list_response(DtcKind::Pending, &[]),
+            0x0A => dtc_list_response(DtcKind::Permanent, &[]),
+            0x06 => {
+                let mut payload = vec![0x46];
+                for mid in &request[1..] {
+                    match *mid {
+                        0x00 => payload
+                            .extend_from_slice(&support_response(0x06, 0x00, &[0x01, 0x21])[1..]),
+                        0x01 => payload.extend_from_slice(
+                            &monitor_result_response(&[(0x01, 0x80, 0x0B, 0x01F4, 0x0000, 0x03E8)])
+                                [1..],
+                        ),
+                        0x21 => payload.extend_from_slice(
+                            &monitor_result_response(&[(0x21, 0x80, 0x0B, 0x02BC, 0x0000, 0x03E8)])
+                                [1..],
+                        ),
+                        _ => {}
+                    }
+                }
+                if payload.len() == 1 {
+                    negative_response(0x06, 0x31)
+                } else {
+                    payload
+                }
+            }
+            other => negative_response(other, 0x11),
+        }
+    }
+
+    fn answer_vehicle_information(vin: &str, module: &ModuleResponder, info_type: u8) -> Vec<u8> {
+        let _ = module;
+        match info_type {
+            0x00 => support_response(0x09, 0x00, &[0x02, 0x04, 0x06, 0x08, 0x0A]),
+            0x02 => vin_response(vin),
+            0x06 => cvn_response(&[[0x17, 0x91, 0xBC, 0x82]]),
+            0x08 => in_use_performance_response(
+                0x08,
+                &[
+                    42, 48, 5, 7, 5, 7, 9, 12, 9, 12, 3, 4, 0, 0, 2, 6, 5, 7, 5, 7,
+                ],
+            ),
+            0x0A => ecu_name_response("ECM", "EngineControl"),
+            _ => negative_response(0x09, 0x12),
+        }
     }
 
     fn reply(module: &ModuleResponder, route: BenchRoute, data: Vec<u8>) -> Option<CanFrame> {
@@ -222,11 +407,14 @@ impl BenchVehicle {
 impl BenchBus for BenchVehicle {
     fn on_frame(&mut self, route: BenchRoute, frame: &CanFrame) -> Vec<CanFrame> {
         let vin = self.vin.clone();
-        let Some(module) = self
-            .modules
-            .iter_mut()
-            .find(|module| module.route == route && module.request_id == frame.id.value())
-        else {
+        // A frame at the functional request reaches whoever sits at one of
+        // the standard's addresses; on the bench that is the first of them.
+        let asked = frame.id.value();
+        let Some(module) = self.modules.iter_mut().find(|module| {
+            module.route == route
+                && (module.request_id == asked
+                    || (asked == OBD_FUNCTIONAL_REQUEST_ID && Self::speaks_legislated(module)))
+        }) else {
             return Vec::new();
         };
         let Some(pci) = frame.data.first() else {

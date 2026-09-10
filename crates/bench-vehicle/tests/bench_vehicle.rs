@@ -320,3 +320,201 @@ fn every_code_the_bench_reports_is_one_the_library_describes_for_that_module() {
         );
     }
 }
+
+/// The legislated services, decoded by the codec after they crossed the
+/// bench's wire: what a tester sees in the standard OBD-II panel.
+fn legislated(
+    bench: &mut BenchVehicle,
+    route: BenchRoute,
+    request_id: u16,
+    asked: obd_j1979::J1979Request,
+) -> Result<obd_j1979::J1979Response, obd_j1979::J1979Error> {
+    let mut data = vec![asked.encoded().len() as u8];
+    data.extend(asked.encoded());
+    let answers = bench.on_frame(route, &request(route, request_id, &data));
+    assert!(
+        !answers.is_empty(),
+        "the bench answered nothing to {asked:?}"
+    );
+    let first = &answers[0].data;
+    let payload = match first[0] >> 4 {
+        0x0 => first[1..1 + usize::from(first[0] & 0x0F)].to_vec(),
+        0x1 => {
+            let length = (usize::from(first[0] & 0x0F) << 8) | usize::from(first[1]);
+            let mut payload = first[2..].to_vec();
+            for frame in bench.on_frame(route, &request(route, request_id, &[0x30, 0x00, 0x00])) {
+                payload.extend_from_slice(&frame.data[1..]);
+            }
+            payload.truncate(length);
+            payload
+        }
+        other => panic!("neither a single nor a first frame: {other:#X}"),
+    };
+    obd_j1979::decode_response(asked, &payload)
+}
+
+#[test]
+fn the_engine_controller_speaks_the_legislated_services_and_nobody_else_does() {
+    use obd_j1979::{J1979Request, J1979Response, ParameterValue, VehicleInformation};
+    let library = library();
+    let mut bench = BenchVehicle::from_library(
+        &library,
+        &vehicle(),
+        Some("SAJTEST0000000001"),
+        bench_vehicle::SCENARIO_DEFAULT,
+    );
+
+    // Current data at the engine controller: idle, warm, at rest.
+    match legislated(
+        &mut bench,
+        BenchRoute::HsCan,
+        0x7E0,
+        J1979Request::current_data(&[0x0C, 0x0D, 0x05]).unwrap(),
+    )
+    .unwrap()
+    {
+        J1979Response::CurrentData(values) => {
+            assert_eq!(values[0].value, ParameterValue::Number(750.0));
+            assert_eq!(values[1].value, ParameterValue::Number(0.0));
+            assert_eq!(values[2].value, ParameterValue::Number(83.0));
+        }
+        other => panic!("{other:?}"),
+    }
+    // The support map names what the bench reports, and says a next map exists.
+    match legislated(
+        &mut bench,
+        BenchRoute::HsCan,
+        0x7E0,
+        J1979Request::current_data(&[0x00]).unwrap(),
+    )
+    .unwrap()
+    {
+        J1979Response::CurrentData(values) => match &values[0].value {
+            ParameterValue::Supported(pids) => {
+                assert!(pids.contains(&0x0C) && pids.contains(&0x01) && pids.contains(&0x20));
+            }
+            other => panic!("{other:?}"),
+        },
+        other => panic!("{other:?}"),
+    }
+    // Stored codes are the scenario's own, and the lamp follows them.
+    let stored = match legislated(
+        &mut bench,
+        BenchRoute::HsCan,
+        0x7E0,
+        J1979Request::stored_dtcs(),
+    )
+    .unwrap()
+    {
+        J1979Response::Dtcs { codes, .. } => codes,
+        other => panic!("{other:?}"),
+    };
+    assert!(!stored.is_empty(), "scenario 1 gives SYNTHMOD codes");
+    match legislated(
+        &mut bench,
+        BenchRoute::HsCan,
+        0x7E0,
+        J1979Request::current_data(&[0x01]).unwrap(),
+    )
+    .unwrap()
+    {
+        J1979Response::CurrentData(values) => {
+            assert_eq!(values[0].value, ParameterValue::Flag(true), "lamp on");
+            assert_eq!(values[1].value, ParameterValue::Number(stored.len() as f64));
+        }
+        other => panic!("{other:?}"),
+    }
+    // The VIN is the session's, over three frames.
+    match legislated(
+        &mut bench,
+        BenchRoute::HsCan,
+        0x7E0,
+        J1979Request::vehicle_information(0x02).unwrap(),
+    )
+    .unwrap()
+    {
+        J1979Response::VehicleInformation(VehicleInformation::Vin(vin)) => {
+            assert_eq!(vin, "SAJTEST0000000001");
+        }
+        other => panic!("{other:?}"),
+    }
+    // The functional request reaches the same controller.
+    assert!(legislated(
+        &mut bench,
+        BenchRoute::HsCan,
+        0x7DF,
+        J1979Request::current_data(&[0x0C]).unwrap()
+    )
+    .is_ok());
+    // A module outside the standard's addresses refuses the service — asked
+    // on its own bus, because a module on the medium-speed pair hears nothing
+    // sent on the high-speed one, and that is silence, not a refusal.
+    let survey = library.survey(&vehicle());
+    let other = survey
+        .modules
+        .iter()
+        .find(|module| module.ecu_family == "OTHERMOD")
+        .expect("OTHERMOD is surveyed");
+    let other_id = other
+        .request_id
+        .as_deref()
+        .map(|id| u16::from_str_radix(id.trim_start_matches("0x"), 16).unwrap())
+        .expect("OTHERMOD has a request identifier");
+    let other_route = match other.backend_route.as_deref() {
+        Some("ms-can") => BenchRoute::MsCan,
+        _ => BenchRoute::HsCan,
+    };
+    let refused = legislated(
+        &mut bench,
+        other_route,
+        other_id,
+        J1979Request::current_data(&[0x0C]).unwrap(),
+    )
+    .unwrap_err();
+    assert!(matches!(
+        refused,
+        obd_j1979::J1979Error::NegativeResponse {
+            service: 0x01,
+            code: 0x11
+        }
+    ));
+}
+
+#[test]
+fn the_healthy_scenario_has_no_codes_no_lamp_and_no_freeze_frame() {
+    use obd_j1979::{J1979Request, J1979Response, ParameterValue};
+    let library = library();
+    let mut bench =
+        BenchVehicle::from_library(&library, &vehicle(), None, bench_vehicle::SCENARIO_HEALTHY);
+    match legislated(
+        &mut bench,
+        BenchRoute::HsCan,
+        0x7E0,
+        J1979Request::stored_dtcs(),
+    )
+    .unwrap()
+    {
+        J1979Response::Dtcs { codes, .. } => assert!(codes.is_empty()),
+        other => panic!("{other:?}"),
+    }
+    match legislated(
+        &mut bench,
+        BenchRoute::HsCan,
+        0x7E0,
+        J1979Request::current_data(&[0x01]).unwrap(),
+    )
+    .unwrap()
+    {
+        J1979Response::CurrentData(values) => {
+            assert_eq!(values[0].value, ParameterValue::Flag(false));
+        }
+        other => panic!("{other:?}"),
+    }
+    assert!(legislated(
+        &mut bench,
+        BenchRoute::HsCan,
+        0x7E0,
+        J1979Request::freeze_frame(0x0C, 0)
+    )
+    .is_err());
+}

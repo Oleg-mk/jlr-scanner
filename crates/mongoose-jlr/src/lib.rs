@@ -5,6 +5,7 @@ mod capture;
 mod codec;
 mod device;
 mod error;
+mod j1979_live;
 mod passive;
 mod uds_live;
 
@@ -18,6 +19,7 @@ pub use device::{
     ReceiveCounters,
 };
 pub use error::ProtocolError;
+pub use j1979_live::{MongooseJ1979ReadResult, J1979_PENDING_TIMEOUT};
 pub use passive::{
     list_vehicle_routes, CanIdFormat, NetworkType, OpenReceiveRoute, PassiveCapability,
     RawCanFrame, VehicleRoute, VehicleRouteId,
