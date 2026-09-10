@@ -9,10 +9,10 @@ rust-version.workspace = true
 diagnostic-environment.workspace = true
 diagnostic-simulator.workspace = true
 isotp.workspace = true
+knowledge.workspace = true
 obd-j1979.workspace = true
 transport-api.workspace = true
 transport-replay.workspace = true
 
 [dev-dependencies]
-knowledge.workspace = true
 serde_json.workspace = true
