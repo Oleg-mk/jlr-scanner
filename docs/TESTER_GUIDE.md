@@ -230,8 +230,13 @@ no "clear codes" button here and there will not be.
 
 **Read everything supported** asks the module which parameters it knows and
 reads them six to a request; the table fills as the answers come. The
-responder is the engine controller by default; the standard's other seven
-addresses can be chosen if something else on the car answers. A parameter
+responder is one of the eight addresses ISO 15765-4 reserves. The standard
+does not say which module sits at which: 0x7E0 is the engine controller by a
+convention kept almost everywhere, 0x7E1 is usually the transmission, and the
+other six are free and silent on most cars. Something answers at them on
+hybrids, on diesels with AdBlue, sometimes on engines with two controllers.
+Reading an empty address is a module saying nothing, not a fault in the
+application. A parameter
 whose layout we do not carry is shown as raw bytes and labelled so — we do
 not invent values. All of it works on the bench too, marked synthetic.
 

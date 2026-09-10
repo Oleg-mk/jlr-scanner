@@ -49,9 +49,21 @@ const OPERATIONS: Record<StandardObdReadKind, string> = {
 const FRAME_CODE_PID = "0x02";
 const NO_CODE = "none";
 
+/**
+ * ISO 15765-4 reserves eight addresses and says nothing about which module
+ * sits at each. 0x7E0 is the engine controller by a convention so widely kept
+ * that a car answering OBD-II at all answers there; 0x7E1 is usually the
+ * transmission; the rest are free, and on most cars nothing answers at them.
+ * The label says that rather than naming a module that may not exist.
+ */
 function responderLabel(index: number) {
   const request = 0x7e0 + index;
-  const name = index === 0 ? t("engine") : index === 1 ? t("transmission") : t("other");
+  const name =
+    index === 0
+      ? t("engine (by convention)")
+      : index === 1
+        ? t("transmission (usually)")
+        : t("reserved by the standard");
   return `0x${request.toString(16).toUpperCase()} — ${name}`;
 }
 

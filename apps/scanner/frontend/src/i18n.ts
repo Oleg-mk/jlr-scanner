@@ -375,6 +375,9 @@ const uk: Record<string, string> = {
   "A large library takes seconds on a fast machine and tens of seconds on an old one. Nothing is wrong; wait for the count to stop.":
     "Велика бібліотека читається кілька секунд на швидкій машині і десятки — на старій. Нічого не зависло: зачекайте, поки лічильник зупиниться.",
   // Standard OBD-II (ADR-0022, decision 7)
+  "engine (by convention)": "двигун (за угодою)",
+  "transmission (usually)": "трансмісія (зазвичай)",
+  "reserved by the standard": "резерв стандарту",
   // The fault-code help SDD carries
   "What the data says about this code": "Що кажуть дані про цей код",
   "The loaded data's own words, in its own English.": "Слова завантажених даних, їхньою англійською.",
@@ -896,9 +899,6 @@ const uk: Record<string, string> = {
   "Legislated services, SAE J1979": "Законодавчі сервіси, SAE J1979",
   "What every OBD-II car answers at the same addresses, JLR or not: current data, fault codes, freeze frame, monitors and vehicle information. Read-only; nothing here clears a code.": "Те, що будь-яке авто з OBD-II відповідає за тими самими адресами, JLR чи ні: поточні дані, коди помилок, стоп-кадр, монітори і дані про авто. Лише читання; тут нічого не стирає коди.",
   Responder: "Відповідач",
-  engine: "двигун",
-  transmission: "трансмісія",
-  other: "інший",
   "Read everything supported": "Прочитати все, що підтримується",
   "Stored codes": "Збережені коди",
   "Pending codes": "Очікувані коди",
@@ -1275,6 +1275,9 @@ const ru: Record<string, string> = {
   "A large library takes seconds on a fast machine and tens of seconds on an old one. Nothing is wrong; wait for the count to stop.":
     "Большая библиотека читается несколько секунд на быстрой машине и десятки — на старой. Ничего не зависло: подождите, пока счётчик не остановится.",
   // Standard OBD-II (ADR-0022, decision 7)
+  "engine (by convention)": "двигатель (по соглашению)",
+  "transmission (usually)": "трансмиссия (обычно)",
+  "reserved by the standard": "резерв стандарта",
   // The fault-code help SDD carries
   "What the data says about this code": "Что данные говорят об этом коде",
   "The loaded data's own words, in its own English.": "Слова загруженных данных, их английским.",
@@ -1796,9 +1799,6 @@ const ru: Record<string, string> = {
   "Legislated services, SAE J1979": "Законодательные сервисы, SAE J1979",
   "What every OBD-II car answers at the same addresses, JLR or not: current data, fault codes, freeze frame, monitors and vehicle information. Read-only; nothing here clears a code.": "То, что любой автомобиль с OBD-II отвечает по тем же адресам, JLR или нет: текущие данные, коды ошибок, стоп-кадр, мониторы и данные об автомобиле. Только чтение; здесь ничего не стирает коды.",
   Responder: "Отвечающий",
-  engine: "двигатель",
-  transmission: "трансмиссия",
-  other: "другой",
   "Read everything supported": "Прочитать всё, что поддерживается",
   "Stored codes": "Сохранённые коды",
   "Pending codes": "Ожидающие коды",
