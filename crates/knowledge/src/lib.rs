@@ -7,6 +7,9 @@ mod applicability;
 mod error;
 mod evidence;
 mod ingestion;
+/// Manifests on a disk: what counts as one, and how to read and write it
+/// whether it is packed or not (ADR-0023).
+pub mod manifest_file;
 mod model;
 mod source;
 mod store;

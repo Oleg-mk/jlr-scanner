@@ -138,7 +138,11 @@ notes, and tell us the macOS version and whether the adapter was found.
    do not copy or pass it on. Every report you send names your copy.
 3. In **Data library** click **Choose folder…**, pick that folder, then
    **Load library**. Loading takes about ten seconds; the panel then shows
-   how many manifests and records were read.
+   how many manifests and records were read. The files inside are compressed
+   (`.json.gz`), which is what makes the archive about twenty megabytes
+   instead of three hundred. **Do not unpack them**: the application reads
+   them as they are. Unpacking one by hand makes the copy stop matching its
+   stamp — ask for a new one.
 4. Plug the adapter into USB. In the adapter panel discover and connect; the
    panel shows the COM port and the device's identity.
 5. Still without a car: run **Capture** on the high-speed bus once. It

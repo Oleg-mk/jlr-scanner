@@ -153,11 +153,12 @@ fn issue(args: &[String]) -> Result<(), Box<dyn std::error::Error>> {
     let mut paths: Vec<_> = std::fs::read_dir(source)?
         .filter_map(|entry| entry.ok().map(|entry| entry.path()))
         .filter(|path| {
-            path.extension()
+            path.file_name()
                 .and_then(|value| value.to_str())
-                .is_some_and(|extension| extension.eq_ignore_ascii_case("json"))
+                .is_some_and(|name| {
+                    knowledge::manifest_file::is_manifest(name) && name != ISSUE_STAMP_FILE
+                })
         })
-        .filter(|path| path.file_name().and_then(|value| value.to_str()) != Some(ISSUE_STAMP_FILE))
         .collect();
     paths.sort();
     if paths.is_empty() {
@@ -172,7 +173,7 @@ fn issue(args: &[String]) -> Result<(), Box<dyn std::error::Error>> {
             .and_then(|value| value.to_str())
             .unwrap_or("bundle.json")
             .to_string();
-        let text = std::fs::read_to_string(&path)?;
+        let text = knowledge::manifest_file::read(&path)?;
         let mut value: Value = serde_json::from_str(&text)?;
         let mut stamped = 0usize;
         if let Value::Array(manifests) = &mut value {
@@ -189,9 +190,15 @@ fn issue(args: &[String]) -> Result<(), Box<dyn std::error::Error>> {
                 }
             }
         }
-        let bytes = serde_json::to_vec(&value)?;
-        std::fs::write(out.join(&name), &bytes)?;
-        bundles.insert(name.clone(), format!("{:x}", Sha256::digest(&bytes)));
+        // The stamp covers what a manifest says, not how it is packed
+        // (ADR-0023), so the hash is of the JSON and the copy keeps the
+        // form it arrived in.
+        let text = serde_json::to_string(&value)?;
+        knowledge::manifest_file::write(&out.join(&name), &text)?;
+        bundles.insert(
+            name.clone(),
+            format!("{:x}", Sha256::digest(text.as_bytes())),
+        );
         println!("{name}: {stamped} manifests stamped");
     }
 

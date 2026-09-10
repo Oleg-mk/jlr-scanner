@@ -663,6 +663,13 @@ that selects it: 44.3 MB of duplicated text against about 15 MB, for no
 gain. A screen with no items — SDD has many, and 103,008 qualifiers point at
 one — produces no record at all rather than an empty claim.
 
+**Packed on the way out.** The export writes `<name>.json.gz` (`ADR-0023`).
+The same 242,691 records that fill 311 MB as plain JSON take 11 MB packed,
+and `dtc_help.json` alone drops from 275.7 MB to 9.97 MB. The application
+reads both forms, and the issue stamp hashes the JSON rather than the bytes
+on disk, so packing changes nothing about what a copy is or how it is
+verified.
+
 **What is not done.** The identifiers named in the action text are left in
 the prose; joining them to the catalogue so a code can offer «watch this
 signal» is a separate change. The thresholds are left in the prose too, and

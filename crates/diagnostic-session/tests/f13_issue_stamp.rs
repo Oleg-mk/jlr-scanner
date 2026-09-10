@@ -274,3 +274,68 @@ fn a_copy_that_travelled_through_a_mac_still_matches_its_stamp() {
     assert_eq!(snapshot.manifests_failed, 0);
     assert!(snapshot.manifests_loaded > 0);
 }
+
+/// A packed library (ADR-0023). The stamp covers what a manifest says, not
+/// how it is packed, so the same hashes stamp both forms — and the file name
+/// in the stamp is the name on disk, so the set of files is still exact.
+#[test]
+fn a_packed_copy_loads_and_stamps_to_the_same_hashes_as_a_plain_one() {
+    use knowledge::manifest_file;
+
+    let text = bundle(Some("[issued AB12-CD34]"));
+    let mut packed_fields = fields(&text, "2026-10-05");
+    // The same hash, under the packed name.
+    let digest = packed_fields
+        .bundles
+        .remove("platform.json")
+        .expect("the plain name was there");
+    packed_fields
+        .bundles
+        .insert("platform.json.gz".to_string(), digest);
+    let stamp = signed_stamp(&packed_fields, TEST_SEED, |_| {});
+
+    let dir = temp_library("packed");
+    manifest_file::write(&dir.join("platform.json.gz"), &text).unwrap();
+    std::fs::write(dir.join("issued_to.json"), &stamp).unwrap();
+    // Packing is worth doing: the file on disk is smaller than the JSON.
+    let on_disk = std::fs::metadata(dir.join("platform.json.gz"))
+        .unwrap()
+        .len();
+    assert!(
+        on_disk < text.len() as u64,
+        "{on_disk} bytes packed against {} of JSON",
+        text.len()
+    );
+
+    let library = load(&dir, true);
+    let snapshot = library.snapshot();
+    assert_eq!(snapshot.state, LibraryState::Loaded);
+    assert_eq!(snapshot.manifests_failed, 0);
+    assert!(snapshot.manifests_loaded > 0);
+    let issue = snapshot.issue.as_ref().expect("the stamp is read");
+    assert_eq!(issue.integrity, LibraryIssueIntegrity::Matches);
+    assert_eq!(issue.issue_code, "AB12-CD34");
+}
+
+/// A packed manifest that is not gzip at all fails as a manifest failure, not
+/// as an empty library: one bad file must not take the rest down.
+#[test]
+fn a_packed_manifest_that_is_not_gzip_is_one_failure_and_no_more() {
+    let text = bundle(None);
+    let dir = temp_library("not-gzip");
+    std::fs::write(dir.join("platform.json"), &text).unwrap();
+    std::fs::write(dir.join("broken.json.gz"), b"this is not gzip").unwrap();
+
+    let library = load(&dir, false);
+    let snapshot = library.snapshot();
+    assert_eq!(snapshot.manifests_failed, 1);
+    assert!(snapshot.manifests_loaded > 0);
+    assert!(
+        snapshot
+            .failures
+            .iter()
+            .any(|failure| failure.file == "broken.json.gz"),
+        "{:?}",
+        snapshot.failures
+    );
+}

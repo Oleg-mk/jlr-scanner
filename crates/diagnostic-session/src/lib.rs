@@ -31,8 +31,9 @@ use diagnostic_environment::{
     EnvironmentField, PartialDiagnosticEnvironment, QueryError,
 };
 use knowledge::{
-    ApplicabilityResolution, ClaimKey, DimensionConstraint, EntityKind, EvidenceClass,
-    JsonManifestAdapter, KnowledgeQuery, KnowledgeStore, KnowledgeValue, YearConstraint,
+    manifest_file, ApplicabilityResolution, ClaimKey, DimensionConstraint, EntityKind,
+    EvidenceClass, JsonManifestAdapter, KnowledgeQuery, KnowledgeStore, KnowledgeValue,
+    YearConstraint,
 };
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
@@ -206,8 +207,8 @@ impl KnowledgeLibrary {
         library
     }
 
-    /// Built-in manifests plus every `.json` manifest or manifest bundle found
-    /// directly in `directory`. A file that fails is reported and skipped; the
+    /// Built-in manifests plus every manifest or manifest bundle found
+    /// directly in `directory`, packed (`.json.gz`) or not (`.json`). A file that fails is reported and skipped; the
     /// rest still load, because a library with one bad file is not an empty
     /// library. The issue stamp is reported, not enforced: this is the loader
     /// for tools, examples and tests.
@@ -251,27 +252,16 @@ impl KnowledgeLibrary {
                 return library;
             }
         };
+        // A manifest is JSON, packed or not (ADR-0023); the rule that keeps
+        // a Mac's AppleDouble sidecars out of the count lives with it.
         let mut files: Vec<_> = entries
             .filter_map(|entry| entry.ok().map(|entry| entry.path()))
             .filter(|path| {
-                path.extension()
+                path.file_name()
                     .and_then(|value| value.to_str())
-                    .is_some_and(|extension| extension.eq_ignore_ascii_case("json"))
-            })
-            .filter(|path| {
-                path.file_name().and_then(|value| value.to_str()) != Some(ISSUE_STAMP_FILE)
-            })
-            // Not ours and not a manifest: a name beginning with a dot is
-            // something the filesystem left behind. macOS writes an
-            // AppleDouble sidecar — `._platform.json` beside `platform.json` —
-            // whenever a folder crosses a stick or a share, invisible in
-            // Finder and ending in `.json` all the same. Counting one as a
-            // manifest refuses a copy that has not lost a byte.
-            .filter(|path| {
-                !path
-                    .file_name()
-                    .and_then(|value| value.to_str())
-                    .is_some_and(|name| name.starts_with('.'))
+                    .is_some_and(|name| {
+                        manifest_file::is_manifest(name) && name != ISSUE_STAMP_FILE
+                    })
             })
             .collect();
         files.sort();
@@ -286,7 +276,9 @@ impl KnowledgeLibrary {
                 .and_then(|value| value.to_str())
                 .unwrap_or("manifest")
                 .to_string();
-            match std::fs::read_to_string(path) {
+            // The stamp covers what a manifest says, not how it is packed,
+            // so a packed one is decompressed before it is hashed or read.
+            match manifest_file::read(path) {
                 Ok(text) => texts.push((name, text)),
                 Err(error) => library.record_failure(&name, &error.to_string()),
             }

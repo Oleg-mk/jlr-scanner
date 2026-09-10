@@ -41,6 +41,7 @@ diagnostic-simulator = { path = "crates/diagnostic-simulator" }
 diagnostic-environment = { path = "crates/diagnostic-environment" }
 diagnostic-session = { path = "crates/diagnostic-session" }
 ed25519-dalek = "2"
+flate2 = "1"
 getrandom = "0.2"
 isotp = { path = "crates/isotp" }
 jlr-profiles = { path = "crates/jlr-profiles" }

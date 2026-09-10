@@ -183,19 +183,24 @@ const BUILT_IN_MANIFESTS: [(&str, &str); 5] = [
 ];
 
 struct Bundle {
-    file: std::io::BufWriter<std::fs::File>,
+    file: flate2::write::GzEncoder<std::io::BufWriter<std::fs::File>>,
     name: String,
     manifests: usize,
     records: usize,
 }
 
 impl Bundle {
+    /// Written packed (ADR-0023): the same records, a twentieth of the bytes.
     fn create(out: &Path, name: &str) -> std::io::Result<Self> {
-        let mut file = std::io::BufWriter::new(std::fs::File::create(out.join(name))?);
+        let name = knowledge::manifest_file::compressed_name(name);
+        let mut file = flate2::write::GzEncoder::new(
+            std::io::BufWriter::new(std::fs::File::create(out.join(&name))?),
+            flate2::Compression::default(),
+        );
         file.write_all(b"[")?;
         Ok(Self {
             file,
-            name: name.to_string(),
+            name,
             manifests: 0,
             records: 0,
         })
@@ -213,7 +218,7 @@ impl Bundle {
 
     fn finish(mut self) -> std::io::Result<(String, usize, usize)> {
         self.file.write_all(b"]\n")?;
-        self.file.flush()?;
+        self.file.finish()?.flush()?;
         Ok((self.name, self.manifests, self.records))
     }
 }
