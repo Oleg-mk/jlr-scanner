@@ -190,3 +190,38 @@ route open for the run and closes it on stop, and the 100 ms floor of
 decision 3 is the binding limit by choice — a courtesy to the bus, ten
 requests a second, below what the link would carry. The module's own answer
 time waits for a car.
+
+## Built, 2026-09-10: the loop steps, and the route is not held
+
+Decision 9(c) is in the product. Two things about the shape of it differ
+from what the measurement above suggested, for reasons the code makes
+unavoidable; they are recorded here rather than left as a surprise.
+
+**The route is opened and closed per request, not held for the run.** The
+device refuses a second open while one is open (`RouteAlreadyOpen`) and
+refuses to close the transport with a route open (`ActiveRoute`). Decision
+4 requires the loop to release the adapter between requests so a stop, a
+disconnect or any other command gets through; a route left open across that
+release would therefore fail every other command in the application, and a
+disconnect with it. Decision 4 is a safety decision and wins. The cost is
+the ~50 ms of open and close measured above, paid once per request; the
+100 ms floor remains the binding limit as claimed, and because decision 3
+shows the achieved round time beside the values, the cost is visible rather
+than hidden.
+
+**The loop's timer is the interface's; its rules are the shell's.** The
+`LiveReadService` owns the set, the order, the floor, the time cap, the
+failure counting and the samples; the interface asks for one step at a
+time. A step that arrives sooner than the floor allows is refused, so no
+interface — or fault in one — can make the product ask a bus faster than
+decision 3 permits. This keeps the per-request lock of decision 4 exact,
+keeps the whole loop testable without a thread, and lets the bench
+end-to-end test drive a run deterministically on every commit. What
+decision 8 places in the shell — the composition of `prepare` and the
+adapter service per request — is in the shell.
+
+Nothing else changes: `LIVE_READ` is `READ_ONLY`, the set is chosen from
+the library's readable identifiers and never typed, at most sixteen
+entries, one request in flight, no `0x10` and no `0x3E`, an entry that
+fails three rounds running is dropped with its reason, and every sample
+carries the validation the single read carries — `SYNTHETIC` on the bench.

@@ -172,6 +172,28 @@ Click **Disconnect** to leave the bench; if you recorded anything
 on it, the application asks for a new session before a real adapter is
 connected.
 
+## Live reading
+
+The "Module network" section has a **Live reading** panel. It does what the
+Read button does, but round after round: tick the parameters you want — up
+to sixteen, from any modules the data describes — press Start, and the
+application asks for each in turn until you stop it. The table shows the
+current value with the catalogue's unit, the smallest and largest of the
+run, how many readings there have been, and beside it **how long a round
+actually takes**. That is a measurement, not a promise: if a round takes two
+seconds, it says two seconds.
+
+The limits are deliberate: no faster than ten requests a second, no longer
+than ten minutes a run, one request at a time, and Stop gets through between
+two requests. An entry that is silent or refused three rounds running is
+dropped from the set, with its reason. All of it is read-only.
+
+**The vehicle must be standing**, engine running or not. This is a
+diagnostic instrument for a stationary car, not for driving.
+
+The whole run joins the session report: every value with the milliseconds
+since the run began, the raw bytes, and the library's own decode.
+
 ## Standard OBD-II
 
 The "Listening and standard OBD-II" section has a **Standard OBD-II** panel:

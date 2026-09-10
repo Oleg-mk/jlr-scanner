@@ -215,7 +215,9 @@ describe("data library and module survey", () => {
     // The map: one lane per bus, the adapter route on the lane, each module a node
     // with SDD's own name for it when the data has one.
     expect(screen.getByRole("button", { name: "SYNTHMOD: Reachable" })).toBeVisible();
-    expect(screen.getByText("Synthetic control module")).toBeVisible();
+    // The name is on the map and again beside the identifiers a live read can
+    // watch; both are the same section.
+    expect(screen.getAllByText("Synthetic control module")[0]).toBeVisible();
     expect(screen.getByText("hs-can · pins 6/14 · 500 kbit/s")).toBeVisible();
     expect(
       screen.getByText("not bound: diagnostic protocol: no applicable evidence-backed value"),

@@ -175,6 +175,7 @@ describe("session flow", () => {
       moduleReads: 2,
       calibrationReads: 0,
       standardObdReads: 0,
+      liveReadRuns: 0,
       reportAvailable: true,
       mode: "real",
     });

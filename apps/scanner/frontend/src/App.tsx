@@ -19,6 +19,7 @@ import { defaultCaptureClient } from "./capture";
 import { AdapterPanel } from "./components/AdapterPanel";
 import { CapturePanel } from "./components/CapturePanel";
 import { DiagnosticPanel } from "./components/DiagnosticPanel";
+import { LiveReadPanel } from "./components/LiveReadPanel";
 import { StandardObdPanel } from "./components/StandardObdPanel";
 import { LibraryPanel } from "./components/LibraryPanel";
 import { hasTauriRuntime } from "./files";
@@ -45,6 +46,8 @@ import { bodyFor, vehicleImageUrl } from "./vehicleBody";
 import { useCaptureController } from "./useCaptureController";
 import { useDiagnosticController } from "./useDiagnosticController";
 import { useLibraryController } from "./useLibraryController";
+import { useLiveReadController } from "./useLiveReadController";
+import { defaultLiveReadClient, type LiveReadClient } from "./liveRead";
 import { useStandardObdController } from "./useStandardObdController";
 import { defaultStandardObdClient, type StandardObdClient } from "./standardObd";
 import { useModuleReadController } from "./useModuleReadController";
@@ -57,6 +60,7 @@ interface AppProps {
   diagnosticClient?: DiagnosticClient;
   libraryClient?: LibraryClient;
   standardObdClient?: StandardObdClient;
+  liveReadClient?: LiveReadClient;
   captureClient?: CaptureClient;
   moduleReadClient?: ModuleReadClient;
   sessionReportClient?: SessionReportClient;
@@ -110,6 +114,7 @@ export function App({
   diagnosticClient = defaultDiagnosticClient,
   libraryClient = defaultLibraryClient,
   standardObdClient = defaultStandardObdClient,
+  liveReadClient = defaultLiveReadClient,
   captureClient = defaultCaptureClient,
   moduleReadClient = defaultModuleReadClient,
   sessionReportClient = defaultSessionReportClient,
@@ -135,6 +140,7 @@ export function App({
     controller.snapshot.boardCommunication === "VERIFIED";
   const diagnostic = useDiagnosticController(diagnosticClient, adapterReady);
   const standardObd = useStandardObdController(standardObdClient, library.vehicle);
+  const liveRead = useLiveReadController(liveReadClient, library.vehicle);
   const session = useSessionReportController(sessionReportClient);
   // The bench (ADR-0020): a virtual vehicle behind a stand-in adapter. The
   // whole screen says so, and the session is bench-only or real-only.
@@ -438,6 +444,21 @@ export function App({
                       onSaveReport={() => void moduleRead.saveReport()}
                     />
                   </div>
+                ) : null}
+                {section.id === "network" ? (
+                  <LiveReadPanel
+                    snapshot={liveRead.snapshot}
+                    set={liveRead.set}
+                    modules={surveyModules}
+                    running={liveRead.running}
+                    busy={liveRead.busy}
+                    adapterReady={adapterReady}
+                    bench={bench}
+                    onToggle={liveRead.toggle}
+                    onClearSet={liveRead.clearSet}
+                    onStart={() => void liveRead.start()}
+                    onStop={() => void liveRead.stop()}
+                  />
                 ) : null}
                 {section.id === "listen" ? (
                   <div className="flow-two-up">

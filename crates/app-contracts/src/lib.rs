@@ -526,6 +526,9 @@ pub struct SessionReportSnapshot {
     /// Legislated OBD-II reads (ADR-0022, decision 7).
     #[serde(default)]
     pub standard_obd_reads: u32,
+    /// Live read runs recorded whole, with their series (ADR-0022).
+    #[serde(default)]
+    pub live_read_runs: u32,
     pub report_available: bool,
     /// `bench` or `real`, once an adapter of either kind took part; a session
     /// is one or the other, never both (ADR-0020).
@@ -772,6 +775,96 @@ pub struct StandardObdSnapshot {
     /// The module's refusal, code and meaning; an answer, not a failure.
     pub negative_response: Option<String>,
     pub pending_responses: u32,
+    pub error: Option<DiagnosticError>,
+    pub report_available: bool,
+}
+
+// ---------------------------------------------------------------------------
+// Live reading (ADR-0022): the same read-only reads, repeated at a stated
+// cadence. One entry is one module and one identifier the library lists for
+// it; the interface never supplies bytes, services or addresses.
+// ---------------------------------------------------------------------------
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LiveReadEntryRequest {
+    pub ecu_family: String,
+    /// Hexadecimal identifier such as `0x1945`, chosen from the survey.
+    pub identifier: String,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LiveReadRequest {
+    pub entries: Vec<LiveReadEntryRequest>,
+    pub context: VehicleContextInput,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum LiveReadState {
+    Idle,
+    Running,
+    Stopped,
+}
+
+/// One entry of the running set, and what has become of it.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LiveReadEntryStatus {
+    pub ecu_family: String,
+    pub identifier: String,
+    pub route_id: String,
+    pub route_validation: String,
+    pub reads: u32,
+    /// Failures in a row; three drops the entry (ADR-0022, decision 4).
+    pub failures: u32,
+    pub dropped: bool,
+    /// Why it was dropped, or why it never entered the set.
+    pub reason: Option<String>,
+    pub last_response_hex: Option<String>,
+    pub negative_response: Option<String>,
+}
+
+/// One parameter as the run has seen it: the latest value the catalogue
+/// decodes, and the smallest and largest of the run (ADR-0022, decision 6).
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LiveReadValue {
+    pub ecu_family: String,
+    pub identifier: String,
+    pub name: String,
+    pub value: Option<String>,
+    pub unit: Option<String>,
+    /// SDD's name for the raw-count range, when the catalogue names it.
+    pub state: Option<String>,
+    pub note: Option<String>,
+    pub raw: Option<u64>,
+    pub minimum: Option<f64>,
+    pub maximum: Option<f64>,
+    pub samples: u32,
+    /// Milliseconds since the run began, at the last sample.
+    pub at_ms: u64,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LiveReadSnapshot {
+    pub state: LiveReadState,
+    pub entries: Vec<LiveReadEntryStatus>,
+    pub values: Vec<LiveReadValue>,
+    /// Complete passes over the set.
+    pub rounds: u32,
+    pub samples: u32,
+    pub elapsed_ms: u64,
+    /// The round time the run actually achieves, shown beside the values so a
+    /// parameter that refreshes every two seconds is shown to (decision 3).
+    pub round_ms: Option<u64>,
+    pub cadence_floor_ms: u64,
+    pub time_cap_ms: u64,
+    /// `SOURCE_BACKED` or the route's own state; `SYNTHETIC` on the bench.
+    pub route_validation: String,
+    pub stopped_reason: Option<String>,
     pub error: Option<DiagnosticError>,
     pub report_available: bool,
 }

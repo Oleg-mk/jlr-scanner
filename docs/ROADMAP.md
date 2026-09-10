@@ -518,7 +518,11 @@ read path that has never met a vehicle. The owner names this the start of
 the 1.1 line. *Measured 2026-09-10:* the link costs ~16 ms a round trip, the
 software 0.01 ms, so the cadence is the link and the module. *Decision 7
 built the same day:* the legislated services, codec to screen, on the
-standard's own addressing, `IMPLEMENTED / FIXTURE_TESTED`.
+standard's own addressing, `IMPLEMENTED / FIXTURE_TESTED`. *Decision 9(c)
+built the same day:* `LiveReadService` and the plain table — the set from
+the library, the floor and the cap enforced in the shell, the samples
+recorded whole, `IMPLEMENTED / FIXTURE_TESTED`. What remains of F15 is the
+visual layer, and the first real tester report still outranks it.
 
 ### Beyond stage 1
 

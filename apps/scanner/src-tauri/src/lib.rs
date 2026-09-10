@@ -3,6 +3,7 @@
 mod adapter_service;
 mod capture_service;
 mod diagnostic_service;
+mod live_read_service;
 mod module_read_service;
 mod session_report_service;
 mod session_service;
@@ -11,13 +12,14 @@ mod standard_obd_service;
 use adapter_service::{lock_service, shared_service, SharedAdapterService};
 use app_contracts::{
     AdapterSnapshot, AdapterState, CaptureSnapshot, DiagnosticSnapshot, LibrarySnapshot,
-    ModuleReadRequest, ModuleReadSnapshot, SessionReportSnapshot, StandardObdRequest,
-    StandardObdSnapshot, VehicleCatalogueSnapshot, VehicleContextInput, VehicleSurveySnapshot,
-    VinDecodeSnapshot,
+    LiveReadRequest, LiveReadSnapshot, ModuleReadRequest, ModuleReadSnapshot,
+    SessionReportSnapshot, StandardObdRequest, StandardObdSnapshot, VehicleCatalogueSnapshot,
+    VehicleContextInput, VehicleSurveySnapshot, VinDecodeSnapshot,
 };
 use bench_vehicle::BenchVehicle;
 use capture_service::CaptureService;
 use diagnostic_service::DiagnosticService;
+use live_read_service::{LiveReadService, LIVE_READ_TIMEOUT};
 use module_read_service::{adapter_unavailable, map_live_error, ModuleReadService};
 use mongoose_jlr::bench::{share_bus, SharedBenchBus};
 use mongoose_jlr::VehicleRouteId;
@@ -35,6 +37,16 @@ type SharedSessionService = Mutex<SessionService>;
 type SharedCaptureService = Mutex<CaptureService>;
 type SharedModuleReadService = Mutex<ModuleReadService>;
 type SharedStandardObdService = Mutex<StandardObdService>;
+type SharedLiveReadService = Mutex<LiveReadService>;
+
+fn lock_live_read<'a>(
+    state: &'a State<'a, SharedLiveReadService>,
+) -> MutexGuard<'a, LiveReadService> {
+    state
+        .inner()
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+}
 
 fn lock_standard_obd<'a>(
     state: &'a State<'a, SharedStandardObdService>,
@@ -572,6 +584,12 @@ async fn start_new_session(
         app.state::<SharedDiagnosticService>(),
         DiagnosticService::new(),
     );
+    replace(
+        app.state::<SharedStandardObdService>(),
+        StandardObdService::new(),
+    );
+    // A live read never survives a new session (ADR-0022, decision 4).
+    replace(app.state::<SharedLiveReadService>(), LiveReadService::new());
     app.state::<SharedSessionService>()
         .inner()
         .lock()
@@ -829,6 +847,147 @@ async fn read_standard_obd(
     ))
 }
 
+// ---------------------------------------------------------------------------
+// Live reading (ADR-0022): the same read-only reads, repeated at a stated
+// cadence. The service owns the rules, the interface owns the timer, and the
+// adapter is taken for one request at a time and released.
+// ---------------------------------------------------------------------------
+
+#[tauri::command]
+async fn get_live_read_state(
+    state: State<'_, SharedLiveReadService>,
+) -> Result<LiveReadSnapshot, String> {
+    Ok(lock_live_read(&state).snapshot())
+}
+
+/// A stopped run joins the session bundle once; the service forgets it as it
+/// hands it over, so a second stop cannot record the same run twice.
+fn record_live_run(
+    live_state: &State<'_, SharedLiveReadService>,
+    report_state: &State<'_, SharedSessionReportService>,
+    bench: bool,
+) {
+    let json = { lock_live_read(live_state).take_report_json() };
+    if let Some(json) = json {
+        let mut session_report = lock_session_report(report_state);
+        session_report.set_mode(if bench {
+            SESSION_MODE_BENCH
+        } else {
+            SESSION_MODE_REAL
+        });
+        let _ = session_report.add_live_read_run(&json);
+    }
+}
+
+fn start_live_read_now(
+    adapter_state: State<'_, SharedAdapterService>,
+    session_state: State<'_, SharedSessionService>,
+    live_state: State<'_, SharedLiveReadService>,
+    report_state: State<'_, SharedSessionReportService>,
+    request: LiveReadRequest,
+) -> LiveReadSnapshot {
+    let (adapter, bench) = {
+        let service = lock_service(&adapter_state);
+        (service.connected_adapter(), service.is_bench())
+    };
+    let Some(adapter) = adapter else {
+        return lock_live_read(&live_state).refuse(adapter_unavailable());
+    };
+    // A run still going is stopped and recorded before another begins.
+    if lock_live_read(&live_state).is_running() {
+        lock_live_read(&live_state).stop("a new run replaced this one");
+        record_live_run(&live_state, &report_state, bench);
+    }
+    let session = lock_session(&session_state);
+    let mut live = lock_live_read(&live_state);
+    live.start(session.library(), Some(&adapter), &request)
+}
+
+fn live_read_step_now(
+    adapter_state: State<'_, SharedAdapterService>,
+    live_state: State<'_, SharedLiveReadService>,
+    report_state: State<'_, SharedSessionReportService>,
+) -> LiveReadSnapshot {
+    let due = { lock_live_read(&live_state).next_due() };
+    let Some(due) = due else {
+        // Not running, too soon for the floor, or the run has just stopped
+        // itself at the cap or with an empty set.
+        let bench = lock_service(&adapter_state).is_bench();
+        record_live_run(&live_state, &report_state, bench);
+        return lock_live_read(&live_state).snapshot();
+    };
+
+    let (result, bench) = {
+        let mut service = lock_service(&adapter_state);
+        let bench = service.is_bench();
+        let result = service
+            .execute_uds_read(&due.transaction, LIVE_READ_TIMEOUT)
+            .map(|result| result.map_err(map_live_error));
+        (result, bench)
+    };
+    let connected = result.is_some();
+    let outcome = result.unwrap_or_else(|| Err(adapter_unavailable()));
+
+    {
+        let mut live = lock_live_read(&live_state);
+        live.record(due.index, outcome);
+        if bench {
+            live.mark_synthetic();
+        }
+        if !connected {
+            live.stop("the adapter is no longer connected");
+        }
+    }
+    record_live_run(&live_state, &report_state, bench);
+    lock_live_read(&live_state).snapshot()
+}
+
+fn stop_live_read_now(
+    adapter_state: State<'_, SharedAdapterService>,
+    live_state: State<'_, SharedLiveReadService>,
+    report_state: State<'_, SharedSessionReportService>,
+) -> LiveReadSnapshot {
+    let bench = lock_service(&adapter_state).is_bench();
+    lock_live_read(&live_state).stop("stopped by the tester");
+    record_live_run(&live_state, &report_state, bench);
+    lock_live_read(&live_state).snapshot()
+}
+
+#[tauri::command]
+async fn start_live_read(
+    adapter_state: State<'_, SharedAdapterService>,
+    session_state: State<'_, SharedSessionService>,
+    live_state: State<'_, SharedLiveReadService>,
+    report_state: State<'_, SharedSessionReportService>,
+    request: LiveReadRequest,
+) -> Result<LiveReadSnapshot, String> {
+    Ok(start_live_read_now(
+        adapter_state,
+        session_state,
+        live_state,
+        report_state,
+        request,
+    ))
+}
+
+#[tauri::command]
+async fn live_read_step(
+    adapter_state: State<'_, SharedAdapterService>,
+    live_state: State<'_, SharedLiveReadService>,
+    report_state: State<'_, SharedSessionReportService>,
+) -> Result<LiveReadSnapshot, String> {
+    Ok(live_read_step_now(adapter_state, live_state, report_state))
+}
+
+#[tauri::command]
+async fn stop_live_read(
+    adapter_state: State<'_, SharedAdapterService>,
+    live_state: State<'_, SharedLiveReadService>,
+    report_state: State<'_, SharedSessionReportService>,
+) -> Result<LiveReadSnapshot, String> {
+    Ok(stop_live_read_now(adapter_state, live_state, report_state))
+}
+
 pub fn run() {
     let bench: SharedBench = share_bus(Box::new(EmptyBench));
     tauri::Builder::default()
@@ -841,6 +1000,7 @@ pub fn run() {
         .manage(Mutex::new(CaptureService::new()))
         .manage(Mutex::new(ModuleReadService::new()))
         .manage(Mutex::new(StandardObdService::new()))
+        .manage(Mutex::new(LiveReadService::new()))
         .manage(Mutex::new(SessionReportService::new()))
         .invoke_handler(tauri::generate_handler![
             get_adapter_state,
@@ -863,6 +1023,10 @@ pub fn run() {
             read_module,
             get_standard_obd_state,
             read_standard_obd,
+            get_live_read_state,
+            start_live_read,
+            live_read_step,
+            stop_live_read,
             get_module_read_report_json,
             get_session_report_state,
             get_session_report_json,

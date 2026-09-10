@@ -126,8 +126,8 @@ const uk: Record<string, string> = {
   Next: "Далі",
   "To do": "Попереду",
   optional: "необовʼязково",
-  "Recorded in this session: {captures} capture(s), {reads} module read(s), {calibrations} calibration read(s), {standard} standard OBD-II read(s).":
-    "Записано в цій сесії: захоплень — {captures}, читань модулів — {reads}, читань калібрування — {calibrations}, стандартних читань OBD-II — {standard}.",
+  "Recorded in this session: {captures} capture(s), {reads} module read(s), {calibrations} calibration read(s), {standard} standard OBD-II read(s), {live} live read run(s).":
+    "Записано в цій сесії: захоплень — {captures}, читань модулів — {reads}, читань калібрування — {calibrations}, стандартних читань OBD-II — {standard}, живих читань — {live}.",
   "Connect the adapter": "Підключити адаптер",
   "Detect the MongoosePro JLR and verify board communication.":
     "Знайти MongoosePro JLR і перевірити звʼязок із платою.",
@@ -375,6 +375,30 @@ const uk: Record<string, string> = {
   "A large library takes seconds on a fast machine and tens of seconds on an old one. Nothing is wrong; wait for the count to stop.":
     "Велика бібліотека читається кілька секунд на швидкій машині і десятки — на старій. Нічого не зависло: зачекайте, поки лічильник зупиниться.",
   // Standard OBD-II (ADR-0022, decision 7)
+  // Live reading (ADR-0022): the panel, and the shell's reasons a run ended
+  "Live reading": "Живе читання",
+  "The same reads, repeated": "Ті самі читання, по колу",
+  "Choose parameters from the modules the data describes and watch them: the application asks for each one in turn, round after round, and shows what it achieves. Read-only, one request at a time, and never faster than ten a second. A standing vehicle, engine running or not — not a moving one.": "Вибери параметри з модулів, які описують дані, і дивись на них: програма питає кожен по черзі, коло за колом, і показує, що виходить насправді. Лише читання, один запит за раз і не швидше ніж десять на секунду. Автомобіль стоїть — з заведеним двигуном чи ні, але не в русі.",
+  "Survey the vehicle first: the set is chosen from what the data describes.": "Спершу огляд автомобіля: набір вибирається з того, що описують дані.",
+  Stop: "Зупинити",
+  "Clear the set": "Очистити набір",
+  "{count} of {max} chosen": "вибрано {count} з {max}",
+  Stopped: "Зупинено",
+  "Not started": "Не запускали",
+  Seen: "Бачили",
+  "{rounds} round(s), {samples} reading(s), {elapsed} s": "кіл — {rounds}, читань — {samples}, {elapsed} с",
+  "a round every {round}": "коло кожні {round}",
+  "{count} reading(s)": "читань: {count}",
+  "dropped from the set": "вилучено з набору",
+  "Live read failed": "Живе читання не вдалося",
+  "The live set cannot be read with the loaded data": "Набір неможливо прочитати із завантаженими даними",
+  "Adapter not found": "Адаптер не знайдено",
+  "stopped by the tester": "зупинив тестувальник",
+  "the run reached its ten-minute cap": "вичерпано десятихвилинну межу",
+  "every entry of the set was dropped": "усі пункти набору вилучено",
+  "the adapter is no longer connected": "адаптер більше не підключений",
+  "a new run replaced this one": "почався новий прогін",
+  "no entry of the set can be read with the loaded data": "жоден пункт набору не можна прочитати із завантаженими даними",
   // The standard's own words, SAE J1979, and the module's refusals
   "Vehicle information": "Дані про автомобіль",
   "Clear the tables": "Очистити таблиці",
@@ -998,8 +1022,8 @@ const ru: Record<string, string> = {
   Next: "Далее",
   "To do": "Впереди",
   optional: "необязательно",
-  "Recorded in this session: {captures} capture(s), {reads} module read(s), {calibrations} calibration read(s), {standard} standard OBD-II read(s).":
-    "Записано в этом сеансе: захватов — {captures}, чтений модулей — {reads}, чтений калибровки — {calibrations}, стандартных чтений OBD-II — {standard}.",
+  "Recorded in this session: {captures} capture(s), {reads} module read(s), {calibrations} calibration read(s), {standard} standard OBD-II read(s), {live} live read run(s).":
+    "Записано в этом сеансе: захватов — {captures}, чтений модулей — {reads}, чтений калибровки — {calibrations}, стандартных чтений OBD-II — {standard}, живых чтений — {live}.",
   "Connect the adapter": "Подключить адаптер",
   "Detect the MongoosePro JLR and verify board communication.":
     "Найти MongoosePro JLR и проверить связь с платой.",
@@ -1247,6 +1271,30 @@ const ru: Record<string, string> = {
   "A large library takes seconds on a fast machine and tens of seconds on an old one. Nothing is wrong; wait for the count to stop.":
     "Большая библиотека читается несколько секунд на быстрой машине и десятки — на старой. Ничего не зависло: подождите, пока счётчик не остановится.",
   // Standard OBD-II (ADR-0022, decision 7)
+  // Live reading (ADR-0022): the panel, and the shell's reasons a run ended
+  "Live reading": "Живое чтение",
+  "The same reads, repeated": "Те же чтения, по кругу",
+  "Choose parameters from the modules the data describes and watch them: the application asks for each one in turn, round after round, and shows what it achieves. Read-only, one request at a time, and never faster than ten a second. A standing vehicle, engine running or not — not a moving one.": "Выберите параметры из модулей, которые описывают данные, и наблюдайте: программа спрашивает каждый по очереди, круг за кругом, и показывает, что получается на самом деле. Только чтение, один запрос за раз и не быстрее десяти в секунду. Автомобиль стоит — с заведённым двигателем или нет, но не в движении.",
+  "Survey the vehicle first: the set is chosen from what the data describes.": "Сначала осмотр автомобиля: набор выбирается из того, что описывают данные.",
+  Stop: "Остановить",
+  "Clear the set": "Очистить набор",
+  "{count} of {max} chosen": "выбрано {count} из {max}",
+  Stopped: "Остановлено",
+  "Not started": "Не запускали",
+  Seen: "Видели",
+  "{rounds} round(s), {samples} reading(s), {elapsed} s": "кругов — {rounds}, чтений — {samples}, {elapsed} с",
+  "a round every {round}": "круг каждые {round}",
+  "{count} reading(s)": "чтений: {count}",
+  "dropped from the set": "исключено из набора",
+  "Live read failed": "Живое чтение не удалось",
+  "The live set cannot be read with the loaded data": "Набор невозможно прочитать с загруженными данными",
+  "Adapter not found": "Адаптер не найден",
+  "stopped by the tester": "остановил тестировщик",
+  "the run reached its ten-minute cap": "исчерпан десятиминутный предел",
+  "every entry of the set was dropped": "все пункты набора исключены",
+  "the adapter is no longer connected": "адаптер больше не подключён",
+  "a new run replaced this one": "начался новый прогон",
+  "no entry of the set can be read with the loaded data": "ни один пункт набора нельзя прочитать с загруженными данными",
   // The standard's own words, SAE J1979, and the module's refusals
   "Vehicle information": "Данные об автомобиле",
   "Clear the tables": "Очистить таблицы",

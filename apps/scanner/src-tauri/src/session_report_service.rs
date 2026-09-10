@@ -26,6 +26,8 @@ pub struct SessionReportService {
     calibration_reads: Vec<Value>,
     /// Legislated OBD-II reads (ADR-0022, decision 7).
     standard_obd_reads: Vec<Value>,
+    /// Live read runs, each with its own series (ADR-0022).
+    live_read_runs: Vec<Value>,
     mode: Option<String>,
     /// The bench scenario this session was connected on (ADR-0020), so the
     /// bundle can say which picture it holds even after the bench is gone.
@@ -40,6 +42,7 @@ impl SessionReportService {
             module_reads: Vec::new(),
             calibration_reads: Vec::new(),
             standard_obd_reads: Vec::new(),
+            live_read_runs: Vec::new(),
             mode: None,
             bench_scenario: None,
         }
@@ -73,12 +76,14 @@ impl SessionReportService {
         let total = self.captures.len()
             + self.module_reads.len()
             + self.calibration_reads.len()
-            + self.standard_obd_reads.len();
+            + self.standard_obd_reads.len()
+            + self.live_read_runs.len();
         SessionReportSnapshot {
             captures: self.captures.len() as u32,
             module_reads: self.module_reads.len() as u32,
             calibration_reads: self.calibration_reads.len() as u32,
             standard_obd_reads: self.standard_obd_reads.len() as u32,
+            live_read_runs: self.live_read_runs.len() as u32,
             report_available: total > 0,
             mode: self.mode.clone(),
         }
@@ -96,6 +101,12 @@ impl SessionReportService {
 
     pub fn add_standard_obd_read(&mut self, json: &str) -> Result<(), String> {
         self.standard_obd_reads.push(parse(json)?);
+        Ok(())
+    }
+
+    /// One whole run of live reading, series and all (ADR-0022).
+    pub fn add_live_read_run(&mut self, json: &str) -> Result<(), String> {
+        self.live_read_runs.push(parse(json)?);
         Ok(())
     }
 
@@ -134,6 +145,7 @@ impl SessionReportService {
             "module_reads": self.module_reads,
             "calibration_reads": self.calibration_reads,
             "standard_obd_reads": self.standard_obd_reads,
+            "live_read_runs": self.live_read_runs,
         });
         serde_json::to_string_pretty(&bundle).map_err(|error| error.to_string())
     }

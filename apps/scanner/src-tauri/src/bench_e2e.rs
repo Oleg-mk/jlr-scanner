@@ -4,14 +4,16 @@
 
 use super::adapter_service::{AdapterService, SystemAdapterBackend, BENCH_PORT, BENCH_TRANSPORT};
 use super::capture_service::CaptureService;
+use super::live_read_service::{LiveReadService, LIVE_READ_TIMEOUT};
 use super::module_read_service::{map_live_error, ModuleReadService, PreparedModuleRead};
 use super::refresh_bench;
 use super::session_report_service::{SessionReportService, SESSION_MODE_BENCH, SESSION_MODE_REAL};
 use super::session_service::SessionService;
 use super::standard_obd_service::{StandardObdService, STANDARD_OBD_TIMEOUT};
 use app_contracts::{
-    AdapterErrorCode, AdapterInfo, AdapterState, ModuleReadKind, ModuleReadRequest,
-    ModuleReadState, StandardObdReadKind, StandardObdRequest, VehicleContextInput,
+    AdapterErrorCode, AdapterInfo, AdapterState, LiveReadEntryRequest, LiveReadRequest,
+    LiveReadState, ModuleReadKind, ModuleReadRequest, ModuleReadState, StandardObdReadKind,
+    StandardObdRequest, VehicleContextInput,
 };
 use diagnostic_session::KnowledgeLibrary;
 use knowledge::{
@@ -144,6 +146,7 @@ fn the_bench_connects_without_a_port_reads_the_surveyed_vehicle_and_marks_everyt
         .expect("SYNTHMOD has a readable identifier")
         .identifier
         .clone();
+    let live_identifier = identifier.clone();
     let request = ModuleReadRequest {
         ecu_family: "SYNTHMOD".into(),
         kind: ModuleReadKind::Identifier,
@@ -251,6 +254,83 @@ fn the_bench_connects_without_a_port_reads_the_surveyed_vehicle_and_marks_everyt
         "scenario 1 gives the engine controller codes"
     );
 
+    // Live reading (ADR-0022): a set of two, one of which the library cannot
+    // plan; the loop steps, the floor refuses a step that comes too soon, and
+    // every sample is the bench's, so synthetic.
+    let mut live = LiveReadService::new();
+    let live_request = LiveReadRequest {
+        entries: vec![
+            LiveReadEntryRequest {
+                ecu_family: "SYNTHMOD".into(),
+                identifier: live_identifier.clone(),
+            },
+            LiveReadEntryRequest {
+                ecu_family: "SYNTHMOD".into(),
+                identifier: "0xDEAD".into(),
+            },
+        ],
+        context: vehicle(),
+    };
+    let started = live.start(session.library(), Some(&info), &live_request);
+    assert_eq!(started.state, LiveReadState::Running, "{started:?}");
+    assert_eq!(started.entries.len(), 2);
+    assert!(
+        started.entries[1].dropped && started.entries[1].reason.is_some(),
+        "an identifier the library does not list never joins the set: {:?}",
+        started.entries[1]
+    );
+    assert_eq!(started.cadence_floor_ms, 100);
+
+    let step =
+        |live: &mut LiveReadService, adapter: &mut AdapterService<SystemAdapterBackend>| match live
+            .next_due()
+        {
+            Some(due) => {
+                let result = adapter
+                    .execute_uds_read(&due.transaction, LIVE_READ_TIMEOUT)
+                    .expect("the bench is connected")
+                    .map_err(map_live_error);
+                live.record(due.index, result);
+                live.mark_synthetic()
+            }
+            None => live.snapshot(),
+        };
+
+    let first = step(&mut live, &mut adapter);
+    assert_eq!(first.samples, 1, "{first:?}");
+    assert_eq!(first.route_validation, "SYNTHETIC");
+    assert!(!first.values.is_empty(), "the catalogue decoded the answer");
+    let too_soon = step(&mut live, &mut adapter);
+    assert_eq!(
+        too_soon.samples, 1,
+        "a step sooner than the floor allows is refused, not queued"
+    );
+    std::thread::sleep(super::live_read_service::LIVE_READ_FLOOR);
+    let second = step(&mut live, &mut adapter);
+    assert_eq!(second.samples, 2, "{second:?}");
+    assert!(
+        second.rounds >= 1,
+        "the one live entry is a round of its own"
+    );
+    assert_eq!(second.values[0].samples, 2);
+
+    let stopped = live.stop("stopped by the tester");
+    assert_eq!(stopped.state, LiveReadState::Stopped);
+    assert_eq!(
+        stopped.stopped_reason.as_deref(),
+        Some("stopped by the tester")
+    );
+    let live_json = live.report_json().expect("a stopped run is a report");
+    assert!(live_json.contains("prowlone.live-read-run"), "{live_json}");
+    assert!(live_json.contains("\"safety_class\": \"READ_ONLY\""));
+    assert!(live_json.contains("\"route_validation\": \"SYNTHETIC\""));
+    assert!(
+        live_json.contains("\"at_ms\""),
+        "the series carries its clock"
+    );
+    // Handed over once: a second stop cannot record the same run twice.
+    assert!(live.take_report_json().is_some());
+    assert!(live.take_report_json().is_none());
     // A listen on the bench hears nothing, and is synthetic all the same.
     let listened = adapter
         .capture_route(VehicleRouteId::HsCan, Duration::from_millis(100))
@@ -279,6 +359,8 @@ fn the_bench_connects_without_a_port_reads_the_surveyed_vehicle_and_marks_everyt
     report.add_capture(&capture_json).unwrap();
     report.add_standard_obd_read(&standard_json).unwrap();
     assert_eq!(report.snapshot().standard_obd_reads, 1);
+    report.add_live_read_run(&live_json).unwrap();
+    assert_eq!(report.snapshot().live_read_runs, 1);
     assert!(report.is_bench());
     assert!(report.accepts(SESSION_MODE_BENCH));
     assert!(!report.accepts(SESSION_MODE_REAL));

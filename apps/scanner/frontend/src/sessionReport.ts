@@ -8,6 +8,8 @@ export interface SessionReportSnapshot {
   calibrationReads: number;
   /** Legislated OBD-II reads (ADR-0022, decision 7). */
   standardObdReads: number;
+  /** Live read runs, each recorded whole with its series (ADR-0022). */
+  liveReadRuns: number;
   reportAvailable: boolean;
   /** "bench" or "real" once the session holds records of either kind (ADR-0020). */
   mode: "bench" | "real" | null;
@@ -23,6 +25,7 @@ export const createSessionReportSnapshot = (): SessionReportSnapshot => ({
   moduleReads: 0,
   calibrationReads: 0,
   standardObdReads: 0,
+  liveReadRuns: 0,
   reportAvailable: false,
   mode: null,
 });

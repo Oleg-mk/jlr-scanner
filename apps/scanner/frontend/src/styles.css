@@ -2397,3 +2397,58 @@ body,
   margin: 1rem 0 0.25rem;
   font-size: 1rem;
 }
+
+/* Live reading (ADR-0022): the set, the cadence and the values. */
+.live-read-panel {
+  margin-top: 1.5rem;
+}
+
+.live-read-set {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin: 1rem 0;
+}
+
+.live-read-module {
+  flex: 1 1 16rem;
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  background: var(--surface);
+}
+
+.live-read-module > summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.live-read-identifiers {
+  list-style: none;
+  margin: 0.5rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  max-height: 12rem;
+  overflow-y: auto;
+}
+
+.live-read-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  margin: 0.75rem 0;
+}
+
+.live-read-cadence {
+  margin: 0.5rem 0;
+}
+
+.live-read-dropped {
+  margin: 0.75rem 0 0;
+  padding-left: 1.1rem;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
