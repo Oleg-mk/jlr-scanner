@@ -129,20 +129,24 @@ notes, and tell us the macOS version and whether the adapter was found.
    SDD's own text — module names, fault-type wording — exists in English and
    Russian; Ukrainian gets the interface in Ukrainian and the car's data in
    English.
-2. Unpack the library archive into a folder. The archive is your personal
-   copy: it is issued in your name, signed, and valid for one month from
-   the date inside it. The application loads no other library — an
+2. The library archive is your personal copy: it is issued in your name,
+   signed, and valid for one month from the date inside it. The application loads no other library — an
    unstamped, altered or expired folder is refused with a plain message —
    and asks for a renewal a week before the date. A new copy takes us a
    minute; just ask. We hand it over on one request: keep it to yourself,
    do not copy or pass it on. Every report you send names your copy.
-3. In **Data library** click **Choose folder…**, pick that folder, then
-   **Load library**. Loading takes about ten seconds; the panel then shows
-   how many manifests and records were read. The files inside are compressed
-   (`.json.gz`), which is what makes the archive about twenty megabytes
-   instead of three hundred. **Do not unpack them**: the application reads
-   them as they are. Unpacking one by hand makes the copy stop matching its
-   stamp — ask for a new one.
+3. **Unpack the zip into an ordinary folder first** — right-click the
+   archive, "Extract All…". The folder chooser in the application shows
+   folders only; an archive will not appear in it.
+
+   Inside you will find eight `.json.gz` files and `issued_to.json`. **Those
+   files stay packed** — the application reads them compressed, which is why
+   the copy is about ten megabytes and not three hundred. Unpacking one by
+   hand makes the copy stop matching its stamp; ask for a new one.
+
+   Then, in **Data library**, click **Choose folder…**, pick that unpacked
+   folder, and press **Load library**. Loading takes a few seconds; the panel
+   then shows how many manifests and records were read.
 4. Plug the adapter into USB. In the adapter panel discover and connect; the
    panel shows the COM port and the device's identity.
 5. Still without a car: run **Capture** on the high-speed bus once. It
