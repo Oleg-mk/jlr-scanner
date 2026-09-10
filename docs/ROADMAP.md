@@ -499,6 +499,24 @@ gets its own ADR and its own fixtures, and it must not be debugged alongside
 the first multi-module pipeline. Until it lands, modules on those buses are
 shown with the reason they are unreachable, never omitted.
 
+### F15 — live reading: the same reads, repeated (decided 2026-09-10, `ADR-0022`)
+
+The owner asked for visualisation — gauges, the car seen from above, cards
+for fault codes — and the library was read for what it holds before
+answering: four of his six blocks are served, per module, by 15,281
+identifier parameters; restraints and the traction battery are not served
+at all. `ADR-0022` decides the operation: `LIVE_READ`, class `READ_ONLY`, a
+loop of the reads the product already makes, in the default session, one
+request in flight, at most sixteen pairs, a floor of 100 ms between
+requests, a ten-minute cap, a stop that gets through between any two
+requests, every sample recorded in the report with the marks a single read
+carries. The cadence is measured before any gauge is drawn. Standard J1979
+mode 01 and 02 follow as their own slice. Order: the ADR, the cadence on
+the bench, the service with a plain table, then the visual layer — and the
+first real tester report outranks the last two, because they build over a
+read path that has never met a vehicle. The owner names this the start of
+the 1.1 line.
+
 ### Beyond stage 1
 
 Service functions and configuration follow only after an explicit owner decision
