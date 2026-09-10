@@ -12,7 +12,7 @@ use app_contracts::{
 use diagnostic_execution::{
     prepare_standard_obd_transaction, PreparedDiagnosticTransaction, StandardObdResponder,
 };
-use diagnostic_session::KnowledgeLibrary;
+use diagnostic_session::{vehicle_context, KnowledgeLibrary, VehicleContext};
 use mongoose_jlr::MongooseJ1979ReadResult;
 use obd_j1979::{
     decode_response, negative_response_text, DtcKind, J1979Error, J1979Request, J1979Response,
@@ -142,7 +142,12 @@ impl StandardObdService {
                 match decode_response(prepared.request, &raw.raw_diagnostic_response) {
                     Ok(response) => {
                         snapshot.state = ModuleReadState::Succeeded;
-                        fill(&mut snapshot, response, library);
+                        fill(
+                            &mut snapshot,
+                            response,
+                            library,
+                            &vehicle_context(&request.context),
+                        );
                     }
                     Err(J1979Error::NegativeResponse { code, .. }) => {
                         snapshot.state = ModuleReadState::Succeeded;
@@ -209,6 +214,7 @@ fn fill(
     snapshot: &mut StandardObdSnapshot,
     response: J1979Response,
     library: Option<&KnowledgeLibrary>,
+    context: &VehicleContext,
 ) {
     match response {
         J1979Response::CurrentData(values) => {
@@ -247,8 +253,10 @@ fn fill(
                 .map(|code| {
                     // The legislated codes are the standard's; the library's
                     // programme-independent wording applies, and so does ours.
+                    // The legislated codes belong to the engine controller;
+                    // the help SDD holds for one is chosen for this car too.
                     let described = library
-                        .map(|library| library.describe_dtc(&code, 0, "PCM"))
+                        .map(|library| library.describe_dtc_with_help(&code, 0, "PCM", context))
                         .unwrap_or_default();
                     DtcSummary {
                         code,
@@ -259,6 +267,8 @@ fn fill(
                         failure_type_text: None,
                         failure_type_texts: Default::default(),
                         description_texts: described.description_texts,
+                        help: described.help,
+                        help_note: described.help_note,
                     }
                 })
                 .collect();

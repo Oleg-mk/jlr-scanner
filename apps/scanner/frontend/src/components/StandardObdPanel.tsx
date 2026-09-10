@@ -6,6 +6,7 @@ import type {
   StandardObdSnapshot,
   StandardObdValue,
 } from "../standardObd";
+import type { DtcSummary } from "../moduleRead";
 import { StatusBadge } from "./StatusBadge";
 
 interface StandardObdPanelProps {
@@ -52,6 +53,24 @@ function responderLabel(index: number) {
   const request = 0x7e0 + index;
   const name = index === 0 ? t("engine") : index === 1 ? t("transmission") : t("other");
   return `0x${request.toString(16).toUpperCase()} — ${name}`;
+}
+
+/** What the loaded data says about a code: SDD's own words, folded away. */
+function DtcHelp({ dtc }: { dtc: DtcSummary }) {
+  if (dtc.help.length === 0) {
+    return dtc.helpNote !== null ? (
+      <div className="module-validation">{t(dtc.helpNote)}</div>
+    ) : null;
+  }
+  return (
+    <details className="dtc-help">
+      <summary>{t("What the data says about this code")}</summary>
+      {dtc.help.map((line, index) => (
+        <p key={`${index}-${line}`}>{line}</p>
+      ))}
+      <p className="module-validation">{t("The loaded data's own words, in its own English.")}</p>
+    </details>
+  );
 }
 
 function badge(snapshot: StandardObdSnapshot, busy: boolean, bench: boolean) {
@@ -267,6 +286,7 @@ export function StandardObdPanel({
                     <td>
                       {wording.shown ?? t("No wording in the loaded data")}
                       {wording.original !== null ? <div className="module-validation">{wording.original}</div> : null}
+                      <DtcHelp dtc={dtc} />
                     </td>
                   </tr>
                 );

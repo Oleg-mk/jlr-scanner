@@ -1,6 +1,6 @@
 import { codeText, dataText, t, useLanguage } from "../i18n";
 import type { ModuleSurveyEntry } from "../library";
-import type { ModuleReadKind, ModuleReadSnapshot } from "../moduleRead";
+import type { DtcSummary, ModuleReadKind, ModuleReadSnapshot } from "../moduleRead";
 import { moduleReasons, moduleRoute, nodeStatus, routeText } from "../networkMap";
 import { StatusBadge } from "./StatusBadge";
 
@@ -18,6 +18,24 @@ interface ModuleDetailsProps {
   onSaveReport: () => void;
   /** On the bench (ADR-0020) nothing is saved. */
   bench?: boolean;
+}
+
+/** What the loaded data says about a code: SDD's own words, folded away. */
+function DtcHelp({ dtc }: { dtc: DtcSummary }) {
+  if (dtc.help.length === 0) {
+    return dtc.helpNote !== null ? (
+      <div className="module-validation">{t(dtc.helpNote)}</div>
+    ) : null;
+  }
+  return (
+    <details className="dtc-help">
+      <summary>{t("What the data says about this code")}</summary>
+      {dtc.help.map((line, index) => (
+        <p key={`${index}-${line}`}>{line}</p>
+      ))}
+      <p className="module-validation">{t("The loaded data's own words, in its own English.")}</p>
+    </details>
+  );
 }
 
 function tone(state: string): "positive" | "pending" | "negative" | "neutral" {
@@ -283,6 +301,7 @@ export function ModuleDetails({
                       {dtc.descriptionScope === "generic" ? (
                         <div className="module-validation">{t("generic wording")}</div>
                       ) : null}
+                      <DtcHelp dtc={dtc} />
                     </td>
                     <td>
                       <code>{dtc.failureType}</code>

@@ -480,6 +480,13 @@ pub struct DtcSummary {
     /// code has no wording of ours.
     #[serde(default)]
     pub description_texts: BTreeMap<String, String>,
+    /// SDD's own help for this code on this car: possible causes, actions
+    /// required, monitoring conditions, line by line as the screen shows it.
+    #[serde(default)]
+    pub help: Vec<String>,
+    /// Why there is no help, when the reason is worth saying.
+    #[serde(default)]
+    pub help_note: Option<String>,
 }
 
 /// One decoded parameter of an identifier read.

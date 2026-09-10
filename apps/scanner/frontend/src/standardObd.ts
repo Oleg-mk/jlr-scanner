@@ -185,7 +185,18 @@ class BrowserStandardObdClient implements StandardObdClient {
       case "STORED_DTCS":
         snapshot.dtcKind = "stored";
         snapshot.dtcs = [
-          { code: "P0300", failureType: "", status: "", description: "Random/multiple cylinder misfire detected", descriptionScope: "generic", failureTypeText: null, failureTypeTexts: {}, descriptionTexts: {} },
+          {
+            code: "P0300",
+            failureType: "",
+            status: "",
+            description: "Random/multiple cylinder misfire detected",
+            descriptionScope: "generic",
+            failureTypeText: null,
+            failureTypeTexts: {},
+            descriptionTexts: {},
+            help: ["Possible causes:", "Browser preview: the loaded data would say them here."],
+            helpNote: null,
+          },
         ];
         break;
       case "PENDING_DTCS":

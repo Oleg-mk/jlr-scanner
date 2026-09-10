@@ -615,3 +615,58 @@ belong here, in the ingest's own document:
   X250 by displacement, which lands in `variant`; the catalogue now carries
   the variants a programme declares, beside its engines, and the interface
   offers them, so that car can say which half it is.
+
+## 2026-09-10 — the help layer, read at last
+
+The per-code DTC help documents were being read for their descriptions and
+nothing else. They carry more: a screen of text per code, chosen by model,
+model year and fault type, listing possible causes, actions required and,
+for a quarter of the corpus, the conditions under which the module sets the
+code. The owner asked for it after saying plainly how diagnosis actually
+begins — with a code, not with a panel of numbers.
+
+**The survey, before any code was written.** Of the 6,168 files in
+`COMMON_SDD_DATA_DTC_HELP_LANG_EN/rds-dtc-help`, every one parses:
+
+| | |
+|---|---:|
+| With real help text | 4,206 (68 %) |
+| With only the `J_H_NO_HELP_AVAIL` placeholder | 1,962 (32 %) |
+| Distinct mnemonics in the string tables | 42,637 |
+| …carrying more than one text under one name | **0** |
+| Text of the whole dictionary, one text per name | 3.7 MB |
+| Qualifiers on description selections | 214,522 |
+| …resolving to a screen that says something | 98,949 |
+| Distinct screens actually selected | 37,291 |
+| Codes naming a datalogger identifier in the text | 223 (157 identifiers, 121 of them in our own catalogue) |
+| Codes carrying a number with a unit or a comparison | 1,613 (26 %) |
+
+**The encoding fault did not exist.** Reported earlier in the day as
+`-40�C` in the source; the files are valid UTF-8 to the byte, with zero
+U+FFFD anywhere, and thirteen non-ASCII characters in all — the degree sign
+(882), the en dash (99), `®`, `±`, `²`, the micro sign, bullets, curly
+quotes, and 58 no-break spaces. The mojibake was the terminal that printed
+it. Nothing needed fixing; what needed doing was reading the bytes as UTF-8,
+which the parser already does.
+
+**What is recorded.** The chain as SDD writes it, not the resolved product:
+
+- `sdd_help` — which screen a car is given, qualified by module, model,
+  model-year designation and, on its own dimension `sdd_fault_type`, the
+  fault type. About 74,500 records, each valued with a screen's name.
+- `sdd_help_screen.<name>` — what that screen says, its mnemonics resolved
+  in order and joined by newlines, unqualified because the text is the text.
+  About 37,300 records.
+
+Resolving at ingest instead would write the same screen out once per car
+that selects it: 44.3 MB of duplicated text against about 15 MB, for no
+gain. A screen with no items — SDD has many, and 103,008 qualifiers point at
+one — produces no record at all rather than an empty claim.
+
+**What is not done.** The identifiers named in the action text are left in
+the prose; joining them to the catalogue so a code can offer «watch this
+signal» is a separate change. The thresholds are left in the prose too, and
+deliberately: «below 65 Volts» carries conditions and delays that a `min`
+and a `max` would drop, and a machine threshold read out of a sentence is
+exactly the kind of invention this project does not make. The sentence is
+shown; the reader does the reading.

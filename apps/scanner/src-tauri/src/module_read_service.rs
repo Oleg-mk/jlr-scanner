@@ -217,10 +217,11 @@ impl ModuleReadService {
                                 let code = record.j2012_code();
                                 let described = library
                                     .map(|library| {
-                                        library.describe_dtc(
+                                        library.describe_dtc_with_help(
                                             &code,
                                             record.failure_type_byte(),
                                             &request.ecu_family,
+                                            &vehicle_context(&request.context),
                                         )
                                     })
                                     .unwrap_or_default();
@@ -233,6 +234,8 @@ impl ModuleReadService {
                                     failure_type_text: described.failure_type_text,
                                     failure_type_texts: described.failure_type_texts,
                                     description_texts: described.description_texts,
+                                    help: described.help,
+                                    help_note: described.help_note,
                                 }
                             })
                             .collect();

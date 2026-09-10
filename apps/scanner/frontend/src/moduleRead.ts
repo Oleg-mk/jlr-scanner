@@ -26,6 +26,13 @@ export interface DtcSummary {
   failureTypeTexts: Record<string, string>;
   /** Our own wording for the code in the interface's languages; English stays in `description`. */
   descriptionTexts: Record<string, string>;
+  /**
+   * What the loaded data says about this code on this car — possible causes,
+   * actions required, monitoring conditions — line by line, in its own English.
+   */
+  help: string[];
+  /** Why there is no help, when the reason is worth saying. */
+  helpNote: string | null;
 }
 
 export interface DecodedParameterSummary {

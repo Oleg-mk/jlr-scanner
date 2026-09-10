@@ -2452,3 +2452,18 @@ body,
   color: var(--muted);
   font-size: 0.9rem;
 }
+
+/* The fault-code help SDD carries, folded away under the code. */
+.dtc-help {
+  margin-top: 0.4rem;
+}
+
+.dtc-help > summary {
+  cursor: pointer;
+  color: var(--accent);
+  font-size: 0.9rem;
+}
+
+.dtc-help p {
+  margin: 0.35rem 0 0;
+}

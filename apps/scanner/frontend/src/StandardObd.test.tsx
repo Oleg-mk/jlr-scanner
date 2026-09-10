@@ -213,6 +213,8 @@ describe("standard OBD-II", () => {
           failureTypeText: null,
           failureTypeTexts: {},
           descriptionTexts: { ukr: "Пропуски запалювання в кількох циліндрах" },
+          help: ["Possible causes:", "Ignition, fuel or compression"],
+          helpNote: null,
         },
       ],
       rawResponseHex: "43 01 03 00",
@@ -253,6 +255,9 @@ describe("standard OBD-II", () => {
     // The code twice — in the list, and as the frame's own value — with the standard's wording underneath.
     expect(screen.getAllByText("P0300")).toHaveLength(2);
     expect(screen.getByText("Random / multiple cylinder misfire detected")).toBeInTheDocument();
+    // What the loaded data says about the code, folded away under it.
+    expect(screen.getByText("What the data says about this code")).toBeInTheDocument();
+    expect(screen.getByText("Ignition, fuel or compression")).toBeInTheDocument();
     expect(screen.getByText("43 01 03 00")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Clear the tables" })).toBeEnabled();
   });

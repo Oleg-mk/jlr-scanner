@@ -375,6 +375,10 @@ const uk: Record<string, string> = {
   "A large library takes seconds on a fast machine and tens of seconds on an old one. Nothing is wrong; wait for the count to stop.":
     "Велика бібліотека читається кілька секунд на швидкій машині і десятки — на старій. Нічого не зависло: зачекайте, поки лічильник зупиниться.",
   // Standard OBD-II (ADR-0022, decision 7)
+  // The fault-code help SDD carries
+  "What the data says about this code": "Що кажуть дані про цей код",
+  "The loaded data's own words, in its own English.": "Слова завантажених даних, їхньою англійською.",
+  "the loaded data holds several help screens for this code; describe the vehicle's model year to choose between them": "у завантажених даних кілька екранів допомоги для цього коду; вкажи модельний рік, щоб обрати між ними",
   // Live reading (ADR-0022): the panel, and the shell's reasons a run ended
   "Live reading": "Живе читання",
   "The same reads, repeated": "Ті самі читання, по колу",
@@ -1271,6 +1275,10 @@ const ru: Record<string, string> = {
   "A large library takes seconds on a fast machine and tens of seconds on an old one. Nothing is wrong; wait for the count to stop.":
     "Большая библиотека читается несколько секунд на быстрой машине и десятки — на старой. Ничего не зависло: подождите, пока счётчик не остановится.",
   // Standard OBD-II (ADR-0022, decision 7)
+  // The fault-code help SDD carries
+  "What the data says about this code": "Что данные говорят об этом коде",
+  "The loaded data's own words, in its own English.": "Слова загруженных данных, их английским.",
+  "the loaded data holds several help screens for this code; describe the vehicle's model year to choose between them": "в загруженных данных несколько экранов помощи для этого кода; укажите модельный год, чтобы выбрать между ними",
   // Live reading (ADR-0022): the panel, and the shell's reasons a run ended
   "Live reading": "Живое чтение",
   "The same reads, repeated": "Те же чтения, по кругу",

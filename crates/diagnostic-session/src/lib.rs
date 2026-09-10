@@ -16,6 +16,9 @@ pub mod issue;
 pub mod vin;
 
 pub use issue::ISSUE_STAMP_FILE;
+/// The context every question to the library is asked in. Re-exported so a
+/// caller needs the library's crate and not the store's.
+pub use knowledge::VehicleContext;
 
 use app_contracts::{
     LibraryIssue, LibraryIssueIntegrity, LibrarySnapshot, LibraryState, ManifestFailure,
@@ -29,8 +32,7 @@ use diagnostic_environment::{
 };
 use knowledge::{
     ApplicabilityResolution, ClaimKey, DimensionConstraint, EntityKind, EvidenceClass,
-    JsonManifestAdapter, KnowledgeQuery, KnowledgeStore, KnowledgeValue, VehicleContext,
-    YearConstraint,
+    JsonManifestAdapter, KnowledgeQuery, KnowledgeStore, KnowledgeValue, YearConstraint,
 };
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
@@ -118,6 +120,22 @@ pub struct DtcDescription {
     /// for the standard codes this is our own text (`dtc_text`); `eng` is
     /// never here, because English stays `description`.
     pub description_texts: BTreeMap<String, String>,
+    /// SDD's own help for this code on this car, line by line as the screen
+    /// shows it: possible causes, actions required, monitoring conditions.
+    /// Empty when the loaded data holds none, or when it holds several and
+    /// the vehicle is not described closely enough to choose between them.
+    pub help: Vec<String>,
+    /// Why there is no help, when the reason is worth saying.
+    pub help_note: Option<String>,
+}
+
+/// One help screen SDD gives a car for a code: what a car must be to be given
+/// it, which fault type it answers, and the screen's name.
+#[derive(Debug)]
+struct HelpSelection {
+    applicability: knowledge::Applicability,
+    fault_type: Option<String>,
+    screen: String,
 }
 
 /// Fault-code wording indexed at load: descriptions by `DTC-<code>` entity,
@@ -129,6 +147,10 @@ struct DtcIndex {
     failure_types: BTreeMap<String, String>,
     /// `FTB-<n>` → language code → wording, from the text database.
     failure_type_texts: BTreeMap<String, BTreeMap<String, String>>,
+    /// `DTC-<code>` → the help screens the data offers for it.
+    help: BTreeMap<String, Vec<HelpSelection>>,
+    /// `DTC-<code>` → screen name → what that screen says, line by line.
+    help_screens: BTreeMap<String, BTreeMap<String, Vec<String>>>,
 }
 
 /// Everything indexed in one pass over the store after a load.
@@ -402,6 +424,80 @@ impl KnowledgeLibrary {
         description
     }
 
+    /// The same, with SDD's own help for the car in front of us.
+    ///
+    /// The help a code carries depends on the module, the vehicle programme,
+    /// the model year and the fault type, because SDD writes a different
+    /// screen for each. The fault type's own screen is preferred; a screen
+    /// that names no fault type stands in. When the loaded data offers
+    /// several and the vehicle is not described closely enough to choose,
+    /// none is shown and the reason is said — a screen from the neighbouring
+    /// model year is worse than no screen.
+    pub fn describe_dtc_with_help(
+        &self,
+        code: &str,
+        failure_type: u8,
+        module: &str,
+        context: &VehicleContext,
+    ) -> DtcDescription {
+        let mut description = self.describe_dtc(code, failure_type, module);
+        let entity = format!("DTC-{code}");
+        let Some(selections) = self.indexes.dtc_index.help.get(&entity) else {
+            return description;
+        };
+        // The module is part of what chooses a screen, so it is part of the
+        // context the record is resolved against.
+        let mut context = context.clone();
+        context.ecu_family = Some(module.to_string());
+
+        let wanted = failure_type.to_string();
+        let mut screens: Vec<&str> = Vec::new();
+        for exact in [true, false] {
+            for selection in selections {
+                let names_it = selection.fault_type.as_deref() == Some(wanted.as_str());
+                let names_none = selection.fault_type.is_none();
+                if exact && !names_it {
+                    continue;
+                }
+                if !exact && !names_none {
+                    continue;
+                }
+                if matches!(
+                    selection.applicability.resolve(&context),
+                    ApplicabilityResolution::NotApplicable
+                ) {
+                    continue;
+                }
+                if !screens.contains(&selection.screen.as_str()) {
+                    screens.push(&selection.screen);
+                }
+            }
+            if !screens.is_empty() {
+                break;
+            }
+        }
+
+        let Some(screen) = screens.first() else {
+            return description;
+        };
+        if screens.len() > 1 {
+            description.help_note = Some(
+                "the loaded data holds several help screens for this code; describe the vehicle's model year to choose between them".into(),
+            );
+            return description;
+        }
+        if let Some(lines) = self
+            .indexes
+            .dtc_index
+            .help_screens
+            .get(&entity)
+            .and_then(|screens| screens.get(*screen))
+        {
+            description.help = lines.clone();
+        }
+        description
+    }
+
     /// Every fault code the loaded data describes for this module family:
     /// those SDD scopes to the family itself first, then the ones it states
     /// without a module, each code once and in a fixed order. `describe_dtc`
@@ -657,6 +753,40 @@ fn build_indexes(store: &KnowledgeStore) -> Indexes {
                         .entry(id.to_string())
                         .or_default()
                         .push((module, value.clone()));
+                } else if id.starts_with("DTC-") {
+                    // The help layer (ADR-0022 is the live read; this is the
+                    // DTC help SDD carries). A car is given a screen by name;
+                    // what the screen says is a claim of its own, so a screen
+                    // dozens of cars select is carried once.
+                    if let ClaimKey::Custom { name } = &record.key {
+                        if name == "sdd_help" {
+                            let fault_type = match record.applicability.other.get("sdd_fault_type")
+                            {
+                                Some(DimensionConstraint::OneOf { values })
+                                    if values.len() == 1 =>
+                                {
+                                    Some(values[0].clone())
+                                }
+                                _ => None,
+                            };
+                            dtc_index
+                                .help
+                                .entry(id.to_string())
+                                .or_default()
+                                .push(HelpSelection {
+                                    applicability: record.applicability.clone(),
+                                    fault_type,
+                                    screen: value.clone(),
+                                });
+                        } else if let Some(screen) = name.strip_prefix("sdd_help_screen.") {
+                            dtc_index
+                                .help_screens
+                                .entry(id.to_string())
+                                .or_default()
+                                .entry(screen.to_string())
+                                .or_insert_with(|| value.lines().map(str::to_string).collect());
+                        }
+                    }
                 } else if id.starts_with("FTB-") {
                     if let ClaimKey::Custom { name } = &record.key {
                         if name == "sdd_failure_type" {

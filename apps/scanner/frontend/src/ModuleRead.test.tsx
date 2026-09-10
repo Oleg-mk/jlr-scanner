@@ -193,6 +193,8 @@ class ControlledModuleReadClient implements ModuleReadClient {
               failureTypeText: null,
               failureTypeTexts: {},
               descriptionTexts: {},
+              help: [],
+              helpNote: null,
             },
           ],
       negativeResponse: null,

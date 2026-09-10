@@ -172,6 +172,23 @@ Click **Disconnect** to leave the bench; if you recorded anything
 on it, the application asks for a new session before a real adapter is
 connected.
 
+## What the data says about a code
+
+Under every fault code there is a fold: **What the data says about this code**.
+It is not our text. It is what SDD writes about that code — possible causes,
+actions required, sometimes the conditions under which the module sets it and
+the manufacturer's own limits ("voltage below 7.5 Volts for at least 200ms").
+In English, because that is the only language the data holds it in.
+
+The data writes different text for different model years, so the screen is
+chosen for the car: by module, programme, model year and fault type. **If the
+model year is not given and the data offers more than one, nothing is shown**
+and the application says why — the neighbouring year's causes would send you
+to the wrong part. Set the model year in the Vehicle section.
+
+Two thirds of codes have text. The rest carry only a placeholder in the data,
+and then there is no fold.
+
 ## Live reading
 
 The "Module network" section has a **Live reading** panel. It does what the

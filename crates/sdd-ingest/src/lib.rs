@@ -30,7 +30,8 @@ pub use addressing::{CanLinkMonitorAdapter, CAN_LINK_MONITOR_PARSER_ID};
 pub use converters::{ConverterCatalogue, ConverterInfo, ConverterKind};
 pub use did::{DidFormattingAdapter, DID_FORMATTING_PARSER_ID, YEAR_BREAKPOINT_DIMENSION};
 pub use dtc::{
-    DtcHelpAdapter, DTC_HELP_PARSER_ID, DTC_TYPE_DIMENSION, MODEL_YEAR_DESIGNATION_DIMENSION,
+    DtcHelpAdapter, DTC_FAULT_TYPE_DIMENSION, DTC_HELP_CLAIM, DTC_HELP_PARSER_ID,
+    DTC_HELP_SCREEN_CLAIM_PREFIX, DTC_TYPE_DIMENSION, MODEL_YEAR_DESIGNATION_DIMENSION,
     MODULE_DATA_NAME_DIMENSION,
 };
 pub use dtc_index::{

@@ -9,13 +9,18 @@
     * several model-year designations for one description, including the
       literal BASE that occurs in the real corpus and must not be interpreted;
     * a selection pointing at a description the document does not define, which
-      must be skipped rather than recorded as an empty claim.
+      must be skipped rather than recorded as an empty claim;
+    * the help layer: a fault-type help data name whose screens differ by
+      model year, one screen with no items at all (the real corpus is full of
+      them, and they must produce no claim), a screen naming a mnemonic the
+      string table does not define, and text carrying the degree sign and the
+      en dash the real corpus uses, which must survive the round trip.
 -->
 <dtcHelp>
 <dtcCode>0x0000</dtcCode>
 <language isoCode="en">English</language>
 <dtcDescriptionQualification>
-<dtcDescriptionSelection dtcDescriptionId="1001" helpScreenDataNameId="9001">
+<dtcDescriptionSelection dtcDescriptionId="1001" helpScreenDataNameId="9001" faultType="17" faultTypeHelpScreenDataNameId="9002">
 <dtcQualifier module="SYNTHMOD" moduleDataName="SYNTHMOD_SYSTEM_A" dtcType="BASE" model="SYNTHA" year="MY06"/>
 <dtcQualifier module="SYNTHMOD" moduleDataName="SYNTHMOD_SYSTEM_A" dtcType="BASE" model="SYNTHA" year="MY07"/>
 </dtcDescriptionSelection>
@@ -36,11 +41,37 @@
 <helpScreenQualifier model="SYNTHA" year="MY06"/>
 </helpScreenSelection>
 </helpScreenDataName>
+<helpScreenDataName id="9002" name="FLT_TYPE_17_SYNTH_DEFAULT_HLP">
+<helpScreenSelection helpScreenId="9102" helpScreenName="FLT_TYPE_17_SYNTH_DEFAULT_HLP_001">
+<helpScreenQualifier model="SYNTHA" year="MY06"/>
+</helpScreenSelection>
+<helpScreenSelection helpScreenId="9103" helpScreenName="FLT_TYPE_17_SYNTH_DEFAULT_HLP_002">
+<helpScreenQualifier model="SYNTHA" year="MY07"/>
+</helpScreenSelection>
+</helpScreenDataName>
 </helpScreenQualification>
 <helpScreenList>
 <helpScreen id="9101" name="SYNTH_DEFAULT_HLP_001"/>
+<helpScreen id="9102" name="FLT_TYPE_17_SYNTH_DEFAULT_HLP_001">
+<helpScreenItem mnemonicName="J_I_POSSIBLE_CAUSES"/>
+<helpScreenItem mnemonicName="H_CAUSE_1"/>
+<helpScreenItem mnemonicName="J_I_ACTIONS_REQUIRED"/>
+<helpScreenItem mnemonicName="H_ACTION_1"/>
+</helpScreen>
+<helpScreen id="9103" name="FLT_TYPE_17_SYNTH_DEFAULT_HLP_002">
+<helpScreenItem mnemonicName="J_I_POSSIBLE_CAUSES"/>
+<helpScreenItem mnemonicName="H_CAUSE_2"/>
+<helpScreenItem mnemonicName="MNEMONIC_THE_TABLE_DOES_NOT_DEFINE"/>
+<helpScreenItem mnemonicName="empty$I"/>
+</helpScreen>
 </helpScreenList>
 <helpScreenMnemonicList>
 <mnemonic name="J_H_NO_HELP_AVAIL"><![CDATA[No help currently available]]></mnemonic>
+<mnemonic name="J_I_POSSIBLE_CAUSES"><![CDATA[Possible causes:]]></mnemonic>
+<mnemonic name="J_I_ACTIONS_REQUIRED"><![CDATA[Actions required:]]></mnemonic>
+<mnemonic name="H_CAUSE_1"><![CDATA[Synthetic sensor circuit open, resistance above 2.30 ohms between -40°C and +85°C]]></mnemonic>
+<mnemonic name="H_CAUSE_2"><![CDATA[Synthetic sensor circuit – short to ground]]></mnemonic>
+<mnemonic name="H_ACTION_1"><![CDATA[Refer to the synthetic circuit diagrams and test the sensor circuit.]]></mnemonic>
+<mnemonic name="empty$I"></mnemonic>
 </helpScreenMnemonicList>
 </dtcHelp>

@@ -206,6 +206,8 @@ function dtc(
     failureTypeText: failureType.eng,
     failureTypeTexts: failureType,
     descriptionTexts,
+    help: [],
+    helpNote: null,
   };
 }
 

@@ -11,8 +11,8 @@ use knowledge::{
     SourceRecord, SourceType, ValidationState, VehicleContext, YearConstraint,
 };
 use sdd_ingest::{
-    DtcHelpAdapter, DTC_TYPE_DIMENSION, MODEL_YEAR_DESIGNATION_DIMENSION,
-    MODULE_DATA_NAME_DIMENSION,
+    DtcHelpAdapter, DTC_FAULT_TYPE_DIMENSION, DTC_HELP_CLAIM, DTC_TYPE_DIMENSION,
+    MODEL_YEAR_DESIGNATION_DIMENSION, MODULE_DATA_NAME_DIMENSION,
 };
 use std::collections::BTreeMap;
 
@@ -154,22 +154,36 @@ fn a_designation_filters_correctly_but_never_reaches_applicable() {
         .into_iter()
         .map(|entry| (entry.record.id, entry.applicability_resolution))
         .collect();
-    assert_eq!(
-        matching,
-        vec![(
-            "f9-dtc.dtc.0x0000.1001.0".to_string(),
-            // Never Applicable: model_year stays unknown because a designation
-            // is not a calendar year, so the record cannot answer a
-            // calendar-year question and says so.
-            ApplicabilityResolution::InsufficientEvidence
-        )]
+    // Never Applicable: model_year stays unknown because a designation is not
+    // a calendar year, so the record cannot answer a calendar-year question
+    // and says so.
+    assert!(matching.contains(&(
+        "f9-dtc.dtc.0x0000.1001.0".to_string(),
+        ApplicabilityResolution::InsufficientEvidence
+    )));
+    assert!(matching.contains(&(
+        "f9-dtc.dtc.0x0000.help.synthmod-syntha-my06-17".to_string(),
+        ApplicabilityResolution::InsufficientEvidence
+    )));
+    assert!(
+        !matching.iter().any(|(id, _)| id.contains("my07")),
+        "MY06 must not drag in the MY07 record: {matching:?}"
     );
 
-    // A designation the record does not carry excludes it outright.
-    let non_matching = store
+    // A designation the record does not carry excludes it outright. What a
+    // help screen says is not qualified by any of this — the text is the text,
+    // and it is the selection above that a car has to match — so the screen
+    // records stay and nothing that names a car does.
+    let non_matching: Vec<_> = store
         .query(&KnowledgeQuery::for_vehicle(context("MY99")).include_indeterminate(true))
-        .records;
-    assert!(non_matching.is_empty());
+        .records
+        .into_iter()
+        .map(|entry| entry.record.id)
+        .collect();
+    assert!(
+        non_matching.iter().all(|id| id.contains(".helpscreen.")),
+        "{non_matching:?}"
+    );
 }
 
 #[test]
@@ -177,8 +191,24 @@ fn a_selection_without_a_defined_description_is_skipped() {
     let store = ingest(SourceType::Documented);
     assert!(store.get_record("f9-dtc.dtc.0x0000.1003.0").is_none());
 
+    // Three descriptions, the two help screens the fault type selects, and
+    // what those two screens say.
     let all = store.query(&KnowledgeQuery::default().include_indeterminate(true));
-    assert_eq!(all.records.len(), 3);
+    assert_eq!(
+        all.records
+            .iter()
+            .map(|entry| entry.record.id.as_str())
+            .collect::<Vec<_>>(),
+        vec![
+            "f9-dtc.dtc.0x0000.1001.0",
+            "f9-dtc.dtc.0x0000.1001.1",
+            "f9-dtc.dtc.0x0000.1002.0",
+            "f9-dtc.dtc.0x0000.help.synthmod-syntha-my06-17",
+            "f9-dtc.dtc.0x0000.help.synthmod-syntha-my07-17",
+            "f9-dtc.dtc.0x0000.helpscreen.flt-type-17-synth-default-hlp-001",
+            "f9-dtc.dtc.0x0000.helpscreen.flt-type-17-synth-default-hlp-002",
+        ]
+    );
 }
 
 #[test]
@@ -232,4 +262,91 @@ fn classification_follows_the_source_type_and_ingestion_is_idempotent() {
             .evidence_class,
         Some(EvidenceClass::OemDocumentation)
     );
+}
+
+/// The help layer (2026-09-10): SDD carries, per code, screens of text chosen
+/// by model, model year and fault type — possible causes, actions required,
+/// monitoring conditions, in its own words. What is recorded is the chain as
+/// it stands: which screen a car is given, and separately what the screen
+/// says, so a screen dozens of cars select is written once.
+#[test]
+fn the_help_screen_a_car_is_given_is_recorded_apart_from_what_the_screen_says() {
+    use knowledge::ClaimKey;
+    let store = ingest(SourceType::Documented);
+
+    // The same fault type gives MY06 and MY07 different screens.
+    let first = store
+        .get_record("f9-dtc.dtc.0x0000.help.synthmod-syntha-my06-17")
+        .expect("the MY06 car is given a screen");
+    assert_eq!(
+        first.key,
+        ClaimKey::Custom {
+            name: DTC_HELP_CLAIM.into()
+        }
+    );
+    assert_eq!(
+        first.value,
+        KnowledgeValue::Text {
+            value: "FLT_TYPE_17_SYNTH_DEFAULT_HLP_001".into()
+        }
+    );
+    assert_eq!(first.applicability.ecu_family, one_of("SYNTHMOD"));
+    assert_eq!(first.applicability.vehicle_program, one_of("SYNTHA"));
+    assert_eq!(
+        first.applicability.other.get(DTC_FAULT_TYPE_DIMENSION),
+        Some(&one_of("17")),
+        "the fault type is part of what chooses the screen"
+    );
+    assert_eq!(
+        store
+            .get_record("f9-dtc.dtc.0x0000.help.synthmod-syntha-my07-17")
+            .expect("the MY07 car is given its own screen")
+            .value,
+        KnowledgeValue::Text {
+            value: "FLT_TYPE_17_SYNTH_DEFAULT_HLP_002".into()
+        }
+    );
+
+    // What the screen says, once, in the order it says it, with the characters
+    // the real corpus uses intact.
+    let screen = store
+        .get_record("f9-dtc.dtc.0x0000.helpscreen.flt-type-17-synth-default-hlp-001")
+        .expect("the screen says something");
+    let KnowledgeValue::Text { value } = &screen.value else {
+        panic!("{:?}", screen.value)
+    };
+    assert_eq!(
+        value.lines().collect::<Vec<_>>(),
+        vec![
+            "Possible causes:",
+            "Synthetic sensor circuit open, resistance above 2.30 ohms between -40°C and +85°C",
+            "Actions required:",
+            "Refer to the synthetic circuit diagrams and test the sensor circuit.",
+        ]
+    );
+
+    // A mnemonic the string table does not define, and one whose text is
+    // empty, are left out rather than shown as a blank line.
+    let sparse = store
+        .get_record("f9-dtc.dtc.0x0000.helpscreen.flt-type-17-synth-default-hlp-002")
+        .expect("the second screen says something too");
+    let KnowledgeValue::Text { value } = &sparse.value else {
+        panic!("{:?}", sparse.value)
+    };
+    assert_eq!(
+        value.lines().collect::<Vec<_>>(),
+        vec![
+            "Possible causes:",
+            "Synthetic sensor circuit – short to ground",
+        ]
+    );
+
+    // A screen with no items at all is no help: two thirds of the real corpus
+    // is such screens, and they must produce no claim.
+    assert!(store
+        .get_record("f9-dtc.dtc.0x0000.helpscreen.synth-default-hlp-001")
+        .is_none());
+    assert!(store
+        .get_record("f9-dtc.dtc.0x0000.help.othermod-synthb-base-any")
+        .is_none());
 }
