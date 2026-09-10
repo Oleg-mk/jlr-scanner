@@ -1,4 +1,4 @@
-import { codeText, dataText, t, useLanguage } from "../i18n";
+import { codeText, dataText, parameterNote, t, useLanguage } from "../i18n";
 import type { ModuleSurveyEntry } from "../library";
 import type { DtcSummary, ModuleReadKind, ModuleReadSnapshot } from "../moduleRead";
 import { moduleReasons, moduleRoute, nodeStatus, routeText } from "../networkMap";
@@ -269,7 +269,7 @@ export function ModuleDetails({
                         </strong>
                       )}
                     </td>
-                    <td>{parameter.note ?? ""}</td>
+                    <td>{parameter.note !== null ? parameterNote(parameter.note) : ""}</td>
                   </tr>
                 ))}
               </tbody>

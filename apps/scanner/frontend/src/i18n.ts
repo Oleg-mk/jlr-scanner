@@ -374,6 +374,17 @@ const uk: Record<string, string> = {
   sec: "с",
   "A large library takes seconds on a fast machine and tens of seconds on an old one. Nothing is wrong; wait for the count to stop.":
     "Велика бібліотека читається кілька секунд на швидкій машині і десятки — на старій. Нічого не зависло: зачекайте, поки лічильник зупиниться.",
+  // Why a live read dropped an entry
+  "the module declined: {code}": "модуль відмовив: {code}",
+  "a fault-code report answered an identifier read": "на читання ідентифікатора прийшов звіт про коди помилок",
+  "the final answer was still ResponsePending": "остання відповідь усе ще була ResponsePending",
+  // What the decoder says about a parameter it could not scale
+  "raw counts; the catalogue records no scaling": "сирі відліки; каталог не описує масштабування",
+  "raw counts; the catalogue's map converter is recorded but its scale is not established": "сирі відліки; табличний перетворювач каталогу записано, але його масштаб не встановлено",
+  "the catalogue records no byte layout for this parameter": "каталог не описує розкладку байтів для цього параметра",
+  "the catalogue records no byte range for this parameter": "каталог не описує діапазон байтів для цього параметра",
+  "wider than 64 bits; shown as bytes": "ширше за 64 біти; показано байтами",
+  "the response holds {held} byte(s); the catalogue places this parameter at bytes {from}..{to}": "відповідь містить {held} байт(ів); каталог розміщує цей параметр у байтах {from}..{to}",
   // Standard OBD-II (ADR-0022, decision 7)
   "engine (by convention)": "двигун (за угодою)",
   "transmission (usually)": "трансмісія (зазвичай)",
@@ -1274,6 +1285,17 @@ const ru: Record<string, string> = {
   sec: "с",
   "A large library takes seconds on a fast machine and tens of seconds on an old one. Nothing is wrong; wait for the count to stop.":
     "Большая библиотека читается несколько секунд на быстрой машине и десятки — на старой. Ничего не зависло: подождите, пока счётчик не остановится.",
+  // Why a live read dropped an entry
+  "the module declined: {code}": "модуль отказал: {code}",
+  "a fault-code report answered an identifier read": "на чтение идентификатора пришёл отчёт о кодах ошибок",
+  "the final answer was still ResponsePending": "последний ответ всё ещё был ResponsePending",
+  // What the decoder says about a parameter it could not scale
+  "raw counts; the catalogue records no scaling": "сырые отсчёты; каталог не описывает масштабирование",
+  "raw counts; the catalogue's map converter is recorded but its scale is not established": "сырые отсчёты; табличный преобразователь каталога записан, но его масштаб не установлен",
+  "the catalogue records no byte layout for this parameter": "каталог не описывает раскладку байтов для этого параметра",
+  "the catalogue records no byte range for this parameter": "каталог не описывает диапазон байтов для этого параметра",
+  "wider than 64 bits; shown as bytes": "шире 64 бит; показано байтами",
+  "the response holds {held} byte(s); the catalogue places this parameter at bytes {from}..{to}": "ответ содержит {held} байт(ов); каталог размещает этот параметр в байтах {from}..{to}",
   // Standard OBD-II (ADR-0022, decision 7)
   "engine (by convention)": "двигатель (по соглашению)",
   "transmission (usually)": "трансмиссия (обычно)",
@@ -1915,6 +1937,40 @@ export function t(text: string, params?: Record<string, string | number>): strin
   return translated.replace(/\{(\w+)\}/g, (match, name: string) =>
     name in params ? String(params[name]) : match,
   );
+}
+
+/**
+ * A decoded parameter's note, in the interface's language.
+ *
+ * The notes come from the decoder and are this project's own words, not
+ * SDD's, so they are translated. Two of them carry numbers the decoder has
+ * already put in; those are matched as patterns and rebuilt around the same
+ * numbers. Anything unrecognised falls back to its English, as `t` does.
+ */
+export function parameterNote(note: string): string {
+  const bytes = /^the response holds (\d+) byte\(s\); the catalogue places this parameter at bytes (\d+)\.\.(\d+)$/.exec(
+    note,
+  );
+  if (bytes !== null) {
+    return t(
+      "the response holds {held} byte(s); the catalogue places this parameter at bytes {from}..{to}",
+      { held: bytes[1], from: bytes[2], to: bytes[3] },
+    );
+  }
+  return t(note);
+}
+
+/**
+ * Why a live read dropped an entry, in the interface's language. The module's
+ * own refusal keeps its protocol name — `RequestOutOfRange` is what the
+ * standard calls it — and the sentence around it is translated.
+ */
+export function liveReadReason(reason: string): string {
+  const declined = /^the module declined: (.+)$/.exec(reason);
+  if (declined !== null) {
+    return t("the module declined: {code}", { code: declined[1] });
+  }
+  return t(reason);
 }
 
 export const LanguageContext = createContext<Language>("en");

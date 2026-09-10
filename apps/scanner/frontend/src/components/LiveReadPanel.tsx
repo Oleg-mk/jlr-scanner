@@ -1,4 +1,4 @@
-import { dataText, t, useLanguage } from "../i18n";
+import { dataText, liveReadReason, parameterNote, t, useLanguage } from "../i18n";
 import type { ModuleSurveyEntry } from "../library";
 import {
   LIVE_READ_MAX_ENTRIES,
@@ -194,7 +194,9 @@ export function LiveReadPanel({
               <tr key={`${value.ecuFamily}-${value.identifier}-${value.name}`}>
                 <td>
                   {value.name}
-                  {value.note !== null ? <div className="module-validation">{value.note}</div> : null}
+                  {value.note !== null ? (
+                    <div className="module-validation">{parameterNote(value.note)}</div>
+                  ) : null}
                 </td>
                 <td>
                   <strong>{reading(value)}</strong>
@@ -220,7 +222,8 @@ export function LiveReadPanel({
             .filter((entry) => entry.dropped)
             .map((entry) => (
               <li key={`${entry.ecuFamily}-${entry.identifier}`}>
-                {entry.ecuFamily} <code>{entry.identifier}</code> — {entry.reason ?? t("dropped from the set")}
+                {entry.ecuFamily} <code>{entry.identifier}</code> —{" "}
+                {entry.reason !== null ? liveReadReason(entry.reason) : t("dropped from the set")}
               </li>
             ))}
         </ul>

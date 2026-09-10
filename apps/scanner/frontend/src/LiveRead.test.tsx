@@ -1,5 +1,6 @@
 import { act, render, renderHook, screen, waitFor } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { LANGUAGE_STORAGE_KEY, setCurrentLanguage } from "./i18n";
 import { LiveReadPanel } from "./components/LiveReadPanel";
 import { createVehicleDescription, type ModuleSurveyEntry } from "./library";
 import {
@@ -101,6 +102,11 @@ const idleHandlers = {
 };
 
 describe("live reading", () => {
+  afterEach(() => {
+    setCurrentLanguage("en");
+    window.localStorage.removeItem(LANGUAGE_STORAGE_KEY);
+  });
+
   it("steps one at a time and stops asking when the shell says the run ended", async () => {
     vi.useFakeTimers();
     try {
@@ -285,5 +291,62 @@ describe("live reading", () => {
     expect(screen.getByText("Connect and verify the adapter, or the bench, first.")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Start" })).toBeDisabled();
     expect(screen.getByText("0 of 16 chosen")).toBeInTheDocument();
+  });
+
+  it("says the decoder's own words and the reason an entry was dropped in the interface's language", () => {
+    setCurrentLanguage("uk");
+    render(
+      <LiveReadPanel
+        snapshot={{
+          ...createLiveReadSnapshot(),
+          state: "STOPPED",
+          stoppedReason: "stopped by the tester",
+          entries: [
+            {
+              ecuFamily: "TCM",
+              identifier: "0x1945",
+              routeId: "hs-can",
+              routeValidation: "SOURCE_BACKED",
+              reads: 0,
+              failures: 3,
+              dropped: true,
+              reason: "the module declined: RequestOutOfRange",
+              lastResponseHex: null,
+              negativeResponse: "RequestOutOfRange",
+            },
+          ],
+          values: [
+            {
+              ecuFamily: "PCM",
+              identifier: "0xF40C",
+              name: "engine speed",
+              value: null,
+              unit: null,
+              state: null,
+              // The decoder's own words, which are ours and not SDD's.
+              note: "raw counts; the catalogue records no scaling",
+              raw: 3000,
+              minimum: 3000,
+              maximum: 3000,
+              samples: 1,
+              atMs: 10,
+            },
+          ],
+        }}
+        set={[]}
+        modules={[]}
+        running={false}
+        busy={false}
+        adapterReady
+        {...idleHandlers}
+      />,
+    );
+    expect(screen.getByText("сирі відліки; каталог не описує масштабування")).toBeInTheDocument();
+    // The protocol's own name for the refusal stays as the standard writes it.
+    expect(screen.getByText(/модуль відмовив: RequestOutOfRange/)).toBeInTheDocument();
+    expect(screen.getByText(/зупинив тестувальник/)).toBeInTheDocument();
+    // SDD's own name for the parameter is English because SDD holds it in
+    // English; inventing a translation would be inventing data.
+    expect(screen.getByText("engine speed")).toBeInTheDocument();
   });
 });
