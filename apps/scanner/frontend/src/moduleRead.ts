@@ -31,6 +31,12 @@ export interface DtcSummary {
    * actions required, monitoring conditions — line by line, in its own English.
    */
   help: string[];
+  /**
+   * The same screen in the interface's languages, by SDD's language code
+   * (ADR-0026). Each list is the same length and order as `help`; a line this
+   * project has no wording for stands in English inside it.
+   */
+  helpTexts: Record<string, string[]>;
   /** Why there is no help, when the reason is worth saying. */
   helpNote: string | null;
 }

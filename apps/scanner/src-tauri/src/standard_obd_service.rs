@@ -268,6 +268,7 @@ fn fill(
                         failure_type_texts: Default::default(),
                         description_texts: described.description_texts,
                         help: described.help,
+                        help_texts: described.help_texts,
                         help_note: described.help_note,
                     }
                 })

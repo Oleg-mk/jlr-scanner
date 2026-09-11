@@ -194,6 +194,7 @@ class ControlledModuleReadClient implements ModuleReadClient {
               failureTypeTexts: {},
               descriptionTexts: {},
               help: [],
+              helpTexts: {},
               helpNote: null,
             },
           ],

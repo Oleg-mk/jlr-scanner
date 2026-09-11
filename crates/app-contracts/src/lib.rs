@@ -480,10 +480,16 @@ pub struct DtcSummary {
     /// code has no wording of ours.
     #[serde(default)]
     pub description_texts: BTreeMap<String, String>,
-    /// SDD's own help for this code on this car: possible causes, actions
-    /// required, monitoring conditions, line by line as the screen shows it.
+    /// The help for this code on this car: possible causes, actions
+    /// required, monitoring conditions, line by line as the screen shows it,
+    /// in English and in this project's own words where it has them.
     #[serde(default)]
     pub help: Vec<String>,
+    /// The same screen in the interface's languages, by SDD's language code,
+    /// each the same length and order as `help`. Empty when none of its lines
+    /// has wording of ours.
+    #[serde(default)]
+    pub help_texts: BTreeMap<String, Vec<String>>,
     /// Why there is no help, when the reason is worth saying.
     #[serde(default)]
     pub help_note: Option<String>,

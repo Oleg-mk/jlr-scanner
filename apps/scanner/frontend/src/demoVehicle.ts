@@ -207,6 +207,7 @@ function dtc(
     failureTypeTexts: failureType,
     descriptionTexts,
     help: [],
+    helpTexts: {},
     helpNote: null,
   };
 }

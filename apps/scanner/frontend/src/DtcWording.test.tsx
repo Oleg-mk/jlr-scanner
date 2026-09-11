@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { codeText, productLanguage } from "./i18n";
+import { codeText, helpLines, productLanguage } from "./i18n";
 
 /**
  * A fault code's wording follows the interface language when we have our own
@@ -33,5 +33,40 @@ describe("fault-code wording by language", () => {
 
   it("says nothing rather than inventing when the library has no wording either", () => {
     expect(codeText({}, null, "uk")).toEqual({ shown: null, original: null });
+  });
+});
+
+/**
+ * A help screen (ADR-0026) follows the same rule as a code's wording, with
+ * one addition: the screen is read whole or not at all. A line this project
+ * has no words for arrives as its English inside the translated list, so the
+ * lists stay the same length; if they ever did not, the English screen is
+ * shown rather than a screen half in each language.
+ */
+describe("help screen wording by language", () => {
+  const english = ["Possible causes", "Injector failure.", "Actions required:"];
+  const texts = {
+    ukr: ["Можливі причини", "Несправність форсунки.", "Рекомендовані дії:"],
+    rus: ["Возможные причины", "Неисправность форсунки.", "Рекомендуемые действия:"],
+  };
+
+  it("reads the screen in the interface's language", () => {
+    expect(helpLines(texts, english, "uk")).toEqual(texts.ukr);
+    expect(helpLines(texts, english, "ru")).toEqual(texts.rus);
+  });
+
+  it("reads it in English when the interface is English, or when we have none", () => {
+    expect(helpLines(texts, english, "en")).toEqual(english);
+    expect(helpLines({}, english, "uk")).toEqual(english);
+    expect(helpLines(undefined, english, "uk")).toEqual(english);
+  });
+
+  it("refuses a screen that does not line up", () => {
+    expect(helpLines({ ukr: ["Можливі причини"] }, english, "uk")).toEqual(english);
+  });
+
+  it("keeps an untranslated line in place rather than dropping it", () => {
+    const mixed = ["Можливі причини", "Injector failure.", "Рекомендовані дії:"];
+    expect(helpLines({ ukr: mixed }, english, "uk")).toEqual(mixed);
   });
 });

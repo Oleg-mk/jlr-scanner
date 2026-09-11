@@ -67,7 +67,9 @@ fn the_model_year_chooses_the_screen_and_the_fault_type_chooses_the_wording() {
             "Possible causes:".to_string(),
             "Synthetic sensor circuit open, resistance above 2.30 ohms between -40°C and +85°C"
                 .to_string(),
-            "Actions required:".to_string(),
+            // The heading is the product's own wording now (`ADR-0026`):
+            // the library still chooses the line, and this project says it.
+            "Recommended actions:".to_string(),
             "Refer to the synthetic circuit diagrams and test the sensor circuit.".to_string(),
         ]
     );

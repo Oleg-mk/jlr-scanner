@@ -12,6 +12,7 @@
 
 pub mod decode;
 pub mod dtc_text;
+pub mod help_text;
 pub mod issue;
 pub mod mileage;
 pub mod parameter_text;
@@ -123,11 +124,18 @@ pub struct DtcDescription {
     /// for the standard codes this is our own text (`dtc_text`); `eng` is
     /// never here, because English stays `description`.
     pub description_texts: BTreeMap<String, String>,
-    /// SDD's own help for this code on this car, line by line as the screen
-    /// shows it: possible causes, actions required, monitoring conditions.
-    /// Empty when the loaded data holds none, or when it holds several and
-    /// the vehicle is not described closely enough to choose between them.
+    /// The help for this code on this car, line by line as the screen shows
+    /// it: possible causes, actions required, monitoring conditions. In
+    /// English, and in this project's own words where it has them
+    /// (`ADR-0026`). Empty when the loaded data holds none, or when it holds
+    /// several and the vehicle is not described closely enough to choose
+    /// between them.
     pub help: Vec<String>,
+    /// The same screen in the interface's languages, by SDD's language code,
+    /// each list the same length and order as `help`. A line this project has
+    /// no wording for stands in English inside them. Empty when no line on
+    /// the screen has any.
+    pub help_texts: BTreeMap<String, Vec<String>>,
     /// Why there is no help, when the reason is worth saying.
     pub help_note: Option<String>,
 }
@@ -487,7 +495,12 @@ impl KnowledgeLibrary {
             .get(&entity)
             .and_then(|screens| screens.get(*screen))
         {
-            description.help = lines.clone();
+            // The library says which lines this car is given; the words are
+            // this project's own (`ADR-0026`), and a line it has no wording
+            // for keeps the library's English.
+            let (shown, texts) = help_text::screen(lines);
+            description.help = shown;
+            description.help_texts = texts;
         }
         description
     }

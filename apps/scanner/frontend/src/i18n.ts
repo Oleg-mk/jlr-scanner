@@ -2009,6 +2009,24 @@ export function liveReadReason(reason: string): string {
   return t(reason);
 }
 
+/**
+ * A help screen's lines for the interface language: ours when the shell sent
+ * them, otherwise the English it sent (`ADR-0026`). The lists must be the
+ * same length — a screen read half in one language and half in another would
+ * be worse than one read wholly in English — so a mismatch falls back rather
+ * than interleaving.
+ */
+export function helpLines(
+  texts: Record<string, string[]> | undefined,
+  english: string[],
+  language: Language,
+): string[] {
+  const code = productLanguage(language);
+  const ours = code !== null ? texts?.[code] : undefined;
+  if (ours === undefined || ours.length !== english.length) return english;
+  return ours;
+}
+
 export const LanguageContext = createContext<Language>("en");
 
 /** The current language, for components that must re-render when it changes. */

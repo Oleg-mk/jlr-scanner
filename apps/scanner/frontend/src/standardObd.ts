@@ -195,6 +195,7 @@ class BrowserStandardObdClient implements StandardObdClient {
             failureTypeTexts: {},
             descriptionTexts: {},
             help: ["Possible causes:", "Browser preview: the loaded data would say them here."],
+            helpTexts: {},
             helpNote: null,
           },
         ];
