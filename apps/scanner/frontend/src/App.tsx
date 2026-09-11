@@ -9,6 +9,11 @@ import {
 } from "./i18n";
 import type { AdapterClient } from "./adapter";
 import {
+  defaultParameterNameClient,
+  loadParameterNames,
+  type ParameterNameClient,
+} from "./parameterNames";
+import {
   BENCH_SCENARIO_DEFAULT,
   browserDemoEnabled,
   defaultAdapterClient,
@@ -68,6 +73,7 @@ interface AppProps {
   captureClient?: CaptureClient;
   moduleReadClient?: ModuleReadClient;
   sessionReportClient?: SessionReportClient;
+  parameterNameClient?: ParameterNameClient;
   pollIntervalMs?: number;
   /** What restarts the interface once the shell has dropped the session; reloads the page by default. */
   onNewSession?: () => void;
@@ -123,6 +129,7 @@ export function App({
   captureClient = defaultCaptureClient,
   moduleReadClient = defaultModuleReadClient,
   sessionReportClient = defaultSessionReportClient,
+  parameterNameClient = defaultParameterNameClient,
   pollIntervalMs,
   onNewSession,
 }: AppProps) {
@@ -135,6 +142,19 @@ export function App({
     setCurrentLanguage(next);
     setLanguage(next);
   }, []);
+  // The parameter names (ADR-0025) are compiled into the application, not
+  // carried by the loaded library. Fetch them once per language; until they
+  // arrive, and for English, every name stays as SDD wrote it.
+  const [, setNamesLoaded] = useState(0);
+  useEffect(() => {
+    let live = true;
+    void loadParameterNames(language, parameterNameClient).then((changed) => {
+      if (live && changed) setNamesLoaded((count) => count + 1);
+    });
+    return () => {
+      live = false;
+    };
+  }, [language, parameterNameClient]);
   const library = useLibraryController(libraryClient);
   const capture = useCaptureController(captureClient, library.vehicle);
   const surveyModules = library.survey?.modules ?? [];

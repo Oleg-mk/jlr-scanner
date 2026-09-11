@@ -2,6 +2,7 @@ import { codeText, dataText, parameterNote, t, useLanguage } from "../i18n";
 import type { ModuleSurveyEntry } from "../library";
 import type { DtcSummary, ModuleReadKind, ModuleReadSnapshot } from "../moduleRead";
 import { moduleReasons, moduleRoute, nodeStatus, routeText } from "../networkMap";
+import { parameterName } from "../parameterNames";
 import { StatusBadge } from "./StatusBadge";
 
 interface ModuleDetailsProps {
@@ -177,7 +178,7 @@ export function ModuleDetails({
                   <option value="">{t("Choose an identifier")}</option>
                   {module.readableIdentifiers.map((entry) => (
                     <option key={entry.identifier} value={entry.identifier}>
-                      {entry.identifier} — {entry.parameters.join(", ")}
+                      {entry.identifier} — {entry.parameters.map(parameterName).join(", ")}
                     </option>
                   ))}
                 </select>
@@ -250,7 +251,7 @@ export function ModuleDetails({
               <tbody>
                 {outcome.parameters.map((parameter) => (
                   <tr key={parameter.name}>
-                    <td>{parameter.name}</td>
+                    <td>{parameterName(parameter.name)}</td>
                     <td>
                       {parameter.state !== null ? (
                         <>

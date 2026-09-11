@@ -180,6 +180,20 @@ Click **Disconnect** to leave the bench; if you recorded anything
 on it, the application asks for a new session before a real adapter is
 connected.
 
+## In the language you read
+
+The names of the readings — "Total distance", "Engine coolant temperature" —
+are translated into Ukrainian and Russian. They are this project's words and
+not JLR's: SDD publishes its catalogue in twelve languages, Ukrainian is not
+one of them, and its Russian is not used here.
+
+A name that stays English is not a fault. It means our table has no row for
+it, and the application would rather show you the original than guess. Tell
+us the name and it gets one.
+
+**A report keeps the English name** whatever language you are reading in. A
+report is evidence, and evidence does not change language.
+
 ## Mileage from every module
 
 In the "Module network" section, beside the button that checks every module,

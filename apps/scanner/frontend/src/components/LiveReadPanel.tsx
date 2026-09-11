@@ -1,4 +1,5 @@
 import { dataText, liveReadReason, parameterNote, t, useLanguage } from "../i18n";
+import { parameterName } from "../parameterNames";
 import type { ModuleSurveyEntry } from "../library";
 import {
   LIVE_READ_MAX_ENTRIES,
@@ -141,7 +142,9 @@ export function LiveReadPanel({
                           </label>
                         </td>
                         <td>
-                          <label htmlFor={id}>{identifier.parameters.join(", ")}</label>
+                          <label htmlFor={id}>
+                            {identifier.parameters.map(parameterName).join(", ")}
+                          </label>
                         </td>
                       </tr>
                     );
@@ -213,7 +216,7 @@ export function LiveReadPanel({
             {snapshot.values.map((value) => (
               <tr key={`${value.ecuFamily}-${value.identifier}-${value.name}`}>
                 <td>
-                  {value.name}
+                  {parameterName(value.name)}
                   {value.note !== null ? (
                     <div className="module-validation">{parameterNote(value.note)}</div>
                   ) : null}

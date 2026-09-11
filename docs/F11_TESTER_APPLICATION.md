@@ -251,7 +251,15 @@ languages, Russian among them and Ukrainian not. So with the Russian
 interface the module names and the failure-type wording are SDD's Russian;
 with the Ukrainian interface they stay SDD's English, because inventing a
 Ukrainian rendering of JLR's text would be a translation this project has no
-source for. Fault-code descriptions are shown in English whichever interface is
+source for.
+
+Since `ADR-0025` that rule covers module names and failure-type wording and
+nothing else. The **parameter names** — the 4,977 names the catalogue gives
+the 15,281 readings this product can take — are the product's own words in
+both Ukrainian and Russian, compiled into the application rather than carried
+by the library, and SDD's Russian is not used for them. `parameterName` in
+`parameterNames.ts` does the lookup at the moment a name is drawn; a name
+with no row is drawn in its English, one name at a time. Fault-code descriptions are shown in English whichever interface is
 chosen, because that is what the library carries today — not because that is
 all SDD has. Measured on 2026-09-11: the payload ships `DTC_HELP` in the same
 twelve languages, the Russian pack keyed identically to the English one, and

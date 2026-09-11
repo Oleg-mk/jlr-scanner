@@ -21,6 +21,7 @@ use app_contracts::{
 use bench_vehicle::BenchVehicle;
 use capture_service::CaptureService;
 use diagnostic_service::DiagnosticService;
+use diagnostic_session::parameter_text;
 use live_read_service::{LiveReadService, LIVE_READ_TIMEOUT};
 use mileage_service::{MileageService, MILEAGE_READ_TIMEOUT};
 use module_read_service::{adapter_unavailable, map_live_error, ModuleReadService};
@@ -30,6 +31,7 @@ use session_report_service::SessionReportService;
 use session_report_service::{SESSION_MODE_BENCH, SESSION_MODE_REAL};
 use session_service::SessionService;
 use standard_obd_service::{StandardObdService, STANDARD_OBD_TIMEOUT};
+use std::collections::BTreeMap;
 use std::sync::{Mutex, MutexGuard};
 use std::time::Duration;
 use tauri::State;
@@ -261,6 +263,15 @@ async fn get_diagnostic_report_json(
     diagnostic_state: State<'_, SharedDiagnosticService>,
 ) -> Result<String, String> {
     lock_diagnostic(&diagnostic_state).report_json()
+}
+
+// The parameter names in the interface's language (`ADR-0025`). A dictionary,
+// not knowledge: it claims nothing about any car, reaches no transport, and
+// the English name it is keyed by stays the identity every report carries.
+
+#[tauri::command]
+async fn get_parameter_names(language: String) -> Result<BTreeMap<String, String>, String> {
+    Ok(parameter_text::parameter_names(&language))
 }
 
 // F10 composition root: the data library and the vehicle survey. These read
@@ -1154,6 +1165,7 @@ pub fn run() {
             get_diagnostic_state,
             read_calibration_identification,
             get_diagnostic_report_json,
+            get_parameter_names,
             get_data_library,
             load_data_library,
             survey_vehicle,

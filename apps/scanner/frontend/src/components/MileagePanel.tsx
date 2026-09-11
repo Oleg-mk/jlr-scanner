@@ -1,4 +1,5 @@
 import { parameterNote, t, useLanguage } from "../i18n";
+import { parameterName } from "../parameterNames";
 import type { MileageReading, MileageSurveySnapshot } from "../mileage";
 import { StatusBadge } from "./StatusBadge";
 
@@ -80,7 +81,7 @@ export function MileagePanel({
             <div className="module-validation">{parameterNote(row.note)}</div>
           ) : null}
           {row.kind === "EVENT" ? (
-            <div className="module-validation">{row.parameter}</div>
+            <div className="module-validation">{parameterName(row.parameter)}</div>
           ) : null}
         </td>
         <td className="mileage-difference">{difference(row)}</td>

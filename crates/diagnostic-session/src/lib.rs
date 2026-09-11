@@ -14,6 +14,7 @@ pub mod decode;
 pub mod dtc_text;
 pub mod issue;
 pub mod mileage;
+pub mod parameter_text;
 pub mod vin;
 
 pub use issue::ISSUE_STAMP_FILE;
