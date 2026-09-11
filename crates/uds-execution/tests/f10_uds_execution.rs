@@ -31,6 +31,8 @@ use uds_execution::{
 const PLATFORM: &str = include_str!("../../../fixtures/knowledge/synthetic/f9_platform.xml");
 const DIDS: &str = include_str!("../../../fixtures/knowledge/synthetic/f9_did_formatting.xml");
 const CONVERTER: &str = include_str!("../../../fixtures/knowledge/synthetic/f9_converter.xml");
+const CONVERTER_KM: &str =
+    include_str!("../../../fixtures/knowledge/synthetic/f9_converter_km.xml");
 const BINDINGS: &str =
     include_str!("../../../fixtures/knowledge/documented/mongoose_jlr_route_bindings.json");
 const REPLAY: &str =
@@ -72,6 +74,7 @@ fn store(with_bindings: bool) -> KnowledgeStore {
     .with_timeline(timeline());
     let mut converters = ConverterCatalogue::new();
     converters.insert_from_xml(CONVERTER).unwrap();
+    converters.insert_from_xml(CONVERTER_KM).unwrap();
     let dids = DidFormattingAdapter::new(
         synthetic_source(
             "f10-did",
@@ -205,9 +208,10 @@ fn readable_identifiers_come_only_from_entries_qualified_to_the_module() {
         DiagnosticEnvironmentResolver::readable_identifiers(&store(true), &context(), "SYNTHMOD");
     let identifiers: Vec<_> = readable.iter().map(|entry| entry.identifier).collect();
     // 0x1945 is qualified to the module alone; 0x0347 to module, programme,
-    // breakpoint and engine. 0x0301 and 0x0343 are unqualified formatting
-    // entries and say nothing about what this module exposes.
-    assert_eq!(identifiers, vec![0x0347, 0x1945]);
+    // breakpoint and engine; 0xDD01 is the distance the mileage survey reads.
+    // 0x0301 and 0x0343 are unqualified formatting entries and say nothing
+    // about what this module exposes.
+    assert_eq!(identifiers, vec![0x0347, 0x1945, 0xDD01]);
     let module_scoped = readable.iter().find(|e| e.identifier == 0x1945).unwrap();
     assert_eq!(module_scoped.parameters.len(), 1);
     assert_eq!(

@@ -15,10 +15,13 @@ use sdd_ingest::{ConverterCatalogue, DidFormattingAdapter, YEAR_BREAKPOINT_DIMEN
 const FORMATTING: &str =
     include_str!("../../../fixtures/knowledge/synthetic/f9_did_formatting.xml");
 const CONVERTER: &str = include_str!("../../../fixtures/knowledge/synthetic/f9_converter.xml");
+const CONVERTER_KM: &str =
+    include_str!("../../../fixtures/knowledge/synthetic/f9_converter_km.xml");
 
 fn converters() -> ConverterCatalogue {
     let mut catalogue = ConverterCatalogue::new();
     catalogue.insert_from_xml(CONVERTER).unwrap();
+    catalogue.insert_from_xml(CONVERTER_KM).unwrap();
     catalogue
 }
 
@@ -224,8 +227,10 @@ fn every_parameter_is_recorded_and_ingestion_is_idempotent() {
     let first = store.ingest(&adapter, FORMATTING).unwrap();
     let second = store.ingest(&adapter, FORMATTING).unwrap();
     assert_eq!(first, second);
-    assert_eq!(first.record_ids.len(), 5);
+    // Five formatting parameters, plus the two on 0xDD01 that the mileage
+    // survey reads: the distance itself and the lamp counter beside it.
+    assert_eq!(first.record_ids.len(), 7);
 
     let all = store.query(&KnowledgeQuery::default().include_indeterminate(true));
-    assert_eq!(all.records.len(), 5);
+    assert_eq!(all.records.len(), 7);
 }

@@ -16,6 +16,11 @@ interface NetworkMapProps {
   onCheckAll: () => void;
   onCancelCheck: () => void;
   onIncludeHypothesisChange: (include: boolean) => void;
+  /** The mileage survey (ADR-0024) is a whole-car action like the check. */
+  mileageRunning: boolean;
+  mileageBusy: boolean;
+  onReadMileage: () => void;
+  onStopMileage: () => void;
 }
 
 function NodeIcon({ state }: { state: NodeState }) {
@@ -90,6 +95,10 @@ export function NetworkMap({
   onCheckAll,
   onCancelCheck,
   onIncludeHypothesisChange,
+  mileageRunning,
+  mileageBusy,
+  onReadMileage,
+  onStopMileage,
 }: NetworkMapProps) {
   const language = useLanguage();
   const modules: ModuleSurveyEntry[] = survey?.modules ?? [];
@@ -123,6 +132,20 @@ export function NetworkMap({
               disabled={!adapterReady || checkable === 0}
             >
               {t("Check all modules ({count})", { count: checkable })}
+            </button>
+          )}
+          {mileageRunning ? (
+            <button className="button button--secondary" type="button" onClick={onStopMileage}>
+              {t("Stop")}
+            </button>
+          ) : (
+            <button
+              className="button button--secondary"
+              type="button"
+              onClick={onReadMileage}
+              disabled={!adapterReady || survey === null || busy || mileageBusy}
+            >
+              {t("Read the mileage")}
             </button>
           )}
         </div>

@@ -4,6 +4,7 @@ mod adapter_service;
 mod capture_service;
 mod diagnostic_service;
 mod live_read_service;
+mod mileage_service;
 mod module_read_service;
 mod session_report_service;
 mod session_service;
@@ -12,14 +13,16 @@ mod standard_obd_service;
 use adapter_service::{lock_service, shared_service, SharedAdapterService};
 use app_contracts::{
     AdapterSnapshot, AdapterState, CaptureSnapshot, DiagnosticSnapshot, LibrarySnapshot,
-    LiveReadRequest, LiveReadSnapshot, ModuleReadRequest, ModuleReadSnapshot,
-    SessionReportSnapshot, StandardObdRequest, StandardObdSnapshot, VehicleCatalogueSnapshot,
-    VehicleContextInput, VehicleSurveySnapshot, VinDecodeSnapshot,
+    LiveReadRequest, LiveReadSnapshot, MileageSurveyRequest, MileageSurveySnapshot,
+    ModuleReadRequest, ModuleReadSnapshot, SessionReportSnapshot, StandardObdRequest,
+    StandardObdSnapshot, VehicleCatalogueSnapshot, VehicleContextInput, VehicleSurveySnapshot,
+    VinDecodeSnapshot,
 };
 use bench_vehicle::BenchVehicle;
 use capture_service::CaptureService;
 use diagnostic_service::DiagnosticService;
 use live_read_service::{LiveReadService, LIVE_READ_TIMEOUT};
+use mileage_service::{MileageService, MILEAGE_READ_TIMEOUT};
 use module_read_service::{adapter_unavailable, map_live_error, ModuleReadService};
 use mongoose_jlr::bench::{share_bus, SharedBenchBus};
 use mongoose_jlr::VehicleRouteId;
@@ -38,6 +41,14 @@ type SharedCaptureService = Mutex<CaptureService>;
 type SharedModuleReadService = Mutex<ModuleReadService>;
 type SharedStandardObdService = Mutex<StandardObdService>;
 type SharedLiveReadService = Mutex<LiveReadService>;
+type SharedMileageService = Mutex<MileageService>;
+
+fn lock_mileage<'a>(state: &'a State<'a, SharedMileageService>) -> MutexGuard<'a, MileageService> {
+    state
+        .inner()
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+}
 
 fn lock_live_read<'a>(
     state: &'a State<'a, SharedLiveReadService>,
@@ -590,6 +601,7 @@ async fn start_new_session(
     );
     // A live read never survives a new session (ADR-0022, decision 4).
     replace(app.state::<SharedLiveReadService>(), LiveReadService::new());
+    replace(app.state::<SharedMileageService>(), MileageService::new());
     app.state::<SharedSessionService>()
         .inner()
         .lock()
@@ -988,6 +1000,136 @@ async fn stop_live_read(
     Ok(stop_live_read_now(adapter_state, live_state, report_state))
 }
 
+// ---------------------------------------------------------------------------
+// The odometer read from every module (ADR-0024). One request per module,
+// once; readings side by side with the arithmetic done; no verdict drawn.
+// ---------------------------------------------------------------------------
+
+#[tauri::command]
+async fn get_mileage_state(
+    state: State<'_, SharedMileageService>,
+) -> Result<MileageSurveySnapshot, String> {
+    Ok(lock_mileage(&state).snapshot())
+}
+
+/// A finished survey joins the session bundle once.
+fn record_mileage_survey(
+    mileage_state: &State<'_, SharedMileageService>,
+    report_state: &State<'_, SharedSessionReportService>,
+    bench: bool,
+) {
+    let json = { lock_mileage(mileage_state).take_report_json() };
+    if let Some(json) = json {
+        let mut session_report = lock_session_report(report_state);
+        session_report.set_mode(if bench {
+            SESSION_MODE_BENCH
+        } else {
+            SESSION_MODE_REAL
+        });
+        let _ = session_report.add_mileage_survey(&json);
+    }
+}
+
+fn start_mileage_survey_now(
+    adapter_state: State<'_, SharedAdapterService>,
+    session_state: State<'_, SharedSessionService>,
+    mileage_state: State<'_, SharedMileageService>,
+    request: MileageSurveyRequest,
+) -> MileageSurveySnapshot {
+    let adapter = { lock_service(&adapter_state).connected_adapter() };
+    let mut session = lock_session(&session_state);
+    // Every module the survey reaches is asked; the point is breadth.
+    let families: Vec<String> = match adapter {
+        Some(_) => session
+            .survey(&request.context)
+            .modules
+            .iter()
+            .map(|module| module.ecu_family.clone())
+            .collect(),
+        None => Vec::new(),
+    };
+    let mut mileage = lock_mileage(&mileage_state);
+    mileage.start(
+        session.library(),
+        adapter.as_ref(),
+        &request.context,
+        &families,
+    )
+}
+
+fn mileage_survey_step_now(
+    adapter_state: State<'_, SharedAdapterService>,
+    mileage_state: State<'_, SharedMileageService>,
+    report_state: State<'_, SharedSessionReportService>,
+) -> MileageSurveySnapshot {
+    let due = { lock_mileage(&mileage_state).next_due() };
+    let Some(due) = due else {
+        let bench = lock_service(&adapter_state).is_bench();
+        record_mileage_survey(&mileage_state, &report_state, bench);
+        return lock_mileage(&mileage_state).snapshot();
+    };
+
+    let (result, bench) = {
+        let mut service = lock_service(&adapter_state);
+        let bench = service.is_bench();
+        let result = service
+            .execute_uds_read(&due.transaction, MILEAGE_READ_TIMEOUT)
+            .map(|result| result.map_err(map_live_error));
+        (result, bench)
+    };
+    let outcome = result.unwrap_or_else(|| Err(adapter_unavailable()));
+
+    {
+        let mut mileage = lock_mileage(&mileage_state);
+        mileage.record(due.index, outcome);
+        if bench {
+            mileage.mark_synthetic();
+        }
+    }
+    record_mileage_survey(&mileage_state, &report_state, bench);
+    lock_mileage(&mileage_state).snapshot()
+}
+
+#[tauri::command]
+async fn start_mileage_survey(
+    adapter_state: State<'_, SharedAdapterService>,
+    session_state: State<'_, SharedSessionService>,
+    mileage_state: State<'_, SharedMileageService>,
+    request: MileageSurveyRequest,
+) -> Result<MileageSurveySnapshot, String> {
+    Ok(start_mileage_survey_now(
+        adapter_state,
+        session_state,
+        mileage_state,
+        request,
+    ))
+}
+
+#[tauri::command]
+async fn mileage_survey_step(
+    adapter_state: State<'_, SharedAdapterService>,
+    mileage_state: State<'_, SharedMileageService>,
+    report_state: State<'_, SharedSessionReportService>,
+) -> Result<MileageSurveySnapshot, String> {
+    Ok(mileage_survey_step_now(
+        adapter_state,
+        mileage_state,
+        report_state,
+    ))
+}
+
+#[tauri::command]
+async fn finish_mileage_survey(
+    adapter_state: State<'_, SharedAdapterService>,
+    mileage_state: State<'_, SharedMileageService>,
+    report_state: State<'_, SharedSessionReportService>,
+) -> Result<MileageSurveySnapshot, String> {
+    let bench = lock_service(&adapter_state).is_bench();
+    lock_mileage(&mileage_state).finish();
+    record_mileage_survey(&mileage_state, &report_state, bench);
+    Ok(lock_mileage(&mileage_state).snapshot())
+}
+
 pub fn run() {
     let bench: SharedBench = share_bus(Box::new(EmptyBench));
     tauri::Builder::default()
@@ -1001,6 +1143,7 @@ pub fn run() {
         .manage(Mutex::new(ModuleReadService::new()))
         .manage(Mutex::new(StandardObdService::new()))
         .manage(Mutex::new(LiveReadService::new()))
+        .manage(Mutex::new(MileageService::new()))
         .manage(Mutex::new(SessionReportService::new()))
         .invoke_handler(tauri::generate_handler![
             get_adapter_state,
@@ -1027,6 +1170,10 @@ pub fn run() {
             start_live_read,
             live_read_step,
             stop_live_read,
+            get_mileage_state,
+            start_mileage_survey,
+            mileage_survey_step,
+            finish_mileage_survey,
             get_module_read_report_json,
             get_session_report_state,
             get_session_report_json,

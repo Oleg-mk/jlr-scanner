@@ -18,6 +18,8 @@ use sdd_ingest::{
 const PLATFORM: &str = include_str!("../../../fixtures/knowledge/synthetic/f9_platform.xml");
 const DIDS: &str = include_str!("../../../fixtures/knowledge/synthetic/f9_did_formatting.xml");
 const CONVERTER: &str = include_str!("../../../fixtures/knowledge/synthetic/f9_converter.xml");
+const CONVERTER_KM: &str =
+    include_str!("../../../fixtures/knowledge/synthetic/f9_converter_km.xml");
 const MODULE_TEXT: &str = include_str!("../../../fixtures/knowledge/synthetic/f9_module_text.xml");
 const VIN_DECODE: &str = include_str!("../../../fixtures/knowledge/synthetic/f9_vin_decode.xml");
 
@@ -55,6 +57,7 @@ fn exported_manifests() -> Vec<(String, String)> {
         .with_timeline(timeline());
     let mut converters = ConverterCatalogue::new();
     converters.insert_from_xml(CONVERTER).unwrap();
+    converters.insert_from_xml(CONVERTER_KM).unwrap();
     let dids = DidFormattingAdapter::new(synthetic_source("f10-session-did", DIDS), converters)
         .unwrap()
         .with_timeline(timeline());
@@ -187,7 +190,9 @@ fn the_survey_shows_reachable_and_unreachable_modules_with_reasons() {
         .iter()
         .map(|entry| entry.identifier.as_str())
         .collect();
-    assert_eq!(identifiers, vec!["0x0347", "0x1945"]);
+    // 0xDD01 is the distance the mileage survey asks for (ADR-0024);
+    // the fixture carries it so the survey has something to read.
+    assert_eq!(identifiers, vec!["0x0347", "0x1945", "0xDD01"]);
 
     // OTHERMOD sits on a bound bus that declares no diagnostic protocol, so
     // the survey says exactly that instead of dropping the row.

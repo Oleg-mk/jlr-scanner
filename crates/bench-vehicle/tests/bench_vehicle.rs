@@ -18,6 +18,8 @@ use transport_api::{BenchBus, BenchRoute, CanFrame, CanId};
 const PLATFORM: &str = include_str!("../../../fixtures/knowledge/synthetic/f9_platform.xml");
 const DIDS: &str = include_str!("../../../fixtures/knowledge/synthetic/f9_did_formatting.xml");
 const CONVERTER: &str = include_str!("../../../fixtures/knowledge/synthetic/f9_converter.xml");
+const CONVERTER_KM: &str =
+    include_str!("../../../fixtures/knowledge/synthetic/f9_converter_km.xml");
 const MODULE_TEXT: &str = include_str!("../../../fixtures/knowledge/synthetic/f9_module_text.xml");
 const VIN_DECODE: &str = include_str!("../../../fixtures/knowledge/synthetic/f9_vin_decode.xml");
 /// Fault-code wording, so the bench has something to draw its codes from:
@@ -53,6 +55,7 @@ fn library() -> KnowledgeLibrary {
         .with_timeline(timeline.clone());
     let mut converters = ConverterCatalogue::new();
     converters.insert_from_xml(CONVERTER).unwrap();
+    converters.insert_from_xml(CONVERTER_KM).unwrap();
     let dids = DidFormattingAdapter::new(synthetic_source("bench-did", DIDS), converters)
         .unwrap()
         .with_timeline(timeline);

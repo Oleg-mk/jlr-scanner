@@ -10,6 +10,8 @@ export interface SessionReportSnapshot {
   standardObdReads: number;
   /** Live read runs, each recorded whole with its series (ADR-0022). */
   liveReadRuns: number;
+  /** Mileage surveys, each recorded whole (ADR-0024). */
+  mileageSurveys: number;
   reportAvailable: boolean;
   /** "bench" or "real" once the session holds records of either kind (ADR-0020). */
   mode: "bench" | "real" | null;
@@ -26,6 +28,7 @@ export const createSessionReportSnapshot = (): SessionReportSnapshot => ({
   calibrationReads: 0,
   standardObdReads: 0,
   liveReadRuns: 0,
+  mileageSurveys: 0,
   reportAvailable: false,
   mode: null,
 });

@@ -73,6 +73,33 @@
 </ReadParameter>
 </KeyedData>
 
+<KeyedData id="DID 0xDD01 SYNTHMOD">
+<Properties>
+<enable>
+<STRING-TEST-TACTIC id="module">
+<Properties>
+<string1 xlink:href="../snapshot.xml#ModuleId"/>
+<string2>SYNTHMOD</string2>
+</Properties>
+</STRING-TEST-TACTIC>
+</enable>
+<keySize>56577</keySize>
+<dataSize>4</dataSize>
+</Properties>
+<ReadParameter id="1" mask="4294967295" lsbNumber="0" msbNumber="3">
+<Properties>
+<name><![CDATA[Total distance]]></name>
+</Properties>
+<SHORTCUT id="CVT_SYNTH_KM" xlink:href="../Converters/CVT_SYNTH_KM.xml#CVT_SYNTH_KM"/>
+</ReadParameter>
+<ReadParameter id="2" mask="65535" lsbNumber="4" msbNumber="5">
+<Properties>
+<name><![CDATA[Distance travelled since the malfunction indicator lamp was activated]]></name>
+</Properties>
+<SHORTCUT id="CVT_SYNTH_KM" xlink:href="../Converters/CVT_SYNTH_KM.xml#CVT_SYNTH_KM"/>
+</ReadParameter>
+</KeyedData>
+
 <KeyedData id="DID 0x0347 SYNTHMOD 1">
 <Properties>
 <enable>

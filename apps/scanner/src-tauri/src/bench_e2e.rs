@@ -5,6 +5,7 @@
 use super::adapter_service::{AdapterService, SystemAdapterBackend, BENCH_PORT, BENCH_TRANSPORT};
 use super::capture_service::CaptureService;
 use super::live_read_service::{LiveReadService, LIVE_READ_TIMEOUT};
+use super::mileage_service::{MileageService, MILEAGE_READ_TIMEOUT};
 use super::module_read_service::{map_live_error, ModuleReadService, PreparedModuleRead};
 use super::refresh_bench;
 use super::session_report_service::{SessionReportService, SESSION_MODE_BENCH, SESSION_MODE_REAL};
@@ -12,8 +13,8 @@ use super::session_service::SessionService;
 use super::standard_obd_service::{StandardObdService, STANDARD_OBD_TIMEOUT};
 use app_contracts::{
     AdapterErrorCode, AdapterInfo, AdapterState, LiveReadEntryRequest, LiveReadRequest,
-    LiveReadState, ModuleReadKind, ModuleReadRequest, ModuleReadState, StandardObdReadKind,
-    StandardObdRequest, VehicleContextInput,
+    LiveReadState, MileageKind, MileageSurveyState, ModuleReadKind, ModuleReadRequest,
+    ModuleReadState, StandardObdReadKind, StandardObdRequest, VehicleContextInput,
 };
 use diagnostic_session::KnowledgeLibrary;
 use knowledge::{
@@ -32,6 +33,8 @@ use transport_api::EmptyBench;
 const PLATFORM: &str = include_str!("../../../../fixtures/knowledge/synthetic/f9_platform.xml");
 const DIDS: &str = include_str!("../../../../fixtures/knowledge/synthetic/f9_did_formatting.xml");
 const CONVERTER: &str = include_str!("../../../../fixtures/knowledge/synthetic/f9_converter.xml");
+const CONVERTER_KM: &str =
+    include_str!("../../../../fixtures/knowledge/synthetic/f9_converter_km.xml");
 const MODULE_TEXT: &str =
     include_str!("../../../../fixtures/knowledge/synthetic/f9_module_text.xml");
 const VIN_DECODE: &str = include_str!("../../../../fixtures/knowledge/synthetic/f9_vin_decode.xml");
@@ -65,6 +68,7 @@ fn library() -> KnowledgeLibrary {
         .with_timeline(timeline.clone());
     let mut converters = ConverterCatalogue::new();
     converters.insert_from_xml(CONVERTER).unwrap();
+    converters.insert_from_xml(CONVERTER_KM).unwrap();
     let dids = DidFormattingAdapter::new(synthetic_source("bench-did", DIDS), converters)
         .unwrap()
         .with_timeline(timeline);
@@ -331,6 +335,57 @@ fn the_bench_connects_without_a_port_reads_the_surveyed_vehicle_and_marks_everyt
     // Handed over once: a second stop cannot record the same run twice.
     assert!(live.take_report_json().is_some());
     assert!(live.take_report_json().is_none());
+    // The odometer read from every module (ADR-0024): the catalogue names a
+    // distance for SYNTHMOD, and the legislated counter beside it must not be
+    // mistaken for one.
+    let mut mileage = MileageService::new();
+    let started = mileage.start(
+        session.library(),
+        Some(&info),
+        &vehicle(),
+        &["SYNTHMOD".to_string()],
+    );
+    assert_eq!(started.state, MileageSurveyState::Running, "{started:?}");
+    assert_eq!(started.planned, 1, "one identifier carries a distance");
+
+    while let Some(due) = mileage.next_due() {
+        let result = adapter
+            .execute_uds_read(&due.transaction, MILEAGE_READ_TIMEOUT)
+            .expect("the bench is connected")
+            .map_err(map_live_error);
+        mileage.record(due.index, result);
+        mileage.mark_synthetic();
+    }
+    let surveyed = mileage.snapshot();
+    assert_eq!(surveyed.state, MileageSurveyState::Finished);
+    assert_eq!(surveyed.asked, 1);
+    assert_eq!(
+        surveyed.readings.len(),
+        1,
+        "only the running total is a mileage; the lamp counter beside it is not: {:?}",
+        surveyed.readings
+    );
+    let row = &surveyed.readings[0];
+    assert_eq!(row.parameter, "Total distance");
+    assert_eq!(row.kind, MileageKind::Current);
+    assert_eq!(row.unit.as_deref(), Some("km"));
+    assert_eq!(row.route_validation, "SYNTHETIC");
+    // One reading is its own highest, so the difference from it is zero.
+    assert_eq!(row.difference, Some(0.0));
+    assert_eq!(surveyed.highest_module.as_deref(), Some("SYNTHMOD"));
+    let mileage_json = mileage
+        .report_json()
+        .expect("a finished survey is a report");
+    assert!(mileage_json.contains("prowlone.mileage-survey"));
+    assert!(mileage_json.contains("\"safety_class\": \"READ_ONLY\""));
+    // Readings, never a verdict: no word for what a difference might mean.
+    for verdict in ["rolled", "tamper", "fraud", "clocked"] {
+        assert!(
+            !mileage_json.to_lowercase().contains(verdict),
+            "the report must not say {verdict}"
+        );
+    }
+
     // A listen on the bench hears nothing, and is synthetic all the same.
     let listened = adapter
         .capture_route(VehicleRouteId::HsCan, Duration::from_millis(100))
@@ -361,6 +416,8 @@ fn the_bench_connects_without_a_port_reads_the_surveyed_vehicle_and_marks_everyt
     assert_eq!(report.snapshot().standard_obd_reads, 1);
     report.add_live_read_run(&live_json).unwrap();
     assert_eq!(report.snapshot().live_read_runs, 1);
+    report.add_mileage_survey(&mileage_json).unwrap();
+    assert_eq!(report.snapshot().mileage_surveys, 1);
     assert!(report.is_bench());
     assert!(report.accepts(SESSION_MODE_BENCH));
     assert!(!report.accepts(SESSION_MODE_REAL));

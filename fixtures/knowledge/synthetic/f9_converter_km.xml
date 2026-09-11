@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  SYNTHETIC F9 FIXTURE. Not JLR evidence and not promotable to evidence.
+  A distance converter, so the mileage survey of ADR-0024 can be proven
+  offline: raw counts straight through, in kilometres.
+-->
+<COMPONENT id="CVT_SYNTH_KM Component">
+<LinearConverter showPreferred="false" offsetFirst="true" id="CVT_SYNTH_KM" multiplier="1" offset="0">
+<Properties>
+<inType quantity="Dimensionless" unit="int"/>
+<outType quantity="Distance" unit="km"/>
+</Properties>
+</LinearConverter>
+</COMPONENT>

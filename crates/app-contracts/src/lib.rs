@@ -536,6 +536,9 @@ pub struct SessionReportSnapshot {
     /// Live read runs recorded whole, with their series (ADR-0022).
     #[serde(default)]
     pub live_read_runs: u32,
+    /// Mileage surveys recorded whole (ADR-0024).
+    #[serde(default)]
+    pub mileage_surveys: u32,
     pub report_available: bool,
     /// `bench` or `real`, once an adapter of either kind took part; a session
     /// is one or the other, never both (ADR-0020).
@@ -872,6 +875,84 @@ pub struct LiveReadSnapshot {
     /// `SOURCE_BACKED` or the route's own state; `SYNTHETIC` on the bench.
     pub route_validation: String,
     pub stopped_reason: Option<String>,
+    pub error: Option<DiagnosticError>,
+    pub report_available: bool,
+}
+
+// ---------------------------------------------------------------------------
+// The odometer read from every module (ADR-0024). A car keeps its mileage in
+// dozens of places; this asks each of them once and puts the answers side by
+// side with the arithmetic done. Nothing is written, and no verdict is drawn.
+// ---------------------------------------------------------------------------
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum MileageKind {
+    /// The module's own running total.
+    Current,
+    /// The odometer as it stood when the module recorded something.
+    Event,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum MileageSurveyState {
+    Idle,
+    Running,
+    Finished,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MileageSurveyRequest {
+    pub context: VehicleContextInput,
+}
+
+/// One module's answer, or its silence.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MileageReading {
+    pub ecu_family: String,
+    pub identifier: String,
+    /// SDD's own name for the parameter.
+    pub parameter: String,
+    pub kind: MileageKind,
+    pub state: ModuleReadState,
+    pub value: Option<String>,
+    pub unit: Option<String>,
+    pub number: Option<f64>,
+    pub raw: Option<u64>,
+    /// How far this reading is from the highest running total found on the
+    /// car. Arithmetic over two numbers this product read itself — never a
+    /// verdict about anyone.
+    pub difference: Option<f64>,
+    pub route_id: String,
+    pub route_validation: String,
+    pub raw_response_hex: Option<String>,
+    /// The module's refusal: an answer, not a failure of the application.
+    pub negative_response: Option<String>,
+    /// What the decoder says about a value it could not scale.
+    pub note: Option<String>,
+    /// Why the module said nothing.
+    pub reason: Option<String>,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MileageSurveySnapshot {
+    pub state: MileageSurveyState,
+    pub readings: Vec<MileageReading>,
+    /// Reads planned, attempted and answered.
+    pub planned: u32,
+    pub asked: u32,
+    pub answered: u32,
+    /// The highest running total found, the module that holds it, and the
+    /// unit the catalogue gives it.
+    pub highest: Option<f64>,
+    pub highest_module: Option<String>,
+    pub unit: Option<String>,
+    /// `SOURCE_BACKED` or the route's own state; `SYNTHETIC` on the bench.
+    pub route_validation: String,
     pub error: Option<DiagnosticError>,
     pub report_available: bool,
 }

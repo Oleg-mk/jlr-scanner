@@ -180,6 +180,33 @@ Click **Disconnect** to leave the bench; if you recorded anything
 on it, the application asks for a new session before a real adapter is
 connected.
 
+## Mileage from every module
+
+In the "Module network" section, beside the button that checks every module,
+there is **Read the mileage**. A car does not keep its mileage in one place:
+the cluster, the engine, the gearbox, the brakes, the airbag module, the
+parking brake, the tyre-pressure module, the doors, the gateway — each counts
+for its own reasons. The button asks every module the data names a distance
+for, once each, and puts the answers in a table.
+
+The **Difference** column is how far that reading is from the highest on the
+car. The highest, not the cluster's: the cluster is the first thing rewritten.
+It is the subtraction of two numbers the application has just read, and
+nothing more.
+
+A second table, **Recorded at an event**, holds the odometer as it stood when
+a module wrote something down — a gearbox stall, a failed gear selection, a
+door opened. A reading above the highest running total is an event the car has
+not driven to.
+
+**The application draws no conclusion.** Modules disagree for honest reasons:
+a replaced cluster, a gearbox or an airbag module fitted after a repair each
+carry their own count. What a difference means is for a person to decide. And
+a mileage rewritten carefully in every module will not show here; a careless
+one will.
+
+Nothing is written — not here, not anywhere.
+
 ## What the data says about a code
 
 Under every fault code there is a fold: **What the data says about this code**.

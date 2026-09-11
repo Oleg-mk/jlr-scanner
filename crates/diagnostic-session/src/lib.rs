@@ -13,6 +13,7 @@
 pub mod decode;
 pub mod dtc_text;
 pub mod issue;
+pub mod mileage;
 pub mod vin;
 
 pub use issue::ISSUE_STAMP_FILE;
@@ -488,6 +489,29 @@ impl KnowledgeLibrary {
             description.help = lines.clone();
         }
         description
+    }
+
+    /// The mileage a module can be asked for (ADR-0024): every identifier
+    /// the loaded data lists for this family whose parameter is a distance
+    /// the car has actually travelled, with the parameter's own name and
+    /// what kind of reading it is. The legislated counters that reset with
+    /// the codes are not here — see `mileage::mileage_kind`.
+    pub fn mileage_identifiers(
+        &self,
+        context: &VehicleContext,
+        ecu_family: &str,
+    ) -> Vec<(u16, String, mileage::MileageKind)> {
+        let mut found = Vec::new();
+        for identifier in
+            DiagnosticEnvironmentResolver::readable_identifiers(self.store(), context, ecu_family)
+        {
+            for parameter in &identifier.parameters {
+                if let Some(kind) = mileage::mileage_kind(&parameter.name) {
+                    found.push((identifier.identifier, parameter.name.clone(), kind));
+                }
+            }
+        }
+        found
     }
 
     /// Every fault code the loaded data describes for this module family:

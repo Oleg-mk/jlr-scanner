@@ -1522,7 +1522,10 @@ html {
   border-radius: var(--radius-control);
   font-size: 0.95rem;
   font-weight: 600;
-  line-height: 1;
+  /* A line box of exactly one em is shorter than the glyphs it holds, so
+     centring it leaves the text sitting about a pixel high. Give the line
+     its natural leading and let the flex centring do the work. */
+  line-height: 1.2;
   white-space: nowrap;
   transition:
     background-color 140ms ease,
@@ -2496,4 +2499,29 @@ table.live-read-identifiers label {
 
 .dtc-help p {
   margin: 0.35rem 0 0;
+}
+
+/* The mileage survey (ADR-0024): readings side by side, the difference in a
+   column of its own so the eye finds it without doing the arithmetic. */
+.mileage-panel {
+  margin-top: 1.5rem;
+}
+
+.mileage-highest {
+  margin: 0.5rem 0;
+  font-weight: 600;
+}
+
+.mileage-subtitle {
+  margin: 1.25rem 0 0.25rem;
+  font-size: 1rem;
+}
+
+.mileage-difference {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.mileage-caveat {
+  margin-top: 0.75rem;
 }

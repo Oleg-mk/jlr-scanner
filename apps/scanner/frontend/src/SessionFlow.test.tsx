@@ -176,6 +176,7 @@ describe("session flow", () => {
       calibrationReads: 0,
       standardObdReads: 0,
       liveReadRuns: 0,
+      mileageSurveys: 0,
       reportAvailable: true,
       mode: "real",
     });

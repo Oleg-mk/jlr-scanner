@@ -22,6 +22,8 @@ use sdd_ingest::{ConverterCatalogue, DidFormattingAdapter, ModelYearTimeline, Pl
 const PLATFORM: &str = include_str!("../../../fixtures/knowledge/synthetic/f9_platform.xml");
 const DIDS: &str = include_str!("../../../fixtures/knowledge/synthetic/f9_did_formatting.xml");
 const CONVERTER: &str = include_str!("../../../fixtures/knowledge/synthetic/f9_converter.xml");
+const CONVERTER_KM: &str =
+    include_str!("../../../fixtures/knowledge/synthetic/f9_converter_km.xml");
 
 /// A synthetic module on `PT_HSCAN`, the bus ADR-0015 binds to hs-can only
 /// as a hypothesis. Written the way the platform adapter writes its records.
@@ -139,6 +141,7 @@ fn base_manifests() -> Vec<(String, String)> {
         .with_timeline(timeline.clone());
     let mut converters = ConverterCatalogue::new();
     converters.insert_from_xml(CONVERTER).unwrap();
+    converters.insert_from_xml(CONVERTER_KM).unwrap();
     let dids = DidFormattingAdapter::new(synthetic_source("f13-did", DIDS), converters)
         .unwrap()
         .with_timeline(timeline);
