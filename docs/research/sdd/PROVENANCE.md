@@ -48,6 +48,10 @@ The knowledge this project derives from SDD traces to one artifact:
   `CONTROLLABLE`, `SECURITY_REFS`) — the machine-checkable stage-1 boundary.
 - `VINDecode.xml`: 33 model decoders over 2,473 values.
 
+Every text-bearing family above is published once per language — twelve of
+them, Russian among them and Ukrainian not — with the same record keys in
+each. Only the English packs have been ingested.
+
 The full, per-file provenance record — every path, count and date of the
 survey — is kept privately by the owner and can be shown to a reviewer.
 Two predictions this project's assistant made about where the addressing

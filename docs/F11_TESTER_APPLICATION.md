@@ -251,9 +251,13 @@ languages, Russian among them and Ukrainian not. So with the Russian
 interface the module names and the failure-type wording are SDD's Russian;
 with the Ukrainian interface they stay SDD's English, because inventing a
 Ukrainian rendering of JLR's text would be a translation this project has no
-source for. Fault-code descriptions exist in English only in the payload
-(`COMMON_SDD_DATA_DTC_HELP_LANG_EN`; the other pack is Chinese) and are shown
-in English whichever interface is chosen. The owner decided this on
+source for. Fault-code descriptions are shown in English whichever interface is
+chosen, because that is what the library carries today — not because that is
+all SDD has. Measured on 2026-09-11: the payload ships `DTC_HELP` in the same
+twelve languages, the Russian pack keyed identically to the English one, and
+the parameter catalogue likewise. See `docs/F9_SDD_KNOWLEDGE_INGESTION.md`,
+2026-09-11; an earlier sentence here said the only other pack was Chinese,
+and that was wrong. The owner decided this on
 2026-09-04: Russian as a full interface, Ukrainian kept as the deliberate
 choice of those who want it.
 

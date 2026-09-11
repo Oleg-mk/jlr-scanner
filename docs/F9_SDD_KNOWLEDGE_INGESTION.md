@@ -616,6 +616,57 @@ belong here, in the ingest's own document:
   the variants a programme declares, beside its engines, and the interface
   offers them, so that car can say which half it is.
 
+## 2026-09-11 — the corpus is published in twelve languages
+
+Read while the owner was translating the parameter names by hand. Every
+text-bearing SDD data family ships once per language, not once in English:
+`SNAPSHOT`, `DTC_HELP`, `ODST`, `RULES`, `QUAL`, `APP_HELP`, `PDF` and
+`SYMPTOM_HELP`, each in `DE EN ES FR IT JA KO NL PT PT_BR RU ZH`. There is no
+Ukrainian, which is the one thing the earlier reading had right.
+
+**Measured, by the documents' own keys.** The English and Russian snapshot
+components were walked and every parameter keyed by its `KeyedData id` plus
+its `ReadParameter id` — identity, not text similarity:
+
+| | |
+|---|---:|
+| Parameters in the English component | 15,269 |
+| Parameters in the Russian component | 15,269 |
+| Keys present in both | 15,269 (100 %) |
+| Text left in English | **0** |
+| Distinct English names | 4,976 |
+| …with more than one Russian rendering | **0** |
+| A whole language as a name dictionary | 0.99 MB, **0.10 MB packed** |
+| The same keyed per identifier instead | 2.35 MB, 0.13 MB packed |
+
+The fault-code family is the same: the Russian `DTC_HELP` pack holds 3,452
+files against English's 3,452, with identical tag counts and identical
+`dtcDescriptionId` values, and only the human text changed — `Coolant
+temperature fault` reads `Неисправность, связанная с температурой
+охлаждающей жидкости`.
+
+Two consequences. A second language costs a tenth of a megabyte against a
+12 MB issued library, so the choice between translations is about wording and
+voice and never about size. And because no English name has two Russian
+renderings, a dictionary keyed by the English name loses nothing — which is
+the shape the owner's own translation file already has.
+
+**A correction.** `docs/F11_TESTER_APPLICATION.md` stated that fault-code
+descriptions exist in English only, "the other pack is Chinese". That was
+wrong, and it was this assistant's sentence. Twelve packs exist and the
+Russian one is on the owner's disk, extracted, 83 MB. The decision the line
+sat next to — Russian a full interface, Ukrainian the deliberate choice — is
+the owner's from 2026-09-04 and is untouched.
+
+**Not ingested, and deliberately so for now.** `COMMON_SDD_DATA_RULES` is
+78 MB over 56 files, one `isip` document per programme and model year,
+holding SDD's symptom-driven tree: system, group, section, then named
+pinpoint procedures — `Anti-lock braking system valve supply  -  Power feed
+test`. It is the path a technician takes when there is no code, and this
+product has no equivalent layer. It needs its own ADR and its own decision
+about whether it belongs in stage 1 at all. Recorded here so it is not
+rediscovered a third time.
+
 ## 2026-09-10 — the help layer, read at last
 
 The per-code DTC help documents were being read for their descriptions and
