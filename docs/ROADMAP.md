@@ -549,6 +549,35 @@ needs no new crate and no new safety class. It is also the first capability
 that serves someone who does not own the car yet — which reaches further than
 the tester programme has so far.
 
+### F17 — the numbers say their names in the user's language (decided 2026-09-11, `ADR-0025`)
+
+Every reading arrives with a name from SDD's catalogue, in English: 15,281
+parameter definitions under 4,977 distinct names, shown raw in all three
+interfaces. Two translations turned out to exist and the choice had to be
+measured rather than assumed.
+
+SDD publishes its whole catalogue in twelve languages, Russian among them and
+Ukrainian not — 15,269 keys in the Russian component against 15,269 in the
+English, nothing left in English, no name with two renderings. The owner
+translated all 4,977 names himself, into Russian **and** Ukrainian, and his
+file won on the numbers: exact coverage including SDD's double spaces, `bank`
+rendered one way in 254 names against JLR's 249 `блок` and 5 `ряд`, a mean
+name 69.8 characters against 78.3 for a column that shares its row with a
+value, and `Total distance` reading `Общий пробег` where JLR reads `Общее
+расстояние` — wrong for an odometer, and the very parameter F16 asks every
+module for.
+
+`ADR-0025` decides what it is: a dictionary, not knowledge. It never enters
+the knowledge store, carries no evidence and no validation state, and can
+never move what the product believes about a car, because it says how a
+phrase reads and nothing about any vehicle. It lives in the repository beside
+`dtc_standard_text.tsv` — the owner's own work, not JLR's text — and the
+English stays the identity: the report keeps it whatever the interface
+language, because evidence does not change language. A name with no row shows
+its English, one name at a time.
+
+Ukrainian becomes a full interface for vehicle data for the first time.
+
 ### Beyond stage 1
 
 Service functions and configuration follow only after an explicit owner decision
