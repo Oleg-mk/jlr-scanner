@@ -616,6 +616,57 @@ belong here, in the ingest's own document:
   the variants a programme declares, beside its engines, and the interface
   offers them, so that car can say which half it is.
 
+## 2026-09-11 — how much text the help layer actually holds
+
+Measured when the owner asked whether the layer could be said in Ukrainian, a
+language SDD does not publish. The earlier estimate of "months of prose" was
+wrong, and wrong in a way worth recording: the unit of work is not a line on
+a screen.
+
+A help screen is a list of `helpScreenItem` references; the text itself lives
+once in a `helpScreenMnemonicList` and is reused. So the corpus is:
+
+| | |
+|---|---:|
+| Named texts with content | 26,893 |
+| Distinct texts among them | 25,393 (2.21 MB) |
+| Screen slots they fill | 193,520 |
+| Mean reuse per named text | 7.2 |
+| Texts of 60 characters or fewer | 41 % |
+| …of 120 or fewer | 78 % |
+| Longer than 250 characters | 3.6 % |
+
+They are short lines, not paragraphs: `Wiring harness fault`, `Clear the DTCs
+and road test the vehicle`. By kind, `H_CAUSE` holds 7,338, `H_ACTION` 4,755,
+`J_I_ACTION` 2,444, and the manufacturer-prefixed families another 4,000 —
+causes and actions are two thirds of everything.
+
+**The reuse is what matters for planning.** Ordered by how many slots each
+text fills:
+
+| texts | slots covered | share |
+|---:|---:|---:|
+| 10 | 59,080 | 30.5 % |
+| 250 | 96,292 | 49.8 % |
+| 1,000 | 118,329 | 61.1 % |
+| 4,000 | 148,181 | 76.6 % |
+| 26,893 | 193,520 | 100 % |
+
+Ten texts cover a third of everything a reader sees, because `Possible
+causes` is placed 23,166 times and `Actions required:` 22,951. The layer can
+therefore be translated in slices, the first slices worth far more than their
+share of the rows, and a text with no translation falls back to English one
+line at a time, as `ADR-0025` already has it.
+
+Separately, the code's own description is a much smaller layer: 1,049 distinct
+descriptions, of which **261 are a raw mnemonic key in all twelve languages** —
+SDD ships no text for them — leaving 788 real ones at a mean of 38 characters.
+
+**Not decided here.** Whether this layer is translated at all, by whom, and
+whether the result can live in this repository or must travel in the issued
+library, is open. The measurement exists so that question is argued over
+numbers.
+
 ## 2026-09-11 — the corpus is published in twelve languages
 
 Read while the owner was translating the parameter names by hand. Every
