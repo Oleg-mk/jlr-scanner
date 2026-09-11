@@ -524,6 +524,31 @@ the library, the floor and the cap enforced in the shell, the samples
 recorded whole, `IMPLEMENTED / FIXTURE_TESTED`. What remains of F15 is the
 visual layer, and the first real tester report still outranks it.
 
+### F16 — the odometer, read from every module (decided 2026-09-11, `ADR-0024`)
+
+A car keeps its mileage in dozens of places, and a rolled-back car is rolled
+back only where the tool could reach. The catalogue was read before this was
+decided: SDD declares `0xDD01` **Total distance** for **92 module families**
+over 21 programmes, the cluster's own `0x61BB` beside it, and — sharper still
+— odometer stamps inside event histories: a gearbox stall, a failed gear
+selection, a delayed park engagement, the Jaguar flight recorder. An incident
+recorded at a mileage the car has not reached is not an ambiguous signal.
+
+`ADR-0024` decides the operation: `MILEAGE_SURVEY`, class `READ_ONLY`, every
+reachable module asked once, a table of module, identifier, reading and the
+difference from the highest reading on the car, with event stamps shown apart
+and compared to it. No verdict is ever printed — a number in a column is the
+whole of what is claimed, a module that stayed silent is silent and not a
+zero, and the legislated "distance since the lamp came on" is excluded by
+name so it can never be mistaken for an odometer. Nothing is written, in this
+stage or any other: correcting an odometer is the fraud the feature exists to
+expose.
+
+It is the network check with one identifier instead of fault codes, so it
+needs no new crate and no new safety class. It is also the first capability
+that serves someone who does not own the car yet — which reaches further than
+the tester programme has so far.
+
 ### Beyond stage 1
 
 Service functions and configuration follow only after an explicit owner decision
