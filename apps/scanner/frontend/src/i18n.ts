@@ -394,6 +394,7 @@ const uk: Record<string, string> = {
   "The loaded data's own words, in its own English.": "Слова завантажених даних, їхньою англійською.",
   "the loaded data holds several help screens for this code; describe the vehicle's model year to choose between them": "у завантажених даних кілька екранів допомоги для цього коду; вкажи модельний рік, щоб обрати між ними",
   // Live reading (ADR-0022): the panel, and the shell's reasons a run ended
+  "Address": "Адреса",
   "Live reading": "Живе читання",
   "The same reads, repeated": "Ті самі читання, по колу",
   "Choose parameters from the modules the data describes and watch them: the application asks for each one in turn, round after round, and shows what it achieves. Read-only, one request at a time, and never faster than ten a second. A standing vehicle, engine running or not — not a moving one.": "Вибери параметри з модулів, які описують дані, і дивись на них: програма питає кожен по черзі, коло за колом, і показує, що виходить насправді. Лише читання, один запит за раз і не швидше ніж десять на секунду. Автомобіль стоїть — з заведеним двигуном чи ні, але не в русі.",
@@ -1305,6 +1306,7 @@ const ru: Record<string, string> = {
   "The loaded data's own words, in its own English.": "Слова загруженных данных, их английским.",
   "the loaded data holds several help screens for this code; describe the vehicle's model year to choose between them": "в загруженных данных несколько экранов помощи для этого кода; укажите модельный год, чтобы выбрать между ними",
   // Live reading (ADR-0022): the panel, and the shell's reasons a run ended
+  "Address": "Адрес",
   "Live reading": "Живое чтение",
   "The same reads, repeated": "Те же чтения, по кругу",
   "Choose parameters from the modules the data describes and watch them: the application asks for each one in turn, round after round, and shows what it achieves. Read-only, one request at a time, and never faster than ten a second. A standing vehicle, engine running or not — not a moving one.": "Выберите параметры из модулей, которые описывают данные, и наблюдайте: программа спрашивает каждый по очереди, круг за кругом, и показывает, что получается на самом деле. Только чтение, один запрос за раз и не быстрее десяти в секунду. Автомобиль стоит — с заведённым двигателем или нет, но не в движении.",

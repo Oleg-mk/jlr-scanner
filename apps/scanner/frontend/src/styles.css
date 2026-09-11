@@ -2415,7 +2415,7 @@ body,
   border: 1px solid var(--border);
   border-radius: 0.5rem;
   padding: 0.5rem 0.75rem;
-  background: var(--surface);
+  background: var(--background);
 }
 
 .live-read-module > summary {
@@ -2423,15 +2423,45 @@ body,
   font-weight: 600;
 }
 
-.live-read-identifiers {
-  list-style: none;
-  margin: 0.5rem 0 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 0.35rem;
+/* The live read set: a table per module, the address column narrow and
+   aligned so a long description cannot push it out of sight. */
+table.live-read-identifiers {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 0.4rem;
+  font-size: 0.9rem;
+  display: block;
   max-height: 12rem;
   overflow-y: auto;
+}
+
+table.live-read-identifiers th {
+  text-align: left;
+  font-weight: 600;
+  color: var(--muted);
+  font-size: 0.8rem;
+  padding: 0.15rem 0.4rem 0.25rem 0;
+  position: sticky;
+  top: 0;
+  background: var(--background);
+}
+
+table.live-read-identifiers td {
+  padding: 0.15rem 0.4rem 0.15rem 0;
+  vertical-align: top;
+}
+
+table.live-read-identifiers td:first-child,
+table.live-read-identifiers th:first-child {
+  width: 1.5rem;
+}
+
+table.live-read-identifiers td:nth-child(2) {
+  white-space: nowrap;
+}
+
+table.live-read-identifiers label {
+  cursor: pointer;
 }
 
 .live-read-actions {

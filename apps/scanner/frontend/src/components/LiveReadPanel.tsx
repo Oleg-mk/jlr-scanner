@@ -107,27 +107,47 @@ export function LiveReadPanel({
                   <span className="module-validation"> {dataText(module.names, module.name, language)}</span>
                 ) : null}
               </summary>
-              <ul className="live-read-identifiers">
-                {module.readableIdentifiers.map((identifier) => {
-                  const entry = { ecuFamily: module.ecuFamily, identifier: identifier.identifier };
-                  const picked = chosen.has(entryKey(entry));
-                  return (
-                    <li key={identifier.identifier}>
-                      <label className="check-option">
-                        <input
-                          type="checkbox"
-                          checked={picked}
-                          disabled={running || (!picked && full)}
-                          onChange={() => onToggle(entry)}
-                        />
-                        <span>
-                          <code>{identifier.identifier}</code> {identifier.parameters.join(", ")}
-                        </span>
-                      </label>
-                    </li>
-                  );
-                })}
-              </ul>
+              <table className="live-read-identifiers">
+                <thead>
+                  <tr>
+                    <th scope="col" aria-label={t("Choose")} />
+                    <th scope="col">{t("Address")}</th>
+                    <th scope="col">{t("Description")}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {module.readableIdentifiers.map((identifier) => {
+                    const entry = {
+                      ecuFamily: module.ecuFamily,
+                      identifier: identifier.identifier,
+                    };
+                    const picked = chosen.has(entryKey(entry));
+                    const id = `live-${module.ecuFamily}-${identifier.identifier}`;
+                    return (
+                      <tr key={identifier.identifier}>
+                        <td>
+                          <input
+                            id={id}
+                            type="checkbox"
+                            checked={picked}
+                            disabled={running || (!picked && full)}
+                            onChange={() => onToggle(entry)}
+                          />
+                        </td>
+                        <td>
+                          {/* An address is an address in every language. */}
+                          <label htmlFor={id}>
+                            <code>{identifier.identifier}</code>
+                          </label>
+                        </td>
+                        <td>
+                          <label htmlFor={id}>{identifier.parameters.join(", ")}</label>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
             </details>
           ))}
         </div>
