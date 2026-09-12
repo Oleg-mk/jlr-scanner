@@ -21,7 +21,7 @@ Written 2026-09-12 at the owner's request: what a person gets from SDD at its fu
 | `not found in the data` | not found in SDD 169's data; may still exist in its runtime |
 | `—` | not applicable, or already answered by the column before |
 
-**Counts.** 99 rows. SDD does 63 of them. ProwlOne today: 43 built, 1 partly, 1 open inside stage 1 — the graphs and gauges of F15, which wait for the first real reports. The roadmap: 20 in stage 2, 8 in stage 3. The ceiling: 53 possible, 3 need other hardware, 8 excluded for good. 10 rows are things SDD does not do and ProwlOne already does; 8 rows are things SDD does that ProwlOne will never do.
+**Counts.** 99 rows. SDD does 63 of them. ProwlOne today: 43 built, 1 partly, 1 open inside stage 1 — the graphs and gauges of F15, which wait for the first real reports. The roadmap: 20 in stage 2, 8 in stage 3. The ceiling: 37 already reached, 50 possible, 3 need other hardware, 8 excluded for good, 1 no. 10 rows are things SDD does not do and ProwlOne already does; 8 rows are things SDD does that ProwlOne will never do.
 
 ## Vehicle, modules, network
 
@@ -41,7 +41,7 @@ Written 2026-09-12 at the owner's request: what a person gets from SDD at its fu
 | K-line and DS2: the early Range Rover, ABS/VIM on the base L316 | **yes** | **built** — ADR-0029, both slices: the buses, the protocols, the adapter's own K-line words confirmed on the bench, and the read in the module panel; no K-line module has answered yet | **—** | **built** | ADR-0029; CURRENT_JLR_KCODEC_RUNTIME; PLATFORM networks KW2000/DS2/ISO |
 | SCP (J1850 PWM) and NVJCOM (JAGCAN) of the older Jaguars | **yes** | **no** — modules shown with the reason | **no** — not in the plan | **possible** — the adapter has the hardware; protocol stacks needed | PLATFORM_X100..X404 networks; F9 2026-09-07 |
 | Modules behind a gateway (MOST, SUB_CAN1, NGI) | **yes** | **no** — gateway access is ROUTINE_CONTROL | **stage 2** | **possible** | PLATFORM gateway access_method |
-| Battery state during the session | **yes** | **built** — a card in the session column: charge, voltage, current, temperature, parked drain, ageing, history, traction battery (ADR-0030) | **—** | **possible** — the same card refreshed at a cadence, as live reading does | ADR-0030; PLATFORM NET sets, DID formatting; SDD keeps no state of health |
+| Battery state during the session | **yes** | **built** — a card in the session column with the state of charge, voltage, current and temperature; the rest — parked drain, ageing, history, traction battery — in the battery panel (ADR-0030) | **—** | **possible** — the same card refreshed at a cadence, as live reading does | ADR-0030; PLATFORM NET sets, DID formatting; SDD keeps no state of health |
 
 ## Fault codes
 
@@ -156,7 +156,7 @@ Written 2026-09-12 at the owner's request: what a person gets from SDD at its fu
 
 | Function | SDD 169 | ProwlOne now (stage 1) | Roadmap (stages 2–3) | Ceiling | Source |
 | --- | --- | --- | --- | --- | --- |
-| Session report | **likely** | **built** — one bundle: survey, captures, reads, live runs, mileage; stamped | **—** | **built** | F11; ADR-0019 |
+| Session report | **likely** | **built** — one bundle: survey, captures, reads, live runs, mileage; stamped. Since ADR-0031 the same session prints as a document, or saves as one web page a browser turns into a PDF | **—** | **built** | F11; ADR-0019; ADR-0031 |
 | Evidence mark on every row (SYNTHETIC / SOURCE_BACKED / VEHICLE_CONFIRMED) | **no** | **built** | **—** | **built** | DEVELOPMENT_PRINCIPLES |
 | A tester's report becomes evidence (intake) | **no** | **built** | **—** | **built** | F13; ADR-0016 |
 | Unknown stays unknown: validation states | **no** | **built** | **—** | **built** | DEVELOPMENT_PRINCIPLES |
