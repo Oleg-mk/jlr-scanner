@@ -709,66 +709,9 @@ its configuration (SDD's `qualifier_map` — the "digital car"), the VDF read.
 project's own in both languages, the way the names and the help were —
 our own words as the goal, a technical phrase that has one natural form
 kept as it is — 2,782 distinct texts, `prowlone-ccf-texts.csv` on the
-owner's desk, waiting its turn behind the fault-code help and written
-here rather than by a model on the card; see `ADR-0028`.
-
-### The wording, measured — 2026-09-12
-
-Counted from the issued library, not estimated. The fault-code help layer
-holds 36,890 screens and 38,526 named lines; 13,415 of those names —
-13,130 distinct sentences, 1,230,272 characters — still have no words of
-ours and are shown to a reader in SDD's English.
-
-Every one of them is reachable. The help layer names 21 vehicle
-programmes, every screen belongs to at least one, and no line belongs to
-none: *reached by no programme at all: 0*. An earlier count of 12,412
-untranslated lines with a remainder said to be unreachable was an
-artifact of summing only the ten largest programmes, and is withdrawn.
-
-The unit of work is a car, finished — a car whose help is half in
-Ukrainian is not delivered. Sentences still in English, by programme:
-
-| program | sentences | characters |
-| --- | ---: | ---: |
-| L320 | 3,740 | 297,922 |
-| X250 | 3,578 | 380,991 |
-| L319 | 3,266 | 259,855 |
-| L322 | 3,076 | 248,957 |
-| X351 | 2,634 | 235,549 |
-| L405 | 2,340 | 223,284 |
-| L359 | 1,922 | 155,142 |
-| X150 | 1,805 | 166,393 |
-| L538 | 1,615 | 139,992 |
-| X350 | 1,344 | 144,209 |
-| X202 | 1,340 | 101,785 |
-| L494 | 1,211 | 113,328 |
-| X400 | 970 | 74,128 |
-| L538JV | 537 | 45,152 |
-| X152 | 515 | 45,563 |
-| L538C | 485 | 41,162 |
-| X100 | 445 | 31,808 |
-| L550 | 322 | 26,478 |
-| L316 | 259 | 19,191 |
-| X760 | 255 | 20,887 |
-| X260 | 209 | 16,933 |
-
-Cars share most of their help, so the order matters. Taking each time
-the car that adds the most the earlier ones do not already carry —
-L320, X250, L405, X350, L359 — puts 73.9% of the corpus into Ukrainian
-in five cars; L322, X400, X351, X150, X152, X202, L538, L316 carry it to
-98.5%; L319, L494, L550 and X100 add 198 sentences between them, and
-L538C, L538JV, X260 and X760 add nothing the others do not already hold.
-
-What makes writing them checkable, after the local run was thrown away:
-SDD 169 ships its own Russian for this layer —
-`COMMON_SDD_DATA_DTC_HELP_LANG_RU`, 83 MB, still in the installer's
-encrypted form, opened by the same `decrypt_sdd169_corpus.py` that opened
-the English. JLR's own translators have already named every component
-there. A line written with the English and that Russian side by side
-cannot quietly become a different part, which is the one failure the
-abandoned local run produced and no code check caught. That text is a
-reference for whoever writes the line, never a source: it does not enter
-this repository and it does not enter the issued library.
+owner's desk. How those texts get their words is **not decided**: the
+local run was thrown away on 2026-09-12 (`CURRENT_STATE.md`) and nothing
+replaced it. See `ADR-0028`.
 
 ### Beyond stage 1
 
