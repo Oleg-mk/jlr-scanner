@@ -213,7 +213,7 @@ impl IngestionAdapter for PlatformAdapter {
     }
 }
 
-fn parse_hex(text: &str) -> Option<u32> {
+pub(crate) fn parse_hex(text: &str) -> Option<u32> {
     let digits = text
         .strip_prefix("0x")
         .or_else(|| text.strip_prefix("0X"))
@@ -831,7 +831,7 @@ impl PlatformAdapter {
 /// on the engine, the build year or the market — and gives each its own
 /// diagnostic address. They must reach the record, or the rows collide and
 /// only one address of several survives.
-fn module_quals(module: roxmltree::Node<'_, '_>) -> Vec<(String, String)> {
+pub(crate) fn module_quals(module: roxmltree::Node<'_, '_>) -> Vec<(String, String)> {
     let Some(qualifier) = child_element(module, "qualifier") else {
         return Vec::new();
     };
@@ -847,7 +847,7 @@ fn module_quals(module: roxmltree::Node<'_, '_>) -> Vec<(String, String)> {
 }
 
 /// The tests as one canonical line, for the evidence note and the digest.
-fn qual_text(quals: &[(String, String)]) -> String {
+pub(crate) fn qual_text(quals: &[(String, String)]) -> String {
     let mut parts: Vec<String> = quals
         .iter()
         .map(|(kind, value)| format!("{kind}={value}"))
@@ -864,7 +864,7 @@ fn qual_text(quals: &[(String, String)]) -> String {
 /// characters and an evidence id repeats the source id inside itself, so the
 /// readable form pushed the longest rows over the limit. The words stay in
 /// the evidence note, where they cost nothing.
-fn qual_suffix(quals: &[(String, String)]) -> String {
+pub(crate) fn qual_suffix(quals: &[(String, String)]) -> String {
     if quals.is_empty() {
         return String::new();
     }
@@ -872,7 +872,7 @@ fn qual_suffix(quals: &[(String, String)]) -> String {
     format!(".q{}", &digest[..8])
 }
 
-fn slug(value: &str) -> String {
+pub(crate) fn slug(value: &str) -> String {
     value
         .chars()
         .map(|character| {
@@ -892,7 +892,7 @@ fn slug(value: &str) -> String {
 /// market is the market. Everything else keeps SDD's own name under `other`,
 /// because inventing a dimension for it would claim to understand more than
 /// the document says.
-fn qualified_by_module(
+pub(crate) fn qualified_by_module(
     base: &Applicability,
     quals: &[(String, String)],
 ) -> Result<Applicability, KnowledgeError> {
@@ -923,7 +923,9 @@ fn qualified_by_module(
 /// Derived from the content rather than the file name, and required to be
 /// unambiguous: a platform describing more than one program or marker would
 /// make every claim in it ambiguous, so it is rejected instead of guessed.
-fn qualification(root: roxmltree::Node<'_, '_>) -> Result<(String, String), KnowledgeError> {
+pub(crate) fn qualification(
+    root: roxmltree::Node<'_, '_>,
+) -> Result<(String, String), KnowledgeError> {
     let mut programs = std::collections::BTreeSet::new();
     let mut markers = std::collections::BTreeSet::new();
     for qualifier in root

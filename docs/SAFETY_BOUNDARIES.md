@@ -20,6 +20,7 @@ record in the session bundle is called:
 | `live_read_runs` | `prowlone.live-read-run`, operation `LIVE_READ` | a module read repeated at a stated cadence, floor and cap in the shell | `ADR-0022` |
 | `mileage_surveys` | `prowlone.mileage-survey`, operation `MILEAGE_SURVEY` | one `ReadDataByIdentifier` per module the data names a distance for | `ADR-0024` |
 | `module_passports` | `prowlone.module-passport`, operation `MODULE_PASSPORT` | one `ReadDataByIdentifier` per identification identifier the platform declares for a module — part numbers, serial, software and hardware levels, shown as the text they are | `ADR-0027` |
+| `ccf_reads` | `prowlone.ccf-read`, operation `CCF_READ` | one `ReadDataByIdentifier` per module and identifier holding a block of the car configuration file, sync module first and then each copy, decoded with SDD's own layout; every value the type it is, a copy's difference two readings side by side, nothing judged; the write service SDD names beside every block is not recorded | `ADR-0028` |
 
 An operation not in this table does not exist in the product. Adding one
 means adding it here, with its class, in the same change. The first three

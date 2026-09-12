@@ -21,7 +21,7 @@ Written 2026-09-12 at the owner's request: what a person gets from SDD at its fu
 | `not found in the data` | not found in SDD 169's data; may still exist in its runtime |
 | `—` | not applicable, or already answered by the column before |
 
-**Counts.** 99 rows. SDD does 63 of them. ProwlOne today: 36 built, 5 partly, 3 open inside stage 1. The roadmap: 20 in stage 2, 8 in stage 3. The ceiling: 53 possible, 3 need other hardware, 8 excluded for good. 10 rows are things SDD does not do and ProwlOne already does; 8 rows are things SDD does that ProwlOne will never do.
+**Counts.** 99 rows. SDD does 63 of them. ProwlOne today: 37 built, 5 partly, 2 open inside stage 1. The roadmap: 20 in stage 2, 8 in stage 3. The ceiling: 53 possible, 3 need other hardware, 8 excluded for good. 10 rows are things SDD does not do and ProwlOne already does; 8 rows are things SDD does that ProwlOne will never do.
 
 ## Vehicle, modules, network
 
@@ -35,7 +35,7 @@ Written 2026-09-12 at the owner's request: what a person gets from SDD at its fu
 | Network check: who answers, codes from every reachable module | **yes** | **built** | **—** | **built** | CANLinkMonitorData.xml; F11 |
 | Module passport: part numbers, serial, software level (F111/F112/F113/F18C) | **yes** | **built** — ADR-0027, F19: one screen across all modules; 34,788 identification records | **—** | **possible** — + software currency from the IVS lineage — a separate decision | PLATFORM data_identifier_set NET/SWDL/PDI; ADR-0027 |
 | Software level checked against JLR's catalogue | **yes** — IVS part lineage, SOTA | **no** | **—** | **possible** — compare numbers; never download software | COMMON_JLR_SMPACK_XML/IVS (17 programmes) |
-| CCF read (car configuration file) | **yes** | **stage 1, open** — in stage-1 scope | **—** | **possible** | PLATFORM ccf_source; CCF_DATA_*.xml (96) |
+| CCF read (car configuration file) | **yes** | **built** — ADR-0028, F20: block by block from the keeper and the copies, SDD's layout; 28 programme-years; 18 gateway cars (2014+) are paged and not read, the reason shown | **—** | **possible** — + the VDF scheme of the gateway cars; + the 'digital car' from the CCF | CCF_DATA_*.xml (48); PLATFORM car_configuration; ADR-0028 |
 | Listen-only capture, nothing transmitted | **not found in the data** | **built** | **—** | **built** | F8/F10 capture |
 | Mileage from every module in one click, differences, event stamps | **no** — one module at a time; and it can write one | **built** — 92 module families declare 0xDD01 | **—** | **possible** — + compared with earlier sessions | ADR-0024; SA_OdoWrite, F2_CAL_ODO on SDD's side |
 | K-line and DS2: the early Range Rover, ABS/VIM on the base L316 | **yes** | **stage 1, open** — F14, after the first live tests | **—** | **possible** | CURRENT_JLR_KCODEC_RUNTIME; PLATFORM networks KW2000/DS2/ISO |

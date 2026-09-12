@@ -114,6 +114,11 @@ struct ModuleResponder {
     /// Identifiers whose payload is a text (ADR-0027): answered with a
     /// part-number-shaped string rather than walking bytes.
     texts: BTreeSet<u16>,
+    /// Identifiers that answer a block of the car configuration (ADR-0028):
+    /// a deterministic block in which every option is one SDD lists and the
+    /// VIN field holds the bench's VIN, built from the same layout the
+    /// decoder uses.
+    configuration: BTreeMap<u16, Vec<u8>>,
     /// Faults as they go on the wire: code high, code low, failure type.
     faults: Vec<[u8; 3]>,
     /// Consecutive frames waiting for the tester's flow control.
@@ -144,6 +149,11 @@ impl BenchVehicle {
         let survey = library.survey(input);
         let context = vehicle_context(input);
         let store = library.store();
+        let layout = library.ccf_layout(&context);
+        let bench_vin = vin
+            .map(str::trim)
+            .filter(|vin| vin.len() == 17)
+            .unwrap_or(BENCH_VIN);
         let mut modules = Vec::new();
         for entry in &survey.modules {
             let (Some(request), Some(response), Some(route)) = (
@@ -174,6 +184,16 @@ impl BenchVehicle {
                 })
                 .collect();
             identifiers.insert(VIN_IDENTIFIER, 17);
+            let configuration: BTreeMap<u16, Vec<u8>> = library
+                .ccf_blocks(&context, &entry.ecu_family)
+                .into_iter()
+                .map(|(identifier, blocks)| {
+                    (
+                        identifier,
+                        synthetic_configuration(&entry.ecu_family, &blocks, &layout, bench_vin),
+                    )
+                })
+                .collect();
             modules.push(ModuleResponder {
                 family: entry.ecu_family.clone(),
                 route,
@@ -182,6 +202,7 @@ impl BenchVehicle {
                 extended: request > 0x7FF,
                 identifiers,
                 texts,
+                configuration,
                 faults: choose_faults(library, &entry.ecu_family, scenario),
                 pending: Vec::new(),
                 answered: 0,
@@ -229,6 +250,8 @@ impl BenchVehicle {
                         let mut payload = vec![0x62, (identifier >> 8) as u8, identifier as u8];
                         if identifier == VIN_IDENTIFIER {
                             payload.extend_from_slice(vin.as_bytes());
+                        } else if let Some(block) = module.configuration.get(&identifier) {
+                            payload.extend_from_slice(block);
                         } else if module.texts.contains(&identifier) {
                             payload.extend_from_slice(
                                 synthetic_text(&module.family, identifier).as_bytes(),
@@ -632,6 +655,93 @@ fn fault_bytes(code: &str, failure_type: u8) -> Option<[u8; 3]> {
 /// byte walks up and back a little as the tick grows, one step every four
 /// requests, so a value read repeatedly moves the way a living one does
 /// without ever leaving the range.
+/// The payload a module answers a configuration identifier with (ADR-0028):
+/// every block the identifier carries at its offset, every parameter of the
+/// layout given a value that is one SDD lists — an option for an enumeration
+/// or a boolean, a small number for a binary field, the bench's VIN for a
+/// seventeen-character text, a bench-marked string for any other, digits for
+/// BCD, zero for the undefined — the same for the same module, so a copy
+/// read twice agrees with itself and a copy on another module differs.
+fn synthetic_configuration(
+    family: &str,
+    blocks: &[diagnostic_session::ccf::CcfBlockRef],
+    layout: &[diagnostic_session::ccf::CcfParameter],
+    vin: &str,
+) -> Vec<u8> {
+    let length = blocks
+        .iter()
+        .map(|block| block.offset + block.length)
+        .max()
+        .unwrap_or(0);
+    let mut payload = vec![0u8; length];
+    for block in blocks {
+        let slice = &mut payload[block.offset..block.offset + block.length];
+        for parameter in layout
+            .iter()
+            .filter(|parameter| parameter.block == block.block)
+        {
+            if parameter.stop_byte >= slice.len() || parameter.stop_byte < parameter.start_byte {
+                continue;
+            }
+            let span = &mut slice[parameter.start_byte..=parameter.stop_byte];
+            let seed = fnv(&format!("{family}/{}/{}", parameter.block, parameter.name));
+            match parameter.kind.as_str() {
+                "ENUM" | "BOOL" if !parameter.options.is_empty() => {
+                    let option = &parameter.options[(seed as usize) % parameter.options.len()];
+                    write_number(span, parameter.mask, option.value);
+                }
+                "BIN" => write_number(span, parameter.mask, u64::from(seed % 200)),
+                "ASCII" => {
+                    let text: Vec<u8> = if span.len() == 17 {
+                        vin.as_bytes().to_vec()
+                    } else {
+                        format!(
+                            "BN{:0width$}",
+                            seed % 1_000_000,
+                            width = span.len().saturating_sub(2)
+                        )
+                        .into_bytes()
+                    };
+                    for (byte, value) in span
+                        .iter_mut()
+                        .zip(text.iter().chain(std::iter::repeat(&b' ')))
+                    {
+                        *byte = *value;
+                    }
+                }
+                "BCD" => span.iter_mut().for_each(|byte| *byte = 0x27),
+                _ => {}
+            }
+        }
+    }
+    payload
+}
+
+/// Write a number into a span the way the decoder reads it: one byte masked
+/// and shifted up to its first set bit, several bytes big-endian whole.
+fn write_number(span: &mut [u8], mask: u64, value: u64) {
+    if span.len() == 1 {
+        let mask = (mask & 0xFF) as u8;
+        if mask == 0 {
+            span[0] = value as u8;
+        } else {
+            let shifted = ((value as u8) << mask.trailing_zeros()) & mask;
+            span[0] = (span[0] & !mask) | shifted;
+        }
+        return;
+    }
+    let width = span.len().min(8);
+    for (index, byte) in span.iter_mut().rev().take(width).enumerate() {
+        *byte = (value >> (8 * index)) as u8;
+    }
+}
+
+fn fnv(text: &str) -> u32 {
+    text.bytes().fold(0x811C_9DC5u32, |hash, byte| {
+        (hash ^ u32::from(byte)).wrapping_mul(0x0100_0193)
+    })
+}
+
 /// A part-number-shaped text for an identification identifier (ADR-0027),
 /// the same for the same module and identifier: a bench prefix that no
 /// real part carries, a base and a revision drawn from the pair.
@@ -683,6 +793,95 @@ mod tests {
         assert_eq!(fault_bytes("B1A08", 0x11), Some([0x9A, 0x08, 0x11]));
         assert_eq!(fault_bytes("U0100", 0x87), Some([0xC1, 0x00, 0x87]));
         assert_eq!(fault_bytes("X0000", 0), None);
+    }
+
+    #[test]
+    fn a_configuration_block_lands_every_parameter_on_a_listed_value() {
+        use diagnostic_session::ccf::{decode, CcfBlockRef, CcfOption, CcfParameter};
+        let option = |value: u64, name: &str| CcfOption {
+            value,
+            name: name.into(),
+            code: String::new(),
+            text_en: String::new(),
+            text_ru: String::new(),
+        };
+        let parameter = |block: &str,
+                         name: &str,
+                         bytes: (usize, usize),
+                         mask: u64,
+                         kind: &str,
+                         options: Vec<CcfOption>| CcfParameter {
+            block: block.into(),
+            name: name.into(),
+            start_byte: bytes.0,
+            stop_byte: bytes.1,
+            start_bit: 0,
+            stop_bit: 7,
+            mask,
+            kind: kind.into(),
+            display: true,
+            edit: false,
+            scope: "base".into(),
+            group: "G".into(),
+            group_title_en: String::new(),
+            group_title_ru: String::new(),
+            title_en: String::new(),
+            title_ru: String::new(),
+            options,
+        };
+        let layout = vec![
+            parameter(
+                "CCF",
+                "BRAND",
+                (0, 0),
+                0xFF,
+                "ENUM",
+                vec![option(0, "UNDEF"), option(1, "ALPHA"), option(2, "BETA")],
+            ),
+            parameter(
+                "CCF",
+                "TRIM",
+                (1, 1),
+                0x06,
+                "ENUM",
+                vec![option(0, "BASE"), option(1, "MID"), option(3, "TOP")],
+            ),
+            parameter("CCF", "VIN", (2, 18), 0xFF, "ASCII", vec![]),
+            parameter("CCF", "RADIUS", (19, 20), 0xFF, "BIN", vec![]),
+            parameter("RES", "SPARE", (0, 1), 0xFF, "BIN", vec![]),
+        ];
+        let blocks = vec![
+            CcfBlockRef {
+                block: "CCF".into(),
+                offset: 0,
+                length: 21,
+            },
+            CcfBlockRef {
+                block: "RES".into(),
+                offset: 21,
+                length: 2,
+            },
+        ];
+        let payload = synthetic_configuration("PCM", &blocks, &layout, BENCH_VIN);
+        assert_eq!(payload.len(), 23);
+        assert_eq!(
+            payload,
+            synthetic_configuration("PCM", &blocks, &layout, BENCH_VIN)
+        );
+        let ccf = &payload[0..21];
+        let brand = decode(&layout[0], ccf);
+        assert!(brand.option_name.is_some(), "{brand:?}");
+        assert_eq!(brand.note, None);
+        let trim = decode(&layout[1], ccf);
+        assert!(trim.option_name.is_some(), "{trim:?}");
+        assert_eq!(decode(&layout[2], ccf).text_en.as_deref(), Some(BENCH_VIN));
+        assert!(decode(&layout[3], ccf).raw.unwrap() < 200);
+        assert!(decode(&layout[4], &payload[21..23]).raw.is_some());
+        // Another module holds its own values, so copies can differ.
+        assert_ne!(
+            payload,
+            synthetic_configuration("BCM", &blocks, &layout, BENCH_VIN)
+        );
     }
 
     #[test]

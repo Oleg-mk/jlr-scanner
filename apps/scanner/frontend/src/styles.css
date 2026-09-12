@@ -2544,3 +2544,31 @@ table.live-read-identifiers label {
 .passport-caveat {
   margin-top: 0.75rem;
 }
+
+/* The car configuration file (ADR-0028): one table per group under SDD's
+   own title, a copy's difference beside the master's value. */
+.ccf-panel {
+  margin-top: 1.5rem;
+}
+
+.ccf-master {
+  margin: 0.5rem 0;
+  font-weight: 600;
+}
+
+.ccf-subtitle {
+  margin: 1.25rem 0 0.25rem;
+  font-size: 1rem;
+}
+
+.ccf-value {
+  font-weight: 600;
+}
+
+.ccf-difference {
+  font-weight: 600;
+}
+
+.ccf-caveat {
+  margin-top: 0.75rem;
+}

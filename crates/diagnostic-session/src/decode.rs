@@ -45,6 +45,10 @@ struct Encoding {
     /// The whole payload is a text — a part number, a serial, a VIN
     /// (ADR-0027, `text=ascii`).
     text: bool,
+    /// The payload carries a block of the car configuration file
+    /// (ADR-0028, `ccf=<BLOCK>;offset=<n>;length=<n>`): decoded by the
+    /// configuration read, not here.
+    ccf: Option<String>,
 }
 
 /// Whether an identifier's parameters say its payload is a text (ADR-0027).
@@ -68,6 +72,7 @@ fn parse_encoding(text: &str) -> Encoding {
         };
         match key.trim() {
             "text" => encoding.text = value.trim().eq_ignore_ascii_case("ascii"),
+            "ccf" => encoding.ccf = Some(value.trim().to_string()),
             "bytes" => {
                 if let Some((from, to)) = value.split_once("..") {
                     if let (Ok(from), Ok(to)) = (from.trim().parse(), to.trim().parse()) {
@@ -114,8 +119,13 @@ pub fn parameters_span(parameters: &[ReadableParameter]) -> Option<usize> {
     parameters
         .iter()
         .filter_map(|parameter| parameter.encoding.as_deref())
-        .filter_map(|text| parse_encoding(text).bytes)
-        .map(|(_, to)| to + 1)
+        .filter_map(|text| {
+            // A configuration block spans its offset and length (ADR-0028).
+            if let Some(block) = crate::ccf::parse_block_encoding(text) {
+                return Some(block.offset + block.length);
+            }
+            parse_encoding(text).bytes.map(|(_, to)| to + 1)
+        })
         .max()
 }
 
@@ -142,6 +152,15 @@ fn decode_one(parameter: &ReadableParameter, data: &[u8]) -> DecodedParameter {
         return decoded;
     };
     let encoding = parse_encoding(text);
+    if let Some(block) = &encoding.ccf {
+        // A block of the configuration file: the configuration read decodes
+        // it with SDD's layout; a plain module read only says what it is.
+        decoded.note = Some(format!(
+            "configuration block {block}, {} byte(s) answered; decoded by the configuration read",
+            data.len()
+        ));
+        return decoded;
+    }
     if encoding.text {
         // The text it is, padding trimmed; not text, then the bytes and the
         // reason. Nothing is parsed out of it and nothing compared.

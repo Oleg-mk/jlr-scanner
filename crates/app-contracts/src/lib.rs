@@ -548,6 +548,9 @@ pub struct SessionReportSnapshot {
     /// Module passports recorded whole (ADR-0027).
     #[serde(default)]
     pub module_passports: u32,
+    /// Configuration reads recorded whole (ADR-0028).
+    #[serde(default)]
+    pub ccf_reads: u32,
     pub report_available: bool,
     /// `bench` or `real`, once an adapter of either kind took part; a session
     /// is one or the other, never both (ADR-0020).
@@ -968,6 +971,111 @@ pub struct ModulePassportSnapshot {
     /// Modules the run covers.
     pub modules: u32,
     /// `SOURCE_BACKED` or the route's own state; `SYNTHETIC` on the bench.
+    pub route_validation: String,
+    pub error: Option<DiagnosticError>,
+    pub report_available: bool,
+}
+
+// ---------------------------------------------------------------------------
+// The car configuration file (ADR-0028): read block by block from the module
+// SDD names as its keeper and from the modules holding copies, decoded with
+// SDD's own layout, every value the type it is and never a judgement.
+// ---------------------------------------------------------------------------
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum CcfReadState {
+    Idle,
+    Running,
+    Finished,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CcfReadRequest {
+    pub context: VehicleContextInput,
+}
+
+/// One parameter of the configuration as one module holds it.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CcfReading {
+    /// The module the value was read from.
+    pub ecu_family: String,
+    /// `sync` for the keeper of the master copy, `copy` otherwise.
+    pub role: String,
+    pub block: String,
+    /// SDD's name for the parameter: the row's identity.
+    pub parameter: String,
+    pub group: String,
+    /// SDD's texts, English and Russian; empty when SDD has none.
+    pub group_title_en: String,
+    pub group_title_ru: String,
+    pub title_en: String,
+    pub title_ru: String,
+    /// `ENUM`, `BOOL`, `BIN`, `ASCII`, `BCD`, `UNDEF`.
+    pub kind: String,
+    /// Whether SDD's editor shows this row.
+    pub display: bool,
+    pub scope: String,
+    pub value_en: Option<String>,
+    pub value_ru: Option<String>,
+    pub option_name: Option<String>,
+    pub option_code: Option<String>,
+    pub raw: Option<u64>,
+    pub hex: Option<String>,
+    pub note: Option<String>,
+}
+
+/// A parameter a copy holds differently from the master: two readings side
+/// by side, and nothing said about which is right.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CcfDifference {
+    pub block: String,
+    pub parameter: String,
+    pub master_module: String,
+    pub master_value: Option<String>,
+    pub copy_module: String,
+    pub copy_value: Option<String>,
+}
+
+/// One block read from one module, answered or not.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CcfBlockRead {
+    pub ecu_family: String,
+    pub role: String,
+    pub identifier: String,
+    pub blocks: Vec<String>,
+    pub state: ModuleReadState,
+    pub bytes: Option<u32>,
+    pub route_validation: String,
+    pub raw_response_hex: Option<String>,
+    pub negative_response: Option<String>,
+    pub reason: Option<String>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CcfReadSnapshot {
+    pub state: CcfReadState,
+    /// `did` when the car's configuration is read block by block; `vdf` when
+    /// it is paged and this product does not read it; absent when the data
+    /// says nothing.
+    pub scheme: Option<String>,
+    /// The module keeping the master copy, when the data names one.
+    pub master_module: Option<String>,
+    pub reads: Vec<CcfBlockRead>,
+    /// The master's configuration, every parameter of every block read.
+    pub readings: Vec<CcfReading>,
+    /// Where a copy differs from the master.
+    pub differences: Vec<CcfDifference>,
+    pub planned: u32,
+    pub asked: u32,
+    pub answered: u32,
+    /// Rows SDD's editor hides, counted so the switch can say how many.
+    pub hidden: u32,
     pub route_validation: String,
     pub error: Option<DiagnosticError>,
     pub report_available: bool,

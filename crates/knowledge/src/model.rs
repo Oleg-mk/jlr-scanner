@@ -18,6 +18,10 @@ pub enum EntityKind {
     /// One of SDD's VIN decode models: the rules that place a VIN in it and
     /// the attributes read off such a VIN (F11, VIN decoding).
     VinDecodeModel,
+    /// One parameter of a car's configuration file: where it sits in which
+    /// block, its type, its options and their texts (ADR-0028). A layout,
+    /// not a value: the value comes from the car.
+    ConfigurationParameter,
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]

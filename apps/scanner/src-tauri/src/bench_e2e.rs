@@ -4,6 +4,7 @@
 
 use super::adapter_service::{AdapterService, SystemAdapterBackend, BENCH_PORT, BENCH_TRANSPORT};
 use super::capture_service::CaptureService;
+use super::ccf_service::{CcfService, CCF_READ_TIMEOUT};
 use super::live_read_service::{LiveReadService, LIVE_READ_TIMEOUT};
 use super::mileage_service::{MileageService, MILEAGE_READ_TIMEOUT};
 use super::module_read_service::{map_live_error, ModuleReadService, PreparedModuleRead};
@@ -13,9 +14,9 @@ use super::session_report_service::{SessionReportService, SESSION_MODE_BENCH, SE
 use super::session_service::SessionService;
 use super::standard_obd_service::{StandardObdService, STANDARD_OBD_TIMEOUT};
 use app_contracts::{
-    AdapterErrorCode, AdapterInfo, AdapterState, LiveReadEntryRequest, LiveReadRequest,
-    LiveReadState, MileageKind, MileageSurveyState, ModulePassportState, ModuleReadKind,
-    ModuleReadRequest, ModuleReadState, StandardObdReadKind, StandardObdRequest,
+    AdapterErrorCode, AdapterInfo, AdapterState, CcfReadState, LiveReadEntryRequest,
+    LiveReadRequest, LiveReadState, MileageKind, MileageSurveyState, ModulePassportState,
+    ModuleReadKind, ModuleReadRequest, ModuleReadState, StandardObdReadKind, StandardObdRequest,
     VehicleContextInput,
 };
 use diagnostic_session::KnowledgeLibrary;
@@ -26,7 +27,7 @@ use knowledge::{
 use mongoose_jlr::bench::share_bus;
 use mongoose_jlr::VehicleRouteId;
 use sdd_ingest::{
-    ConverterCatalogue, DidFormattingAdapter, ModelYearTimeline, ModuleTextAdapter,
+    CcfAdapter, ConverterCatalogue, DidFormattingAdapter, ModelYearTimeline, ModuleTextAdapter,
     PlatformAdapter, VinDecodeAdapter,
 };
 use std::time::Duration;
@@ -40,6 +41,7 @@ const CONVERTER_KM: &str =
 const MODULE_TEXT: &str =
     include_str!("../../../../fixtures/knowledge/synthetic/f9_module_text.xml");
 const VIN_DECODE: &str = include_str!("../../../../fixtures/knowledge/synthetic/f9_vin_decode.xml");
+const CCF: &str = include_str!("../../../../fixtures/knowledge/synthetic/f9_ccf_data.xml");
 
 fn synthetic_source(id: &str, text: &str) -> SourceRecord {
     SourceRecord {
@@ -68,6 +70,9 @@ fn library() -> KnowledgeLibrary {
     let platform = PlatformAdapter::new(synthetic_source("bench-plat", PLATFORM))
         .unwrap()
         .with_timeline(timeline.clone());
+    let ccf_adapter = CcfAdapter::new(synthetic_source("bench-ccf", CCF))
+        .unwrap()
+        .with_timeline(timeline.clone());
     let mut converters = ConverterCatalogue::new();
     converters.insert_from_xml(CONVERTER).unwrap();
     converters.insert_from_xml(CONVERTER_KM).unwrap();
@@ -76,6 +81,7 @@ fn library() -> KnowledgeLibrary {
         .with_timeline(timeline);
     let platform_batch = platform.parse(PLATFORM).unwrap();
     let did_batch = dids.parse(DIDS).unwrap();
+    let ccf_batch = ccf_adapter.parse(CCF).unwrap();
     let text_batch = ModuleTextAdapter::new(synthetic_source("bench-text", MODULE_TEXT))
         .unwrap()
         .parse(MODULE_TEXT)
@@ -91,7 +97,7 @@ fn library() -> KnowledgeLibrary {
         ),
         (
             "bundle.json".to_string(),
-            serde_json::to_string(&vec![did_batch, text_batch, vin_batch]).unwrap(),
+            serde_json::to_string(&vec![did_batch, text_batch, vin_batch, ccf_batch]).unwrap(),
         ),
     ];
     KnowledgeLibrary::from_manifests(
@@ -474,6 +480,73 @@ fn the_bench_connects_without_a_port_reads_the_surveyed_vehicle_and_marks_everyt
         );
     }
 
+    // The car configuration file (ADR-0028): SYNTHMOD keeps the master copy
+    // and answers 0xF106 with the CCF block and 0xF105 with VB and RES at
+    // two offsets; the copy on OTHERMOD cannot be planned and is listed with
+    // the reason. The bench's blocks land every parameter on a listed option
+    // and every row is synthetic; nothing is judged.
+    let mut ccf = CcfService::new();
+    let started = ccf.start(session.library(), Some(&info), &vehicle());
+    assert_eq!(started.state, CcfReadState::Running, "{started:?}");
+    assert_eq!(started.scheme.as_deref(), Some("did"));
+    assert_eq!(started.master_module.as_deref(), Some("SYNTHMOD"));
+    assert_eq!(
+        started.planned, 2,
+        "0xF106 and 0xF105 of SYNTHMOD: {started:?}"
+    );
+    while let Some(due) = ccf.next_due() {
+        let result = adapter
+            .execute_uds_read(&due.transaction, CCF_READ_TIMEOUT)
+            .expect("the bench is connected")
+            .map_err(map_live_error);
+        ccf.record(due.index, result);
+        ccf.mark_synthetic();
+    }
+    let configured = ccf.snapshot();
+    assert_eq!(configured.state, CcfReadState::Finished);
+    assert_eq!(configured.answered, 2, "{:?}", configured.reads);
+    assert_eq!(configured.readings.len(), 8, "{:?}", configured.readings);
+    let brand = configured
+        .readings
+        .iter()
+        .find(|row| row.parameter == "PARAM_SYNTH_BRAND")
+        .unwrap();
+    assert!(brand.option_name.is_some(), "{brand:?}");
+    assert_eq!(brand.note, None);
+    assert!(brand.display);
+    assert_eq!(brand.role, "sync");
+    let res = configured
+        .readings
+        .iter()
+        .find(|row| row.parameter == "SYNTH_RES")
+        .unwrap();
+    assert!(
+        res.raw.is_some(),
+        "the second block of 0xF105 is sliced at its offset: {res:?}"
+    );
+    assert_eq!(configured.hidden, 5, "{:?}", configured.readings);
+    assert!(configured.differences.is_empty(), "no copy was read");
+    for read in &configured.reads {
+        assert_eq!(read.route_validation, "SYNTHETIC");
+    }
+    let ccf_json = ccf.report_json().expect("a finished run is a report");
+    assert!(ccf_json.contains("prowlone.ccf-read"));
+    assert!(ccf_json.contains("\"safety_class\": \"READ_ONLY\""));
+    assert!(
+        !ccf_json.contains("SOURCE_BACKED"),
+        "a bench reading is marked as real inside the report: {ccf_json}"
+    );
+    assert!(
+        ccf_json.contains("OTHERMOD"),
+        "the refused copy is listed: {ccf_json}"
+    );
+    for verdict in ["corrupt", "wrong", "should be", "invalid"] {
+        assert!(
+            !ccf_json.to_lowercase().contains(verdict),
+            "the report must not say {verdict}"
+        );
+    }
+
     // A listen on the bench hears nothing, and is synthetic all the same.
     let listened = adapter
         .capture_route(VehicleRouteId::HsCan, Duration::from_millis(100))
@@ -508,6 +581,8 @@ fn the_bench_connects_without_a_port_reads_the_surveyed_vehicle_and_marks_everyt
     assert_eq!(report.snapshot().mileage_surveys, 1);
     report.add_module_passport(&passport_json).unwrap();
     assert_eq!(report.snapshot().module_passports, 1);
+    report.add_ccf_read(&ccf_json).unwrap();
+    assert_eq!(report.snapshot().ccf_reads, 1);
     assert!(report.is_bench());
     assert!(report.accepts(SESSION_MODE_BENCH));
     assert!(!report.accepts(SESSION_MODE_REAL));

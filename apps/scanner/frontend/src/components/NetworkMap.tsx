@@ -26,6 +26,11 @@ interface NetworkMapProps {
   passportBusy: boolean;
   onReadPassports: () => void;
   onStopPassports: () => void;
+  /** The car configuration file (ADR-0028), read block by block. */
+  ccfRunning: boolean;
+  ccfBusy: boolean;
+  onReadCcf: () => void;
+  onStopCcf: () => void;
 }
 
 function NodeIcon({ state }: { state: NodeState }) {
@@ -108,6 +113,10 @@ export function NetworkMap({
   passportBusy,
   onReadPassports,
   onStopPassports,
+  ccfRunning,
+  ccfBusy,
+  onReadCcf,
+  onStopCcf,
 }: NetworkMapProps) {
   const language = useLanguage();
   const modules: ModuleSurveyEntry[] = survey?.modules ?? [];
@@ -169,6 +178,22 @@ export function NetworkMap({
               disabled={!adapterReady || survey === null || busy || passportBusy || mileageRunning}
             >
               {t("Read the module passports")}
+            </button>
+          )}
+          {ccfRunning ? (
+            <button className="button button--secondary" type="button" onClick={onStopCcf}>
+              {t("Stop")}
+            </button>
+          ) : (
+            <button
+              className="button button--secondary"
+              type="button"
+              onClick={onReadCcf}
+              disabled={
+                !adapterReady || survey === null || busy || ccfBusy || mileageRunning || passportRunning
+              }
+            >
+              {t("Read the configuration (CCF)")}
             </button>
           )}
         </div>

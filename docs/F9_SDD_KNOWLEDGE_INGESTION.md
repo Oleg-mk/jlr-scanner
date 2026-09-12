@@ -825,3 +825,73 @@ before; `platform.json.gz` alone goes from 11,564 to 47,465. Golden test:
 over a fixture whose `NET` set mixes identification with a distance, a
 legislated mirror and a member read with `0x09`, whose two `SWDL` sets are
 chosen by a qualifier, and which references one set it never defines.
+
+## 2026-09-12 — the car configuration file (ADR-0028)
+
+`CCF_DATA_<PROGRAM>[_<YEAR>].xml` describes one car's configuration: a
+header naming the module that keeps the master copy (`<sync>`) and the
+modules holding copies (`<source>`); blocks, each with `serviceIdRd`,
+`serviceIdWr` and, per module, an `<address>` naming the data identifier,
+the offset of the block inside that identifier's payload and its byte range;
+and a layout of groups and parameters — `id="SSS_EEE_bbb_BBB"` the start
+byte, the stop byte, the first and the last bit — with a mask, a type
+(`ENUM`, `BOOL`, `BIN`, `ASCII`, `BCD`, `UNDEF`), a `<category>` saying
+whether SDD's editor displays and edits it, and options with a value, a name,
+sometimes a sales `code`, and a text id. The programme and marker come from
+the document's own qualifiers, never the file name.
+
+`CcfAdapter` records three things. The scheme (`sdd_ccf_scheme`: `did`, or
+`vdf` for a document that pages its `CCF` block through VDF blocks) and the
+sources (`sdd_ccf_source.<MODULE>`: `sync` or `copy`) as text claims on the
+programme. For a `did` document, every `<address>` of a block read with
+`0x22` whose module is a module — `AS_BUILT`, `AS_IS` and `OTHER` are the
+factory file and placeholders — as an `IdentifierParameter` in the DID
+catalogue's shape, the parameter named `Car configuration block <BLOCK>`,
+the encoding `ccf=<BLOCK>;offset=<n>;length=<n>`, applicable to the
+programme, the marker, the address's engine qualifier and the module, so
+the resolver's readable list and the transaction gate admit the read as
+they admit a catalogue parameter. And every parameter as a
+`ConfigurationParameter` record — a new entity kind, `ADR-0010`'s
+precedent — valued as one escaped `key=value;…` text: block, byte and bit
+span, mask, type, the display, edit and scope flags, group and titles in
+English and Russian, and the options as `value=name=code=en=ru|…`. The
+texts come from a `TextLookup` the exporter fills from every item of SDD's
+text database; an id SDD has no text for stays empty and the name speaks.
+`serviceIdWr`, `t_ccf` and `upload="mem"` sources are not recorded.
+
+### Two things only the real corpus revealed
+
+- **A document may stamp a few addresses with a neighbouring year.** The
+  X250 document of 2013 names `MY13` sixteen times and `MY12` four — its
+  reserved block's addresses. The platform rule (exactly one marker, or
+  reject) would have lost the whole car. The document's marker is now the
+  one most qualifiers name, a tie is refused, and an address whose own
+  qualifier names another year is narrowed to that year: the source's
+  statement, kept.
+- **A span may be written backwards.** The X351 document of 2016 gives one
+  parameter the id `460_406_006_007`, the stop byte before the start. A span
+  that cannot be read is a parameter this product cannot place; it is left
+  unrecorded and the document's other 1,263 parameters stand, rather than
+  the document being refused whole.
+
+### Real-source run
+
+| | |
+| --- | --- |
+| documents | 48 (46 under `CURRENT_JLR_XCL_XML_DATA_XML`, 2 legacy under `CURRENT_JLR_MCP_XML_XML`) |
+| programmes | 20 |
+| rejected | 0 |
+| scheme `did` / `vdf` | 30 / 18 |
+| block identifiers | 335 over `BCM`, `FSJB`, `GWM`, `IPC`, `PCM`, `RSJB` |
+| …by identifier | `0xF105` 154, `0xF106` 85, `0xDE00` 64, `0xC25F` 12, `0xD900` 12, `0xF114` 4, `0xE736`/`0xE737` 2 each |
+| parameters | **38,505**, of which SDD's editor displays 2,871 |
+| …with a group title text | 24,450 |
+| options | 141,125 |
+| text items read for the titles | 6,981 |
+| `ccf.json.gz` | 6.8 MB; the library 353,450 records, 21 MB on disk |
+
+Golden tests: `f9_ccf_golden.rs`, five of them, over a fixture that mixes
+a readable block with padding, two blocks in one identifier at two offsets,
+a copy narrowed by an engine, an address stamped with a neighbouring year, a
+span written backwards, texts carrying every separator, and a paged
+document that yields no identifier.

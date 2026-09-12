@@ -628,6 +628,42 @@ beside the mileage one, the session bundle's `module_passports`, the intake's
 owner batches the work. Not decided: whether a software level is current —
 SDD's `IVS` part lineage could say, and comparing is a separate ADR.
 
+### F20 — the car configuration file, read as SDD reads it (decided and built 2026-09-12, `ADR-0028`)
+
+The second row the owner took from `CAPABILITY_MATRIX.md`: "CCF read" had
+been in stage 1's own definition since 2026-09-01 without a line of code.
+The corpus was read first. SDD describes one car's configuration in a
+`CCF_DATA_<PROGRAM>[_<YEAR>].xml` — 46 documents, 22 programmes, `MY04_5`
+to `MY17`: the module keeping the master copy (`GWM` 19, `BCM` 14, `IPC` 7,
+`RSJB` 6) and the modules holding copies; blocks (`CCF`, `EUCD`, `ITP`,
+`VEH_BUILD`, `MCODE`, `RES`) each read with `0x22` from one identifier at an
+offset and a length — `0xF106` for 196 bytes on the X250 of 2010, `0xF105`
+carrying two blocks at two offsets; and a layout of 22,185 groups, 38,576
+parameters (`ENUM` 24,420, `BOOL` 10,231, `BIN` 1,941, `ASCII` 1,790, `BCD`
+162) and 142,162 options, of which SDD's own editor displays 2,708. Two
+schemes: 28 documents address every block plainly; 18 — the gateway cars
+from 2014 on — page the `CCF` block through VDF blocks over `0xEE00`, a
+mechanism the corpus describes but whose request sequence this reading does
+not establish.
+
+`ADR-0028` decides: read as SDD reads, sync module first and then each copy,
+one `ReadDataByIdentifier` per module and identifier, the block sliced at
+its offset; record the identifiers in the catalogue's shape (`ccf=<BLOCK>;
+offset;length`) so the read is a module read, and the layout as its own
+entity kind, `ConfigurationParameter`, one record per parameter with its
+texts resolved in English and Russian at ingest; decode every value as the
+type SDD declares and never judge it; compare copies with the master and
+show both; record nothing that leads to a write — `serviceIdWr`, the VBF
+names and the memory-read sources are left where they lie; refuse a paged
+car with the reason. *Built the same day:* the ingest slice, the exporter's
+`ccf.json` with the whole text database read for the titles, the library
+re-exported, the decoder, the bench's plausible blocks, `CcfService`, the
+panel with SDD's rows behind one switch, the session bundle's `ccf_reads`,
+the intake's `ccf_reads[i].reads[j]`. `IMPLEMENTED / FIXTURE_TESTED`; no
+build, the owner batches the work. Not decided: describing the vehicle from
+its configuration (SDD's `qualifier_map` — the "digital car"), the VDF read,
+the product's own words for the 2,313 texts.
+
 ### Beyond stage 1
 
 Service functions and configuration follow only after an explicit owner decision

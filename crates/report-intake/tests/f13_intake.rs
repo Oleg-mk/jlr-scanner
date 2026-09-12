@@ -244,6 +244,24 @@ fn session_bundle(
     mileage_surveys: serde_json::Value,
     module_passports: serde_json::Value,
 ) -> String {
+    session_bundle_with_ccf(
+        reads,
+        with_capture,
+        live_read_runs,
+        mileage_surveys,
+        module_passports,
+        serde_json::json!([]),
+    )
+}
+
+fn session_bundle_with_ccf(
+    reads: Vec<ModuleReadReport>,
+    with_capture: bool,
+    live_read_runs: serde_json::Value,
+    mileage_surveys: serde_json::Value,
+    module_passports: serde_json::Value,
+    ccf_reads: serde_json::Value,
+) -> String {
     let captures = if with_capture {
         serde_json::json!([{
             "schema_version": 1,
@@ -274,9 +292,50 @@ fn session_bundle(
         "calibration_reads": [],
         "live_read_runs": live_read_runs,
         "mileage_surveys": mileage_surveys,
-        "module_passports": module_passports
+        "module_passports": module_passports,
+        "ccf_reads": ccf_reads
     })
     .to_string()
+}
+
+/// A configuration read (ADR-0028) is read like the passport: its block
+/// reads are module reads and confirm what one read confirms; the decoded
+/// configuration is not evidence and is not recorded.
+#[test]
+fn a_configuration_read_confirms_what_one_read_confirms_and_records_no_value() {
+    let before = library(&[]);
+    let answered = read_report(Some("0x72E"), Some("59 02 FF"));
+    let bundle = session_bundle_with_ccf(
+        vec![],
+        false,
+        serde_json::json!([]),
+        serde_json::json!([]),
+        serde_json::json!([]),
+        serde_json::json!([{
+            "schema": "prowlone.ccf-read",
+            "master_module": "RELAYMOD",
+            "reads": [ answered ],
+            "readings": [ { "parameter": "PARAM_SYNTH_BRAND", "valueEn": "Alpha" } ]
+        }]),
+    );
+    let outcome = intake(&bundle, "session.json", &before).unwrap();
+    assert_eq!(outcome.batch.records.len(), 7, "{:#?}", outcome.summary);
+    assert!(outcome
+        .summary
+        .confirmations
+        .iter()
+        .any(|line| line.starts_with("ccf_reads[0].reads[0] RELAYMOD")));
+    let manifest = serde_json::to_string(&outcome.batch).unwrap();
+    assert!(manifest.contains(".ccf.00.000."));
+    assert!(
+        !manifest.contains("PARAM_SYNTH_BRAND") && !manifest.contains("Alpha"),
+        "a configuration value is not evidence about a route"
+    );
+    let after = library(&[("captured.json".into(), manifest)]);
+    assert_eq!(
+        status_of(&after, "RELAYMOD"),
+        (RouteStatus::Reachable, "CAPTURE_VALIDATED".into())
+    );
 }
 
 fn status_of(library: &KnowledgeLibrary, family: &str) -> (RouteStatus, String) {
@@ -486,4 +545,5 @@ fn a_live_read_run_and_a_mileage_survey_confirm_what_one_read_confirms() {
         .to_string();
     assert!(error.contains("live-read run"), "{error}");
     assert!(error.contains("module passport"), "{error}");
+    assert!(error.contains("configuration read"), "{error}");
 }

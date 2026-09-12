@@ -10,6 +10,7 @@
 //! directory of their choosing. Only the two documented manifests in this
 //! repository are built in.
 
+pub mod ccf;
 pub mod decode;
 pub mod dtc_text;
 pub mod help_text;
@@ -566,6 +567,116 @@ impl KnowledgeLibrary {
                 .map(|parameter| parameter.name.clone())
                 .unwrap_or_else(|| format!("0x{:04X}", identifier.identifier));
             found.push((identifier.identifier, name));
+        }
+        found
+    }
+
+    /// The programme-level texts the loaded data states for this car under
+    /// custom claim names (the configuration's scheme and sources, ADR-0028).
+    fn programme_texts(&self, context: &VehicleContext) -> Vec<(String, String)> {
+        let result = self
+            .store
+            .query(&KnowledgeQuery::for_vehicle(context.clone()).include_indeterminate(true));
+        result
+            .records
+            .iter()
+            .filter(|entry| {
+                entry.applicability_resolution == ApplicabilityResolution::Applicable
+                    && entry.record.entity.kind == EntityKind::VehicleProgram
+            })
+            .filter_map(|entry| match (&entry.record.key, &entry.record.value) {
+                (ClaimKey::Custom { name }, KnowledgeValue::Text { value }) => {
+                    Some((name.clone(), value.clone()))
+                }
+                _ => None,
+            })
+            .collect()
+    }
+
+    /// How this car's configuration is read, per the loaded data (ADR-0028):
+    /// `did` block by block, `vdf` paged and not read by this product; `None`
+    /// when the data describes no configuration for it.
+    pub fn ccf_scheme(&self, context: &VehicleContext) -> Option<String> {
+        self.programme_texts(context)
+            .into_iter()
+            .find(|(name, _)| name == "sdd_ccf_scheme")
+            .map(|(_, value)| value)
+    }
+
+    /// The modules holding this car's configuration, the keeper of the
+    /// master copy (`sync`) first and then the copies, each with its role.
+    pub fn ccf_sources(&self, context: &VehicleContext) -> Vec<(String, String)> {
+        let mut sources: Vec<(String, String)> = self
+            .programme_texts(context)
+            .into_iter()
+            .filter_map(|(name, role)| {
+                name.strip_prefix("sdd_ccf_source.")
+                    .map(|module| (module.to_string(), role))
+            })
+            .collect();
+        sources.sort_by(|a, b| {
+            (a.1 != "sync")
+                .cmp(&(b.1 != "sync"))
+                .then_with(|| a.0.cmp(&b.0))
+        });
+        sources.dedup();
+        sources
+    }
+
+    /// The layout of this car's configuration: every parameter of every
+    /// block the loaded data describes, in block and byte order.
+    pub fn ccf_layout(&self, context: &VehicleContext) -> Vec<ccf::CcfParameter> {
+        let result = self
+            .store
+            .query(&KnowledgeQuery::for_vehicle(context.clone()).include_indeterminate(true));
+        let mut layout: Vec<ccf::CcfParameter> = result
+            .records
+            .iter()
+            .filter(|entry| {
+                entry.applicability_resolution == ApplicabilityResolution::Applicable
+                    && entry.record.entity.kind == EntityKind::ConfigurationParameter
+            })
+            .filter_map(|entry| match &entry.record.value {
+                KnowledgeValue::Text { value } => {
+                    ccf::parse_parameter(&entry.record.entity.id, value)
+                }
+                _ => None,
+            })
+            .collect();
+        layout.sort_by(|a, b| {
+            a.block
+                .cmp(&b.block)
+                .then(a.start_byte.cmp(&b.start_byte))
+                .then(a.start_bit.cmp(&b.start_bit))
+                .then(a.name.cmp(&b.name))
+        });
+        layout
+    }
+
+    /// The configuration blocks a module answers, per identifier: from its
+    /// readable identifiers whose parameters are `ccf=` block references
+    /// (ADR-0028), each identifier's blocks in offset order.
+    pub fn ccf_blocks(
+        &self,
+        context: &VehicleContext,
+        ecu_family: &str,
+    ) -> Vec<(u16, Vec<ccf::CcfBlockRef>)> {
+        let mut found: Vec<(u16, Vec<ccf::CcfBlockRef>)> = Vec::new();
+        for identifier in
+            DiagnosticEnvironmentResolver::readable_identifiers(self.store(), context, ecu_family)
+        {
+            let mut blocks: Vec<ccf::CcfBlockRef> = identifier
+                .parameters
+                .iter()
+                .filter_map(|parameter| parameter.encoding.as_deref())
+                .filter_map(ccf::parse_block_encoding)
+                .collect();
+            if blocks.is_empty() {
+                continue;
+            }
+            blocks.sort_by_key(|block| block.offset);
+            blocks.dedup();
+            found.push((identifier.identifier, blocks));
         }
         found
     }

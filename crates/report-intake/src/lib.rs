@@ -71,6 +71,18 @@ struct SessionReport {
     /// The module passport (`ADR-0027`): one record per read made.
     #[serde(default)]
     module_passports: Vec<ModulePassport>,
+    /// The configuration read (`ADR-0028`): one record per block read.
+    #[serde(default)]
+    ccf_reads: Vec<CcfRead>,
+}
+
+/// As much of a configuration read as the intake reads: the reads it made.
+/// The configuration itself is what a car holds, not evidence about a route,
+/// and is not recorded here.
+#[derive(Debug, Deserialize)]
+struct CcfRead {
+    #[serde(default)]
+    reads: Vec<ModuleReadReport>,
 }
 
 /// As much of a live-read run as the intake reads: the set, each entry with
@@ -206,7 +218,8 @@ pub fn intake(
                 .module_passports
                 .iter()
                 .flat_map(|passport| passport.reads.iter()),
-        );
+        )
+        .chain(report.ccf_reads.iter().flat_map(|ccf| ccf.reads.iter()));
     for read in every_read {
         let program = read.vehicle.vehicle_program.trim();
         if !program.is_empty() && !programs.iter().any(|known| known == program) {
@@ -287,10 +300,20 @@ pub fn intake(
             )?;
         }
     }
+    for (ccf_index, ccf) in report.ccf_reads.iter().enumerate() {
+        for (read_index, record) in ccf.reads.iter().enumerate() {
+            builder.read(
+                format!("ccf_reads[{ccf_index}].reads[{read_index}]"),
+                format!("ccf.{ccf_index:02}.{read_index:03}"),
+                record,
+                library,
+            )?;
+        }
+    }
 
     if builder.records.is_empty() {
         return Err(KnowledgeError::Parse(
-            "the report holds nothing this intake can record: no module read, capture, calibration read, live-read run, mileage survey or module passport".into(),
+            "the report holds nothing this intake can record: no module read, capture, calibration read, live-read run, mileage survey, module passport or configuration read".into(),
         ));
     }
     Ok(IntakeOutcome {

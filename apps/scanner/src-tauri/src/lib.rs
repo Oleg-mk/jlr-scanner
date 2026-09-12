@@ -2,6 +2,7 @@
 
 mod adapter_service;
 mod capture_service;
+mod ccf_service;
 mod diagnostic_service;
 mod live_read_service;
 mod mileage_service;
@@ -14,14 +15,15 @@ mod standard_obd_service;
 
 use adapter_service::{lock_service, shared_service, SharedAdapterService};
 use app_contracts::{
-    AdapterSnapshot, AdapterState, CaptureSnapshot, DiagnosticSnapshot, LibrarySnapshot,
-    LiveReadRequest, LiveReadSnapshot, MileageSurveyRequest, MileageSurveySnapshot,
-    ModulePassportRequest, ModulePassportSnapshot, ModuleReadRequest, ModuleReadSnapshot,
-    SessionReportSnapshot, StandardObdRequest, StandardObdSnapshot, VehicleCatalogueSnapshot,
-    VehicleContextInput, VehicleSurveySnapshot, VinDecodeSnapshot,
+    AdapterSnapshot, AdapterState, CaptureSnapshot, CcfReadRequest, CcfReadSnapshot,
+    DiagnosticSnapshot, LibrarySnapshot, LiveReadRequest, LiveReadSnapshot, MileageSurveyRequest,
+    MileageSurveySnapshot, ModulePassportRequest, ModulePassportSnapshot, ModuleReadRequest,
+    ModuleReadSnapshot, SessionReportSnapshot, StandardObdRequest, StandardObdSnapshot,
+    VehicleCatalogueSnapshot, VehicleContextInput, VehicleSurveySnapshot, VinDecodeSnapshot,
 };
 use bench_vehicle::BenchVehicle;
 use capture_service::CaptureService;
+use ccf_service::{CcfService, CCF_READ_TIMEOUT};
 use diagnostic_service::DiagnosticService;
 use diagnostic_session::parameter_text;
 use live_read_service::{LiveReadService, LIVE_READ_TIMEOUT};
@@ -48,6 +50,14 @@ type SharedStandardObdService = Mutex<StandardObdService>;
 type SharedLiveReadService = Mutex<LiveReadService>;
 type SharedMileageService = Mutex<MileageService>;
 type SharedPassportService = Mutex<PassportService>;
+type SharedCcfService = Mutex<CcfService>;
+
+fn lock_ccf<'a>(state: &'a State<'a, SharedCcfService>) -> MutexGuard<'a, CcfService> {
+    state
+        .inner()
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+}
 
 fn lock_mileage<'a>(state: &'a State<'a, SharedMileageService>) -> MutexGuard<'a, MileageService> {
     state
@@ -627,6 +637,7 @@ async fn start_new_session(
     replace(app.state::<SharedLiveReadService>(), LiveReadService::new());
     replace(app.state::<SharedMileageService>(), MileageService::new());
     replace(app.state::<SharedPassportService>(), PassportService::new());
+    replace(app.state::<SharedCcfService>(), CcfService::new());
     app.state::<SharedSessionService>()
         .inner()
         .lock()
@@ -1306,6 +1317,127 @@ async fn finish_module_passport(
     Ok(lock_passport(&passport_state).snapshot())
 }
 
+// ---------------------------------------------------------------------------
+// The car configuration file (ADR-0028): read block by block from the module
+// SDD names as its keeper and from the modules holding copies, decoded with
+// SDD's own layout. Every value is what its type says; nothing is judged.
+// ---------------------------------------------------------------------------
+
+#[tauri::command]
+async fn get_ccf_state(state: State<'_, SharedCcfService>) -> Result<CcfReadSnapshot, String> {
+    Ok(lock_ccf(&state).snapshot())
+}
+
+/// A finished run joins the session bundle once.
+fn record_ccf_read(
+    ccf_state: &State<'_, SharedCcfService>,
+    report_state: &State<'_, SharedSessionReportService>,
+    bench: bool,
+) {
+    let json = { lock_ccf(ccf_state).take_report_json() };
+    if let Some(json) = json {
+        let mut session_report = lock_session_report(report_state);
+        session_report.set_mode(if bench {
+            SESSION_MODE_BENCH
+        } else {
+            SESSION_MODE_REAL
+        });
+        let _ = session_report.add_ccf_read(&json);
+    }
+}
+
+fn start_ccf_read_now(
+    adapter_state: State<'_, SharedAdapterService>,
+    session_state: State<'_, SharedSessionService>,
+    ccf_state: State<'_, SharedCcfService>,
+    request: CcfReadRequest,
+) -> CcfReadSnapshot {
+    let adapter = { lock_service(&adapter_state).connected_adapter() };
+    // Without an adapter the honest answer is that, not that the data
+    // describes no configuration.
+    let Some(adapter) = adapter else {
+        return lock_ccf(&ccf_state).refuse(adapter_unavailable());
+    };
+    let session = lock_session(&session_state);
+    let mut ccf = lock_ccf(&ccf_state);
+    ccf.start(session.library(), Some(&adapter), &request.context)
+}
+
+fn ccf_read_step_now(
+    adapter_state: State<'_, SharedAdapterService>,
+    ccf_state: State<'_, SharedCcfService>,
+    report_state: State<'_, SharedSessionReportService>,
+) -> CcfReadSnapshot {
+    let due = { lock_ccf(&ccf_state).next_due() };
+    let Some(due) = due else {
+        let bench = lock_service(&adapter_state).is_bench();
+        record_ccf_read(&ccf_state, &report_state, bench);
+        return lock_ccf(&ccf_state).snapshot();
+    };
+
+    let (result, bench) = {
+        let mut service = lock_service(&adapter_state);
+        let bench = service.is_bench();
+        let result = service
+            .execute_uds_read(&due.transaction, CCF_READ_TIMEOUT)
+            .map(|result| result.map_err(map_live_error));
+        (result, bench)
+    };
+    let connected = result.is_some();
+    let outcome = result.unwrap_or_else(|| Err(adapter_unavailable()));
+
+    {
+        let mut ccf = lock_ccf(&ccf_state);
+        ccf.record(due.index, outcome);
+        if bench {
+            ccf.mark_synthetic();
+        }
+        // An adapter that is gone will not come back for the next read;
+        // what was read stays.
+        if !connected {
+            ccf.finish();
+        }
+    }
+    record_ccf_read(&ccf_state, &report_state, bench);
+    lock_ccf(&ccf_state).snapshot()
+}
+
+#[tauri::command]
+async fn start_ccf_read(
+    adapter_state: State<'_, SharedAdapterService>,
+    session_state: State<'_, SharedSessionService>,
+    ccf_state: State<'_, SharedCcfService>,
+    request: CcfReadRequest,
+) -> Result<CcfReadSnapshot, String> {
+    Ok(start_ccf_read_now(
+        adapter_state,
+        session_state,
+        ccf_state,
+        request,
+    ))
+}
+
+#[tauri::command]
+async fn ccf_read_step(
+    adapter_state: State<'_, SharedAdapterService>,
+    ccf_state: State<'_, SharedCcfService>,
+    report_state: State<'_, SharedSessionReportService>,
+) -> Result<CcfReadSnapshot, String> {
+    Ok(ccf_read_step_now(adapter_state, ccf_state, report_state))
+}
+
+#[tauri::command]
+async fn finish_ccf_read(
+    adapter_state: State<'_, SharedAdapterService>,
+    ccf_state: State<'_, SharedCcfService>,
+    report_state: State<'_, SharedSessionReportService>,
+) -> Result<CcfReadSnapshot, String> {
+    let bench = lock_service(&adapter_state).is_bench();
+    lock_ccf(&ccf_state).finish();
+    record_ccf_read(&ccf_state, &report_state, bench);
+    Ok(lock_ccf(&ccf_state).snapshot())
+}
+
 pub fn run() {
     let bench: SharedBench = share_bus(Box::new(EmptyBench));
     tauri::Builder::default()
@@ -1321,6 +1453,7 @@ pub fn run() {
         .manage(Mutex::new(LiveReadService::new()))
         .manage(Mutex::new(MileageService::new()))
         .manage(Mutex::new(PassportService::new()))
+        .manage(Mutex::new(CcfService::new()))
         .manage(Mutex::new(SessionReportService::new()))
         .invoke_handler(tauri::generate_handler![
             get_adapter_state,
@@ -1356,6 +1489,10 @@ pub fn run() {
             start_module_passport,
             module_passport_step,
             finish_module_passport,
+            get_ccf_state,
+            start_ccf_read,
+            ccf_read_step,
+            finish_ccf_read,
             get_module_read_report_json,
             get_session_report_state,
             get_session_report_json,

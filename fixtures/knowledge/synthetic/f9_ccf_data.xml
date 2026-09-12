@@ -1,0 +1,159 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Synthetic car configuration description in the shape of SDD's CCF_DATA
+  documents (ADR-0028). It reproduces the element shape only: a header that
+  names the module keeping the master copy and the modules holding copies; a
+  readable block with one address per module, one of them narrowed by an
+  engine qualifier and one naming the factory file; a padding block read with
+  no service; two blocks answered by the same identifier at different
+  offsets; and one parameter of every type SDD uses, with options that carry
+  a name, a sales code and a text id the lookup may or may not know.
+-->
+<configuration_data type="CCF">
+	<version>
+		<car_config>SYNTH/01 Rev 1.0</car_config>
+		<vbf_version>2.0</vbf_version>
+	</version>
+	<ccf>
+		<sync status="0">SYNTHMOD</sync>
+		<source status="0">SYNTHMOD</source>
+		<source status="0">OTHERMOD</source>
+		<source status="0">AS_BUILT</source>
+		<source status="0">OTHER</source>
+	</ccf>
+	<block id="1" name="CCF" serviceIdRd="0x22" serviceIdWr="0x2E" dl_exclude="false">
+		<name>Vehicle Configuration Parameters</name>
+		<address module="SYNTHMOD" t_ccf="SYNTH_CCF.vbf" parameterId="0xF106" parameterIdOffset="0x0" start_address="0x0000C000" stop_address="0x0000C007" merge="false">
+			<qualifier model="SYNTHA" year="MY10"/>
+		</address>
+		<address module="OTHERMOD" t_ccf="" parameterId="0xF106" parameterIdOffset="0x0" start_address="0x0000C000" stop_address="0x0000C007" merge="false">
+			<qualifier model="SYNTHA" year="MY10">
+				<qual type="Type" value="SYNTHENGINE"/>
+			</qualifier>
+		</address>
+		<address module="AS_BUILT" t_ccf="" parameterId="0xF106" parameterIdOffset="0x0" start_address="0x0000C000" stop_address="0x0000C007" merge="false">
+			<qualifier model="SYNTHA" year="MY10"/>
+		</address>
+		<block_data>
+			<data module="SYNTHMOD" length="8" checksum="0x0">00</data>
+		</block_data>
+		<group start="0" stop="0" name="GROUP_SYNTH_BRAND">
+			<title>
+				<tm id="@SYNTH_BRAND"/>
+			</title>
+			<parameter id="000_000_000_007" name="PARAM_SYNTH_BRAND" mask="0xFF" type="ENUM">
+				<category display="true" edit="false" scope="base"/>
+				<select>
+					<option value="0x00" name="UNDEF">
+						<tm id="@SYNTH_UNDEF"/>
+					</option>
+					<option value="0x01" name="ALPHA" code="VS_A">
+						<tm id="@SYNTH_ALPHA"/>
+					</option>
+					<option value="0x02" name="BETA">
+						<tm id="@SYNTH_MISSING"/>
+					</option>
+				</select>
+			</parameter>
+		</group>
+		<group start="1" stop="1" name="GROUP_SYNTH_FLAGS">
+			<title>
+				<tm id="@SYNTH_FLAGS"/>
+			</title>
+			<parameter id="001_001_000_000" name="PARAM_SYNTH_HEATED_SEATS" mask="0x01" type="BOOL">
+				<category display="true" edit="true" scope="personalisation"/>
+				<parameter_title>
+					<tm id="@SYNTH_HEATED"/>
+				</parameter_title>
+				<select>
+					<option value="0x00" name="FALSE">
+						<tm id="@SYNTH_NO"/>
+					</option>
+					<option value="0x01" name="TRUE">
+						<tm id="@SYNTH_YES"/>
+					</option>
+				</select>
+			</parameter>
+			<parameter id="001_001_001_002" name="PARAM_SYNTH_TRIM_LEVEL" mask="0x06" type="ENUM">
+				<category display="false" edit="false" scope="base"/>
+				<select>
+					<option value="0x00" name="BASE">
+						<tm id="@SYNTH_BASE"/>
+					</option>
+					<option value="0x01" name="MID">
+						<tm id="@SYNTH_MID"/>
+					</option>
+					<option value="0x03" name="TOP">
+						<tm id="@SYNTH_TOP"/>
+					</option>
+				</select>
+			</parameter>
+		</group>
+		<group start="2" stop="4" name="GROUP_SYNTH_CODE">
+			<title>
+				<tm id="@SYNTH_CODE"/>
+			</title>
+			<parameter id="002_004_000_023" name="PARAM_SYNTH_CODE" mask="0xFF" type="ASCII">
+				<category display="true" edit="false" scope="base"/>
+			</parameter>
+		</group>
+		<group start="5" stop="6" name="GROUP_SYNTH_RADIUS">
+			<title>
+				<tm id="@SYNTH_RADIUS"/>
+			</title>
+			<parameter id="005_006_000_015" name="PARAM_SYNTH_RADIUS" mask="0xFF" type="BIN">
+				<category display="false" edit="false" scope="base"/>
+			</parameter>
+		</group>
+		<group start="7" stop="7" name="GROUP_SYNTH_DAY">
+			<title>
+				<tm id="@SYNTH_DAY"/>
+			</title>
+			<parameter id="007_007_000_007" name="PARAM_SYNTH_DAY" mask="0xFF" type="BCD">
+				<category display="false" edit="false" scope="base"/>
+			</parameter>
+		</group>
+	</block>
+	<block id="2" name="PAD" serviceIdRd="0x00" serviceIdWr="0x00">
+		<address module="SYNTHMOD" t_ccf="" parameterId="0x0000" start_address="0x0000C008" stop_address="0x0000C00F" merge="false">
+			<qualifier model="SYNTHA" year="MY10"/>
+		</address>
+	</block>
+	<block id="3" name="VB" serviceIdRd="0x22" serviceIdWr="0x2E">
+		<address module="SYNTHMOD" t_ccf="" parameterId="0xF105" parameterIdOffset="0x0" start_address="0x0000C010" stop_address="0x0000C013" merge="false">
+			<qualifier model="SYNTHA" year="MY10"/>
+		</address>
+		<group start="0" stop="3" name="GROUP_SYNTH_RESERVED">
+			<title>
+				<tm id="@SYNTH_RESERVED"/>
+			</title>
+			<parameter id="000_003_000_031" name="SYNTH_RESERVED" mask="0xFF" type="UNDEF">
+				<category display="false" edit="false" scope="base"/>
+			</parameter>
+		</group>
+	</block>
+	<block id="4" name="RES" serviceIdRd="0x22" serviceIdWr="0x2E">
+		<address module="SYNTHMOD" t_ccf="" parameterId="0xF105" parameterIdOffset="0x4" start_address="0x0000C014" stop_address="0x0000C015" merge="false">
+			<qualifier model="SYNTHA" year="MY10"/>
+		</address>
+		<!-- Stamped with a neighbouring year, as SDD's X250 document of 2013 stamps its reserved block. -->
+		<address module="OTHERMOD" t_ccf="" parameterId="0xF105" parameterIdOffset="0x4" start_address="0x0000C014" stop_address="0x0000C015" merge="false">
+			<qualifier model="SYNTHA" year="MY12"/>
+		</address>
+		<group start="0" stop="1" name="GROUP_SYNTH_RES">
+			<title>
+				<tm id="@SYNTH_RES"/>
+			</title>
+			<parameter id="000_001_000_015" name="SYNTH_RES" mask="0xFF" type="BIN">
+				<category display="false" edit="false" scope="base"/>
+			</parameter>
+			<!-- A span written stop-before-start, as SDD's X351 document of 2016 writes one: not placeable, not recorded. -->
+			<parameter id="001_000_006_007" name="SYNTH_RES_ODD" mask="0xC0" type="ENUM">
+				<category display="false" edit="false" scope="base"/>
+				<select>
+					<option value="0x00" name="OFF"/>
+				</select>
+			</parameter>
+		</group>
+	</block>
+</configuration_data>

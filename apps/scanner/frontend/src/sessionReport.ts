@@ -14,6 +14,8 @@ export interface SessionReportSnapshot {
   mileageSurveys: number;
   /** Module passports, each recorded whole (ADR-0027). */
   modulePassports: number;
+  /** Configuration reads, each recorded whole (ADR-0028). */
+  ccfReads: number;
   reportAvailable: boolean;
   /** "bench" or "real" once the session holds records of either kind (ADR-0020). */
   mode: "bench" | "real" | null;
@@ -32,6 +34,7 @@ export const createSessionReportSnapshot = (): SessionReportSnapshot => ({
   liveReadRuns: 0,
   mileageSurveys: 0,
   modulePassports: 0,
+  ccfReads: 0,
   reportAvailable: false,
   mode: null,
 });

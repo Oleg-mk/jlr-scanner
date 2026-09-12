@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Synthetic car configuration description of the paged kind (ADR-0028): the
+  CCF block is addressed through VDF blocks, a mechanism this product does
+  not read. The scheme and the layout are recorded; no identifier is.
+-->
+<configuration_data type="CCF">
+	<version>
+		<car_config>SYNTH/02 Rev 1.0</car_config>
+		<vbf_version>2.0</vbf_version>
+	</version>
+	<ccf>
+		<sync status="0">GATEMOD</sync>
+		<source status="0">GATEMOD</source>
+		<source status="0">AS_IS</source>
+	</ccf>
+	<block id="1" name="CCF" serviceIdRd="0x22" serviceIdWr="0x2E" dl_exclude="false">
+		<address module="GATEMOD" t_ccf="" parameterId="0xEE00" parameterIdOffset="0x0" start_vdf_block="0x01" stop_vdf_block="0x70" vdf_type="0x0101" vdf_offset="0x14" start_address="0x00008000" stop_address="0x00008393" merge="false" dynamic_block_in_use="false">
+			<qualifier model="SYNTHA" year="MY12"/>
+		</address>
+		<group start="0" stop="0" name="GROUP_SYNTH_BRAND">
+			<title>
+				<tm id="@SYNTH_BRAND"/>
+			</title>
+			<parameter id="000_000_000_007" name="PARAM_SYNTH_BRAND" mask="0xFF" type="ENUM">
+				<category display="true" edit="false" scope="base"/>
+				<select>
+					<option value="0x01" name="ALPHA">
+						<tm id="@SYNTH_ALPHA"/>
+					</option>
+				</select>
+			</parameter>
+		</group>
+	</block>
+</configuration_data>

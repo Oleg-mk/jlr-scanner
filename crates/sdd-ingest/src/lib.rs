@@ -15,6 +15,7 @@
 //! Firmware is never ingested and `.exml` decryption is out of scope.
 
 mod addressing;
+mod ccf;
 mod converters;
 mod did;
 mod dtc;
@@ -27,6 +28,10 @@ mod vin;
 mod xml;
 
 pub use addressing::{CanLinkMonitorAdapter, CAN_LINK_MONITOR_PARSER_ID};
+pub use ccf::{
+    CcfAdapter, TextLookup, CCF_BLOCK_ENCODING_PREFIX, CCF_PARAMETER_CLAIM, CCF_PARSER_ID,
+    CCF_SCHEME_CLAIM, CCF_SOURCE_CLAIM_PREFIX,
+};
 pub use converters::{ConverterCatalogue, ConverterInfo, ConverterKind};
 pub use did::{DidFormattingAdapter, DID_FORMATTING_PARSER_ID, YEAR_BREAKPOINT_DIMENSION};
 pub use dtc::{

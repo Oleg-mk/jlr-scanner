@@ -178,6 +178,7 @@ describe("session flow", () => {
       liveReadRuns: 0,
       mileageSurveys: 0,
       modulePassports: 0,
+      ccfReads: 0,
       reportAvailable: true,
       mode: "real",
     });

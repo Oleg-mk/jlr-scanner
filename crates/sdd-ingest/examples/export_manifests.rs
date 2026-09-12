@@ -20,9 +20,9 @@ use knowledge::{
     SourceRecord, SourceType,
 };
 use sdd_ingest::{
-    is_text_item_id, CanLinkMonitorAdapter, ConverterCatalogue, DidFormattingAdapter,
+    is_text_item_id, CanLinkMonitorAdapter, CcfAdapter, ConverterCatalogue, DidFormattingAdapter,
     DtcDescriptionAdapter, DtcFaultTypeAdapter, DtcHelpAdapter, ModelYearTimeline,
-    ModuleTextAdapter, OdstInfoAdapter, PlatformAdapter, VinDecodeAdapter,
+    ModuleTextAdapter, OdstInfoAdapter, PlatformAdapter, TextLookup, VinDecodeAdapter,
     YEAR_BREAKPOINT_DIMENSION,
 };
 use std::collections::BTreeMap;
@@ -40,6 +40,11 @@ struct Corpus {
     link_monitor: Vec<Found>,
     vin: Vec<Found>,
     module_text: Vec<Found>,
+    /// The car configuration descriptions (ADR-0028).
+    ccf: Vec<Found>,
+    /// Every item of SDD's text database, for the configuration's titles
+    /// and options.
+    texts: Vec<Found>,
 }
 
 /// A corpus file and where it sits relative to the root it was found under,
@@ -104,8 +109,12 @@ fn walk(root: &Path, dir: &Path, corpus: &mut Corpus) -> std::io::Result<()> {
             corpus.link_monitor.push(found);
         } else if name == "VINDecode.xml" {
             corpus.vin.push(found);
+        } else if name.starts_with("CCF_DATA_") {
+            corpus.ccf.push(found);
         } else if is_text_item_id(name.trim_end_matches(".xml")) {
             corpus.module_text.push(found);
+        } else if name.starts_with('@') && parent.starts_with('@') {
+            corpus.texts.push(found);
         }
     }
     Ok(())
@@ -284,7 +293,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         walk(root, root, &mut corpus)?;
     }
     println!(
-        "found: {} platform, {} converter, {} DID snapshot, {} DTC help, {} DTC index, {} ODST, {} link monitor, {} VIN decode, {} module text",
+        "found: {} platform, {} converter, {} DID snapshot, {} DTC help, {} DTC index, {} ODST, {} link monitor, {} VIN decode, {} module text, {} CCF, {} other text items",
         corpus.platforms.len(),
         corpus.converters.len(),
         corpus.snapshots.len(),
@@ -293,7 +302,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         corpus.odst.len(),
         corpus.link_monitor.len(),
         corpus.vin.len(),
-        corpus.module_text.len()
+        corpus.module_text.len(),
+        corpus.ccf.len(),
+        corpus.texts.len()
     );
 
     let mut converters = ConverterCatalogue::new();
@@ -487,6 +498,32 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             &adapter,
             &text,
             "module-text",
+            &mut rejections,
+        )?;
+    }
+    summary.push(bundle.finish()?);
+
+    // The configuration descriptions (ADR-0028), their titles and options
+    // resolved through the whole text database in English and Russian.
+    let mut lookup = TextLookup::new();
+    for found in corpus.texts.iter().chain(corpus.module_text.iter()) {
+        if let Err(error) = lookup.insert_from_xml(&read(found)?) {
+            rejections.note("text-item", error);
+        }
+    }
+    let lookup = std::sync::Arc::new(lookup);
+    let mut bundle = Bundle::create(out, "ccf.json")?;
+    for found in &corpus.ccf {
+        let text = read(found)?;
+        let adapter = CcfAdapter::new(source(found, &text)?)?
+            .with_timeline(timeline.clone())
+            .with_texts(lookup.clone());
+        export(
+            &mut store,
+            &mut bundle,
+            &adapter,
+            &text,
+            "ccf",
             &mut rejections,
         )?;
     }

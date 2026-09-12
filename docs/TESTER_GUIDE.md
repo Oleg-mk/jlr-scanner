@@ -243,6 +243,30 @@ otherwise. What is here is what is in the car.
 
 Nothing is written — a part number is read, never set.
 
+## The car's configuration (CCF)
+
+Beside the passport button there is **Read the configuration (CCF)**. Every
+SDD-era car carries a *car configuration file*: what it is fitted with and
+how it is set — brand, market, engine, gearbox, driven axle, tyre size,
+every optional system and its settings. One module keeps the master copy
+(the rear junction box on an XF, the body or gateway module on others) and
+some modules hold copies. The button reads the file block by block from
+those modules and decodes it with the data's own description of every byte.
+
+The table shows the rows SDD's own editor shows a technician — about sixty
+on an XF — grouped as SDD groups them, each with its value as an option's
+text, a number or a string. A switch below the heading shows the several
+hundred rows SDD hides; they are in the report either way. Where a copy
+differs from the master copy, both values are shown side by side.
+
+**The application does not judge a configuration.** It does not say a
+value is wrong, a copy corrupt, or an option missing; it shows what the
+modules hold. Cars from 2014 on with a gateway module keep the file in a
+paged form this version does not read, and the screen says so instead of
+guessing.
+
+Nothing is written — the configuration is read, never set.
+
 ## What the data says about a code
 
 Under every fault code there is a fold: **What the data says about this code**.
