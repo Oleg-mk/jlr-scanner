@@ -195,12 +195,17 @@ fn the_survey_shows_reachable_and_unreachable_modules_with_reasons() {
         .collect();
     // 0xDD01 is the distance the mileage survey asks for (ADR-0024);
     // the fixture carries it so the survey has something to read. The
-    // 0xF1xx rows are the module's identification (ADR-0027), from the sets
-    // the platform names for it; the two software lists a qualifier chooses
-    // are not this car's, which states no such qualifier, so they are absent.
+    // 0x40xx rows are the battery monitor the platform names for this
+    // module (ADR-0030). The 0xF1xx rows are the module's identification
+    // (ADR-0027), from the sets the platform names for it; the two software
+    // lists a qualifier chooses are not this car's, which states no such
+    // qualifier, so they are absent.
     assert_eq!(
         identifiers,
-        vec!["0x0347", "0x1945", "0xDD01", "0xF111", "0xF188", "0xF18C", "0xF190", "0xF1A0"]
+        vec![
+            "0x0347", "0x1945", "0x4020", "0x4025", "0x4028", "0x4090", "0xDD01", "0xF111",
+            "0xF188", "0xF18C", "0xF190", "0xF1A0"
+        ]
     );
 
     // DS2MOD speaks DS2 on the K-line bus the document pins to 7; the
@@ -296,14 +301,19 @@ fn the_survey_shows_reachable_and_unreachable_modules_with_reasons() {
         .reasons
         .iter()
         .any(|reason| reason.starts_with("read-only capability:")));
-    // The data still declares the module's identification (ADR-0027): the
-    // route, not the list, is what says it cannot be read today.
+    // The data still declares the module's identification (ADR-0027) and the
+    // battery monitor it shares with SYNTHMOD through the same set
+    // (ADR-0030): the route, not the list, is what says it cannot be read
+    // today.
     let declared: Vec<&str> = unreachable
         .readable_identifiers
         .iter()
         .map(|entry| entry.identifier.as_str())
         .collect();
-    assert_eq!(declared, vec!["0xF111", "0xF188", "0xF190", "0xF1A0"]);
+    assert_eq!(
+        declared,
+        vec!["0x4020", "0x4025", "0x4028", "0xF111", "0xF188", "0xF190", "0xF1A0"]
+    );
 
     // LEGACYMOD has a physical address and no CAN identifiers: seen, placed on
     // its bus, and unreachable for exactly that reason. (FIXEDMOD, first in

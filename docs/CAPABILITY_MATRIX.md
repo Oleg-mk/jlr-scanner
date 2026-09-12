@@ -21,7 +21,7 @@ Written 2026-09-12 at the owner's request: what a person gets from SDD at its fu
 | `not found in the data` | not found in SDD 169's data; may still exist in its runtime |
 | `—` | not applicable, or already answered by the column before |
 
-**Counts.** 99 rows. SDD does 63 of them. ProwlOne today: 37 built, 5 partly, 2 open inside stage 1. The roadmap: 20 in stage 2, 8 in stage 3. The ceiling: 53 possible, 3 need other hardware, 8 excluded for good. 10 rows are things SDD does not do and ProwlOne already does; 8 rows are things SDD does that ProwlOne will never do.
+**Counts.** 99 rows. SDD does 63 of them. ProwlOne today: 38 built, 4 partly, 2 open inside stage 1. The roadmap: 20 in stage 2, 8 in stage 3. The ceiling: 53 possible, 3 need other hardware, 8 excluded for good. 10 rows are things SDD does not do and ProwlOne already does; 8 rows are things SDD does that ProwlOne will never do.
 
 ## Vehicle, modules, network
 
@@ -41,7 +41,7 @@ Written 2026-09-12 at the owner's request: what a person gets from SDD at its fu
 | K-line and DS2: the early Range Rover, ABS/VIM on the base L316 | **yes** | **stage 1, open** — in progress since 2026-09-12 (ADR-0029): buses, pins, node addresses and the DS2/KWP2000 protocol crates built, the survey shows these modules as a hypothesis; the read itself is the second slice | **—** | **possible** | CURRENT_JLR_KCODEC_RUNTIME; PLATFORM networks KW2000/DS2/ISO |
 | SCP (J1850 PWM) and NVJCOM (JAGCAN) of the older Jaguars | **yes** | **no** — modules shown with the reason | **no** — not in the plan | **possible** — the adapter has the hardware; protocol stacks needed | PLATFORM_X100..X404 networks; F9 2026-09-07 |
 | Modules behind a gateway (MOST, SUB_CAN1, NGI) | **yes** | **no** — gateway access is ROUTINE_CONTROL | **stage 2** | **possible** | PLATFORM gateway access_method |
-| Battery state during the session | **yes** | **partly** — voltage as a live-read parameter | **—** | **possible** — a standing indicator with a warning | PLATFORM data_identifier_set BATT; VCON BATTERYCHECK |
+| Battery state during the session | **yes** | **built** — a card in the session column: charge, voltage, current, temperature, parked drain, ageing, history, traction battery (ADR-0030) | **—** | **possible** — the same card refreshed at a cadence, as live reading does | ADR-0030; PLATFORM NET sets, DID formatting; SDD keeps no state of health |
 
 ## Fault codes
 

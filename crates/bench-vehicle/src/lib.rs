@@ -256,6 +256,10 @@ impl BenchVehicle {
                             payload.extend_from_slice(
                                 synthetic_text(&module.family, identifier).as_bytes(),
                             );
+                        } else if let Some(bytes) = synthetic_battery(identifier, *length) {
+                            // A battery the card can draw, and every row of
+                            // it marked SYNTHETIC (ADR-0030, ADR-0020).
+                            payload.extend_from_slice(&bytes);
                         } else {
                             // The value walks with the number of requests
                             // this module has answered, so a live read has
@@ -760,6 +764,42 @@ fn synthetic_text(family: &str, identifier: u16) -> String {
         letter(seed >> 20),
         letter(seed >> 24),
     )
+}
+
+/// A believable battery for the bench (ADR-0030): the readings whose bytes
+/// the loaded data describes, written the way the decoder reads them, so the
+/// card has something to draw before any car has been met. Every value is a
+/// bench value and every row that carries it says `SYNTHETIC`; nothing here
+/// is a measurement and nothing is a claim about a real battery.
+fn synthetic_battery(identifier: u16, length: usize) -> Option<Vec<u8>> {
+    // The raw number as the module would hold it, before the data own
+    // scale and offset turn it back into a reading.
+    let raw: u64 = match identifier {
+        // 78 %: one per cent per bit.
+        0x4028 => 78,
+        // The lowest it has been: 61 %.
+        0x4035 | 0x41C3 => 61,
+        // 21 degrees: the data reads the byte with a -40 offset.
+        0x4029 => 61,
+        // -1.5 A into the battery: (raw - 8192) * 0.0625.
+        0x4090 | 0x402B => 8192 - 24,
+        // 12.6 V at 1/16 of a volt.
+        0x402A => 202,
+        // 14.4 V at 1/2048 of a volt.
+        0x0304 => 29_491,
+        // 10.9 V of estimated cold cranking, at 1/16 of a volt.
+        0x41EA => 174,
+        // 1287 days in service, and two monitor resets.
+        0x4027 => 1_287,
+        0x4020 => 2,
+        // 23 mA parked, 41 mA in the last fifteen minutes.
+        0x4025 => 23,
+        0x401D => 41,
+        _ => return None,
+    };
+    let mut bytes = vec![0u8; length.max(1)];
+    write_number(&mut bytes, 0, raw);
+    Some(bytes)
 }
 
 fn synthetic_bytes(family: &str, identifier: u16, length: usize, tick: u32) -> Vec<u8> {

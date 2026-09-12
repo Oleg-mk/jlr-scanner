@@ -209,13 +209,19 @@ fn readable_identifiers_come_only_from_entries_qualified_to_the_module() {
     let identifiers: Vec<_> = readable.iter().map(|entry| entry.identifier).collect();
     // 0x1945 is qualified to the module alone; 0x0347 to module, programme,
     // breakpoint and engine; 0xDD01 is the distance the mileage survey reads;
-    // the 0xF1xx rows are the module's identification from the sets the
-    // platform names for it (ADR-0027), qualified to the module by the
-    // ingest. 0x0301 and 0x0343 are unqualified formatting entries and say
-    // nothing about what this module exposes.
+    // 0x4020, 0x4025, 0x4028 and 0x4090 are the battery monitor the platform
+    // names for this module (ADR-0030); the 0xF1xx rows are the module's
+    // identification from the sets the platform names for it (ADR-0027),
+    // qualified to the module by the ingest. 0x0301 and 0x0343 are
+    // unqualified formatting entries and say nothing about what this module
+    // exposes, and 0xDE05 is a turbocharger parameter the battery rule keeps
+    // out of the card but the platform never declares here.
     assert_eq!(
         identifiers,
-        vec![0x0347, 0x1945, 0xDD01, 0xF111, 0xF188, 0xF18C, 0xF190, 0xF1A0]
+        vec![
+            0x0347, 0x1945, 0x4020, 0x4025, 0x4028, 0x4090, 0xDD01, 0xF111, 0xF188, 0xF18C, 0xF190,
+            0xF1A0
+        ]
     );
     let module_scoped = readable.iter().find(|e| e.identifier == 0x1945).unwrap();
     assert_eq!(module_scoped.parameters.len(), 1);
@@ -226,14 +232,18 @@ fn readable_identifiers_come_only_from_entries_qualified_to_the_module() {
     assert_eq!(module_scoped.parameters[0].unit.as_deref(), Some("V"));
     assert!(!module_scoped.evidence.is_empty());
 
-    // A different module has none of the catalogue's entries; only the
-    // identification the platform names for it (ADR-0027).
+    // A different module has none of the catalogue's entries; only what the
+    // platform names for it — its identification (ADR-0027) and the battery
+    // monitor of the set it shares (ADR-0030).
     let other: Vec<_> =
         DiagnosticEnvironmentResolver::readable_identifiers(&store(true), &context(), "OTHERMOD")
             .iter()
             .map(|entry| entry.identifier)
             .collect();
-    assert_eq!(other, vec![0xF111, 0xF188, 0xF190, 0xF1A0]);
+    assert_eq!(
+        other,
+        vec![0x4020, 0x4025, 0x4028, 0xF111, 0xF188, 0xF190, 0xF1A0]
+    );
 }
 
 #[test]

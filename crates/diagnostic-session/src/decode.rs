@@ -36,6 +36,10 @@ pub struct DecodedParameter {
 #[derive(Debug, Default)]
 struct Encoding {
     bytes: Option<(usize, usize)>,
+    /// How many bytes the parameter occupies, where the data says so
+    /// without saying where they start. A one-parameter identifier whose
+    /// answer is exactly that long has only one reading (ADR-0030).
+    size: Option<usize>,
     mask: Option<u64>,
     scale: Option<f64>,
     offset: Option<f64>,
@@ -88,6 +92,7 @@ fn parse_encoding(text: &str) -> Encoding {
                         .and_then(|hex| u64::from_str_radix(hex, 16).ok());
                 }
             }
+            "size" => encoding.size = value.trim().parse().ok(),
             "scale" => encoding.scale = value.trim().parse().ok(),
             "offset" => encoding.offset = value.trim().parse().ok(),
             "offset_first" => encoding.offset_first = value.trim() == "true",
@@ -124,7 +129,11 @@ pub fn parameters_span(parameters: &[ReadableParameter]) -> Option<usize> {
             if let Some(block) = crate::ccf::parse_block_encoding(text) {
                 return Some(block.offset + block.length);
             }
-            parse_encoding(text).bytes.map(|(_, to)| to + 1)
+            // A parameter the data places explicitly spans to its last
+            // byte; one it only sizes spans that many bytes from the start
+            // (ADR-0030).
+            let encoding = parse_encoding(text);
+            encoding.bytes.map(|(_, to)| to + 1).or(encoding.size)
         })
         .max()
 }
@@ -184,8 +193,24 @@ fn decode_one(parameter: &ReadableParameter, data: &[u8]) -> DecodedParameter {
         }
         return decoded;
     }
-    let Some((from, to)) = encoding.bytes else {
-        decoded.note = Some("the catalogue records no byte range for this parameter".into());
+    // Where the data states a size and no byte range — which is how it
+    // describes most single-byte parameters, the battery's state of charge
+    // among them (ADR-0030) — and the module answered exactly that many
+    // bytes, the parameter is the whole answer. That is a reading, not a
+    // guess: there is nowhere else for it to be. An answer of any other
+    // length is left unplaced, with the reason.
+    let span = encoding.bytes.or_else(|| match encoding.size {
+        Some(size) if size > 0 && size == data.len() => Some((0, size - 1)),
+        _ => None,
+    });
+    let Some((from, to)) = span else {
+        decoded.note = Some(match encoding.size {
+            Some(size) => format!(
+                "the catalogue places this parameter nowhere and gives it {size} byte(s); the module answered {}",
+                data.len()
+            ),
+            None => "the catalogue records no byte range for this parameter".into(),
+        });
         return decoded;
     };
     if from > to || to >= data.len() {

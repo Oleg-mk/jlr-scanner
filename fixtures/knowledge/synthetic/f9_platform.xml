@@ -101,6 +101,7 @@
 			<data_identifier_set type="SWDL">synth_swdl_plus<qualifier><qual type="CM_QUAL_SYNTH_HW" value="VAL_PLUS"/></qualifier></data_identifier_set>
 			<data_identifier_set type="PDI">synth_pdi</data_identifier_set>
 			<data_identifier_set type="APP_DATA_COLLECT">synth_net</data_identifier_set>
+			<data_identifier_set type="BATT">synth_batt_current</data_identifier_set>
 			<fitment>mandatory</fitment>
 		</module>
 		<module>
@@ -168,8 +169,26 @@
 		<did id="0xDD01" name="generic_pid_dd01" service_id="0x22">
 			<tm>Total Distance</tm>
 		</did>
+		<!-- Additional PIDS: the battery monitor (ADR-0030). -->
+		<did id="0x4028" name="batt_state_of_chrg" service_id="0x22" format="10">
+			<tm>Vehicle Battery Estimated State of Charge</tm>
+		</did>
+		<did id="0x4025" name="batt_q_cur_low" service_id="0x22" format="10">
+			<tm>Average Vehicle Quiesent Current - Previous 24 Hours (mA)</tm>
+		</did>
+		<did id="0x4020" name="num_batt_repl_rst" service_id="0x22" format="10">
+			<tm>Number of Vehicle Battery Monitor Resets</tm>
+		</did>
+		<did id="0xDE05" name="turbo_offset_values" service_id="0x22" format="10">
+			<tm>Turbocharger valve offset values</tm>
+		</did>
 		<did id="0xF802" name="vehicle_id_number" service_id="0x09">
 			<tm>Vehicle Identification Number</tm>
+		</did>
+	</data_identifier_set>
+	<data_identifier_set id="synth_batt_current">
+		<did id="0x4090" name="batt_current" service_id="0x22" format="10">
+			<tm>Battery current</tm>
 		</did>
 	</data_identifier_set>
 	<data_identifier_set id="synth_swdl_std">

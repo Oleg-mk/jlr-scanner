@@ -74,6 +74,18 @@ struct SessionReport {
     /// The configuration read (`ADR-0028`): one record per block read.
     #[serde(default)]
     ccf_reads: Vec<CcfRead>,
+    /// The battery read (`ADR-0030`): one record per read made.
+    #[serde(default)]
+    battery_reads: Vec<BatteryRead>,
+}
+
+/// As much of a battery read as the intake reads: the reads it made. What
+/// the battery holds is a fact about that car on that day, not evidence
+/// about a route, and is not recorded here.
+#[derive(Debug, Deserialize)]
+struct BatteryRead {
+    #[serde(default)]
+    reads: Vec<ModuleReadReport>,
 }
 
 /// As much of a configuration read as the intake reads: the reads it made.
@@ -219,7 +231,13 @@ pub fn intake(
                 .iter()
                 .flat_map(|passport| passport.reads.iter()),
         )
-        .chain(report.ccf_reads.iter().flat_map(|ccf| ccf.reads.iter()));
+        .chain(report.ccf_reads.iter().flat_map(|ccf| ccf.reads.iter()))
+        .chain(
+            report
+                .battery_reads
+                .iter()
+                .flat_map(|battery| battery.reads.iter()),
+        );
     for read in every_read {
         let program = read.vehicle.vehicle_program.trim();
         if !program.is_empty() && !programs.iter().any(|known| known == program) {
@@ -310,10 +328,20 @@ pub fn intake(
             )?;
         }
     }
+    for (battery_index, battery) in report.battery_reads.iter().enumerate() {
+        for (read_index, record) in battery.reads.iter().enumerate() {
+            builder.read(
+                format!("battery_reads[{battery_index}].reads[{read_index}]"),
+                format!("battery.{battery_index:02}.{read_index:03}"),
+                record,
+                library,
+            )?;
+        }
+    }
 
     if builder.records.is_empty() {
         return Err(KnowledgeError::Parse(
-            "the report holds nothing this intake can record: no module read, capture, calibration read, live-read run, mileage survey, module passport or configuration read".into(),
+            "the report holds nothing this intake can record: no module read, capture, calibration read, live-read run, mileage survey, module passport, configuration read or battery read".into(),
         ));
     }
     Ok(IntakeOutcome {

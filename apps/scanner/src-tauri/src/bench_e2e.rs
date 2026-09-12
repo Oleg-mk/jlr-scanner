@@ -3,6 +3,7 @@
 //! port is opened, and nothing here is evidence of any vehicle.
 
 use super::adapter_service::{AdapterService, SystemAdapterBackend, BENCH_PORT, BENCH_TRANSPORT};
+use super::battery_service::{BatteryService, BATTERY_READ_TIMEOUT};
 use super::capture_service::CaptureService;
 use super::ccf_service::{CcfService, CCF_READ_TIMEOUT};
 use super::live_read_service::{LiveReadService, LIVE_READ_TIMEOUT};
@@ -14,10 +15,10 @@ use super::session_report_service::{SessionReportService, SESSION_MODE_BENCH, SE
 use super::session_service::SessionService;
 use super::standard_obd_service::{StandardObdService, STANDARD_OBD_TIMEOUT};
 use app_contracts::{
-    AdapterErrorCode, AdapterInfo, AdapterState, CcfReadState, LiveReadEntryRequest,
-    LiveReadRequest, LiveReadState, MileageKind, MileageSurveyState, ModulePassportState,
-    ModuleReadKind, ModuleReadRequest, ModuleReadState, StandardObdReadKind, StandardObdRequest,
-    VehicleContextInput,
+    AdapterErrorCode, AdapterInfo, AdapterState, BatteryReadState, CcfReadState,
+    LiveReadEntryRequest, LiveReadRequest, LiveReadState, MileageKind, MileageSurveyState,
+    ModulePassportState, ModuleReadKind, ModuleReadRequest, ModuleReadState, StandardObdReadKind,
+    StandardObdRequest, VehicleContextInput,
 };
 use diagnostic_session::KnowledgeLibrary;
 use knowledge::{
@@ -27,8 +28,8 @@ use knowledge::{
 use mongoose_jlr::bench::share_bus;
 use mongoose_jlr::VehicleRouteId;
 use sdd_ingest::{
-    CcfAdapter, ConverterCatalogue, DidFormattingAdapter, ModelYearTimeline, ModuleTextAdapter,
-    PlatformAdapter, VinDecodeAdapter,
+    BatteryFormatting, CcfAdapter, ConverterCatalogue, DidFormattingAdapter, ModelYearTimeline,
+    ModuleTextAdapter, PlatformAdapter, VinDecodeAdapter,
 };
 use std::time::Duration;
 use transport_api::EmptyBench;
@@ -67,9 +68,20 @@ fn library() -> KnowledgeLibrary {
     for marker in ["MY08", "MY10", "MY12"] {
         timeline.observe("SYNTHA", marker).unwrap();
     }
+    // The battery join of ADR-0030: the platform names the module, the
+    // formatting document describes the bytes. The exporter hands the one to
+    // the other, and so does the bench.
+    let mut battery_formatting = BatteryFormatting::new();
+    battery_formatting.insert(
+        0x4028,
+        "Vehicle Battery Estimated State of Charge",
+        Some("size=1;mask=0xff;converter=CVT_N_PCT_OFF_0_RES_1;scale=1;offset=0;offset_first=true"),
+        Some("pct"),
+    );
     let platform = PlatformAdapter::new(synthetic_source("bench-plat", PLATFORM))
         .unwrap()
-        .with_timeline(timeline.clone());
+        .with_timeline(timeline.clone())
+        .with_battery_formatting(std::sync::Arc::new(battery_formatting));
     let ccf_adapter = CcfAdapter::new(synthetic_source("bench-ccf", CCF))
         .unwrap()
         .with_timeline(timeline.clone());
@@ -547,6 +559,98 @@ fn the_bench_connects_without_a_port_reads_the_surveyed_vehicle_and_marks_everyt
         );
     }
 
+    // The battery (ADR-0030): the modules whose sets name the battery
+    // monitor answer its identifiers, the card gets a level and a current,
+    // and every row of it is synthetic. Nothing in the report judges the
+    // battery, and the turbocharger parameter whose name merely contains
+    // "charge" is not among the reads.
+    let mut battery = BatteryService::new();
+    let families: Vec<String> = survey
+        .modules
+        .iter()
+        .map(|module| module.ecu_family.clone())
+        .collect();
+    let started = battery.start(session.library(), Some(&info), &vehicle(), &families);
+    assert_eq!(started.state, BatteryReadState::Running, "{started:?}");
+    assert_eq!(
+        started.planned, 4,
+        "the four battery identifiers SYNTHMOD declares: {started:?}"
+    );
+    // OTHERMOD declares the same set, so the data says it serves them too;
+    // its route cannot be planned, and it is listed with that reason rather
+    // than passed over.
+    assert!(
+        started
+            .refused
+            .iter()
+            .any(|refusal| refusal.ecu_family == "OTHERMOD"),
+        "{:?}",
+        started.refused
+    );
+    while let Some(due) = battery.next_due() {
+        let result = adapter
+            .execute_uds_read(&due.transaction, BATTERY_READ_TIMEOUT)
+            .expect("the bench is connected")
+            .map_err(map_live_error);
+        battery.record(due.index, result);
+        battery.mark_synthetic();
+    }
+    let charged = battery.snapshot();
+    assert_eq!(charged.state, BatteryReadState::Finished);
+    assert_eq!(charged.answered, 4, "{:?}", charged.readings);
+    let charge = charged
+        .readings
+        .iter()
+        .find(|row| row.identifier == "0x4028")
+        .expect("the state of charge is read");
+    assert_eq!(charge.role, "CHARGE");
+    assert!(charge.headline);
+    assert_eq!(
+        charge.value.as_deref(),
+        Some("78"),
+        "the bench answers a believable state of charge, decoded through the \
+         formatting document own scale: {charge:?}"
+    );
+    assert_eq!(charge.unit.as_deref(), Some("pct"));
+    // The ones no document describes are the bytes they are, with the
+    // decoder own reason beside them.
+    let resets = charged
+        .readings
+        .iter()
+        .find(|row| row.identifier == "0x4020")
+        .expect("the monitor resets are read");
+    assert!(resets.note.is_some(), "{resets:?}");
+    let current = charged
+        .readings
+        .iter()
+        .find(|row| row.identifier == "0x4090")
+        .expect("the dedicated battery set is read too");
+    assert_eq!(current.role, "CURRENT");
+    assert!(
+        charged
+            .readings
+            .iter()
+            .all(|row| row.identifier != "0xDE05"),
+        "a turbocharger parameter is not the battery: {:?}",
+        charged.readings
+    );
+    for row in &charged.readings {
+        assert_eq!(row.route_validation, "SYNTHETIC");
+    }
+    let battery_json = battery.report_json().expect("a finished run is a report");
+    assert!(battery_json.contains("prowlone.battery-state"));
+    assert!(battery_json.contains("\"safety_class\": \"READ_ONLY\""));
+    assert!(
+        !battery_json.contains("SOURCE_BACKED"),
+        "a bench reading is marked as real inside the report: {battery_json}"
+    );
+    for verdict in ["good", "bad", "poor", "healthy", "replace", "failing"] {
+        assert!(
+            !battery_json.to_lowercase().contains(verdict),
+            "the report must not say {verdict}"
+        );
+    }
+
     // A listen on the bench hears nothing, and is synthetic all the same.
     let listened = adapter
         .capture_route(VehicleRouteId::HsCan, Duration::from_millis(100))
@@ -582,6 +686,7 @@ fn the_bench_connects_without_a_port_reads_the_surveyed_vehicle_and_marks_everyt
     report.add_module_passport(&passport_json).unwrap();
     assert_eq!(report.snapshot().module_passports, 1);
     report.add_ccf_read(&ccf_json).unwrap();
+    report.add_battery_read(&battery_json).unwrap();
     assert_eq!(report.snapshot().ccf_reads, 1);
     assert!(report.is_bench());
     assert!(report.accepts(SESSION_MODE_BENCH));

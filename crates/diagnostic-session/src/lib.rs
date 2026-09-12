@@ -119,6 +119,20 @@ pub fn vehicle_context(input: &VehicleContextInput) -> VehicleContext {
     }
 }
 
+/// One battery parameter a module can be asked for (ADR-0030).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct BatteryParameter {
+    pub identifier: u16,
+    /// SDD's own name for it.
+    pub parameter: String,
+    /// What it is for; the card groups by this.
+    pub role: knowledge::BatteryRole,
+    /// Whether it belongs on the card's face.
+    pub headline: bool,
+    /// The unit the data states, never one inferred from a name.
+    pub unit: Option<String>,
+}
+
 /// SDD's wording for a fault code and its failure type byte, as far as the
 /// library holds it.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
@@ -551,6 +565,48 @@ impl KnowledgeLibrary {
                 }
             }
         }
+        found
+    }
+
+    /// The battery parameters the loaded data declares for this module
+    /// (ADR-0030): every identifier the platform document names for it that
+    /// the battery rule recognises, with SDD's own name, the role it plays
+    /// and the unit where the data states one. One entry per parameter: a
+    /// record of bits carries several, and each is its own row.
+    pub fn battery_parameters(
+        &self,
+        context: &VehicleContext,
+        ecu_family: &str,
+    ) -> Vec<BatteryParameter> {
+        let mut found = Vec::new();
+        for identifier in
+            DiagnosticEnvironmentResolver::readable_identifiers(self.store(), context, ecu_family)
+        {
+            for parameter in &identifier.parameters {
+                let Some(role) = knowledge::battery_role(identifier.identifier, &parameter.name)
+                else {
+                    continue;
+                };
+                found.push(BatteryParameter {
+                    identifier: identifier.identifier,
+                    parameter: parameter.name.clone(),
+                    role,
+                    headline: knowledge::is_headline_battery_parameter(identifier.identifier),
+                    unit: parameter.unit.clone(),
+                });
+            }
+        }
+        found.sort_by(|left, right| {
+            left.role
+                .order()
+                .cmp(&right.role.order())
+                .then_with(|| right.headline.cmp(&left.headline))
+                .then_with(|| left.identifier.cmp(&right.identifier))
+                .then_with(|| left.parameter.cmp(&right.parameter))
+        });
+        found.dedup_by(|left, right| {
+            left.identifier == right.identifier && left.parameter == right.parameter
+        });
         found
     }
 

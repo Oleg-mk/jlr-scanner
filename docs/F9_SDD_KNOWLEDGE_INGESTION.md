@@ -954,3 +954,61 @@ Golden test: `k_line_buses_carry_pin_rate_framing_and_wakeup_and_their_modules_a
 in `f9_platform_golden.rs`, over the synthetic platform's two K-line buses —
 one pinned and spoken (`DS2_PIN7`, `DS2MOD` at `0x72`), one unpinned and only
 named (`KW2000STAR`, `STARMOD` at `0x12`).
+
+
+## 2026-09-12 — the battery monitor (ADR-0030)
+
+The platform documents carry more than addressing. Inside each module's own
+`NET` set, under a comment that reads *Additional PIDS*, they name the
+identifiers that module answers for the battery monitor — and they name them
+per car, with the module, the programme and the breakpoint marker the set is
+qualified by. A dedicated `type="BATT"` set exists as well, in 30 documents
+for `BCM`, `GWM` and `RSJB`, and it holds exactly one identifier: the battery
+current. The dataset had to be found where it lives, not where its name
+suggested.
+
+`PlatformAdapter` now records, per module, each member of any of its sets
+that the battery rule recognises. The rule is `knowledge::battery`: a curated
+table of identifiers with the role each plays, and a check that the name the
+document gives the identifier **on that module** names the battery or the
+charging system. Both tests must pass. The table alone would trust a number
+that means something else elsewhere; the name alone admits `Turbocharger
+valve offset values`, which contains "charge" and is not a battery parameter.
+
+The bytes are a join. SDD's DID formatting document — the one the catalogue
+is built from — describes the bytes of 18 of these identifiers, with
+converters, scales, offsets and units, and names no module for any of them,
+so those rows resolve as *insufficient evidence* and reach nothing on their
+own. The platform document names the module and not the bytes. The exporter
+collects the formatting document's battery rows in its first pass and hands
+them to the platform adapter in its second, which writes one
+`ParameterDefinition` per module and battery parameter carrying that encoding
+and unit. Where the formatting document says nothing, the platform's own name
+is recorded with no encoding and the value is shown as the bytes it is.
+
+### Real-source run
+
+| | |
+| --- | --- |
+| identifiers the rule admits | 59 |
+| module-identifier pairs | 106 |
+| programmes | 17 |
+| modules that serve them | `GWM`, `BCM`, `RSJB`, `BECM`, `FSJB`, `IPC`, `PSCM` |
+| described byte by byte by the formatting document | 18 |
+| battery records written | 1,486 |
+| the library | 355,112 records (from 353,626), 21M on disk |
+| rejected | 0 |
+
+What SDD does not hold, and this product therefore does not show: a state of
+health, an internal resistance for the 12-volt battery, and any arithmetic
+that would produce either. The nearest thing the corpus keeps is the
+estimated cold cranking voltage at the present state of charge, beside the
+amp-hour charge loss and the lowest calculated amp-hour value; leakage
+resistance exists only for the traction battery of a hybrid.
+
+Golden tests: `the_battery_monitors_identifiers_are_recorded_for_the_module_that_serves_them`
+and `the_byte_description_joins_the_module_that_serves_the_parameter` in
+`f9_platform_golden.rs`, over a fixture whose `NET` set carries a state of
+charge, a quiescent current, a monitor-reset count and a turbocharger
+parameter that must stay out, and whose module also declares the dedicated
+`BATT` set.

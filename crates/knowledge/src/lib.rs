@@ -4,6 +4,9 @@
 //! transport, operating-system, application-shell, or UI dependency.
 
 mod applicability;
+/// Which identifiers are the car's battery, and what each one is for
+/// (ADR-0030).
+pub mod battery;
 mod error;
 mod evidence;
 mod ingestion;
@@ -17,6 +20,7 @@ mod store;
 pub use applicability::{
     Applicability, ApplicabilityResolution, DimensionConstraint, VehicleContext, YearConstraint,
 };
+pub use battery::{battery_role, is_headline as is_headline_battery_parameter, BatteryRole};
 pub use error::KnowledgeError;
 pub use evidence::{EvidenceClass, EvidenceId, EvidenceRecord, SourceLocator};
 pub use ingestion::{

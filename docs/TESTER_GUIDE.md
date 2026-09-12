@@ -267,6 +267,31 @@ guessing.
 
 Nothing is written — the configuration is read, never set.
 
+## The battery
+
+In the session column, under the steps, there is a **battery card**. Press
+**Read the battery** once the adapter is connected and the car is chosen.
+The card then shows the state of charge as a bar, with the voltage, the
+current and the battery temperature beside it.
+
+Everything else the car's battery monitor holds is in the **battery panel**,
+in the working area beside the module passport: what the car draws while it
+is parked, the estimated cold cranking voltage, how long the battery has
+been in service, how many times the monitor was reset, the battery type, and
+on a hybrid the traction battery as its own group. On a real car that is
+thirty-odd rows, which is why they are a panel and not a card.
+
+Two things worth knowing. First, the card always says when the reading was
+taken: a battery reading five minutes into a session is a different fact
+from a fresh one, because the session itself draws from that battery.
+Second, **the application does not judge the battery**. It shows what the
+modules hold, in the units the data states, and says nothing about whether
+the battery is good, weak or due for replacement. Where a number is shown as
+raw bytes, it is because the loaded data does not describe those bytes and
+this application does not guess a scale.
+
+Nothing is written: the battery is read, never registered or reset.
+
 ## The K-line modules of the older cars
 
 A Range Rover L322 of 2006–2007 keeps its body electronics — light control,

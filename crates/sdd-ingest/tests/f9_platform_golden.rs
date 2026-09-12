@@ -10,7 +10,7 @@ use knowledge::{
     EvidenceClass, KnowledgeQuery, KnowledgeStore, KnowledgeValue, RedistributionStatus, SourceId,
     SourceRecord, SourceType, ValidationState, YearConstraint,
 };
-use sdd_ingest::{ModelYearTimeline, PlatformAdapter, NETWORK_CLAIM};
+use sdd_ingest::{BatteryFormatting, ModelYearTimeline, PlatformAdapter, NETWORK_CLAIM};
 
 const FIXTURE: &str = include_str!("../../../fixtures/knowledge/synthetic/f9_platform.xml");
 /// A document that declares one acronym several times, each under its own
@@ -780,6 +780,9 @@ fn identification_identifiers_are_recorded_per_module_in_the_catalogue_shape() {
             .iter()
             .filter(|resolved| {
                 resolved.record.entity.kind == EntityKind::IdentifierParameter
+                    // The battery parameters of ADR-0030 share the entity
+                    // kind and the module; this list is the identification.
+                    && resolved.record.id.contains(".identification.")
                     && resolved.record.applicability.ecu_family
                         == DimensionConstraint::one_of([family.to_string()]).unwrap()
             })
@@ -886,4 +889,149 @@ fn identification_identifiers_are_recorded_per_module_in_the_catalogue_shape() {
             .iter()
             .all(|id| id.0.starts_with("f9-plat.ev.f9-plat.module.")));
     }
+}
+
+/// ADR-0030: the battery monitor's identifiers are recorded per module, from
+/// whichever of the module's sets names them, and the rule admits them by
+/// identifier *and* by name — so a turbocharger parameter whose name merely
+/// contains "charge" is not the battery. Where the exporter has given the
+/// adapter SDD's own byte description, the record carries it; where it has
+/// not, the platform's own name stands alone and the value is bytes.
+#[test]
+fn the_battery_monitors_identifiers_are_recorded_for_the_module_that_serves_them() {
+    let store = ingest(SourceType::Documented);
+
+    // From the module's own NET set, under its "Additional PIDS".
+    let charge = store
+        .get_record("f9-plat.module.SYNTHMOD.battery.0x4028.0")
+        .expect("the state of charge is recorded for the module that serves it");
+    assert_eq!(
+        charge.entity,
+        knowledge::KnowledgeEntity {
+            kind: EntityKind::IdentifierParameter,
+            id: "DID-0x4028".into(),
+        }
+    );
+    assert_eq!(
+        charge.key,
+        ClaimKey::ParameterDefinition {
+            parameter: "Vehicle Battery Estimated State of Charge".into(),
+        }
+    );
+    assert_eq!(
+        charge.value,
+        KnowledgeValue::IdentifierDefinition {
+            identifier: "0x4028".into(),
+            // Nothing describes these bytes in this ingest, so nothing is
+            // invented: the reading will be shown as the bytes it is.
+            encoding: None,
+            unit: None,
+        }
+    );
+    // Scoped to the module that declares it, not to every module on the car.
+    assert_eq!(
+        charge.applicability.ecu_family,
+        DimensionConstraint::one_of(["SYNTHMOD".to_string()]).unwrap()
+    );
+
+    // The drain and the history members of the same set.
+    assert!(store
+        .get_record("f9-plat.module.SYNTHMOD.battery.0x4025.0")
+        .is_some());
+    assert!(store
+        .get_record("f9-plat.module.SYNTHMOD.battery.0x4020.0")
+        .is_some());
+    // And the one member of the dedicated BATT set.
+    let current = store
+        .get_record("f9-plat.module.SYNTHMOD.battery.0x4090.0")
+        .expect("the dedicated battery set is read like any other");
+    assert_eq!(
+        current.key,
+        ClaimKey::ParameterDefinition {
+            parameter: "Battery current".into(),
+        }
+    );
+
+    // The one a word match would have let in.
+    assert!(
+        store
+            .get_record("f9-plat.module.SYNTHMOD.battery.0xde05.0")
+            .is_none(),
+        "a turbocharger parameter is not the battery"
+    );
+    // OTHERMOD declares the same NET set, so the document says it serves
+    // these parameters too, and the record follows the document.
+    assert!(store
+        .get_record("f9-plat.module.OTHERMOD.battery.0x4028.0")
+        .is_some());
+    // A module that declares no set at all gets no battery record.
+    assert!(store
+        .get_record("f9-plat.module.FIXEDMOD.battery.0x4028.0")
+        .is_none());
+}
+
+/// The join of ADR-0030: SDD describes the bytes of the state of charge in
+/// its DID formatting document and names no module there; the platform
+/// document names the module and not the bytes. Given both, the record
+/// carries the formatting document's own name, encoding and unit.
+#[test]
+fn the_byte_description_joins_the_module_that_serves_the_parameter() {
+    let mut formatting = BatteryFormatting::new();
+    formatting.insert(
+        0x4028,
+        "Vehicle battery state of charge  -  Estimated",
+        Some("size=1;mask=0xff;converter=CVT_N_PCT_OFF_0_RES_1;scale=1;offset=0;offset_first=true"),
+        Some("pct"),
+    );
+    // A parameter the rule does not recognise is not kept, whatever the
+    // formatting document says about it.
+    formatting.insert(
+        0xDE05,
+        "Turbocharger valve offset values",
+        Some("size=2"),
+        None,
+    );
+    assert_eq!(formatting.identifiers(), 1);
+
+    let adapter = PlatformAdapter::new(source(SourceType::Documented))
+        .unwrap()
+        .with_battery_formatting(std::sync::Arc::new(formatting));
+    let mut store = KnowledgeStore::new();
+    store.ingest(&adapter, FIXTURE).unwrap();
+
+    let charge = store
+        .get_record("f9-plat.module.SYNTHMOD.battery.0x4028.0")
+        .unwrap();
+    assert_eq!(
+        charge.key,
+        ClaimKey::ParameterDefinition {
+            parameter: "Vehicle battery state of charge  -  Estimated".into(),
+        }
+    );
+    assert_eq!(
+        charge.value,
+        KnowledgeValue::IdentifierDefinition {
+            identifier: "0x4028".into(),
+            encoding: Some(
+                "size=1;mask=0xff;converter=CVT_N_PCT_OFF_0_RES_1;scale=1;offset=0;offset_first=true"
+                    .into()
+            ),
+            unit: Some("pct".into()),
+        }
+    );
+    // The ones the formatting document says nothing about keep the
+    // platform's own name and no encoding.
+    let resets = store
+        .get_record("f9-plat.module.SYNTHMOD.battery.0x4020.0")
+        .unwrap();
+    assert_eq!(
+        resets.key,
+        ClaimKey::ParameterDefinition {
+            parameter: "Number of Vehicle Battery Monitor Resets".into(),
+        }
+    );
+    assert!(matches!(
+        &resets.value,
+        KnowledgeValue::IdentifierDefinition { encoding: None, .. }
+    ));
 }

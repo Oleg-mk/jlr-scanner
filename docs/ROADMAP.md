@@ -494,6 +494,20 @@ application does and does not do, report submission, and the intake path that
 turns a returned report into F5 evidence. Testers operate their own vehicles at
 their own discretion; the application must never imply otherwise.
 
+### F21 — the battery, read and shown as a standing indicator (2026-09-12, `ADR-0030`)
+
+Built. A diagnostic session runs on the car's own battery and is exactly
+when it is weakest, so the rail every read depends on is shown beside the
+reads: a card in the session column with the state of charge, the voltage,
+the current and the estimated temperature on its face, and the whole battery
+monitor behind it — what the car leaks while parked, how the battery has
+aged, what the car remembers about it, and, on a hybrid, the traction
+battery from its own module. The knowledge is SDD's own: the platform
+documents name these identifiers per module and per car, and the DID
+formatting document describes the bytes of the ones this product can decode.
+Nothing is judged, nothing is written, and no health percentage is computed
+out of parts SDD did not put together.
+
 ### F14 — K-line transport for the legacy buses (brought forward 2026-09-12, `ADR-0029`)
 
 ISO 9141 / ISO 14230 over J1962 pins 7 and 8, which the MongoosePro JLR variant

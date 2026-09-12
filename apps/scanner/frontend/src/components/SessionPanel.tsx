@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { t, useLanguage } from "../i18n";
 import { bodyImageUrl, type BodyType } from "../vehicleBody";
 import type { SessionStep } from "../sessionReport";
@@ -14,6 +14,11 @@ export interface RailVehicle {
 
 interface SessionPanelProps {
   steps: SessionStep[];
+  /**
+   * The battery card (ADR-0030), drawn between the steps and the vehicle:
+   * the rail the session runs on is the rail every read runs on.
+   */
+  battery?: ReactNode;
   /** Bring the section that holds this step into view. */
   onJump: (stepId: SessionStep["id"]) => void;
   /** The vehicle of the session, once described; drawn at the foot of the rail. */
@@ -68,7 +73,7 @@ const stateLabel: Record<SessionStep["state"], string> = {
   todo: "To do",
 };
 
-export function SessionPanel({ steps, onJump, vehicle }: SessionPanelProps) {
+export function SessionPanel({ steps, onJump, vehicle, battery }: SessionPanelProps) {
   useLanguage();
   const next = steps.find((step) => step.state === "next");
   return (
@@ -115,6 +120,7 @@ export function SessionPanel({ steps, onJump, vehicle }: SessionPanelProps) {
           </li>
         ))}
       </ol>
+      {battery ?? null}
       <div
         className={vehicle ? "rail-vehicle" : "rail-vehicle rail-vehicle--empty"}
         aria-live="polite"

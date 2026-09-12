@@ -65,6 +65,7 @@ pub struct PlatformAdapter {
     source: SourceRecord,
     timeline: Option<ModelYearTimeline>,
     derive_normal_fixed: bool,
+    battery_formatting: Option<std::sync::Arc<BatteryFormatting>>,
 }
 
 impl PlatformAdapter {
@@ -74,6 +75,7 @@ impl PlatformAdapter {
             source,
             timeline: None,
             derive_normal_fixed: false,
+            battery_formatting: None,
         })
     }
 
@@ -91,6 +93,77 @@ impl PlatformAdapter {
     pub fn with_derived_normal_fixed_identifiers(mut self) -> Self {
         self.derive_normal_fixed = true;
         self
+    }
+
+    /// Give the adapter the byte descriptions of the battery identifiers
+    /// (ADR-0030). The platform document names the module and the parameter;
+    /// the DID formatting document describes the bytes but names no module,
+    /// so its rows reach nothing on their own. Joined here, a battery
+    /// parameter becomes readable for the module that serves it. Without the
+    /// index the identifiers are still recorded, under the platform's own
+    /// name, and their values are shown as the bytes they are.
+    pub fn with_battery_formatting(
+        mut self,
+        formatting: std::sync::Arc<BatteryFormatting>,
+    ) -> Self {
+        self.battery_formatting = Some(formatting);
+        self
+    }
+}
+
+/// How SDD's DID formatting document describes the bytes of one parameter.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct BatteryFormattingRow {
+    pub parameter: String,
+    pub encoding: Option<String>,
+    pub unit: Option<String>,
+}
+
+/// The byte descriptions of the battery identifiers, by identifier
+/// (ADR-0030). Built by the exporter from the DID formatting document and
+/// handed to the platform adapter.
+#[derive(Clone, Debug, Default)]
+pub struct BatteryFormatting {
+    rows: BTreeMap<u16, Vec<BatteryFormattingRow>>,
+}
+
+impl BatteryFormatting {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Record one description. A parameter the battery rule does not
+    /// recognise is not a battery parameter and is not kept.
+    pub fn insert(
+        &mut self,
+        identifier: u16,
+        parameter: &str,
+        encoding: Option<&str>,
+        unit: Option<&str>,
+    ) {
+        if knowledge::battery_role(identifier, parameter).is_none() {
+            return;
+        }
+        let rows = self.rows.entry(identifier).or_default();
+        if rows.iter().any(|row| row.parameter == parameter) {
+            return;
+        }
+        rows.push(BatteryFormattingRow {
+            parameter: parameter.to_string(),
+            encoding: encoding.map(str::to_string),
+            unit: unit.map(str::to_string),
+        });
+    }
+
+    pub fn rows_for(&self, identifier: u16) -> &[BatteryFormattingRow] {
+        self.rows
+            .get(&identifier)
+            .map(Vec::as_slice)
+            .unwrap_or_default()
+    }
+
+    pub fn identifiers(&self) -> usize {
+        self.rows.len()
     }
 }
 
@@ -773,6 +846,9 @@ impl PlatformAdapter {
             self.add_identification(
                 module, sets, acronym, &segment, &suffix, program, base, evidence, records,
             )?;
+            self.add_battery(
+                module, sets, acronym, &segment, &suffix, program, base, evidence, records,
+            )?;
         }
         Ok(())
     }
@@ -871,6 +947,124 @@ impl PlatformAdapter {
                     evidence,
                     records,
                 )?;
+            }
+        }
+        Ok(())
+    }
+
+    /// The module's battery parameters (ADR-0030): the members of any set it
+    /// declares whose identifier the battery rule names, recorded in the DID
+    /// catalogue's own shape so that the resolver's readable list and the
+    /// transaction gate admit them as they admit a catalogue parameter.
+    ///
+    /// The bytes come from SDD's DID formatting document where the exporter
+    /// has given the adapter its descriptions — that document names no
+    /// module, so on its own it reaches nothing — and where it has none the
+    /// platform's own name stands alone and the value is shown as bytes.
+    #[allow(clippy::too_many_arguments)]
+    fn add_battery(
+        &self,
+        module: roxmltree::Node<'_, '_>,
+        sets: &BTreeMap<String, Vec<DeclaredIdentifier>>,
+        acronym: &str,
+        segment: &str,
+        suffix: &str,
+        program: &str,
+        base: &Applicability,
+        evidence: &mut BTreeMap<String, EvidenceRecord>,
+        records: &mut BTreeMap<String, KnowledgeRecord>,
+    ) -> Result<(), KnowledgeError> {
+        for reference in module
+            .children()
+            .filter(|node| node.is_element() && node.tag_name().name() == "data_identifier_set")
+        {
+            let kind = reference.attribute("type").unwrap_or_default();
+            let Some(set_name) = reference
+                .text()
+                .map(str::trim)
+                .filter(|name| !name.is_empty())
+            else {
+                continue;
+            };
+            let Some(members) = sets.get(set_name) else {
+                continue;
+            };
+            let set_quals = module_quals(reference);
+            let set_suffix = qual_suffix(&set_quals);
+            let mut applicability = qualified_by_module(base, &set_quals)?;
+            applicability.ecu_family = DimensionConstraint::one_of([acronym.to_string()])?;
+            applicability.validate()?;
+            let qualifier_note = if set_quals.is_empty() {
+                String::new()
+            } else {
+                format!(" set qualifier={}", qual_text(&set_quals))
+            };
+
+            for member in members {
+                if member.service.as_deref() != Some(READ_DATA_BY_IDENTIFIER_SERVICE) {
+                    continue;
+                }
+                let Some(role) = knowledge::battery_role(member.identifier, &member.name) else {
+                    continue;
+                };
+                let identifier = format!("0x{:04X}", member.identifier);
+                let described: Vec<BatteryFormattingRow> = self
+                    .battery_formatting
+                    .as_ref()
+                    .map(|formatting| formatting.rows_for(member.identifier).to_vec())
+                    .unwrap_or_default();
+                let rows: Vec<BatteryFormattingRow> = if described.is_empty() {
+                    vec![BatteryFormattingRow {
+                        parameter: member.name.clone(),
+                        encoding: None,
+                        unit: None,
+                    }]
+                } else {
+                    described
+                };
+                for (index, row) in rows.into_iter().enumerate() {
+                    let record_id = format!(
+                        "{}.module.{segment}.battery.{}.{index}{suffix}{set_suffix}",
+                        self.source.id.0,
+                        identifier.to_ascii_lowercase()
+                    );
+                    // The same identifier reached through two of the module's
+                    // sets is one parameter; the first set to name it speaks.
+                    if records.contains_key(&record_id) {
+                        continue;
+                    }
+                    let bytes_note = if row.encoding.is_some() {
+                        "; bytes as the DID formatting document describes them"
+                    } else {
+                        "; bytes not described by the loaded data"
+                    };
+                    self.push(
+                        record_id,
+                        format!(
+                            "module_fitment/module[module_code_name/@acronym='{acronym}']/data_identifier_set[@type='{kind}']; data_identifier_set[@id='{set_name}']/did[@id='{identifier}']"
+                        ),
+                        format!(
+                            "{program} {acronym} battery {} {identifier} {} service 0x22{bytes_note}{qualifier_note}",
+                            role.as_str().to_ascii_lowercase(),
+                            row.parameter
+                        ),
+                        KnowledgeEntity {
+                            kind: EntityKind::IdentifierParameter,
+                            id: format!("DID-{identifier}"),
+                        },
+                        ClaimKey::ParameterDefinition {
+                            parameter: row.parameter.clone(),
+                        },
+                        KnowledgeValue::IdentifierDefinition {
+                            identifier: identifier.clone(),
+                            encoding: row.encoding.clone(),
+                            unit: row.unit.clone(),
+                        },
+                        applicability.clone(),
+                        evidence,
+                        records,
+                    )?;
+                }
             }
         }
         Ok(())

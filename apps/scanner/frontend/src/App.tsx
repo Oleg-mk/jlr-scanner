@@ -27,6 +27,8 @@ import { DiagnosticPanel } from "./components/DiagnosticPanel";
 import { LiveReadPanel } from "./components/LiveReadPanel";
 import { MileagePanel } from "./components/MileagePanel";
 import { PassportPanel } from "./components/PassportPanel";
+import { BatteryCard } from "./components/BatteryCard";
+import { BatteryPanel } from "./components/BatteryPanel";
 import { CcfPanel } from "./components/CcfPanel";
 import { StandardObdPanel } from "./components/StandardObdPanel";
 import { LibraryPanel } from "./components/LibraryPanel";
@@ -59,7 +61,9 @@ import { useMileageController } from "./useMileageController";
 import { defaultMileageClient, type MileageClient } from "./mileage";
 import { usePassportController } from "./usePassportController";
 import { defaultPassportClient, type PassportClient } from "./passport";
+import { useBatteryController } from "./useBatteryController";
 import { useCcfController } from "./useCcfController";
+import { defaultBatteryClient, type BatteryClient } from "./battery";
 import { defaultCcfClient, type CcfClient } from "./ccf";
 import { defaultLiveReadClient, type LiveReadClient } from "./liveRead";
 import { useStandardObdController } from "./useStandardObdController";
@@ -78,6 +82,7 @@ interface AppProps {
   mileageClient?: MileageClient;
   passportClient?: PassportClient;
   ccfClient?: CcfClient;
+  batteryClient?: BatteryClient;
   captureClient?: CaptureClient;
   moduleReadClient?: ModuleReadClient;
   sessionReportClient?: SessionReportClient;
@@ -136,6 +141,7 @@ export function App({
   mileageClient = defaultMileageClient,
   passportClient = defaultPassportClient,
   ccfClient = defaultCcfClient,
+  batteryClient = defaultBatteryClient,
   captureClient = defaultCaptureClient,
   moduleReadClient = defaultModuleReadClient,
   sessionReportClient = defaultSessionReportClient,
@@ -179,6 +185,7 @@ export function App({
   const mileage = useMileageController(mileageClient, library.vehicle);
   const passport = usePassportController(passportClient, library.vehicle);
   const ccf = useCcfController(ccfClient, library.vehicle);
+  const battery = useBatteryController(batteryClient, library.vehicle);
   const session = useSessionReportController(sessionReportClient);
   // The bench (ADR-0020): a virtual vehicle behind a stand-in adapter. The
   // whole screen says so, and the session is bench-only or real-only.
@@ -280,6 +287,13 @@ export function App({
     bench,
   });
   const demoPreview = browserDemoEnabled();
+  // The card is offered when there is something to read it with and a car
+  // to read it from; the reason is said rather than the button hidden.
+  const batteryDisabledReason = !adapterReady
+    ? t("Connect the adapter first.")
+    : library.vehicle.vehicleProgram.trim() === ""
+      ? t("Choose the vehicle first.")
+      : null;
   const railVehicle: RailVehicle | null = (() => {
     const programme = library.vehicle.vehicleProgram.trim();
     if (programme === "") return null;
@@ -382,6 +396,16 @@ export function App({
           steps={steps}
           onJump={(stepId) => jumpTo(sectionOf(stepId).id)}
           vehicle={railVehicle}
+          battery={
+            <BatteryCard
+              snapshot={battery.snapshot}
+              busy={battery.busy}
+              running={battery.running}
+              onRead={() => void battery.start()}
+              onStop={() => void battery.stop()}
+              disabledReason={batteryDisabledReason}
+            />
+          }
         />
         <div className="flow-body">
           {sections.map((section) => {
@@ -494,6 +518,15 @@ export function App({
                       onSaveReport={() => void moduleRead.saveReport()}
                     />
                   </div>
+                ) : null}
+                {section.id === "network" ? (
+                  <BatteryPanel
+                    snapshot={battery.snapshot}
+                    running={battery.running}
+                    adapterReady={adapterReady}
+                    surveyed={library.survey !== null}
+                    bench={bench}
+                  />
                 ) : null}
                 {section.id === "network" ? (
                   <MileagePanel

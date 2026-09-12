@@ -554,6 +554,8 @@ pub struct SessionReportSnapshot {
     /// Configuration reads recorded whole (ADR-0028).
     #[serde(default)]
     pub ccf_reads: u32,
+    /// Battery readings recorded in this session (ADR-0030).
+    pub battery_reads: u32,
     pub report_available: bool,
     /// `bench` or `real`, once an adapter of either kind took part; a session
     /// is one or the other, never both (ADR-0020).
@@ -977,6 +979,91 @@ pub struct ModulePassportSnapshot {
     pub route_validation: String,
     pub error: Option<DiagnosticError>,
     pub report_available: bool,
+}
+
+// ---------------------------------------------------------------------------
+// The battery (ADR-0030): what the battery monitor holds, read from the
+// modules SDD says hold it and shown as a card of its own. The card judges
+// nothing; where a band appears behind a voltage it is SDD's own band, named
+// as SDD's.
+// ---------------------------------------------------------------------------
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum BatteryReadState {
+    Idle,
+    Running,
+    Finished,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BatteryReadRequest {
+    pub context: VehicleContextInput,
+    /// The modules to ask; `None` asks every module the survey reaches.
+    #[serde(default)]
+    pub ecu_families: Option<Vec<String>>,
+}
+
+/// One battery parameter as one module answered it, or its silence.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BatteryReading {
+    pub ecu_family: String,
+    pub identifier: String,
+    /// SDD's own name for the parameter, in English: the row's identity.
+    pub parameter: String,
+    /// What the parameter is for: `CHARGE`, `VOLTAGE`, `CURRENT`,
+    /// `TEMPERATURE`, `DRAIN`, `HEALTH`, `HISTORY`, `CONFIGURATION`,
+    /// `HYBRID` (`ADR-0030`).
+    pub role: String,
+    /// Whether the reading belongs on the card's face.
+    pub headline: bool,
+    pub state: ModuleReadState,
+    /// The decoded value where the loaded data describes the bytes, the
+    /// bytes themselves where it does not.
+    pub value: Option<String>,
+    /// The unit the data states, never one inferred from a name.
+    pub unit: Option<String>,
+    pub route_id: String,
+    pub route_validation: String,
+    pub raw_response_hex: Option<String>,
+    /// The module's refusal: an answer, not a failure of the application.
+    pub negative_response: Option<String>,
+    /// What the decoder says about a value it shows as bytes.
+    pub note: Option<String>,
+    /// Why the module said nothing.
+    pub reason: Option<String>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BatteryReadSnapshot {
+    pub state: BatteryReadState,
+    pub readings: Vec<BatteryReading>,
+    /// Reads planned, attempted and answered.
+    pub planned: u32,
+    pub asked: u32,
+    pub answered: u32,
+    /// Modules the run covers.
+    pub modules: u32,
+    /// `SOURCE_BACKED` or the route's own state; `SYNTHETIC` on the bench.
+    pub route_validation: String,
+    /// When the run began, so a reading taken minutes ago is not mistaken
+    /// for a fresh one. Milliseconds since the epoch.
+    pub read_unix_ms: Option<u64>,
+    /// Modules asked for but not planned, each with the resolver's reason.
+    pub refused: Vec<ModuleRefusal>,
+    pub error: Option<DiagnosticError>,
+    pub report_available: bool,
+}
+
+/// A module the run could not plan, with the reason as the resolver gave it.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ModuleRefusal {
+    pub ecu_family: String,
+    pub reason: String,
 }
 
 // ---------------------------------------------------------------------------

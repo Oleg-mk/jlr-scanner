@@ -1,6 +1,7 @@
 //! Tauri composition root for ProwlOne.
 
 mod adapter_service;
+mod battery_service;
 mod capture_service;
 mod ccf_service;
 mod diagnostic_service;
@@ -15,12 +16,14 @@ mod standard_obd_service;
 
 use adapter_service::{lock_service, shared_service, SharedAdapterService};
 use app_contracts::{
-    AdapterSnapshot, AdapterState, CaptureSnapshot, CcfReadRequest, CcfReadSnapshot,
-    DiagnosticSnapshot, LibrarySnapshot, LiveReadRequest, LiveReadSnapshot, MileageSurveyRequest,
-    MileageSurveySnapshot, ModulePassportRequest, ModulePassportSnapshot, ModuleReadRequest,
-    ModuleReadSnapshot, SessionReportSnapshot, StandardObdRequest, StandardObdSnapshot,
-    VehicleCatalogueSnapshot, VehicleContextInput, VehicleSurveySnapshot, VinDecodeSnapshot,
+    AdapterSnapshot, AdapterState, BatteryReadRequest, BatteryReadSnapshot, CaptureSnapshot,
+    CcfReadRequest, CcfReadSnapshot, DiagnosticSnapshot, LibrarySnapshot, LiveReadRequest,
+    LiveReadSnapshot, MileageSurveyRequest, MileageSurveySnapshot, ModulePassportRequest,
+    ModulePassportSnapshot, ModuleReadRequest, ModuleReadSnapshot, SessionReportSnapshot,
+    StandardObdRequest, StandardObdSnapshot, VehicleCatalogueSnapshot, VehicleContextInput,
+    VehicleSurveySnapshot, VinDecodeSnapshot,
 };
+use battery_service::{BatteryService, BATTERY_READ_TIMEOUT};
 use bench_vehicle::BenchVehicle;
 use capture_service::CaptureService;
 use ccf_service::{CcfService, CCF_READ_TIMEOUT};
@@ -51,6 +54,13 @@ type SharedLiveReadService = Mutex<LiveReadService>;
 type SharedMileageService = Mutex<MileageService>;
 type SharedPassportService = Mutex<PassportService>;
 type SharedCcfService = Mutex<CcfService>;
+type SharedBatteryService = Mutex<BatteryService>;
+
+fn lock_battery<'a>(state: &'a State<'a, SharedBatteryService>) -> MutexGuard<'a, BatteryService> {
+    state
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+}
 
 fn lock_ccf<'a>(state: &'a State<'a, SharedCcfService>) -> MutexGuard<'a, CcfService> {
     state
@@ -1438,6 +1448,149 @@ async fn finish_ccf_read(
     Ok(lock_ccf(&ccf_state).snapshot())
 }
 
+// ---------------------------------------------------------------------------
+// The battery (ADR-0030): what the battery monitor holds, read from the
+// modules the loaded data names, shown as a card of its own. Nothing is
+// judged, and nothing is written.
+// ---------------------------------------------------------------------------
+
+#[tauri::command]
+async fn get_battery_state(
+    state: State<'_, SharedBatteryService>,
+) -> Result<BatteryReadSnapshot, String> {
+    Ok(lock_battery(&state).snapshot())
+}
+
+/// A finished run joins the session bundle once.
+fn record_battery_read(
+    battery_state: &State<'_, SharedBatteryService>,
+    report_state: &State<'_, SharedSessionReportService>,
+    bench: bool,
+) {
+    let json = { lock_battery(battery_state).take_report_json() };
+    if let Some(json) = json {
+        let mut session_report = lock_session_report(report_state);
+        session_report.set_mode(if bench {
+            SESSION_MODE_BENCH
+        } else {
+            SESSION_MODE_REAL
+        });
+        let _ = session_report.add_battery_read(&json);
+    }
+}
+
+fn start_battery_read_now(
+    adapter_state: State<'_, SharedAdapterService>,
+    session_state: State<'_, SharedSessionService>,
+    battery_state: State<'_, SharedBatteryService>,
+    request: BatteryReadRequest,
+) -> BatteryReadSnapshot {
+    let adapter = { lock_service(&adapter_state).connected_adapter() };
+    // Without an adapter the honest answer is that, not that the data
+    // names no battery parameter.
+    let Some(adapter) = adapter else {
+        return lock_battery(&battery_state).refuse(adapter_unavailable());
+    };
+    let mut session = lock_session(&session_state);
+    // The chosen modules, or every module the survey reaches.
+    let families: Vec<String> = session
+        .survey(&request.context)
+        .modules
+        .iter()
+        .map(|module| module.ecu_family.clone())
+        .filter(|family| match &request.ecu_families {
+            Some(chosen) => chosen.iter().any(|wanted| wanted == family),
+            None => true,
+        })
+        .collect();
+    let mut battery = lock_battery(&battery_state);
+    battery.start(
+        session.library(),
+        Some(&adapter),
+        &request.context,
+        &families,
+    )
+}
+
+fn battery_read_step_now(
+    adapter_state: State<'_, SharedAdapterService>,
+    battery_state: State<'_, SharedBatteryService>,
+    report_state: State<'_, SharedSessionReportService>,
+) -> BatteryReadSnapshot {
+    let due = { lock_battery(&battery_state).next_due() };
+    let Some(due) = due else {
+        let bench = lock_service(&adapter_state).is_bench();
+        record_battery_read(&battery_state, &report_state, bench);
+        return lock_battery(&battery_state).snapshot();
+    };
+
+    let (result, bench) = {
+        let mut service = lock_service(&adapter_state);
+        let bench = service.is_bench();
+        let result = service
+            .execute_uds_read(&due.transaction, BATTERY_READ_TIMEOUT)
+            .map(|result| result.map_err(map_live_error));
+        (result, bench)
+    };
+    let connected = result.is_some();
+    let outcome = result.unwrap_or_else(|| Err(adapter_unavailable()));
+
+    {
+        let mut battery = lock_battery(&battery_state);
+        battery.record(due.index, outcome);
+        if bench {
+            battery.mark_synthetic();
+        }
+        // An adapter that is gone will not come back for the next read;
+        // what was read stays.
+        if !connected {
+            battery.finish();
+        }
+    }
+    record_battery_read(&battery_state, &report_state, bench);
+    lock_battery(&battery_state).snapshot()
+}
+
+#[tauri::command]
+async fn start_battery_read(
+    adapter_state: State<'_, SharedAdapterService>,
+    session_state: State<'_, SharedSessionService>,
+    battery_state: State<'_, SharedBatteryService>,
+    request: BatteryReadRequest,
+) -> Result<BatteryReadSnapshot, String> {
+    Ok(start_battery_read_now(
+        adapter_state,
+        session_state,
+        battery_state,
+        request,
+    ))
+}
+
+#[tauri::command]
+async fn battery_read_step(
+    adapter_state: State<'_, SharedAdapterService>,
+    battery_state: State<'_, SharedBatteryService>,
+    report_state: State<'_, SharedSessionReportService>,
+) -> Result<BatteryReadSnapshot, String> {
+    Ok(battery_read_step_now(
+        adapter_state,
+        battery_state,
+        report_state,
+    ))
+}
+
+#[tauri::command]
+async fn finish_battery_read(
+    adapter_state: State<'_, SharedAdapterService>,
+    battery_state: State<'_, SharedBatteryService>,
+    report_state: State<'_, SharedSessionReportService>,
+) -> Result<BatteryReadSnapshot, String> {
+    let bench = lock_service(&adapter_state).is_bench();
+    lock_battery(&battery_state).finish();
+    record_battery_read(&battery_state, &report_state, bench);
+    Ok(lock_battery(&battery_state).snapshot())
+}
+
 pub fn run() {
     let bench: SharedBench = share_bus(Box::new(EmptyBench));
     tauri::Builder::default()
@@ -1454,6 +1607,7 @@ pub fn run() {
         .manage(Mutex::new(MileageService::new()))
         .manage(Mutex::new(PassportService::new()))
         .manage(Mutex::new(CcfService::new()))
+        .manage(Mutex::new(BatteryService::new()))
         .manage(Mutex::new(SessionReportService::new()))
         .invoke_handler(tauri::generate_handler![
             get_adapter_state,
@@ -1489,6 +1643,10 @@ pub fn run() {
             start_module_passport,
             module_passport_step,
             finish_module_passport,
+            get_battery_state,
+            start_battery_read,
+            battery_read_step,
+            finish_battery_read,
             get_ccf_state,
             start_ccf_read,
             ccf_read_step,

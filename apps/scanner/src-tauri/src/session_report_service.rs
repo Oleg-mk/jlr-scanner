@@ -35,6 +35,8 @@ pub struct SessionReportService {
     /// Configuration reads: the car's configuration as its modules hold it
     /// (ADR-0028).
     ccf_reads: Vec<Value>,
+    /// Battery readings (ADR-0030).
+    battery_reads: Vec<Value>,
     mode: Option<String>,
     /// The bench scenario this session was connected on (ADR-0020), so the
     /// bundle can say which picture it holds even after the bench is gone.
@@ -53,6 +55,7 @@ impl SessionReportService {
             mileage_surveys: Vec::new(),
             module_passports: Vec::new(),
             ccf_reads: Vec::new(),
+            battery_reads: Vec::new(),
             mode: None,
             bench_scenario: None,
         }
@@ -90,7 +93,8 @@ impl SessionReportService {
             + self.live_read_runs.len()
             + self.mileage_surveys.len()
             + self.module_passports.len()
-            + self.ccf_reads.len();
+            + self.ccf_reads.len()
+            + self.battery_reads.len();
         SessionReportSnapshot {
             captures: self.captures.len() as u32,
             module_reads: self.module_reads.len() as u32,
@@ -100,6 +104,7 @@ impl SessionReportService {
             mileage_surveys: self.mileage_surveys.len() as u32,
             module_passports: self.module_passports.len() as u32,
             ccf_reads: self.ccf_reads.len() as u32,
+            battery_reads: self.battery_reads.len() as u32,
             report_available: total > 0,
             mode: self.mode.clone(),
         }
@@ -144,6 +149,11 @@ impl SessionReportService {
         Ok(())
     }
 
+    pub fn add_battery_read(&mut self, json: &str) -> Result<(), String> {
+        self.battery_reads.push(parse(json)?);
+        Ok(())
+    }
+
     pub fn add_calibration_read(&mut self, json: &str) -> Result<(), String> {
         self.calibration_reads.push(parse(json)?);
         Ok(())
@@ -183,6 +193,7 @@ impl SessionReportService {
             "mileage_surveys": self.mileage_surveys,
             "module_passports": self.module_passports,
             "ccf_reads": self.ccf_reads,
+            "battery_reads": self.battery_reads,
         });
         serde_json::to_string_pretty(&bundle).map_err(|error| error.to_string())
     }

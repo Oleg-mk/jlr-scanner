@@ -20,10 +20,10 @@ use knowledge::{
     SourceRecord, SourceType,
 };
 use sdd_ingest::{
-    is_text_item_id, CanLinkMonitorAdapter, CcfAdapter, ConverterCatalogue, DidFormattingAdapter,
-    DtcDescriptionAdapter, DtcFaultTypeAdapter, DtcHelpAdapter, ModelYearTimeline,
-    ModuleTextAdapter, OdstInfoAdapter, PlatformAdapter, TextLookup, VinDecodeAdapter,
-    YEAR_BREAKPOINT_DIMENSION,
+    is_text_item_id, BatteryFormatting, CanLinkMonitorAdapter, CcfAdapter, ConverterCatalogue,
+    DidFormattingAdapter, DtcDescriptionAdapter, DtcFaultTypeAdapter, DtcHelpAdapter,
+    ModelYearTimeline, ModuleTextAdapter, OdstInfoAdapter, PlatformAdapter, TextLookup,
+    VinDecodeAdapter, YEAR_BREAKPOINT_DIMENSION,
 };
 use std::collections::BTreeMap;
 use std::io::Write;
@@ -343,14 +343,45 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             observe(&batch)?;
         }
     }
+    // The same pass collects how SDD's DID formatting document describes the
+    // bytes of the battery identifiers (ADR-0030). That document names no
+    // module, so its rows reach nothing on their own; joined to the platform
+    // document, which names the module, they make a readable parameter.
+    let mut battery_formatting = BatteryFormatting::new();
     for found in &corpus.snapshots {
         let text = read(found)?;
         if let Ok(batch) =
             DidFormattingAdapter::new(source(found, &text)?, converters.clone())?.parse(&text)
         {
+            for record in &batch.records {
+                let (
+                    knowledge::ClaimKey::ParameterDefinition { parameter },
+                    knowledge::KnowledgeValue::IdentifierDefinition {
+                        identifier,
+                        encoding,
+                        unit,
+                    },
+                ) = (&record.key, &record.value)
+                else {
+                    continue;
+                };
+                let Some(number) = identifier
+                    .strip_prefix("0x")
+                    .or_else(|| identifier.strip_prefix("0X"))
+                    .and_then(|digits| u16::from_str_radix(digits, 16).ok())
+                else {
+                    continue;
+                };
+                battery_formatting.insert(number, parameter, encoding.as_deref(), unit.as_deref());
+            }
             observe(&batch)?;
         }
     }
+    let battery_formatting = std::sync::Arc::new(battery_formatting);
+    println!(
+        "battery: {} identifiers described byte by byte",
+        battery_formatting.identifiers()
+    );
     println!(
         "timeline: {} programmes with a breakpoint sequence",
         timeline.programs().count()
@@ -373,7 +404,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let text = read(found)?;
         let adapter = PlatformAdapter::new(source(found, &text)?)?
             .with_timeline(timeline.clone())
-            .with_derived_normal_fixed_identifiers();
+            .with_derived_normal_fixed_identifiers()
+            .with_battery_formatting(battery_formatting.clone());
         export(
             &mut store,
             &mut bundle,

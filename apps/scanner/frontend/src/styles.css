@@ -1964,6 +1964,216 @@ main.flow {
   padding-bottom: 0.5rem;
 }
 
+/* The battery card (ADR-0030), in the session column: a level a person
+   reads at a glance, the three readings a session turns on, and the rest in
+   groups. No colour here says good or bad — the application states no
+   threshold of its own. */
+.battery-card {
+  margin: 1.25rem 0 0.75rem;
+  padding: 0.85rem 0.9rem 0.75rem;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface-raised, rgba(255, 255, 255, 0.55));
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.battery-card__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.battery-card__head h3 {
+  margin: 0;
+  font-size: 0.95rem;
+  letter-spacing: 0.01em;
+}
+
+.battery-card__action {
+  border: 1px solid var(--line);
+  background: transparent;
+  border-radius: 999px;
+  padding: 0.2rem 0.65rem;
+  font: inherit;
+  font-size: 0.75rem;
+  cursor: pointer;
+  color: inherit;
+}
+
+.battery-card__action:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.battery-card__level {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+}
+
+/* The level, drawn the way a battery is drawn: a rounded body with a cap. */
+.battery-card__gauge {
+  position: relative;
+  flex: 1;
+  height: 1.6rem;
+  border: 2px solid currentColor;
+  border-radius: 6px;
+  padding: 2px;
+  opacity: 0.85;
+}
+
+.battery-card__gauge::after {
+  content: "";
+  position: absolute;
+  right: -6px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 4px;
+  height: 0.6rem;
+  border-radius: 0 2px 2px 0;
+  background: currentColor;
+}
+
+.battery-card__fill {
+  height: 100%;
+  border-radius: 3px;
+  background: currentColor;
+  opacity: 0.55;
+  transition: width 240ms ease;
+}
+
+.battery-card__reading {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  min-width: 5.5rem;
+}
+
+.battery-card__reading strong {
+  font-size: 1.35rem;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+
+.battery-card__reading span {
+  font-size: 0.7rem;
+  opacity: 0.7;
+}
+
+.battery-card__tiles {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.4rem;
+  margin: 0;
+}
+
+.battery-card__tile {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 0.4rem 0.45rem;
+  text-align: center;
+}
+
+.battery-card__tile dt {
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  opacity: 0.65;
+}
+
+.battery-card__tile dd {
+  margin: 0.15rem 0 0;
+  font-size: 0.85rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.battery-card__group h4 {
+  margin: 0.35rem 0 0.2rem;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  opacity: 0.6;
+}
+
+.battery-card__group dl {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.battery-card__row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+  font-size: 0.75rem;
+}
+
+.battery-card__row dt {
+  opacity: 0.8;
+  overflow-wrap: anywhere;
+}
+
+.battery-card__row dd {
+  margin: 0;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.battery-card__why {
+  display: block;
+  font-size: 0.65rem;
+  opacity: 0.6;
+  white-space: normal;
+}
+
+.battery-card__toggle {
+  align-self: flex-start;
+  border: none;
+  background: none;
+  padding: 0;
+  font: inherit;
+  font-size: 0.7rem;
+  text-decoration: underline;
+  cursor: pointer;
+  color: inherit;
+  opacity: 0.75;
+}
+
+.battery-card__note {
+  margin: 0;
+  font-size: 0.68rem;
+  line-height: 1.35;
+  opacity: 0.65;
+}
+
+.battery-card__note--reason {
+  opacity: 0.85;
+}
+
+.battery-panel .battery-group {
+  margin-top: 1rem;
+}
+
+.battery-refused {
+  margin: 0.5rem 0 0;
+  padding-left: 1rem;
+  font-size: 0.78rem;
+  opacity: 0.75;
+}
+
+.battery-card__refused {
+  margin: 0;
+  padding-left: 1rem;
+  font-size: 0.68rem;
+  opacity: 0.7;
+}
+
 .rail-vehicle {
   display: flex;
   flex-direction: column;

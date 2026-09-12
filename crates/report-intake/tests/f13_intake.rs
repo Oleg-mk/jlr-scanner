@@ -262,6 +262,27 @@ fn session_bundle_with_ccf(
     module_passports: serde_json::Value,
     ccf_reads: serde_json::Value,
 ) -> String {
+    session_bundle_with_battery(
+        reads,
+        with_capture,
+        live_read_runs,
+        mileage_surveys,
+        module_passports,
+        ccf_reads,
+        serde_json::json!([]),
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+fn session_bundle_with_battery(
+    reads: Vec<ModuleReadReport>,
+    with_capture: bool,
+    live_read_runs: serde_json::Value,
+    mileage_surveys: serde_json::Value,
+    module_passports: serde_json::Value,
+    ccf_reads: serde_json::Value,
+    battery_reads: serde_json::Value,
+) -> String {
     let captures = if with_capture {
         serde_json::json!([{
             "schema_version": 1,
@@ -293,7 +314,8 @@ fn session_bundle_with_ccf(
         "live_read_runs": live_read_runs,
         "mileage_surveys": mileage_surveys,
         "module_passports": module_passports,
-        "ccf_reads": ccf_reads
+        "ccf_reads": ccf_reads,
+        "battery_reads": battery_reads
     })
     .to_string()
 }
@@ -330,6 +352,54 @@ fn a_configuration_read_confirms_what_one_read_confirms_and_records_no_value() {
     assert!(
         !manifest.contains("PARAM_SYNTH_BRAND") && !manifest.contains("Alpha"),
         "a configuration value is not evidence about a route"
+    );
+    let after = library(&[("captured.json".into(), manifest)]);
+    assert_eq!(
+        status_of(&after, "RELAYMOD"),
+        (RouteStatus::Reachable, "CAPTURE_VALIDATED".into())
+    );
+}
+
+/// A battery read (ADR-0030) is read like the passport and the
+/// configuration: its reads are module reads and confirm what one read
+/// confirms; what the battery holds is a fact about that car on that day,
+/// not evidence about a route, and no value of it reaches a manifest.
+#[test]
+fn a_battery_read_confirms_the_route_and_records_no_reading() {
+    let before = library(&[]);
+    let answered = read_report(Some("0x72E"), Some("62 40 28 4E"));
+    let bundle = session_bundle_with_battery(
+        vec![],
+        false,
+        serde_json::json!([]),
+        serde_json::json!([]),
+        serde_json::json!([]),
+        serde_json::json!([]),
+        serde_json::json!([{
+            "schema": "prowlone.battery-state",
+            "operation": "BATTERY_STATE",
+            "safety_class": "READ_ONLY",
+            "reads": [ answered ],
+            "readings": [ {
+                "parameter": "Vehicle Battery Estimated State of Charge",
+                "role": "CHARGE",
+                "value": "78",
+                "unit": "pct"
+            } ]
+        }]),
+    );
+    let outcome = intake(&bundle, "session.json", &before).unwrap();
+    assert_eq!(outcome.batch.records.len(), 7, "{:#?}", outcome.summary);
+    assert!(outcome
+        .summary
+        .confirmations
+        .iter()
+        .any(|line| line.starts_with("battery_reads[0].reads[0] RELAYMOD")));
+    let manifest = serde_json::to_string(&outcome.batch).unwrap();
+    assert!(manifest.contains(".battery.00.000."));
+    assert!(
+        !manifest.contains("State of Charge") && !manifest.contains("\"78\""),
+        "what the battery holds is not evidence about a route: {manifest}"
     );
     let after = library(&[("captured.json".into(), manifest)]);
     assert_eq!(
