@@ -61,6 +61,35 @@ struct SessionReport {
     module_reads: Vec<ModuleReadReport>,
     #[serde(default)]
     calibration_reads: Vec<DiagnosticReport>,
+    /// Live reading (`ADR-0022`): each entry of the set keeps the record of
+    /// its last completed request, in the shape a single read leaves.
+    #[serde(default)]
+    live_read_runs: Vec<LiveReadRun>,
+    /// The mileage survey (`ADR-0024`): one record per read made.
+    #[serde(default)]
+    mileage_surveys: Vec<MileageSurvey>,
+}
+
+/// As much of a live-read run as the intake reads: the set, each entry with
+/// the record of its last completed request. Samples are not evidence of
+/// anything the record is not already evidence of.
+#[derive(Debug, Deserialize)]
+struct LiveReadRun {
+    #[serde(default)]
+    set: Vec<LiveReadSetEntry>,
+}
+
+#[derive(Debug, Deserialize)]
+struct LiveReadSetEntry {
+    #[serde(default)]
+    record: Option<ModuleReadReport>,
+}
+
+/// As much of a mileage survey as the intake reads: the reads it made.
+#[derive(Debug, Deserialize)]
+struct MileageSurvey {
+    #[serde(default)]
+    reads: Vec<ModuleReadReport>,
 }
 
 /// The listen-only capture as the application saves it (a replay fixture).
@@ -145,7 +174,22 @@ pub fn intake(
     let short = &fingerprint.value[..16];
     let source_id = format!("capture-session-{short}");
     let mut programs: Vec<String> = Vec::new();
-    for read in &report.module_reads {
+    let every_read = report
+        .module_reads
+        .iter()
+        .chain(
+            report
+                .live_read_runs
+                .iter()
+                .flat_map(|run| run.set.iter().filter_map(|entry| entry.record.as_ref())),
+        )
+        .chain(
+            report
+                .mileage_surveys
+                .iter()
+                .flat_map(|survey| survey.reads.iter()),
+        );
+    for read in every_read {
         let program = read.vehicle.vehicle_program.trim();
         if !program.is_empty() && !programs.iter().any(|known| known == program) {
             programs.push(program.to_string());
@@ -190,10 +234,35 @@ pub fn intake(
     for (index, calibration) in report.calibration_reads.iter().enumerate() {
         builder.calibration(index, calibration)?;
     }
+    // A live read and a mileage survey make the same request a module read
+    // makes, through the same path, and leave the same record; the record
+    // is read the same way, under the name of the place it sat.
+    for (run_index, run) in report.live_read_runs.iter().enumerate() {
+        for (entry_index, entry) in run.set.iter().enumerate() {
+            if let Some(record) = &entry.record {
+                builder.read(
+                    format!("live_read_runs[{run_index}].set[{entry_index}]"),
+                    format!("live.{run_index:02}.{entry_index:03}"),
+                    record,
+                    library,
+                )?;
+            }
+        }
+    }
+    for (survey_index, survey) in report.mileage_surveys.iter().enumerate() {
+        for (read_index, record) in survey.reads.iter().enumerate() {
+            builder.read(
+                format!("mileage_surveys[{survey_index}].reads[{read_index}]"),
+                format!("mileage.{survey_index:02}.{read_index:03}"),
+                record,
+                library,
+            )?;
+        }
+    }
 
     if builder.records.is_empty() {
         return Err(KnowledgeError::Parse(
-            "the report holds nothing this intake can record: no module read, capture or calibration read".into(),
+            "the report holds nothing this intake can record: no module read, capture, calibration read, live-read run or mileage survey".into(),
         ));
     }
     Ok(IntakeOutcome {
@@ -270,8 +339,25 @@ impl Builder {
         read: &ModuleReadReport,
         library: &KnowledgeLibrary,
     ) -> Result<(), KnowledgeError> {
+        self.read(
+            format!("module_reads[{index}]"),
+            format!("read.{index:03}"),
+            read,
+            library,
+        )
+    }
+
+    /// One read's record, wherever in the bundle it sat: `locator` names the
+    /// place, `stem` makes the record ids unique within the source.
+    fn read(
+        &mut self,
+        locator: String,
+        stem: String,
+        read: &ModuleReadReport,
+        library: &KnowledgeLibrary,
+    ) -> Result<(), KnowledgeError> {
         let family = read.ecu_family.trim();
-        let what = format!("module_reads[{index}] {family} {}", read.operation);
+        let what = format!("{locator} {family} {}", read.operation);
         if family.is_empty() {
             self.summary
                 .skipped
@@ -286,8 +372,7 @@ impl Builder {
         }
         let applicability = applicability_for(&read.vehicle)?;
         let timestamp = Some(read.timestamp_unix_ms.saturating_mul(1000));
-        let locator = format!("module_reads[{index}]");
-        let base = format!("{}.read.{index:03}", self.source_id);
+        let base = format!("{}.{stem}", self.source_id);
         let family_entity = KnowledgeEntity {
             kind: EntityKind::EcuFamily,
             id: family.to_string(),

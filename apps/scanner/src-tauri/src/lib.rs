@@ -6,6 +6,7 @@ mod diagnostic_service;
 mod live_read_service;
 mod mileage_service;
 mod module_read_service;
+mod read_record;
 mod session_report_service;
 mod session_service;
 mod standard_obd_service;

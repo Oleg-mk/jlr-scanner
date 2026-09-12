@@ -15,10 +15,11 @@
 //! interface asks for one step at a time.
 
 use crate::module_read_service::{ModuleReadService, PreparedModuleRead};
+use crate::read_record::{read_record, ReadIdentity, ReadOutcome};
 use app_contracts::{
     AdapterInfo, DiagnosticError, DiagnosticErrorCategory, DiagnosticExecutionStage, MileageKind,
-    MileageReading, MileageSurveySnapshot, MileageSurveyState, ModuleReadKind, ModuleReadRequest,
-    ModuleReadState, VehicleContextInput,
+    MileageReading, MileageSurveySnapshot, MileageSurveyState, ModuleReadKind, ModuleReadReport,
+    ModuleReadRequest, ModuleReadState, VehicleContextInput,
 };
 use diagnostic_session::decode::decode_parameters;
 use diagnostic_session::{mileage, vehicle_context, KnowledgeLibrary};
@@ -61,6 +62,9 @@ struct Run {
     adapter: Option<AdapterInfo>,
     entries: Vec<Entry>,
     readings: Vec<MileageReading>,
+    /// One record per read made, answered or not, in the shape a single read
+    /// leaves — what the intake turns into evidence.
+    records: Vec<ModuleReadReport>,
     /// Modules the data describes but whose route could not be planned.
     refused: Vec<(String, String)>,
     asked: u32,
@@ -163,6 +167,7 @@ impl MileageService {
             adapter: adapter.cloned(),
             entries,
             readings: Vec::new(),
+            records: Vec::new(),
             refused,
             asked: 0,
             answered: 0,
@@ -287,6 +292,24 @@ impl Run {
             return;
         };
         let identifier = format!("0x{:04X}", entry.identifier);
+        // The record first, from what was sent and what came back.
+        let identity = ReadIdentity {
+            context: &self.context,
+            ecu_family: &entry.ecu_family,
+            operation: MILEAGE_OPERATION,
+            route_validation: if self.synthetic {
+                "SYNTHETIC"
+            } else {
+                entry.route_validation.as_str()
+            },
+            adapter: self.adapter.as_ref(),
+        };
+        let outcome = match &result {
+            Ok(raw) => ReadOutcome::Answered(raw),
+            Err(error) => ReadOutcome::Failed(error),
+        };
+        let record = read_record(identity, &entry.transaction, outcome, None);
+        self.records.push(record);
         let mut rows: Vec<MileageReading> = entry
             .wanted
             .iter()
@@ -508,6 +531,13 @@ fn build_report(run: &Run) -> Value {
                 row.route_validation = "SYNTHETIC".into();
             }
             row
+        }).collect::<Vec<_>>(),
+        // Every read as a single read records it, for the intake.
+        "reads": run.records.iter().cloned().map(|mut record| {
+            if run.synthetic {
+                record.route_validation = "SYNTHETIC".into();
+            }
+            record
         }).collect::<Vec<_>>(),
         "not_planned": run.refused.iter().map(|(family, reason)| json!({
             "ecu_family": family,

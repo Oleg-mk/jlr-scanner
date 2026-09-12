@@ -220,6 +220,17 @@ end-to-end test drive a run deterministically on every commit. What
 decision 8 places in the shell — the composition of `prepare` and the
 adapter service per request — is in the shell.
 
+**Decision 5 was not true until 2026-09-12.** The run recorded its samples and
+the intake ignored the run: a tester's live session contributed no evidence.
+Now each entry of the set keeps the record of its last completed request in
+the shape a single module read leaves — the same builder, `read_record`,
+serves all three — and the intake reads it through the same path, under
+the name `live_read_runs[i].set[j]`. One record per entry, not per sample:
+the module answering at that address on that route is proven once, and
+repeating the request proves nothing new. Found by the review of the ADRs
+against the code, recorded here because the decision said otherwise for
+two days.
+
 Nothing else changes: `LIVE_READ` is `READ_ONLY`, the set is chosen from
 the library's readable identifiers and never typed, at most sixteen
 entries, one request in flight, no `0x10` and no `0x3E`, an entry that

@@ -118,6 +118,17 @@ Reaching every module on every bus is the whole reason this project exists.
 - The run puts one request per module on the bus, once. It is the network
   check's traffic, not a live read's.
 
+## Built, 2026-09-11; read by the intake since 2026-09-12
+
+The survey keeps, per read, the record a single module read leaves, and the
+intake reads it as `mileage_surveys[i].reads[j]` through the builder a
+module read goes through — so a survey of forty modules is forty pieces of
+evidence that those modules answered at those addresses on those routes,
+and nothing about mileage, which was never evidence of anything. Two
+faults of the first build were found by the review of 2026-09-12 and are
+in `CURRENT_STATE`: the reference mixed units, and the report's rows were
+not marked on the bench.
+
 ## What this does not decide
 
 - **Writing a mileage anywhere.** Not now, not in stage 2, not with a

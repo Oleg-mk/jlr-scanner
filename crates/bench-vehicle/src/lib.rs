@@ -115,6 +115,9 @@ struct ModuleResponder {
     faults: Vec<[u8; 3]>,
     /// Consecutive frames waiting for the tester's flow control.
     pending: Vec<Vec<u8>>,
+    /// Requests this module has answered with a value; the values walk
+    /// with it.
+    answered: u32,
 }
 
 /// The vehicle described in the session, as far as the library describes it.
@@ -172,6 +175,7 @@ impl BenchVehicle {
                 identifiers,
                 faults: choose_faults(library, &entry.ecu_family, scenario),
                 pending: Vec::new(),
+                answered: 0,
             });
         }
         let label = match (&input.year_breakpoint, input.model_year) {
@@ -217,7 +221,16 @@ impl BenchVehicle {
                         if identifier == VIN_IDENTIFIER {
                             payload.extend_from_slice(vin.as_bytes());
                         } else {
-                            payload.extend(synthetic_bytes(&module.family, identifier, *length));
+                            // The value walks with the number of requests
+                            // this module has answered, so a live read has
+                            // something to draw; the walk is deterministic.
+                            module.answered = module.answered.wrapping_add(1);
+                            payload.extend(synthetic_bytes(
+                                &module.family,
+                                identifier,
+                                *length,
+                                module.answered,
+                            ));
                         }
                         payload
                     }
@@ -601,19 +614,29 @@ fn fault_bytes(code: &str, failure_type: u8) -> Option<[u8; 3]> {
 }
 
 /// Deterministic bytes for an identifier's value, in the middle of the
-/// range so the catalogue's scaling shows a plausible figure: the same
-/// module and identifier always give the same bytes.
-fn synthetic_bytes(family: &str, identifier: u16, length: usize) -> Vec<u8> {
+/// range so the catalogue's scaling shows a plausible figure. The same
+/// module and identifier give the same bytes for the same `tick`; the last
+/// byte walks up and back a little as the tick grows, one step every four
+/// requests, so a value read repeatedly moves the way a living one does
+/// without ever leaving the range.
+fn synthetic_bytes(family: &str, identifier: u16, length: usize, tick: u32) -> Vec<u8> {
     let mut seed: u32 = 0x9E37_79B9 ^ u32::from(identifier);
     for byte in family.bytes() {
         seed = seed.wrapping_mul(31).wrapping_add(u32::from(byte));
     }
-    (0..length)
+    let mut bytes: Vec<u8> = (0..length)
         .map(|index| {
             seed = seed.wrapping_mul(1_664_525).wrapping_add(1_013_904_223);
             0x40 + ((seed >> 16) as u8 % 0x40) + (index as u8 & 0x0F)
         })
-        .collect()
+        .collect();
+    if let Some(last) = bytes.last_mut() {
+        // A triangle wave of amplitude 8 over 64 requests.
+        let phase = (tick / 4) % 16;
+        let walk = if phase < 8 { phase } else { 16 - phase } as u8;
+        *last = last.wrapping_add(walk);
+    }
+    bytes
 }
 
 #[cfg(test)]
@@ -631,11 +654,28 @@ mod tests {
 
     #[test]
     fn synthetic_bytes_are_deterministic_and_mid_range() {
-        let a = synthetic_bytes("PCM", 0x1945, 8);
-        let b = synthetic_bytes("PCM", 0x1945, 8);
+        let a = synthetic_bytes("PCM", 0x1945, 8, 0);
+        let b = synthetic_bytes("PCM", 0x1945, 8, 0);
         assert_eq!(a, b);
-        assert_ne!(a, synthetic_bytes("TCM", 0x1945, 8));
+        assert_ne!(a, synthetic_bytes("TCM", 0x1945, 8, 0));
         assert!(a.iter().all(|byte| (0x40..=0x8F).contains(byte)));
+    }
+
+    /// A value read again and again moves, a little and predictably: the
+    /// last byte walks with the request count, the rest stand still, and
+    /// after 64 requests the walk is back where it began.
+    #[test]
+    fn synthetic_bytes_walk_with_the_request_count_and_come_back() {
+        let start = synthetic_bytes("PCM", 0x1945, 8, 0);
+        let later = synthetic_bytes("PCM", 0x1945, 8, 32);
+        assert_eq!(start[..7], later[..7], "only the last byte moves");
+        assert_ne!(start[7], later[7]);
+        assert!(later.iter().all(|byte| (0x40..=0x97).contains(byte)));
+        assert_eq!(
+            start,
+            synthetic_bytes("PCM", 0x1945, 8, 64),
+            "a full period"
+        );
     }
 
     #[test]

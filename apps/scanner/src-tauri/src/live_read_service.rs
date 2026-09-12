@@ -18,10 +18,12 @@
 //! route open; see the ADR's "Built" section.
 
 use crate::module_read_service::{ModuleReadService, PreparedModuleRead};
+use crate::read_record::{read_record, ReadIdentity, ReadOutcome};
 use app_contracts::{
     AdapterInfo, DecodedParameterSummary, DiagnosticError, DiagnosticErrorCategory,
     DiagnosticExecutionStage, LiveReadEntryRequest, LiveReadEntryStatus, LiveReadRequest,
-    LiveReadSnapshot, LiveReadState, LiveReadValue, ModuleReadKind, ModuleReadRequest,
+    LiveReadSnapshot, LiveReadState, LiveReadValue, ModuleReadKind, ModuleReadReport,
+    ModuleReadRequest,
 };
 use diagnostic_session::decode::decode_parameters;
 use diagnostic_session::KnowledgeLibrary;
@@ -69,6 +71,11 @@ struct Entry {
     reason: Option<String>,
     last_response_hex: Option<String>,
     negative_response: Option<String>,
+    /// The record of the last completed request, answered or not, in the
+    /// shape a single read leaves — what the intake turns into evidence. One
+    /// per entry: the module answering at that address on that route is
+    /// proven once, and repeating it adds nothing.
+    record: Option<ModuleReadReport>,
 }
 
 /// A refused entry: it never joined the set, and the run says why.
@@ -279,8 +286,29 @@ impl LiveReadService {
         let mut all_dropped = false;
         if let Some(run) = self.run.as_mut() {
             let at_ms = elapsed_ms(run.started);
+            let context = run.context.clone();
+            let adapter = run.adapter.clone();
+            let synthetic = run.synthetic;
             let mut recorded: Option<(Sample, Option<Vec<DecodedParameterSummary>>)> = None;
             if let Some(entry) = run.entries.get_mut(index) {
+                // The record first, from what was sent and what came back,
+                // before the result is taken apart below.
+                let identity = ReadIdentity {
+                    context: &context,
+                    ecu_family: &entry.ecu_family,
+                    operation: &entry.operation,
+                    route_validation: if synthetic {
+                        "SYNTHETIC"
+                    } else {
+                        entry.route_validation.as_str()
+                    },
+                    adapter: adapter.as_ref(),
+                };
+                let outcome = match &result {
+                    Ok(raw) => ReadOutcome::Answered(raw),
+                    Err(error) => ReadOutcome::Failed(error),
+                };
+                entry.record = Some(read_record(identity, &entry.transaction, outcome, None));
                 let mut sample = Sample {
                     at_ms,
                     ecu_family: entry.ecu_family.clone(),
@@ -598,6 +626,7 @@ fn prepare_entry(
         reason: None,
         last_response_hex: None,
         negative_response: None,
+        record: None,
     })
 }
 
@@ -630,6 +659,15 @@ fn build_report(run: &Run) -> Value {
             "reads": entry.reads,
             "dropped": entry.dropped,
             "reason": entry.reason,
+            // The last completed request as a single read records it, for
+            // the intake; SYNTHETIC on the bench like everything else here.
+            "record": entry.record.as_ref().map(|record| {
+                let mut record = record.clone();
+                if run.synthetic {
+                    record.route_validation = "SYNTHETIC".into();
+                }
+                record
+            }),
         })).collect::<Vec<_>>(),
         "refused": run.refused.iter().map(|refused| json!({
             "ecu_family": refused.ecu_family,

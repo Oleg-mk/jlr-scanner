@@ -224,6 +224,23 @@ fn read_report(responder: Option<&str>, response: Option<&str>) -> ModuleReadRep
 }
 
 fn session_report(reads: Vec<ModuleReadReport>, with_capture: bool) -> String {
+    session_bundle(
+        reads,
+        with_capture,
+        serde_json::json!([]),
+        serde_json::json!([]),
+    )
+}
+
+/// A bundle with live-read runs and mileage surveys in it as the shell
+/// writes them (ADR-0022, ADR-0024): a run's set entries each carry the
+/// record of their last completed request; a survey carries its reads.
+fn session_bundle(
+    reads: Vec<ModuleReadReport>,
+    with_capture: bool,
+    live_read_runs: serde_json::Value,
+    mileage_surveys: serde_json::Value,
+) -> String {
     let captures = if with_capture {
         serde_json::json!([{
             "schema_version": 1,
@@ -251,7 +268,9 @@ fn session_report(reads: Vec<ModuleReadReport>, with_capture: bool) -> String {
         "survey": null,
         "captures": captures,
         "module_reads": reads,
-        "calibration_reads": []
+        "calibration_reads": [],
+        "live_read_runs": live_read_runs,
+        "mileage_surveys": mileage_surveys
     })
     .to_string()
 }
@@ -365,4 +384,89 @@ fn a_report_of_another_schema_or_with_nothing_to_record_is_refused() {
         .unwrap_err()
         .to_string()
         .contains("nothing this intake can record"));
+}
+
+/// A live read and a mileage survey make the same request a module read
+/// makes, through the same path, and since the review of 2026-09-12 they
+/// leave the same record. The intake reads it the same way, under the name of
+/// the place it sat, so a tester's live session confirms what a single read
+/// confirms — and no more, because repeating a request proves nothing new.
+#[test]
+fn a_live_read_run_and_a_mileage_survey_confirm_what_one_read_confirms() {
+    let before = library(&[]);
+    assert_eq!(
+        status_of(&before, "RELAYMOD"),
+        (RouteStatus::Hypothesis, "UNVERIFIED".into())
+    );
+
+    let answered = read_report(Some("0x72E"), Some("59 02 FF"));
+    let silent = read_report(None, None);
+    let bundle = session_bundle(
+        vec![],
+        false,
+        serde_json::json!([{
+            "schema": "prowlone.live-read-run",
+            "set": [
+                { "ecu_family": "RELAYMOD", "identifier": "0x1945", "reads": 12, "dropped": false, "record": answered },
+                { "ecu_family": "RELAYMOD", "identifier": "0x0347", "reads": 0, "dropped": true, "record": silent }
+            ],
+            "samples": []
+        }]),
+        serde_json::json!([{
+            "schema": "prowlone.mileage-survey",
+            "reads": [ answered ],
+            "readings": []
+        }]),
+    );
+    let outcome = intake(&bundle, "session.json", &before).unwrap();
+    let batch = &outcome.batch;
+    // Two answered records confirm six facts each and record one observation
+    // each; the silent one is an attempt. 7 + 7 + 1.
+    assert_eq!(batch.records.len(), 15, "{:#?}", outcome.summary);
+    assert_eq!(outcome.summary.confirmations.len(), 2);
+    assert!(outcome
+        .summary
+        .confirmations
+        .iter()
+        .any(|line| line.starts_with("live_read_runs[0].set[0] RELAYMOD")));
+    assert!(outcome
+        .summary
+        .confirmations
+        .iter()
+        .any(|line| line.starts_with("mileage_surveys[0].reads[0] RELAYMOD")));
+    assert!(outcome
+        .summary
+        .observations
+        .iter()
+        .any(|line| line.starts_with("live_read_runs[0].set[1] RELAYMOD")));
+    // Record ids stay apart: the same fact confirmed twice is two records
+    // from two places, not one overwritten by the other.
+    let ids: std::collections::BTreeSet<&str> = batch
+        .records
+        .iter()
+        .map(|record| record.id.as_str())
+        .collect();
+    assert_eq!(ids.len(), batch.records.len());
+    assert!(ids.iter().any(|id| id.contains(".live.00.000.")));
+    assert!(ids.iter().any(|id| id.contains(".mileage.00.000.")));
+
+    let manifest = serde_json::to_string(batch).unwrap();
+    let after = library(&[("captured.json".into(), manifest)]);
+    assert_eq!(
+        status_of(&after, "RELAYMOD"),
+        (RouteStatus::Reachable, "CAPTURE_VALIDATED".into())
+    );
+
+    // A bundle that holds only an empty run is still nothing to record, and
+    // the refusal names the kinds it looked for.
+    let empty = session_bundle(
+        vec![],
+        false,
+        serde_json::json!([{ "set": [] }]),
+        serde_json::json!([]),
+    );
+    let error = intake(&empty, "session.json", &before)
+        .unwrap_err()
+        .to_string();
+    assert!(error.contains("live-read run"), "{error}");
 }
