@@ -26,6 +26,7 @@ import { CapturePanel } from "./components/CapturePanel";
 import { DiagnosticPanel } from "./components/DiagnosticPanel";
 import { LiveReadPanel } from "./components/LiveReadPanel";
 import { MileagePanel } from "./components/MileagePanel";
+import { PassportPanel } from "./components/PassportPanel";
 import { StandardObdPanel } from "./components/StandardObdPanel";
 import { LibraryPanel } from "./components/LibraryPanel";
 import { hasTauriRuntime } from "./files";
@@ -55,6 +56,8 @@ import { useLibraryController } from "./useLibraryController";
 import { useLiveReadController } from "./useLiveReadController";
 import { useMileageController } from "./useMileageController";
 import { defaultMileageClient, type MileageClient } from "./mileage";
+import { usePassportController } from "./usePassportController";
+import { defaultPassportClient, type PassportClient } from "./passport";
 import { defaultLiveReadClient, type LiveReadClient } from "./liveRead";
 import { useStandardObdController } from "./useStandardObdController";
 import { defaultStandardObdClient, type StandardObdClient } from "./standardObd";
@@ -70,6 +73,7 @@ interface AppProps {
   standardObdClient?: StandardObdClient;
   liveReadClient?: LiveReadClient;
   mileageClient?: MileageClient;
+  passportClient?: PassportClient;
   captureClient?: CaptureClient;
   moduleReadClient?: ModuleReadClient;
   sessionReportClient?: SessionReportClient;
@@ -126,6 +130,7 @@ export function App({
   standardObdClient = defaultStandardObdClient,
   liveReadClient = defaultLiveReadClient,
   mileageClient = defaultMileageClient,
+  passportClient = defaultPassportClient,
   captureClient = defaultCaptureClient,
   moduleReadClient = defaultModuleReadClient,
   sessionReportClient = defaultSessionReportClient,
@@ -167,6 +172,7 @@ export function App({
   const standardObd = useStandardObdController(standardObdClient, library.vehicle);
   const liveRead = useLiveReadController(liveReadClient, library.vehicle);
   const mileage = useMileageController(mileageClient, library.vehicle);
+  const passport = usePassportController(passportClient, library.vehicle);
   const session = useSessionReportController(sessionReportClient);
   // The bench (ADR-0020): a virtual vehicle behind a stand-in adapter. The
   // whole screen says so, and the session is bench-only or real-only.
@@ -458,6 +464,10 @@ export function App({
                       mileageBusy={mileage.busy}
                       onReadMileage={() => void mileage.start()}
                       onStopMileage={() => void mileage.stop()}
+                      passportRunning={passport.running}
+                      passportBusy={passport.busy}
+                      onReadPassports={() => void passport.start()}
+                      onStopPassports={() => void passport.stop()}
                     />
                     <ModuleDetails
                       module={selected}
@@ -479,6 +489,15 @@ export function App({
                   <MileagePanel
                     snapshot={mileage.snapshot}
                     running={mileage.running}
+                    adapterReady={adapterReady}
+                    surveyed={library.survey !== null}
+                    bench={bench}
+                  />
+                ) : null}
+                {section.id === "network" ? (
+                  <PassportPanel
+                    snapshot={passport.snapshot}
+                    running={passport.running}
                     adapterReady={adapterReady}
                     surveyed={library.survey !== null}
                     bench={bench}

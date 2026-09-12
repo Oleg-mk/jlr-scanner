@@ -636,3 +636,129 @@ fn a_module_qualified_by_engine_build_or_market_keeps_every_address() {
         .get_record("f9-qual.module.PLAINMOD.network")
         .is_some());
 }
+
+/// ADR-0027: a module's identification identifiers are recorded in the DID
+/// catalogue's own shape, from the sets the platform names for it — and
+/// only those. The NET set's non-identification members, a member read with
+/// another service, a set the document never defines, and a module without a
+/// diagnostic address all yield nothing.
+#[test]
+fn identification_identifiers_are_recorded_per_module_in_the_catalogue_shape() {
+    let store = ingest(SourceType::Documented);
+    let all = store.query(&KnowledgeQuery::default().include_indeterminate(true));
+
+    /// identifier, parameter name, encoding, the set's own qualifiers.
+    type Row = (String, String, Option<String>, Vec<(String, String)>);
+    fn identification(all: &knowledge::KnowledgeQueryResult, family: &str) -> Vec<Row> {
+        let mut rows: Vec<_> = all
+            .records
+            .iter()
+            .filter(|resolved| {
+                resolved.record.entity.kind == EntityKind::IdentifierParameter
+                    && resolved.record.applicability.ecu_family
+                        == DimensionConstraint::one_of([family.to_string()]).unwrap()
+            })
+            .map(|resolved| {
+                let (identifier, encoding) = match &resolved.record.value {
+                    KnowledgeValue::IdentifierDefinition {
+                        identifier,
+                        encoding,
+                        ..
+                    } => (identifier.clone(), encoding.clone()),
+                    other => panic!("unexpected value {other:?}"),
+                };
+                let parameter = match &resolved.record.key {
+                    ClaimKey::ParameterDefinition { parameter } => parameter.clone(),
+                    other => panic!("unexpected key {other:?}"),
+                };
+                let quals: Vec<(String, String)> = resolved
+                    .record
+                    .applicability
+                    .other
+                    .iter()
+                    .filter(|(key, _)| key.starts_with("sdd_qual_"))
+                    .map(|(key, value)| {
+                        let value = match value {
+                            DimensionConstraint::OneOf { values } => values.join("|"),
+                            other => format!("{other:?}"),
+                        };
+                        (key.clone(), value)
+                    })
+                    .collect();
+                (identifier, parameter, encoding, quals)
+            })
+            .collect();
+        rows.sort();
+        rows
+    }
+
+    let synth = identification(&all, "SYNTHMOD");
+    let identifiers: Vec<&str> = synth.iter().map(|row| row.0.as_str()).collect();
+    assert_eq!(
+        identifiers,
+        vec!["0xF111", "0xF124", "0xF125", "0xF188", "0xF188", "0xF188", "0xF18C", "0xF190", "0xF1A0"],
+        "NET gives its F1xx members, SWDL its two qualified lists, PDI its two; DD01 and the 0x09 member stay out: {synth:?}"
+    );
+    for (identifier, parameter, encoding, _) in &synth {
+        assert_eq!(
+            encoding.as_deref(),
+            Some("text=ascii"),
+            "{identifier} is a text"
+        );
+        assert!(!parameter.is_empty());
+    }
+    // SDD's human text is the parameter's name; the attribute name only
+    // when there is no text.
+    assert!(synth
+        .iter()
+        .any(|row| row.0 == "0xF111" && row.1 == "ECU Core Assembly Number"));
+    assert!(synth
+        .iter()
+        .any(|row| row.0 == "0xF1A0" && row.1 == "synth_no_text"));
+    // The software list a qualifier chooses is narrowed by that qualifier;
+    // the unqualified NET row of the same identifier stays unqualified.
+    let f188: Vec<_> = synth.iter().filter(|row| row.0 == "0xF188").collect();
+    assert_eq!(f188.len(), 3);
+    assert!(
+        f188.iter().any(|row| row.3.is_empty()),
+        "the NET row carries no set qualifier"
+    );
+    assert!(f188.iter().any(|row| row.3
+        == vec![(
+            "sdd_qual_cm_qual_synth_hw".to_string(),
+            "VAL_STD".to_string()
+        )]));
+    assert!(f188.iter().any(|row| row.3
+        == vec![(
+            "sdd_qual_cm_qual_synth_hw".to_string(),
+            "VAL_PLUS".to_string()
+        )]));
+
+    // OTHERMOD names the same NET set and an undefined PDI set: the NET
+    // identification only.
+    let other: Vec<String> = identification(&all, "OTHERMOD")
+        .into_iter()
+        .map(|row| row.0)
+        .collect();
+    assert_eq!(other, vec!["0xF111", "0xF188", "0xF190", "0xF1A0"]);
+
+    // A module with no diagnostic address is not seen at all, sets or not.
+    assert!(identification(&all, "PROGONLY").is_empty());
+    // Every identification record cites this document's own evidence and
+    // is documented, like the addressing beside it.
+    for resolved in all
+        .records
+        .iter()
+        .filter(|resolved| resolved.record.entity.kind == EntityKind::IdentifierParameter)
+    {
+        assert_eq!(
+            resolved.record.validation_state,
+            ValidationState::SourceBacked
+        );
+        assert!(resolved
+            .record
+            .evidence_ids
+            .iter()
+            .all(|id| id.0.starts_with("f9-plat.ev.f9-plat.module.")));
+    }
+}

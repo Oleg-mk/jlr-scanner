@@ -22,7 +22,7 @@
 
 use app_contracts::VehicleContextInput;
 use diagnostic_environment::DiagnosticEnvironmentResolver;
-use diagnostic_session::decode::parameters_span;
+use diagnostic_session::decode::{is_text, parameters_span};
 use diagnostic_session::{vehicle_context, KnowledgeLibrary};
 use obd_j1979::bench::{
     current_data_response, cvn_response, dtc_list_response, ecu_name_response,
@@ -111,6 +111,9 @@ struct ModuleResponder {
     extended: bool,
     /// Identifier to the number of data bytes it answers with.
     identifiers: BTreeMap<u16, usize>,
+    /// Identifiers whose payload is a text (ADR-0027): answered with a
+    /// part-number-shaped string rather than walking bytes.
+    texts: BTreeSet<u16>,
     /// Faults as they go on the wire: code high, code low, failure type.
     faults: Vec<[u8; 3]>,
     /// Consecutive frames waiting for the tester's flow control.
@@ -150,12 +153,17 @@ impl BenchVehicle {
             ) else {
                 continue;
             };
-            let mut identifiers: BTreeMap<u16, usize> =
-                DiagnosticEnvironmentResolver::readable_identifiers(
-                    store,
-                    &context,
-                    &entry.ecu_family,
-                )
+            let readable = DiagnosticEnvironmentResolver::readable_identifiers(
+                store,
+                &context,
+                &entry.ecu_family,
+            );
+            let texts: BTreeSet<u16> = readable
+                .iter()
+                .filter(|identifier| is_text(&identifier.parameters))
+                .map(|identifier| identifier.identifier)
+                .collect();
+            let mut identifiers: BTreeMap<u16, usize> = readable
                 .into_iter()
                 .map(|identifier| {
                     (
@@ -173,6 +181,7 @@ impl BenchVehicle {
                 response_id: response,
                 extended: request > 0x7FF,
                 identifiers,
+                texts,
                 faults: choose_faults(library, &entry.ecu_family, scenario),
                 pending: Vec::new(),
                 answered: 0,
@@ -220,6 +229,10 @@ impl BenchVehicle {
                         let mut payload = vec![0x62, (identifier >> 8) as u8, identifier as u8];
                         if identifier == VIN_IDENTIFIER {
                             payload.extend_from_slice(vin.as_bytes());
+                        } else if module.texts.contains(&identifier) {
+                            payload.extend_from_slice(
+                                synthetic_text(&module.family, identifier).as_bytes(),
+                            );
                         } else {
                             // The value walks with the number of requests
                             // this module has answered, so a live read has
@@ -619,6 +632,26 @@ fn fault_bytes(code: &str, failure_type: u8) -> Option<[u8; 3]> {
 /// byte walks up and back a little as the tick grows, one step every four
 /// requests, so a value read repeatedly moves the way a living one does
 /// without ever leaving the range.
+/// A part-number-shaped text for an identification identifier (ADR-0027),
+/// the same for the same module and identifier: a bench prefix that no
+/// real part carries, a base and a revision drawn from the pair.
+fn synthetic_text(family: &str, identifier: u16) -> String {
+    let mut seed: u32 = 0x811C_9DC5 ^ u32::from(identifier);
+    for byte in family.bytes() {
+        seed = (seed ^ u32::from(byte)).wrapping_mul(0x0100_0193);
+    }
+    let letter = |value: u32| char::from(b'A' + (value % 26) as u8);
+    format!(
+        "BN{:02}-{:02}{}{:03}-{}{}",
+        seed % 100,
+        (seed >> 8) % 100,
+        letter(seed >> 12),
+        (seed >> 16) % 1000,
+        letter(seed >> 20),
+        letter(seed >> 24),
+    )
+}
+
 fn synthetic_bytes(family: &str, identifier: u16, length: usize, tick: u32) -> Vec<u8> {
     let mut seed: u32 = 0x9E37_79B9 ^ u32::from(identifier);
     for byte in family.bytes() {
@@ -650,6 +683,21 @@ mod tests {
         assert_eq!(fault_bytes("B1A08", 0x11), Some([0x9A, 0x08, 0x11]));
         assert_eq!(fault_bytes("U0100", 0x87), Some([0xC1, 0x00, 0x87]));
         assert_eq!(fault_bytes("X0000", 0), None);
+    }
+
+    #[test]
+    fn a_text_identifier_answers_with_the_same_part_number_shaped_string() {
+        let one = synthetic_text("PCM", 0xF111);
+        assert_eq!(one, synthetic_text("PCM", 0xF111));
+        assert_ne!(one, synthetic_text("TCM", 0xF111));
+        assert_ne!(one, synthetic_text("PCM", 0xF112));
+        assert!(
+            one.starts_with("BN"),
+            "a bench prefix no real part carries: {one}"
+        );
+        assert_eq!(one.len(), 14, "{one}");
+        assert!(one.bytes().all(|byte| (0x20..=0x7E).contains(&byte)));
+        assert_eq!(one.matches('-').count(), 2);
     }
 
     #[test]

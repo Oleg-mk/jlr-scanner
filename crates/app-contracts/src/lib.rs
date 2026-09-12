@@ -545,6 +545,9 @@ pub struct SessionReportSnapshot {
     /// Mileage surveys recorded whole (ADR-0024).
     #[serde(default)]
     pub mileage_surveys: u32,
+    /// Module passports recorded whole (ADR-0027).
+    #[serde(default)]
+    pub module_passports: u32,
     pub report_available: bool,
     /// `bench` or `real`, once an adapter of either kind took part; a session
     /// is one or the other, never both (ADR-0020).
@@ -906,6 +909,68 @@ pub enum MileageSurveyState {
     Idle,
     Running,
     Finished,
+}
+
+// ---------------------------------------------------------------------------
+// The module passport (ADR-0027): what a module says it is — part numbers,
+// serial, hardware and software levels — read over the identification
+// identifiers SDD declares for it, one module or every module reached.
+// ---------------------------------------------------------------------------
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum ModulePassportState {
+    Idle,
+    Running,
+    Finished,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ModulePassportRequest {
+    pub context: VehicleContextInput,
+    /// The modules to ask; `None` asks every module the survey reaches.
+    #[serde(default)]
+    pub ecu_families: Option<Vec<String>>,
+}
+
+/// One identifier's answer from one module, or its silence.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PassportReading {
+    pub ecu_family: String,
+    pub identifier: String,
+    /// SDD's own name for the identifier, in English: the row's identity.
+    pub parameter: String,
+    pub state: ModuleReadState,
+    /// The text the module holds, padding trimmed; bytes when not text.
+    pub value: Option<String>,
+    pub route_id: String,
+    pub route_validation: String,
+    pub raw_response_hex: Option<String>,
+    /// The module's refusal: an answer, not a failure of the application.
+    pub negative_response: Option<String>,
+    /// What the decoder says about a value it shows as bytes.
+    pub note: Option<String>,
+    /// Why the module said nothing.
+    pub reason: Option<String>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ModulePassportSnapshot {
+    pub state: ModulePassportState,
+    pub readings: Vec<PassportReading>,
+    /// Reads planned, attempted and answered.
+    pub planned: u32,
+    pub asked: u32,
+    pub answered: u32,
+    /// Modules the run covers.
+    pub modules: u32,
+    /// `SOURCE_BACKED` or the route's own state; `SYNTHETIC` on the bench.
+    pub route_validation: String,
+    pub error: Option<DiagnosticError>,
+    pub report_available: bool,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]

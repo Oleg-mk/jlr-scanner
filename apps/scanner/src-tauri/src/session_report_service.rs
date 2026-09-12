@@ -30,6 +30,8 @@ pub struct SessionReportService {
     live_read_runs: Vec<Value>,
     /// Mileage surveys: every module's answer side by side (ADR-0024).
     mileage_surveys: Vec<Value>,
+    /// Module passports: what each module says it is (ADR-0027).
+    module_passports: Vec<Value>,
     mode: Option<String>,
     /// The bench scenario this session was connected on (ADR-0020), so the
     /// bundle can say which picture it holds even after the bench is gone.
@@ -46,6 +48,7 @@ impl SessionReportService {
             standard_obd_reads: Vec::new(),
             live_read_runs: Vec::new(),
             mileage_surveys: Vec::new(),
+            module_passports: Vec::new(),
             mode: None,
             bench_scenario: None,
         }
@@ -81,7 +84,8 @@ impl SessionReportService {
             + self.calibration_reads.len()
             + self.standard_obd_reads.len()
             + self.live_read_runs.len()
-            + self.mileage_surveys.len();
+            + self.mileage_surveys.len()
+            + self.module_passports.len();
         SessionReportSnapshot {
             captures: self.captures.len() as u32,
             module_reads: self.module_reads.len() as u32,
@@ -89,6 +93,7 @@ impl SessionReportService {
             standard_obd_reads: self.standard_obd_reads.len() as u32,
             live_read_runs: self.live_read_runs.len() as u32,
             mileage_surveys: self.mileage_surveys.len() as u32,
+            module_passports: self.module_passports.len() as u32,
             report_available: total > 0,
             mode: self.mode.clone(),
         }
@@ -118,6 +123,12 @@ impl SessionReportService {
     /// One whole mileage survey, every module's answer (ADR-0024).
     pub fn add_mileage_survey(&mut self, json: &str) -> Result<(), String> {
         self.mileage_surveys.push(parse(json)?);
+        Ok(())
+    }
+
+    /// One whole module passport run, every identifier's text (ADR-0027).
+    pub fn add_module_passport(&mut self, json: &str) -> Result<(), String> {
+        self.module_passports.push(parse(json)?);
         Ok(())
     }
 
@@ -158,6 +169,7 @@ impl SessionReportService {
             "standard_obd_reads": self.standard_obd_reads,
             "live_read_runs": self.live_read_runs,
             "mileage_surveys": self.mileage_surveys,
+            "module_passports": self.module_passports,
         });
         serde_json::to_string_pretty(&bundle).map_err(|error| error.to_string())
     }

@@ -21,6 +21,11 @@ interface NetworkMapProps {
   mileageBusy: boolean;
   onReadMileage: () => void;
   onStopMileage: () => void;
+  /** The module passport (ADR-0027): every module's part numbers, once each. */
+  passportRunning: boolean;
+  passportBusy: boolean;
+  onReadPassports: () => void;
+  onStopPassports: () => void;
 }
 
 function NodeIcon({ state }: { state: NodeState }) {
@@ -99,6 +104,10 @@ export function NetworkMap({
   mileageBusy,
   onReadMileage,
   onStopMileage,
+  passportRunning,
+  passportBusy,
+  onReadPassports,
+  onStopPassports,
 }: NetworkMapProps) {
   const language = useLanguage();
   const modules: ModuleSurveyEntry[] = survey?.modules ?? [];
@@ -146,6 +155,20 @@ export function NetworkMap({
               disabled={!adapterReady || survey === null || busy || mileageBusy}
             >
               {t("Read the mileage")}
+            </button>
+          )}
+          {passportRunning ? (
+            <button className="button button--secondary" type="button" onClick={onStopPassports}>
+              {t("Stop")}
+            </button>
+          ) : (
+            <button
+              className="button button--secondary"
+              type="button"
+              onClick={onReadPassports}
+              disabled={!adapterReady || survey === null || busy || passportBusy || mileageRunning}
+            >
+              {t("Read the module passports")}
             </button>
           )}
         </div>

@@ -598,6 +598,36 @@ owner wrote. Ukrainian has this layer for the first time in any tool.
 What remains is the owner's remaining lines — listed for him in the order of
 their use — and, separately, the review's open items above it.
 
+### F19 — the module passport (decided and built 2026-09-12, `ADR-0027`)
+
+The first row the owner took from `CAPABILITY_MATRIX.md` to finish stage 1:
+the part numbers fitted, the serial, the software and hardware levels a
+module holds, read as one operation instead of one identifier at a time by
+someone who knows the numbers. The platform documents were read first: every
+one names, per module, the identifier sets `NET`, `SWDL` and `PDI` — 3,168
+set definitions, 549 distinct identifiers, 5,671 references over 55
+documents — and every `NET` set opens with the same block SDD comments as
+*Core PIDs*: `0xF111` core assembly, `0xF112` assembly, `0xF113` delivery
+assembly, `0xF18C` serial, `0xF188` software, `0xF191` hardware, `0xF190`
+VIN, `0xF103` active network configuration.
+
+`ADR-0027` decides that the passport is SDD's own list for that module on
+that car, recorded in the DID catalogue's shape with the encoding
+`text=ascii`, so a passport read *is* a module read through the same
+prepared transaction, the same record and the same intake; that a value is
+the text it is — printable ASCII with the padding trimmed, bytes with the
+reason otherwise, nothing parsed and nothing compared; that the operation is
+`MODULE_PASSPORT`, class `READ_ONLY`, in the mileage survey's shape; and that
+the label on screen is this project's own, keyed by the identifier, with
+SDD's name beneath as the row's identity. *Built the same day:* the ingest
+slice (34,788 records over 99 module families and 21 programmes; the library
+re-exported to 314,462 records and the owner's copy re-stamped), the decoder,
+the bench's part-number-shaped answers, the service, the panel and the button
+beside the mileage one, the session bundle's `module_passports`, the intake's
+`module_passports[i].reads[j]`. `IMPLEMENTED / FIXTURE_TESTED`; no build, the
+owner batches the work. Not decided: whether a software level is current —
+SDD's `IVS` part lineage could say, and comparing is a separate ADR.
+
 ### Beyond stage 1
 
 Service functions and configuration follow only after an explicit owner decision

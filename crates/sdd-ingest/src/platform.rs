@@ -22,6 +22,29 @@ pub const NETWORK_CLAIM: &str = "sdd_network";
 /// resolves as unreachable until a later slice derives identifiers with the
 /// standard as evidence.
 pub const PHYSICAL_ADDRESS_CLAIM: &str = "sdd_physical_address";
+/// Encoding descriptor of an identification identifier (ADR-0027): the whole
+/// payload is a text — a part number, a serial, a VIN. The decoder shows
+/// printable ASCII as text and anything else as bytes.
+pub const IDENTIFICATION_ENCODING: &str = "text=ascii";
+/// The module's data-identifier sets whose members are a module's
+/// identification: its own set, the software part numbers, the pre-delivery
+/// list. The module's own set also carries data that is not identification;
+/// only its `0xF100`–`0xF1FF` members are taken (ADR-0027).
+const IDENTIFICATION_SET_TYPES: [&str; 3] = ["NET", "SWDL", "PDI"];
+const IDENTIFICATION_RANGE: std::ops::RangeInclusive<u16> = 0xF100..=0xF1FF;
+/// The one service an identification identifier is read with.
+const READ_DATA_BY_IDENTIFIER_SERVICE: &str = "0x22";
+
+/// One `<did>` of a named data-identifier set, as the platform declares it.
+#[derive(Clone, Debug)]
+struct DeclaredIdentifier {
+    identifier: u16,
+    /// SDD's human text for it (`ECU Core Assembly Number`), or its
+    /// attribute name when the text is absent.
+    name: String,
+    /// The service SDD reads it with, verbatim (`0x22`).
+    service: Option<String>,
+}
 
 /// Adapter for the SDD `PLATFORM_<PROGRAM>_<YEAR>.xml` documents.
 ///
@@ -137,6 +160,7 @@ impl IngestionAdapter for PlatformAdapter {
         let mut evidence = BTreeMap::new();
         let mut records = BTreeMap::new();
         let base = self.applicability(&program, &marker)?;
+        let sets = identifier_sets(root)?;
 
         self.add_connector(root, &program, &base, &mut evidence, &mut records)?;
         for network in networks.values() {
@@ -145,6 +169,7 @@ impl IngestionAdapter for PlatformAdapter {
         self.add_modules(
             root,
             &networks,
+            &sets,
             &program,
             &base,
             &mut evidence,
@@ -473,10 +498,12 @@ impl PlatformAdapter {
         Ok(())
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn add_modules(
         &self,
         root: roxmltree::Node<'_, '_>,
         networks: &BTreeMap<String, Network>,
+        sets: &BTreeMap<String, Vec<DeclaredIdentifier>>,
         program: &str,
         base: &Applicability,
         evidence: &mut BTreeMap<String, EvidenceRecord>,
@@ -593,6 +620,108 @@ impl PlatformAdapter {
             if let Some(network) = network {
                 self.add_module_bus_facts(
                     network, &entity, acronym, &suffix, program, base, evidence, records,
+                )?;
+            }
+            self.add_identification(
+                module, sets, acronym, &segment, &suffix, program, base, evidence, records,
+            )?;
+        }
+        Ok(())
+    }
+
+    /// The module's identification identifiers (ADR-0027): the members of
+    /// its `SWDL` and `PDI` sets and the `0xF100`–`0xF1FF` members of its own
+    /// `NET` set, each recorded in the DID catalogue's own shape so that the
+    /// resolver's readable list and the transaction gate admit them as they
+    /// admit a catalogue parameter. A set the document references but never
+    /// defines states nothing and yields nothing; a member read with any
+    /// service but `0x22` is not a read this product makes and is left out.
+    #[allow(clippy::too_many_arguments)]
+    fn add_identification(
+        &self,
+        module: roxmltree::Node<'_, '_>,
+        sets: &BTreeMap<String, Vec<DeclaredIdentifier>>,
+        acronym: &str,
+        segment: &str,
+        suffix: &str,
+        program: &str,
+        base: &Applicability,
+        evidence: &mut BTreeMap<String, EvidenceRecord>,
+        records: &mut BTreeMap<String, KnowledgeRecord>,
+    ) -> Result<(), KnowledgeError> {
+        for reference in module.children().filter(|node| {
+            node.is_element()
+                && node.tag_name().name() == "data_identifier_set"
+                && node
+                    .attribute("type")
+                    .is_some_and(|kind| IDENTIFICATION_SET_TYPES.contains(&kind))
+        }) {
+            let kind = reference.attribute("type").unwrap_or_default();
+            // The set's name is the element's own text; a qualifier may
+            // follow it as a child element.
+            let Some(set_name) = reference
+                .text()
+                .map(str::trim)
+                .filter(|name| !name.is_empty())
+            else {
+                continue;
+            };
+            let Some(members) = sets.get(set_name) else {
+                continue;
+            };
+            let set_quals = module_quals(reference);
+            let set_suffix = qual_suffix(&set_quals);
+            let mut applicability = qualified_by_module(base, &set_quals)?;
+            applicability.ecu_family = DimensionConstraint::one_of([acronym.to_string()])?;
+            applicability.validate()?;
+            let qualifier_note = if set_quals.is_empty() {
+                String::new()
+            } else {
+                format!(" set qualifier={}", qual_text(&set_quals))
+            };
+
+            for member in members {
+                if member.service.as_deref() != Some(READ_DATA_BY_IDENTIFIER_SERVICE) {
+                    continue;
+                }
+                if kind == "NET" && !IDENTIFICATION_RANGE.contains(&member.identifier) {
+                    continue;
+                }
+                let identifier = format!("0x{:04X}", member.identifier);
+                let record_id = format!(
+                    "{}.module.{segment}.identification.{}{suffix}{set_suffix}",
+                    self.source.id.0,
+                    identifier.to_ascii_lowercase()
+                );
+                // The same identifier reached through two of the module's
+                // sets is one identifier; the first set to name it speaks.
+                if records.contains_key(&record_id) {
+                    continue;
+                }
+                self.push(
+                    record_id,
+                    format!(
+                        "module_fitment/module[module_code_name/@acronym='{acronym}']/data_identifier_set[@type='{kind}']; data_identifier_set[@id='{set_name}']/did[@id='{identifier}']"
+                    ),
+                    format!(
+                        "{program} {acronym} {kind} {set_name}: {identifier} {} service 0x22{qualifier_note}",
+                        member.name
+                    ),
+                    KnowledgeEntity {
+                        kind: EntityKind::IdentifierParameter,
+                        id: format!("DID-{identifier}"),
+                    },
+                    ClaimKey::ParameterDefinition {
+                        parameter: member.name.clone(),
+                    },
+                    KnowledgeValue::IdentifierDefinition {
+                        identifier,
+                        encoding: Some(IDENTIFICATION_ENCODING.to_string()),
+                        unit: None,
+                    },
+                    applicability.clone(),
+                    evidence,
+                    records,
                 )?;
             }
         }
@@ -821,6 +950,55 @@ fn qualification(root: roxmltree::Node<'_, '_>) -> Result<(String, String), Know
             "<platform> must name exactly one program and one model-year marker; found {programs:?} and {markers:?}"
         ))),
     }
+}
+
+/// The named data-identifier sets a platform defines at its root, each a
+/// list of `<did>` elements with the identifier, SDD's attribute name, the
+/// service it is read with and, usually, a human text.
+fn identifier_sets(
+    root: roxmltree::Node<'_, '_>,
+) -> Result<BTreeMap<String, Vec<DeclaredIdentifier>>, KnowledgeError> {
+    let mut sets = BTreeMap::new();
+    for set in root.children().filter(|node| {
+        node.is_element()
+            && node.tag_name().name() == "data_identifier_set"
+            && node.has_attribute("id")
+    }) {
+        let id = require_attribute(set, "id")?.to_string();
+        let mut members = Vec::new();
+        for did in set
+            .children()
+            .filter(|node| node.is_element() && node.tag_name().name() == "did")
+        {
+            let raw = require_attribute(did, "id")?;
+            let Some(identifier) = parse_hex(raw).and_then(|value| u16::try_from(value).ok())
+            else {
+                return Err(KnowledgeError::Parse(format!(
+                    "data_identifier_set '{id}' declares a did '{raw}' that is not a 16-bit identifier"
+                )));
+            };
+            let attribute_name = did.attribute("name").map(str::trim).unwrap_or_default();
+            let name = child_text(did, "tm")
+                .map(str::trim)
+                .filter(|text| !text.is_empty())
+                .unwrap_or(attribute_name)
+                .to_string();
+            if name.is_empty() {
+                return Err(KnowledgeError::Parse(format!(
+                    "data_identifier_set '{id}' declares did {raw} with no name"
+                )));
+            }
+            members.push(DeclaredIdentifier {
+                identifier,
+                name,
+                service: did
+                    .attribute("service_id")
+                    .map(|value| value.trim().to_string()),
+            });
+        }
+        sets.insert(id, members);
+    }
+    Ok(sets)
 }
 
 fn networks(root: roxmltree::Node<'_, '_>) -> Result<BTreeMap<String, Network>, KnowledgeError> {

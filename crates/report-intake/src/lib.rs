@@ -68,6 +68,9 @@ struct SessionReport {
     /// The mileage survey (`ADR-0024`): one record per read made.
     #[serde(default)]
     mileage_surveys: Vec<MileageSurvey>,
+    /// The module passport (`ADR-0027`): one record per read made.
+    #[serde(default)]
+    module_passports: Vec<ModulePassport>,
 }
 
 /// As much of a live-read run as the intake reads: the set, each entry with
@@ -88,6 +91,15 @@ struct LiveReadSetEntry {
 /// As much of a mileage survey as the intake reads: the reads it made.
 #[derive(Debug, Deserialize)]
 struct MileageSurvey {
+    #[serde(default)]
+    reads: Vec<ModuleReadReport>,
+}
+
+/// As much of a module passport as the intake reads: the reads it made. The
+/// texts themselves — part numbers, serials — are what a module holds, not
+/// evidence about the route, so they are not recorded here.
+#[derive(Debug, Deserialize)]
+struct ModulePassport {
     #[serde(default)]
     reads: Vec<ModuleReadReport>,
 }
@@ -188,6 +200,12 @@ pub fn intake(
                 .mileage_surveys
                 .iter()
                 .flat_map(|survey| survey.reads.iter()),
+        )
+        .chain(
+            report
+                .module_passports
+                .iter()
+                .flat_map(|passport| passport.reads.iter()),
         );
     for read in every_read {
         let program = read.vehicle.vehicle_program.trim();
@@ -259,10 +277,20 @@ pub fn intake(
             )?;
         }
     }
+    for (passport_index, passport) in report.module_passports.iter().enumerate() {
+        for (read_index, record) in passport.reads.iter().enumerate() {
+            builder.read(
+                format!("module_passports[{passport_index}].reads[{read_index}]"),
+                format!("passport.{passport_index:02}.{read_index:03}"),
+                record,
+                library,
+            )?;
+        }
+    }
 
     if builder.records.is_empty() {
         return Err(KnowledgeError::Parse(
-            "the report holds nothing this intake can record: no module read, capture, calibration read, live-read run or mileage survey".into(),
+            "the report holds nothing this intake can record: no module read, capture, calibration read, live-read run, mileage survey or module passport".into(),
         ));
     }
     Ok(IntakeOutcome {

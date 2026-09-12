@@ -66,6 +66,11 @@
 			<address type="can_tx" session="prog">0x111</address>
 			<address type="can_rx" session="prog">0x222</address>
 			<network>CAN_HS</network>
+			<data_identifier_set type="NET">synth_net</data_identifier_set>
+			<data_identifier_set type="SWDL">synth_swdl_std<qualifier><qual type="CM_QUAL_SYNTH_HW" value="VAL_STD"/></qualifier></data_identifier_set>
+			<data_identifier_set type="SWDL">synth_swdl_plus<qualifier><qual type="CM_QUAL_SYNTH_HW" value="VAL_PLUS"/></qualifier></data_identifier_set>
+			<data_identifier_set type="PDI">synth_pdi</data_identifier_set>
+			<data_identifier_set type="APP_DATA_COLLECT">synth_net</data_identifier_set>
 			<fitment>mandatory</fitment>
 		</module>
 		<module>
@@ -73,6 +78,8 @@
 			<address type="can_tx" session="diag">0x760</address>
 			<address type="can_rx" session="diag">0x768</address>
 			<network>CAN_MS</network>
+			<data_identifier_set type="NET">synth_net</data_identifier_set>
+			<data_identifier_set type="PDI">synth_undefined</data_identifier_set>
 			<fitment>optional</fitment>
 		</module>
 		<module>
@@ -96,4 +103,53 @@
 			<network>CAN_HS</network>
 		</module>
 	</module_fitment>
+	<!--
+	  Named data-identifier sets (ADR-0027). The NET set mixes identification
+	  with data that is not (a distance, a legislated mirror) and one member
+	  read with a service this product does not use; only its 0xF1xx members
+	  read with 0x22 are identification. The SWDL and PDI sets are wholly
+	  identification. synth_undefined is referenced above and never defined.
+	-->
+	<data_identifier_set id="synth_net">
+		<did id="0xF111" name="ecu_core_assembly_pn" service_id="0x22">
+			<tm>ECU Core Assembly Number</tm>
+		</did>
+		<did id="0xF188" name="vm_ecu_sw_pn" service_id="0x22">
+			<tm>ECU Software Number</tm>
+		</did>
+		<did id="0xF190" name="ecu_vin" service_id="0x22">
+			<tm>Vehicle Identification Number</tm>
+		</did>
+		<did id="0xF1A0" name="synth_no_text" service_id="0x22"/>
+		<did id="0xDD01" name="generic_pid_dd01" service_id="0x22">
+			<tm>Total Distance</tm>
+		</did>
+		<did id="0xF802" name="vehicle_id_number" service_id="0x09">
+			<tm>Vehicle Identification Number</tm>
+		</did>
+	</data_identifier_set>
+	<data_identifier_set id="synth_swdl_std">
+		<did id="0xF188" name="vm_ecu_sw_pn" service_id="0x22">
+			<tm>ECU Software Number</tm>
+		</did>
+		<did id="0xF124" name="ecu_cal_01_pn" service_id="0x22">
+			<tm>ECU Calibration Data 1 Number</tm>
+		</did>
+	</data_identifier_set>
+	<data_identifier_set id="synth_swdl_plus">
+		<did id="0xF188" name="vm_ecu_sw_pn" service_id="0x22">
+			<tm>ECU Software Number</tm>
+		</did>
+		<did id="0xF125" name="ecu_cal_02_pn" service_id="0x22">
+			<tm>ECU Calibration Data 2 Number</tm>
+		</did>
+	</data_identifier_set>
+	<data_identifier_set id="synth_pdi">
+		<did id="0xF111" name="ecu_core_assembly_pn" service_id="0x22">
+			<tm>ECU Core Assembly Number</tm>
+		</did>
+		<did id="0xF18C" name="ecu_sn" service_id="0x22">
+			<tm>ECU Serial Number</tm>
+		</did>
+	</data_identifier_set>
 </platform>

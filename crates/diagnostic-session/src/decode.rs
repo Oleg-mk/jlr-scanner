@@ -42,6 +42,22 @@ struct Encoding {
     offset_first: bool,
     has_map: bool,
     states: Vec<(u64, u64, String)>,
+    /// The whole payload is a text — a part number, a serial, a VIN
+    /// (ADR-0027, `text=ascii`).
+    text: bool,
+}
+
+/// Whether an identifier's parameters say its payload is a text (ADR-0027).
+pub fn is_text(parameters: &[ReadableParameter]) -> bool {
+    parameters
+        .iter()
+        .filter_map(|parameter| parameter.encoding.as_deref())
+        .any(|text| parse_encoding(text).text)
+}
+
+/// Bytes that pad a text at either end: NUL, `0xFF`, space.
+fn is_padding(byte: u8) -> bool {
+    byte == 0x00 || byte == 0xFF || byte == b' '
 }
 
 fn parse_encoding(text: &str) -> Encoding {
@@ -51,6 +67,7 @@ fn parse_encoding(text: &str) -> Encoding {
             continue;
         };
         match key.trim() {
+            "text" => encoding.text = value.trim().eq_ignore_ascii_case("ascii"),
             "bytes" => {
                 if let Some((from, to)) = value.split_once("..") {
                     if let (Ok(from), Ok(to)) = (from.trim().parse(), to.trim().parse()) {
@@ -125,6 +142,29 @@ fn decode_one(parameter: &ReadableParameter, data: &[u8]) -> DecodedParameter {
         return decoded;
     };
     let encoding = parse_encoding(text);
+    if encoding.text {
+        // The text it is, padding trimmed; not text, then the bytes and the
+        // reason. Nothing is parsed out of it and nothing compared.
+        let start = data.iter().position(|byte| !is_padding(*byte));
+        let end = data.iter().rposition(|byte| !is_padding(*byte));
+        let content = match (start, end) {
+            (Some(start), Some(end)) if start <= end => &data[start..=end],
+            _ => &data[..0],
+        };
+        if content.is_empty() {
+            decoded.note = Some(if data.is_empty() {
+                "the module answered with no bytes".into()
+            } else {
+                "the module answered with padding only".into()
+            });
+        } else if content.iter().all(|byte| (0x20..=0x7E).contains(byte)) {
+            decoded.value = Some(String::from_utf8_lossy(content).into_owned());
+        } else {
+            decoded.value = Some(hex(data));
+            decoded.note = Some("not printable text; shown as bytes".into());
+        }
+        return decoded;
+    }
     let Some((from, to)) = encoding.bytes else {
         decoded.note = Some("the catalogue records no byte range for this parameter".into());
         return decoded;
@@ -342,5 +382,37 @@ mod tests {
             .as_deref()
             .unwrap()
             .contains("no byte layout"));
+    }
+
+    /// ADR-0027: an identification identifier is the text it holds, padding
+    /// trimmed; what is not text is shown as bytes with the reason; and the
+    /// text encoding names no byte range, so the bench asks the encoding
+    /// rather than the span.
+    #[test]
+    fn a_text_identifier_is_the_string_it_holds() {
+        let parameters = [parameter("ECU Core Assembly Number", "text=ascii", None)];
+        assert!(is_text(&parameters));
+        assert_eq!(parameters_span(&parameters), None);
+
+        let decoded = decode_parameters(&parameters, b"8X23-14C088-AB\0\0\xFF");
+        assert_eq!(decoded[0].value.as_deref(), Some("8X23-14C088-AB"));
+        assert_eq!(decoded[0].raw, None);
+        assert_eq!(decoded[0].note, None);
+
+        let padded = decode_parameters(&parameters, b"  DPLA-12A650-BC  ");
+        assert_eq!(padded[0].value.as_deref(), Some("DPLA-12A650-BC"));
+
+        let binary = decode_parameters(&parameters, &[0x01, 0x02, 0x80]);
+        assert_eq!(binary[0].value.as_deref(), Some("01 02 80"));
+        assert!(binary[0].note.as_deref().unwrap().contains("not printable"));
+
+        let empty = decode_parameters(&parameters, &[0x00, 0x00]);
+        assert_eq!(empty[0].value, None);
+        assert!(empty[0].note.as_deref().unwrap().contains("padding only"));
+        assert!(!is_text(&[parameter(
+            "Engine speed",
+            "bytes=0..1;scale=0.25",
+            Some("rpm")
+        )]));
     }
 }

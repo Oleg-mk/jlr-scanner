@@ -410,6 +410,44 @@ const uk: Record<string, string> = {
   "Modules disagree for honest reasons too: a replaced cluster, a gearbox or an airbag module fitted after a repair all carry their own count. These are readings, not a conclusion.": "Блоки розходяться і з чесних причин: замінений щиток, коробка чи блок подушок, поставлені після ремонту, несуть власний лічильник. Це показання, а не висновок.",
   "The mileage survey failed": "Читання пробігу не вдалося",
   "The loaded data names no mileage for this vehicle": "Завантажені дані не називають пробігу для цього авто",
+  // The module passport (ADR-0027)
+  "Module passport": "Паспорт модуля",
+  "What every module says it is": "Що кожен модуль каже про себе",
+  "The part numbers fitted, the serial, the software and hardware levels — read from the identifiers the data declares for each module, once each. The text is shown as the module holds it; nothing is compared with a catalogue. Read-only; nothing is written anywhere.": "Номери встановлених деталей, серійний номер, рівні програмного й апаратного забезпечення — читаються з ідентифікаторів, які дані оголошують для кожного модуля, по одному разу. Текст показано так, як його зберігає модуль; ні з чим не порівнюється. Лише читання; нікуди нічого не записується.",
+  "Read the module passports": "Прочитати паспорти модулів",
+  "{asked} of {planned} identifier reads over {modules} modules, {answered} answered": "{asked} з {planned} читань ідентифікаторів у {modules} модулях, відповіли {answered}",
+  "What": "Що",
+  "The module holds": "Модуль зберігає",
+  "These are the texts the modules hold, as they hold them. Whether a software level is current is a question for a catalogue this product does not carry; nothing here says so.": "Це тексти, які зберігають модулі, такі, як вони їх зберігають. Чи актуальна версія програмного забезпечення — питання до каталогу, якого в програмі немає; тут про це нічого не сказано.",
+  "Reading the module passports failed": "Читання паспортів модулів не вдалося",
+  "The loaded data names no identification for these modules": "Завантажені дані не називають ідентифікації для цих модулів",
+  "the module answered with no bytes": "модуль відповів без даних",
+  "the module answered with padding only": "модуль відповів лише заповненням",
+  "not printable text; shown as bytes": "не друкований текст; показано байтами",
+  "the answer does not carry this parameter": "у відповіді немає цього параметра",
+  // Our labels for the identification identifiers, keyed by the identifier
+  "Active network configuration": "Активна конфігурація мережі",
+  "Master network configuration": "Головна конфігурація мережі",
+  "Vehicle build parameters": "Параметри збірки автомобіля",
+  "Vehicle configuration parameters": "Параметри конфігурації автомобіля",
+  "Core assembly part number": "Номер деталі основного вузла",
+  "Assembly part number": "Номер деталі вузла в зборі",
+  "Delivery assembly part number": "Номер деталі вузла як поставлено",
+  "Vehicle information section": "Розділ відомостей про автомобіль",
+  "Software part number": "Номер програмного забезпечення",
+  "Software part number {n}": "Номер програмного забезпечення {n}",
+  "Calibration data {n} part number": "Номер калібрувальних даних {n}",
+  "Software download specification version": "Версія специфікації завантаження ПЗ",
+  "Combined ECU and external hardware part number": "Спільний номер блока і зовнішнього обладнання",
+  "External hardware serial number": "Серійний номер зовнішнього обладнання",
+  "Boot software identification": "Ідентифікація завантажувального ПЗ",
+  "Serial number": "Серійний номер",
+  "VIN held by the module": "VIN, який зберігає модуль",
+  "Hardware part number": "Номер апаратної частини",
+  "System supplier software number": "Номер ПЗ постачальника",
+  "Type approval number": "Номер схвалення типу",
+  "Hardware configuration {n} part number": "Номер конфігурації апаратної частини {n}",
+  "Mechatronic index number": "Індексний номер мехатроніки",
   // Live reading (ADR-0022): the panel, and the shell's reasons a run ended
   "Address": "Адреса",
   "Live reading": "Живе читання",
@@ -1339,6 +1377,44 @@ const ru: Record<string, string> = {
   "Modules disagree for honest reasons too: a replaced cluster, a gearbox or an airbag module fitted after a repair all carry their own count. These are readings, not a conclusion.": "Блоки расходятся и по честным причинам: заменённый щиток, коробка или блок подушек, поставленные после ремонта, несут собственный счётчик. Это показания, а не вывод.",
   "The mileage survey failed": "Чтение пробега не удалось",
   "The loaded data names no mileage for this vehicle": "Загруженные данные не называют пробега для этого автомобиля",
+  // The module passport (ADR-0027)
+  "Module passport": "Паспорт модуля",
+  "What every module says it is": "Что каждый модуль говорит о себе",
+  "The part numbers fitted, the serial, the software and hardware levels — read from the identifiers the data declares for each module, once each. The text is shown as the module holds it; nothing is compared with a catalogue. Read-only; nothing is written anywhere.": "Номера установленных деталей, серийный номер, уровни программного и аппаратного обеспечения — читаются из идентификаторов, которые данные объявляют для каждого модуля, по одному разу. Текст показан так, как его хранит модуль; ни с чем не сравнивается. Только чтение; никуда ничего не записывается.",
+  "Read the module passports": "Прочитать паспорта модулей",
+  "{asked} of {planned} identifier reads over {modules} modules, {answered} answered": "{asked} из {planned} чтений идентификаторов в {modules} модулях, ответили {answered}",
+  "What": "Что",
+  "The module holds": "Модуль хранит",
+  "These are the texts the modules hold, as they hold them. Whether a software level is current is a question for a catalogue this product does not carry; nothing here says so.": "Это тексты, которые хранят модули, такие, как они их хранят. Актуальна ли версия программного обеспечения — вопрос к каталогу, которого в программе нет; здесь об этом ничего не сказано.",
+  "Reading the module passports failed": "Чтение паспортов модулей не удалось",
+  "The loaded data names no identification for these modules": "Загруженные данные не называют идентификации для этих модулей",
+  "the module answered with no bytes": "модуль ответил без данных",
+  "the module answered with padding only": "модуль ответил только заполнением",
+  "not printable text; shown as bytes": "непечатный текст; показано байтами",
+  "the answer does not carry this parameter": "в ответе нет этого параметра",
+  // Our labels for the identification identifiers, keyed by the identifier
+  "Active network configuration": "Активная конфигурация сети",
+  "Master network configuration": "Главная конфигурация сети",
+  "Vehicle build parameters": "Параметры сборки автомобиля",
+  "Vehicle configuration parameters": "Параметры конфигурации автомобиля",
+  "Core assembly part number": "Номер детали основного узла",
+  "Assembly part number": "Номер детали узла в сборе",
+  "Delivery assembly part number": "Номер детали узла как поставлено",
+  "Vehicle information section": "Раздел сведений об автомобиле",
+  "Software part number": "Номер программного обеспечения",
+  "Software part number {n}": "Номер программного обеспечения {n}",
+  "Calibration data {n} part number": "Номер калибровочных данных {n}",
+  "Software download specification version": "Версия спецификации загрузки ПО",
+  "Combined ECU and external hardware part number": "Общий номер блока и внешнего оборудования",
+  "External hardware serial number": "Серийный номер внешнего оборудования",
+  "Boot software identification": "Идентификация загрузочного ПО",
+  "Serial number": "Серийный номер",
+  "VIN held by the module": "VIN, который хранит модуль",
+  "Hardware part number": "Номер аппаратной части",
+  "System supplier software number": "Номер ПО поставщика",
+  "Type approval number": "Номер одобрения типа",
+  "Hardware configuration {n} part number": "Номер конфигурации аппаратной части {n}",
+  "Mechatronic index number": "Индексный номер мехатроники",
   // Live reading (ADR-0022): the panel, and the shell's reasons a run ended
   "Address": "Адрес",
   "Live reading": "Живое чтение",
@@ -1994,6 +2070,68 @@ export function parameterNote(note: string): string {
     );
   }
   return t(note);
+}
+
+/**
+ * This project's own label for an identification identifier (ADR-0027,
+ * decision 5), keyed by the identifier and said in the interface's language.
+ * Only identifiers SDD names one way across the fleet have a label; an
+ * identifier SDD names differently from module to module (`0xF108` is a
+ * software number in one and a network-signal calibration in another) has
+ * none, and the caller shows SDD's own name for the row instead.
+ */
+const PASSPORT_LABELS: Record<string, string> = {
+  "0xF103": "Active network configuration",
+  "0xF104": "Master network configuration",
+  "0xF105": "Vehicle build parameters",
+  "0xF106": "Vehicle configuration parameters",
+  "0xF111": "Core assembly part number",
+  "0xF112": "Assembly part number",
+  "0xF113": "Delivery assembly part number",
+  "0xF114": "Vehicle information section",
+  "0xF162": "Software download specification version",
+  "0xF169": "Combined ECU and external hardware part number",
+  "0xF16F": "External hardware serial number",
+  "0xF180": "Boot software identification",
+  "0xF188": "Software part number",
+  "0xF18C": "Serial number",
+  "0xF190": "VIN held by the module",
+  "0xF191": "Hardware part number",
+  "0xF194": "System supplier software number",
+  "0xF196": "Type approval number",
+  "0xF199": "Software part number",
+  "0xF1F0": "Mechatronic index number",
+};
+
+/** Numbered families: the number is part of the label, not of the key. */
+const PASSPORT_NUMBERED: Array<[string, number, string]> = [
+  ["0xF120", 2, "Software part number {n}"],
+  ["0xF121", 3, "Software part number {n}"],
+  ["0xF122", 4, "Software part number {n}"],
+  ["0xF123", 5, "Software part number {n}"],
+  ["0xF1A5", 6, "Software part number {n}"],
+  ["0xF124", 1, "Calibration data {n} part number"],
+  ["0xF125", 2, "Calibration data {n} part number"],
+  ["0xF126", 3, "Calibration data {n} part number"],
+  ["0xF127", 4, "Calibration data {n} part number"],
+  ["0xF128", 5, "Calibration data {n} part number"],
+  ["0xF1A9", 1, "Hardware configuration {n} part number"],
+  ["0xF1AA", 2, "Hardware configuration {n} part number"],
+  ["0xF1AB", 3, "Hardware configuration {n} part number"],
+  ["0xF1AC", 4, "Hardware configuration {n} part number"],
+  ["0xF1AD", 5, "Hardware configuration {n} part number"],
+  ["0xF1AE", 6, "Hardware configuration {n} part number"],
+  ["0xF1AF", 7, "Hardware configuration {n} part number"],
+  ["0xF1B0", 8, "Hardware configuration {n} part number"],
+];
+
+export function passportLabel(identifier: string): string | null {
+  const key = `0x${identifier.replace(/^0x/i, "").toUpperCase()}`;
+  const plain = PASSPORT_LABELS[key];
+  if (plain !== undefined) return t(plain);
+  const numbered = PASSPORT_NUMBERED.find(([id]) => id === key);
+  if (numbered !== undefined) return t(numbered[2], { n: numbered[1] });
+  return null;
 }
 
 /**

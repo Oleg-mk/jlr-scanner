@@ -221,6 +221,28 @@ one will.
 
 Nothing is written — not here, not anywhere.
 
+## The module passport
+
+Beside **Read the mileage** there is **Read the module passports**. Every
+module carries, in its own memory, the numbers that say which one it is: the
+part number of the unit fitted, the serial number, the software it runs, the
+hardware level, the VIN it was told it belongs to. The data names, per
+module, exactly which identifiers hold those texts; the button asks each of
+them once and puts the answers in one table per module — the text as the
+module holds it, nothing shortened and nothing interpreted.
+
+Each row shows our own name for the identifier, SDD's name under it (that is
+the name the report keeps), the address, and the text. A module that stayed
+silent says **no answer**; a text that is not printable is shown as bytes,
+with the reason.
+
+**The application does not judge a part number.** Whether the software in a
+module is current, or the part the right one for the car, is a question for
+a catalogue this application does not carry — and it will not pretend
+otherwise. What is here is what is in the car.
+
+Nothing is written — a part number is read, never set.
+
 ## What the data says about a code
 
 Under every fault code there is a fold: **What the data says about this code**.

@@ -229,17 +229,20 @@ fn session_report(reads: Vec<ModuleReadReport>, with_capture: bool) -> String {
         with_capture,
         serde_json::json!([]),
         serde_json::json!([]),
+        serde_json::json!([]),
     )
 }
 
-/// A bundle with live-read runs and mileage surveys in it as the shell
-/// writes them (ADR-0022, ADR-0024): a run's set entries each carry the
-/// record of their last completed request; a survey carries its reads.
+/// A bundle with live-read runs, mileage surveys and module passports in it
+/// as the shell writes them (ADR-0022, ADR-0024, ADR-0027): a run's set
+/// entries each carry the record of their last completed request; a survey
+/// and a passport carry their reads.
 fn session_bundle(
     reads: Vec<ModuleReadReport>,
     with_capture: bool,
     live_read_runs: serde_json::Value,
     mileage_surveys: serde_json::Value,
+    module_passports: serde_json::Value,
 ) -> String {
     let captures = if with_capture {
         serde_json::json!([{
@@ -270,7 +273,8 @@ fn session_bundle(
         "module_reads": reads,
         "calibration_reads": [],
         "live_read_runs": live_read_runs,
-        "mileage_surveys": mileage_surveys
+        "mileage_surveys": mileage_surveys,
+        "module_passports": module_passports
     })
     .to_string()
 }
@@ -417,13 +421,23 @@ fn a_live_read_run_and_a_mileage_survey_confirm_what_one_read_confirms() {
             "reads": [ answered ],
             "readings": []
         }]),
+        serde_json::json!([{
+            "schema": "prowlone.module-passport",
+            "reads": [ answered ],
+            "readings": []
+        }]),
     );
     let outcome = intake(&bundle, "session.json", &before).unwrap();
     let batch = &outcome.batch;
-    // Two answered records confirm six facts each and record one observation
-    // each; the silent one is an attempt. 7 + 7 + 1.
-    assert_eq!(batch.records.len(), 15, "{:#?}", outcome.summary);
-    assert_eq!(outcome.summary.confirmations.len(), 2);
+    // Three answered records confirm six facts each and record one
+    // observation each; the silent one is an attempt. 7 + 7 + 7 + 1.
+    assert_eq!(batch.records.len(), 22, "{:#?}", outcome.summary);
+    assert_eq!(outcome.summary.confirmations.len(), 3);
+    assert!(outcome
+        .summary
+        .confirmations
+        .iter()
+        .any(|line| line.starts_with("module_passports[0].reads[0] RELAYMOD")));
     assert!(outcome
         .summary
         .confirmations
@@ -449,6 +463,7 @@ fn a_live_read_run_and_a_mileage_survey_confirm_what_one_read_confirms() {
     assert_eq!(ids.len(), batch.records.len());
     assert!(ids.iter().any(|id| id.contains(".live.00.000.")));
     assert!(ids.iter().any(|id| id.contains(".mileage.00.000.")));
+    assert!(ids.iter().any(|id| id.contains(".passport.00.000.")));
 
     let manifest = serde_json::to_string(batch).unwrap();
     let after = library(&[("captured.json".into(), manifest)]);
@@ -464,9 +479,11 @@ fn a_live_read_run_and_a_mileage_survey_confirm_what_one_read_confirms() {
         false,
         serde_json::json!([{ "set": [] }]),
         serde_json::json!([]),
+        serde_json::json!([{ "reads": [] }]),
     );
     let error = intake(&empty, "session.json", &before)
         .unwrap_err()
         .to_string();
     assert!(error.contains("live-read run"), "{error}");
+    assert!(error.contains("module passport"), "{error}");
 }

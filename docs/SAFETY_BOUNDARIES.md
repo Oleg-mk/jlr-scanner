@@ -19,6 +19,7 @@ record in the session bundle is called:
 | `standard_obd_reads` | `prowlone.standard-obd-read` | the legislated J1979 services | `ADR-0022` §7 |
 | `live_read_runs` | `prowlone.live-read-run`, operation `LIVE_READ` | a module read repeated at a stated cadence, floor and cap in the shell | `ADR-0022` |
 | `mileage_surveys` | `prowlone.mileage-survey`, operation `MILEAGE_SURVEY` | one `ReadDataByIdentifier` per module the data names a distance for | `ADR-0024` |
+| `module_passports` | `prowlone.module-passport`, operation `MODULE_PASSPORT` | one `ReadDataByIdentifier` per identification identifier the platform declares for a module — part numbers, serial, software and hardware levels, shown as the text they are | `ADR-0027` |
 
 An operation not in this table does not exist in the product. Adding one
 means adding it here, with its class, in the same change. The first three

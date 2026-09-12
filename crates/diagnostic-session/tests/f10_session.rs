@@ -191,8 +191,14 @@ fn the_survey_shows_reachable_and_unreachable_modules_with_reasons() {
         .map(|entry| entry.identifier.as_str())
         .collect();
     // 0xDD01 is the distance the mileage survey asks for (ADR-0024);
-    // the fixture carries it so the survey has something to read.
-    assert_eq!(identifiers, vec!["0x0347", "0x1945", "0xDD01"]);
+    // the fixture carries it so the survey has something to read. The
+    // 0xF1xx rows are the module's identification (ADR-0027), from the sets
+    // the platform names for it; the two software lists a qualifier chooses
+    // are not this car's, which states no such qualifier, so they are absent.
+    assert_eq!(
+        identifiers,
+        vec!["0x0347", "0x1945", "0xDD01", "0xF111", "0xF188", "0xF18C", "0xF190", "0xF1A0"]
+    );
 
     // OTHERMOD sits on a bound bus that declares no diagnostic protocol, so
     // the survey says exactly that instead of dropping the row.
@@ -215,7 +221,14 @@ fn the_survey_shows_reachable_and_unreachable_modules_with_reasons() {
         .reasons
         .iter()
         .any(|reason| reason.starts_with("read-only capability:")));
-    assert!(unreachable.readable_identifiers.is_empty());
+    // The data still declares the module's identification (ADR-0027): the
+    // route, not the list, is what says it cannot be read today.
+    let declared: Vec<&str> = unreachable
+        .readable_identifiers
+        .iter()
+        .map(|entry| entry.identifier.as_str())
+        .collect();
+    assert_eq!(declared, vec!["0xF111", "0xF188", "0xF190", "0xF1A0"]);
 
     // LEGACYMOD has a physical address and no CAN identifiers: seen, placed on
     // its bus, and unreachable for exactly that reason. (FIXEDMOD, first in

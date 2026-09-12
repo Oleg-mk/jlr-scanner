@@ -21,7 +21,7 @@ Written 2026-09-12 at the owner's request: what a person gets from SDD at its fu
 | `not found in the data` | not found in SDD 169's data; may still exist in its runtime |
 | `—` | not applicable, or already answered by the column before |
 
-**Counts.** 99 rows. SDD does 63 of them. ProwlOne today: 35 built, 6 partly, 3 open inside stage 1. The roadmap: 20 in stage 2, 8 in stage 3. The ceiling: 53 possible, 3 need other hardware, 8 excluded for good. 10 rows are things SDD does not do and ProwlOne already does; 8 rows are things SDD does that ProwlOne will never do.
+**Counts.** 99 rows. SDD does 63 of them. ProwlOne today: 36 built, 5 partly, 3 open inside stage 1. The roadmap: 20 in stage 2, 8 in stage 3. The ceiling: 53 possible, 3 need other hardware, 8 excluded for good. 10 rows are things SDD does not do and ProwlOne already does; 8 rows are things SDD does that ProwlOne will never do.
 
 ## Vehicle, modules, network
 
@@ -33,7 +33,7 @@ Written 2026-09-12 at the owner's request: what a person gets from SDD at its fu
 | Network map: buses, modules, gateways | **yes** | **built** — drawn as SDD draws it; every state explained | **—** | **built** | PLATFORM_*.xml; F11 M1 |
 | Module survey with the route and the reason when unreachable | **partly** — shows what it reaches | **built** | **—** | **built** | F10, ADR-0013/0014 |
 | Network check: who answers, codes from every reachable module | **yes** | **built** | **—** | **built** | CANLinkMonitorData.xml; F11 |
-| Module passport: part numbers, serial, software level (F111/F112/F113/F18C) | **yes** | **partly** — single identifier reads; no passport screen | **—** | **possible** — one screen across all modules | PLATFORM data_identifier_set NET/SWDL/PDI |
+| Module passport: part numbers, serial, software level (F111/F112/F113/F18C) | **yes** | **built** — ADR-0027, F19: one screen across all modules; 34,788 identification records | **—** | **possible** — + software currency from the IVS lineage — a separate decision | PLATFORM data_identifier_set NET/SWDL/PDI; ADR-0027 |
 | Software level checked against JLR's catalogue | **yes** — IVS part lineage, SOTA | **no** | **—** | **possible** — compare numbers; never download software | COMMON_JLR_SMPACK_XML/IVS (17 programmes) |
 | CCF read (car configuration file) | **yes** | **stage 1, open** — in stage-1 scope | **—** | **possible** | PLATFORM ccf_source; CCF_DATA_*.xml (96) |
 | Listen-only capture, nothing transmitted | **not found in the data** | **built** | **—** | **built** | F8/F10 capture |

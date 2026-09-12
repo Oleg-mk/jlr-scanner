@@ -7,14 +7,16 @@ use super::capture_service::CaptureService;
 use super::live_read_service::{LiveReadService, LIVE_READ_TIMEOUT};
 use super::mileage_service::{MileageService, MILEAGE_READ_TIMEOUT};
 use super::module_read_service::{map_live_error, ModuleReadService, PreparedModuleRead};
+use super::passport_service::{PassportService, PASSPORT_READ_TIMEOUT};
 use super::refresh_bench;
 use super::session_report_service::{SessionReportService, SESSION_MODE_BENCH, SESSION_MODE_REAL};
 use super::session_service::SessionService;
 use super::standard_obd_service::{StandardObdService, STANDARD_OBD_TIMEOUT};
 use app_contracts::{
     AdapterErrorCode, AdapterInfo, AdapterState, LiveReadEntryRequest, LiveReadRequest,
-    LiveReadState, MileageKind, MileageSurveyState, ModuleReadKind, ModuleReadRequest,
-    ModuleReadState, StandardObdReadKind, StandardObdRequest, VehicleContextInput,
+    LiveReadState, MileageKind, MileageSurveyState, ModulePassportState, ModuleReadKind,
+    ModuleReadRequest, ModuleReadState, StandardObdReadKind, StandardObdRequest,
+    VehicleContextInput,
 };
 use diagnostic_session::KnowledgeLibrary;
 use knowledge::{
@@ -396,6 +398,82 @@ fn the_bench_connects_without_a_port_reads_the_surveyed_vehicle_and_marks_everyt
         );
     }
 
+    // The module passport (ADR-0027): SYNTHMOD's identification identifiers
+    // are the platform's own list for it — the NET set's F1xx members and
+    // the PDI set; the two software lists a qualifier this car does not state
+    // chooses stay out. The bench answers each with a part-number-shaped text
+    // and the VIN identifier with its VIN, every row marked synthetic.
+    let mut passport = PassportService::new();
+    let started = passport.start(
+        session.library(),
+        Some(&info),
+        &vehicle(),
+        &["SYNTHMOD".to_string(), "OTHERMOD".to_string()],
+    );
+    assert_eq!(started.state, ModulePassportState::Running, "{started:?}");
+    assert_eq!(started.planned, 5, "{started:?}");
+    assert_eq!(started.modules, 1, "OTHERMOD's route cannot be planned");
+    while let Some(due) = passport.next_due() {
+        let result = adapter
+            .execute_uds_read(&due.transaction, PASSPORT_READ_TIMEOUT)
+            .expect("the bench is connected")
+            .map_err(map_live_error);
+        passport.record(due.index, result);
+        passport.mark_synthetic();
+    }
+    let identified = passport.snapshot();
+    assert_eq!(identified.state, ModulePassportState::Finished);
+    assert_eq!(identified.asked, 5);
+    assert_eq!(identified.answered, 5, "{:?}", identified.readings);
+    let identifiers: Vec<&str> = identified
+        .readings
+        .iter()
+        .map(|row| row.identifier.as_str())
+        .collect();
+    assert_eq!(
+        identifiers,
+        vec!["0xF111", "0xF188", "0xF18C", "0xF190", "0xF1A0"]
+    );
+    for row in &identified.readings {
+        assert_eq!(row.state, ModuleReadState::Succeeded, "{row:?}");
+        assert_eq!(row.route_validation, "SYNTHETIC");
+        assert_eq!(row.note, None, "the bench answers printable text: {row:?}");
+        let value = row.value.as_deref().expect("a text");
+        if row.identifier == "0xF190" {
+            assert_eq!(
+                value.len(),
+                17,
+                "the VIN identifier answers the VIN: {value}"
+            );
+        } else {
+            assert!(
+                value.starts_with("BN"),
+                "a bench prefix no real part carries: {value}"
+            );
+        }
+    }
+    let core = identified
+        .readings
+        .iter()
+        .find(|row| row.identifier == "0xF111")
+        .unwrap();
+    assert_eq!(core.parameter, "ECU Core Assembly Number");
+    let passport_json = passport.report_json().expect("a finished run is a report");
+    assert!(passport_json.contains("prowlone.module-passport"));
+    assert!(passport_json.contains("\"safety_class\": \"READ_ONLY\""));
+    assert!(
+        !passport_json.contains("SOURCE_BACKED"),
+        "a bench reading is marked as real inside the report: {passport_json}"
+    );
+    assert!(passport_json.contains("\"not_planned\""));
+    // Read, never judged: no word for what a part number might mean.
+    for verdict in ["outdated", "obsolete", "wrong part", "superseded"] {
+        assert!(
+            !passport_json.to_lowercase().contains(verdict),
+            "the report must not say {verdict}"
+        );
+    }
+
     // A listen on the bench hears nothing, and is synthetic all the same.
     let listened = adapter
         .capture_route(VehicleRouteId::HsCan, Duration::from_millis(100))
@@ -428,6 +506,8 @@ fn the_bench_connects_without_a_port_reads_the_surveyed_vehicle_and_marks_everyt
     assert_eq!(report.snapshot().live_read_runs, 1);
     report.add_mileage_survey(&mileage_json).unwrap();
     assert_eq!(report.snapshot().mileage_surveys, 1);
+    report.add_module_passport(&passport_json).unwrap();
+    assert_eq!(report.snapshot().module_passports, 1);
     assert!(report.is_bench());
     assert!(report.accepts(SESSION_MODE_BENCH));
     assert!(!report.accepts(SESSION_MODE_REAL));

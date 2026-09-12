@@ -12,6 +12,8 @@ export interface SessionReportSnapshot {
   liveReadRuns: number;
   /** Mileage surveys, each recorded whole (ADR-0024). */
   mileageSurveys: number;
+  /** Module passports, each recorded whole (ADR-0027). */
+  modulePassports: number;
   reportAvailable: boolean;
   /** "bench" or "real" once the session holds records of either kind (ADR-0020). */
   mode: "bench" | "real" | null;
@@ -29,6 +31,7 @@ export const createSessionReportSnapshot = (): SessionReportSnapshot => ({
   standardObdReads: 0,
   liveReadRuns: 0,
   mileageSurveys: 0,
+  modulePassports: 0,
   reportAvailable: false,
   mode: null,
 });

@@ -6,6 +6,7 @@ mod diagnostic_service;
 mod live_read_service;
 mod mileage_service;
 mod module_read_service;
+mod passport_service;
 mod read_record;
 mod session_report_service;
 mod session_service;
@@ -15,9 +16,9 @@ use adapter_service::{lock_service, shared_service, SharedAdapterService};
 use app_contracts::{
     AdapterSnapshot, AdapterState, CaptureSnapshot, DiagnosticSnapshot, LibrarySnapshot,
     LiveReadRequest, LiveReadSnapshot, MileageSurveyRequest, MileageSurveySnapshot,
-    ModuleReadRequest, ModuleReadSnapshot, SessionReportSnapshot, StandardObdRequest,
-    StandardObdSnapshot, VehicleCatalogueSnapshot, VehicleContextInput, VehicleSurveySnapshot,
-    VinDecodeSnapshot,
+    ModulePassportRequest, ModulePassportSnapshot, ModuleReadRequest, ModuleReadSnapshot,
+    SessionReportSnapshot, StandardObdRequest, StandardObdSnapshot, VehicleCatalogueSnapshot,
+    VehicleContextInput, VehicleSurveySnapshot, VinDecodeSnapshot,
 };
 use bench_vehicle::BenchVehicle;
 use capture_service::CaptureService;
@@ -28,6 +29,7 @@ use mileage_service::{MileageService, MILEAGE_READ_TIMEOUT};
 use module_read_service::{adapter_unavailable, map_live_error, ModuleReadService};
 use mongoose_jlr::bench::{share_bus, SharedBenchBus};
 use mongoose_jlr::VehicleRouteId;
+use passport_service::{PassportService, PASSPORT_READ_TIMEOUT};
 use session_report_service::SessionReportService;
 use session_report_service::{SESSION_MODE_BENCH, SESSION_MODE_REAL};
 use session_service::SessionService;
@@ -45,8 +47,18 @@ type SharedModuleReadService = Mutex<ModuleReadService>;
 type SharedStandardObdService = Mutex<StandardObdService>;
 type SharedLiveReadService = Mutex<LiveReadService>;
 type SharedMileageService = Mutex<MileageService>;
+type SharedPassportService = Mutex<PassportService>;
 
 fn lock_mileage<'a>(state: &'a State<'a, SharedMileageService>) -> MutexGuard<'a, MileageService> {
+    state
+        .inner()
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+}
+
+fn lock_passport<'a>(
+    state: &'a State<'a, SharedPassportService>,
+) -> MutexGuard<'a, PassportService> {
     state
         .inner()
         .lock()
@@ -614,6 +626,7 @@ async fn start_new_session(
     // A live read never survives a new session (ADR-0022, decision 4).
     replace(app.state::<SharedLiveReadService>(), LiveReadService::new());
     replace(app.state::<SharedMileageService>(), MileageService::new());
+    replace(app.state::<SharedPassportService>(), PassportService::new());
     app.state::<SharedSessionService>()
         .inner()
         .lock()
@@ -1150,6 +1163,149 @@ async fn finish_mileage_survey(
     Ok(lock_mileage(&mileage_state).snapshot())
 }
 
+// ---------------------------------------------------------------------------
+// The module passport (ADR-0027): part numbers, serial, hardware and software
+// levels, over the identification identifiers SDD declares for each module.
+// One request per module and identifier, once; the text shown as it is.
+// ---------------------------------------------------------------------------
+
+#[tauri::command]
+async fn get_passport_state(
+    state: State<'_, SharedPassportService>,
+) -> Result<ModulePassportSnapshot, String> {
+    Ok(lock_passport(&state).snapshot())
+}
+
+/// A finished run joins the session bundle once.
+fn record_module_passport(
+    passport_state: &State<'_, SharedPassportService>,
+    report_state: &State<'_, SharedSessionReportService>,
+    bench: bool,
+) {
+    let json = { lock_passport(passport_state).take_report_json() };
+    if let Some(json) = json {
+        let mut session_report = lock_session_report(report_state);
+        session_report.set_mode(if bench {
+            SESSION_MODE_BENCH
+        } else {
+            SESSION_MODE_REAL
+        });
+        let _ = session_report.add_module_passport(&json);
+    }
+}
+
+fn start_module_passport_now(
+    adapter_state: State<'_, SharedAdapterService>,
+    session_state: State<'_, SharedSessionService>,
+    passport_state: State<'_, SharedPassportService>,
+    request: ModulePassportRequest,
+) -> ModulePassportSnapshot {
+    let adapter = { lock_service(&adapter_state).connected_adapter() };
+    // Without an adapter the honest answer is that, not that the data
+    // names no identification.
+    let Some(adapter) = adapter else {
+        return lock_passport(&passport_state).refuse(adapter_unavailable());
+    };
+    let mut session = lock_session(&session_state);
+    // The chosen modules, or every module the survey reaches.
+    let families: Vec<String> = session
+        .survey(&request.context)
+        .modules
+        .iter()
+        .map(|module| module.ecu_family.clone())
+        .filter(|family| match &request.ecu_families {
+            Some(chosen) => chosen.iter().any(|wanted| wanted == family),
+            None => true,
+        })
+        .collect();
+    let mut passport = lock_passport(&passport_state);
+    passport.start(
+        session.library(),
+        Some(&adapter),
+        &request.context,
+        &families,
+    )
+}
+
+fn module_passport_step_now(
+    adapter_state: State<'_, SharedAdapterService>,
+    passport_state: State<'_, SharedPassportService>,
+    report_state: State<'_, SharedSessionReportService>,
+) -> ModulePassportSnapshot {
+    let due = { lock_passport(&passport_state).next_due() };
+    let Some(due) = due else {
+        let bench = lock_service(&adapter_state).is_bench();
+        record_module_passport(&passport_state, &report_state, bench);
+        return lock_passport(&passport_state).snapshot();
+    };
+
+    let (result, bench) = {
+        let mut service = lock_service(&adapter_state);
+        let bench = service.is_bench();
+        let result = service
+            .execute_uds_read(&due.transaction, PASSPORT_READ_TIMEOUT)
+            .map(|result| result.map_err(map_live_error));
+        (result, bench)
+    };
+    let connected = result.is_some();
+    let outcome = result.unwrap_or_else(|| Err(adapter_unavailable()));
+
+    {
+        let mut passport = lock_passport(&passport_state);
+        passport.record(due.index, outcome);
+        if bench {
+            passport.mark_synthetic();
+        }
+        // An adapter that is gone will not come back for the next read;
+        // what was read stays, as the mileage survey does.
+        if !connected {
+            passport.finish();
+        }
+    }
+    record_module_passport(&passport_state, &report_state, bench);
+    lock_passport(&passport_state).snapshot()
+}
+
+#[tauri::command]
+async fn start_module_passport(
+    adapter_state: State<'_, SharedAdapterService>,
+    session_state: State<'_, SharedSessionService>,
+    passport_state: State<'_, SharedPassportService>,
+    request: ModulePassportRequest,
+) -> Result<ModulePassportSnapshot, String> {
+    Ok(start_module_passport_now(
+        adapter_state,
+        session_state,
+        passport_state,
+        request,
+    ))
+}
+
+#[tauri::command]
+async fn module_passport_step(
+    adapter_state: State<'_, SharedAdapterService>,
+    passport_state: State<'_, SharedPassportService>,
+    report_state: State<'_, SharedSessionReportService>,
+) -> Result<ModulePassportSnapshot, String> {
+    Ok(module_passport_step_now(
+        adapter_state,
+        passport_state,
+        report_state,
+    ))
+}
+
+#[tauri::command]
+async fn finish_module_passport(
+    adapter_state: State<'_, SharedAdapterService>,
+    passport_state: State<'_, SharedPassportService>,
+    report_state: State<'_, SharedSessionReportService>,
+) -> Result<ModulePassportSnapshot, String> {
+    let bench = lock_service(&adapter_state).is_bench();
+    lock_passport(&passport_state).finish();
+    record_module_passport(&passport_state, &report_state, bench);
+    Ok(lock_passport(&passport_state).snapshot())
+}
+
 pub fn run() {
     let bench: SharedBench = share_bus(Box::new(EmptyBench));
     tauri::Builder::default()
@@ -1164,6 +1320,7 @@ pub fn run() {
         .manage(Mutex::new(StandardObdService::new()))
         .manage(Mutex::new(LiveReadService::new()))
         .manage(Mutex::new(MileageService::new()))
+        .manage(Mutex::new(PassportService::new()))
         .manage(Mutex::new(SessionReportService::new()))
         .invoke_handler(tauri::generate_handler![
             get_adapter_state,
@@ -1195,6 +1352,10 @@ pub fn run() {
             start_mileage_survey,
             mileage_survey_step,
             finish_mileage_survey,
+            get_passport_state,
+            start_module_passport,
+            module_passport_step,
+            finish_module_passport,
             get_module_read_report_json,
             get_session_report_state,
             get_session_report_json,

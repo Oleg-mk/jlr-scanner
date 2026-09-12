@@ -544,6 +544,32 @@ impl KnowledgeLibrary {
         found
     }
 
+    /// The identification identifiers the loaded data declares for this
+    /// module (ADR-0027) — the ones whose payload is a text: a part number,
+    /// a serial, a software level — each with SDD's own name for it, in
+    /// identifier order.
+    pub fn identification_identifiers(
+        &self,
+        context: &VehicleContext,
+        ecu_family: &str,
+    ) -> Vec<(u16, String)> {
+        let mut found = Vec::new();
+        for identifier in
+            DiagnosticEnvironmentResolver::readable_identifiers(self.store(), context, ecu_family)
+        {
+            if !decode::is_text(&identifier.parameters) {
+                continue;
+            }
+            let name = identifier
+                .parameters
+                .first()
+                .map(|parameter| parameter.name.clone())
+                .unwrap_or_else(|| format!("0x{:04X}", identifier.identifier));
+            found.push((identifier.identifier, name));
+        }
+        found
+    }
+
     /// Every fault code the loaded data describes for this module family:
     /// those SDD scopes to the family itself first, then the ones it states
     /// without a module, each code once and in a fixed order. `describe_dtc`

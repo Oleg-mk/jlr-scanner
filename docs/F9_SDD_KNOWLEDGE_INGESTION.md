@@ -779,3 +779,49 @@ deliberately: «below 65 Volts» carries conditions and delays that a `min`
 and a `max` would drop, and a machine threshold read out of a sentence is
 exactly the kind of invention this project does not make. The sentence is
 shown; the reader does the reading.
+
+## 2026-09-12 — the identification identifiers (ADR-0027)
+
+The platform documents carry one more thing the first slices left where it
+lay: per module, the names of three identifier sets — `NET` (the module's
+own, `ggds_<module>`), `SWDL` (software part numbers, `ggds_swdl_N`) and
+`PDI` (the pre-delivery list, `ggds_pdi_1`) — and, at the document root, the
+sets themselves, each a list of `<did>` with the identifier, SDD's attribute
+name, the service and, usually, a human text. Over the 55 documents: 3,168
+set definitions, 549 distinct identifiers, 5,671 references from modules to
+sets. Of 33,000 `<did>` declarations 32,992 name service `0x22`.
+
+`PlatformAdapter::add_identification` records, per module, the members of
+its `SWDL` and `PDI` sets and the `0xF100`–`0xF1FF` members of its `NET`
+set, service `0x22` only, as `IdentifierParameter` records in the DID
+catalogue's own shape — `ClaimKey::ParameterDefinition` under SDD's text
+for the name, `IdentifierDefinition` with the encoding `text=ascii` — so the
+resolver's readable list and the transaction gate admit them exactly as they
+admit a catalogue parameter. The row is narrowed by the module's own
+qualifier and by the set's: 348 `SWDL` references carry a qualifier of
+their own, a DAB module having one software list for standard hardware and
+another for DAB+. A set the document references but never defines yields
+nothing; a member read with any other service is left out; the `NET` set's
+other members — the distance `0xDD01`, the legislated mirrors, a module's
+own data — are seen and not ingested, because they come without a byte
+layout and would widen the module-read list with rows the decoder can only
+show as bytes.
+
+### Real-source run
+
+| | |
+| --- | --- |
+| platform documents | 55 |
+| identification records | **34,788** |
+| distinct identifiers | 45 |
+| module families | 99 |
+| vehicle programmes | 21 |
+| most declared | `0xF188` (2,142), `0xF124` (1,918), `0xF18C` (1,890), `0xF191` (1,890) |
+| rejected | 0 |
+
+The library exported afresh holds 314,462 records against 279,674 the day
+before; `platform.json.gz` alone goes from 11,564 to 47,465. Golden test:
+`identification_identifiers_are_recorded_per_module_in_the_catalogue_shape`,
+over a fixture whose `NET` set mixes identification with a distance, a
+legislated mirror and a member read with `0x09`, whose two `SWDL` sets are
+chosen by a qualifier, and which references one set it never defines.

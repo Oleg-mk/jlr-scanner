@@ -2525,3 +2525,22 @@ table.live-read-identifiers label {
 .mileage-caveat {
   margin-top: 0.75rem;
 }
+
+/* The module passport (ADR-0027): one table per module, the text a module
+   holds set in the same figure-friendly face as an address. */
+.passport-panel {
+  margin-top: 1.5rem;
+}
+
+.passport-subtitle {
+  margin: 1.25rem 0 0.25rem;
+  font-size: 1rem;
+}
+
+.passport-value {
+  white-space: nowrap;
+}
+
+.passport-caveat {
+  margin-top: 0.75rem;
+}
