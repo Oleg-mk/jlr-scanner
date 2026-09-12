@@ -147,8 +147,10 @@ recorded and not read.
   the owner later the same day:** the texts are this project's own in both
   languages, Ukrainian and Russian, made the way the parameter names and
   the fault-code help were — SDD's English worded first, then translated,
-  then reviewed — and never taken from SDD one to one, so that no sentence
-  of SDD's is reproduced. The unit is small: the 48 documents use 2,782
+  then reviewed. Our own words are the goal, not a rule against agreement:
+  this is technical text, and a phrase that has one natural form —
+  *Not fitted*, *Enabled* — stays that form; nothing is reworded for the
+  sake of differing (`ADR-0026`'s position). The unit is small: the 48 documents use 2,782
   distinct texts (1,436 option texts, 443 parameter titles, 428 group
   titles, 475 mnemonics SDD has no text for), and 124 of them cover half
   of all 138,683 uses. The input file is `prowlone-ccf-texts.csv` on the

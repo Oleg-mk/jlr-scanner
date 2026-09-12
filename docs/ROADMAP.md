@@ -664,8 +664,10 @@ build, the owner batches the work. Not decided: describing the vehicle from
 its configuration (SDD's `qualifier_map` — the "digital car"), the VDF read.
 *Decided later the same day:* the configuration's texts become this
 project's own in both languages, the way the names and the help were —
-2,782 distinct texts, `prowlone-ccf-texts.csv` on the owner's desk, queued
-on the GPU after the help texts and the parameter names; see `ADR-0028`.
+our own words as the goal, a technical phrase that has one natural form
+kept as it is — 2,782 distinct texts, `prowlone-ccf-texts.csv` on the
+owner's desk, queued on the GPU after the help texts and the parameter
+names; see `ADR-0028`.
 
 ### Beyond stage 1
 
