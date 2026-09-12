@@ -15,6 +15,12 @@ use knowledge::{
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 
+/// Claims the SDD platform ingest writes for a serial line's framing and
+/// wake-up (`ADR-0029`). The literals are the ingest's; a test asserts they
+/// agree.
+const ISO_SETTINGS_CLAIM: &str = "sdd_iso_settings";
+const ISO_WAKEUP_CLAIM: &str = "sdd_iso_wakeup";
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct DiagnosticEnvironmentQuery {
     pub vehicle_context: VehicleContext,
@@ -178,6 +184,13 @@ pub struct DiagnosticEnvironmentPlan {
     /// a node address and no CAN identifier, so none is required or
     /// invented. Required under every CAN addressing mode.
     pub can_id_format: Option<PlanField<CanIdFormat>>,
+    /// How the serial line is framed, in the data's own words
+    /// (`data_bits=8;parity=even;stop_bits=1`), and how it is woken
+    /// (`bmw_ds2`, `kw2000_fast`, `rosco`). Present only where the bus
+    /// states them, which in this corpus is the K-line (`ADR-0029`); a CAN
+    /// plan carries neither, and neither is ever invented.
+    pub serial_framing: Option<PlanField<String>>,
+    pub serial_wakeup: Option<PlanField<String>>,
     pub physical_request_id: PlanField<u32>,
     pub physical_response_id: PlanField<u32>,
     pub functional_request_id: Option<PlanField<u32>>,
@@ -198,6 +211,8 @@ pub struct PartialDiagnosticEnvironment {
     pub protocol_family: Option<PlanField<String>>,
     pub addressing_mode: Option<PlanField<String>>,
     pub can_id_format: Option<PlanField<CanIdFormat>>,
+    pub serial_framing: Option<PlanField<String>>,
+    pub serial_wakeup: Option<PlanField<String>>,
     pub physical_request_id: Option<PlanField<u32>>,
     pub physical_response_id: Option<PlanField<u32>>,
     pub functional_request_id: Option<PlanField<u32>>,
@@ -281,6 +296,8 @@ pub enum EnvironmentField {
     ProtocolFamily,
     AddressingMode,
     CanIdFormat,
+    SerialFraming,
+    SerialWakeup,
     PhysicalRequestId,
     PhysicalResponseId,
     FunctionalRequestId,
@@ -371,6 +388,10 @@ impl DiagnosticEnvironmentResolver {
         let mut response_ids = BTreeMap::new();
         let mut functional_ids = BTreeMap::new();
         let mut capabilities = BTreeMap::new();
+        // The serial line's framing and wake-up, which the platform ingest
+        // records as text on the bus itself (ADR-0029).
+        let mut serial_framings = BTreeMap::new();
+        let mut serial_wakeups = BTreeMap::new();
         let mut markers: BTreeMap<
             ImplementationMarkerKind,
             BTreeMap<String, Vec<ResolvedKnowledge>>,
@@ -385,6 +406,16 @@ impl DiagnosticEnvironmentResolver {
             if let Some(expected) = &effective_target.diagnostic_implementation {
                 if record_mentions_implementation(record, expected) {
                     insert_candidate(&mut implementations, expected.clone(), record.clone());
+                }
+            }
+
+            if let (ClaimKey::Custom { name }, KnowledgeValue::Text { value }) =
+                (&record.record.key, &record.record.value)
+            {
+                if name == ISO_SETTINGS_CLAIM {
+                    insert_candidate(&mut serial_framings, value.clone(), record.clone());
+                } else if name == ISO_WAKEUP_CLAIM {
+                    insert_candidate(&mut serial_wakeups, value.clone(), record.clone());
                 }
             }
 
@@ -514,6 +545,22 @@ impl DiagnosticEnvironmentResolver {
             )
         };
 
+        // Both are the line's own facts: absent on a CAN plan, and absent
+        // on a K-line whose document states neither, where the execution
+        // layer refuses rather than assuming a framing.
+        let serial_framing = select_optional_field(
+            EnvironmentField::SerialFraming,
+            serial_framings,
+            &mut unresolved,
+            &mut conflicts,
+        );
+        let serial_wakeup = select_optional_field(
+            EnvironmentField::SerialWakeup,
+            serial_wakeups,
+            &mut unresolved,
+            &mut conflicts,
+        );
+
         let partial = PartialDiagnosticEnvironment {
             vehicle_applicability: select_field(
                 EnvironmentField::VehicleApplicability,
@@ -576,6 +623,8 @@ impl DiagnosticEnvironmentResolver {
             ),
             addressing_mode,
             can_id_format,
+            serial_framing,
+            serial_wakeup,
             physical_request_id: select_field(
                 EnvironmentField::PhysicalRequestId,
                 request_ids,
@@ -677,6 +726,8 @@ impl PartialDiagnosticEnvironment {
             protocol_family: self.protocol_family.unwrap(),
             addressing_mode: self.addressing_mode.unwrap(),
             can_id_format: self.can_id_format,
+            serial_framing: self.serial_framing,
+            serial_wakeup: self.serial_wakeup,
             physical_request_id: self.physical_request_id.unwrap(),
             physical_response_id: self.physical_response_id.unwrap(),
             functional_request_id: self.functional_request_id,

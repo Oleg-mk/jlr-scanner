@@ -1856,6 +1856,8 @@ fn field_label(field: EnvironmentField) -> String {
         EnvironmentField::ProtocolFamily => "diagnostic protocol".into(),
         EnvironmentField::AddressingMode => "addressing mode".into(),
         EnvironmentField::CanIdFormat => "CAN identifier width".into(),
+        EnvironmentField::SerialFraming => "serial line framing".into(),
+        EnvironmentField::SerialWakeup => "serial line wake-up".into(),
         EnvironmentField::PhysicalRequestId => "request identifier".into(),
         EnvironmentField::PhysicalResponseId => "response identifier".into(),
         EnvironmentField::FunctionalRequestId => "functional request identifier".into(),

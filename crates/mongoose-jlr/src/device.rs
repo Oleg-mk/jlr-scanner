@@ -230,6 +230,147 @@ impl<T: ByteTransport> MongooseJlrDevice<T> {
         }
     }
 
+    /// Opens a K-line for one read (`ADR-0029`, slice B). Every word this
+    /// sends is a hypothesis and lives in `crate::kline`; the adapter has
+    /// never answered one. Only the probe path calls it.
+    pub(crate) fn open_kline_line(
+        &mut self,
+        resource: u16,
+        baud: u32,
+        pin: u8,
+        parity: crate::kline::LineParity,
+        wakeup: &str,
+        node_address: u8,
+    ) -> Result<(), ProtocolError> {
+        self.require_open_transport()?;
+        if self.open_route.is_some() {
+            return Err(ProtocolError::RouteAlreadyOpen);
+        }
+        let route = *passive::route_by_id(if pin == 8 {
+            VehicleRouteId::KLine8
+        } else {
+            VehicleRouteId::KLine7
+        });
+        self.ensure_firmware()?;
+
+        let open_sequence = self.sequences.allocate();
+        self.transport.set_read_timeout(COMMAND_READ_TIMEOUT)?;
+        self.transport
+            .write_all(&passive::diagnostic_open_channel_request(
+                open_sequence,
+                resource,
+                baud,
+            ))?;
+        let open_response = self.wait_for_response(|frame| {
+            passive::parse_open_response(frame, open_sequence, resource)
+        })?;
+        let opened = OpenReceiveRoute {
+            route,
+            device_channel_id: open_response.channel_id,
+        };
+
+        // The line, then how a byte on it is framed. A failure at either
+        // step closes the channel rather than leaving it open on a guess.
+        let pin_sequence = self.sequences.allocate();
+        let pin_request =
+            crate::kline::set_pin_request(pin_sequence, opened.device_channel_id, pin);
+        if let Err(error) = self.transport.write_all(&pin_request) {
+            let _ = self.close_channel_after_failed_setup(opened.device_channel_id);
+            return Err(error.into());
+        }
+        if let Err(error) = self.wait_for_response(|frame| {
+            passive::parse_set_pin_response(frame, pin_sequence, opened.device_channel_id)
+        }) {
+            let _ = self.close_channel_after_failed_setup(opened.device_channel_id);
+            return Err(error);
+        }
+
+        let parity_sequence = self.sequences.allocate();
+        let parity_request =
+            crate::kline::set_parity_request(parity_sequence, opened.device_channel_id, parity);
+        if let Err(error) = self.transport.write_all(&parity_request) {
+            let _ = self.close_channel_after_failed_setup(opened.device_channel_id);
+            return Err(error.into());
+        }
+        if let Err(error) = self.wait_for_response(|frame| {
+            crate::kline::parse_set_config_response(
+                frame,
+                parity_sequence,
+                opened.device_channel_id,
+            )
+        }) {
+            let _ = self.close_channel_after_failed_setup(opened.device_channel_id);
+            return Err(error);
+        }
+
+        // The bus's own wake-up, where it asks for one. ISO 14230's fast
+        // init is a command this adapter performs itself; DS2 asks for none.
+        if wakeup == crate::kline::WAKEUP_KW2000_FAST {
+            let init_sequence = self.sequences.allocate();
+            let init_request = crate::kline::fast_init_request(
+                init_sequence,
+                opened.device_channel_id,
+                node_address,
+            );
+            if let Err(error) = self.transport.write_all(&init_request) {
+                let _ = self.close_channel_after_failed_setup(opened.device_channel_id);
+                return Err(error.into());
+            }
+            if let Err(error) = self.wait_for_response(|frame| {
+                crate::kline::parse_fast_init_response(
+                    frame,
+                    init_sequence,
+                    opened.device_channel_id,
+                )
+            }) {
+                let _ = self.close_channel_after_failed_setup(opened.device_channel_id);
+                return Err(error);
+            }
+        }
+
+        self.open_route = Some(opened);
+        Ok(())
+    }
+
+    /// Puts one prepared request's bytes on an open K-line. Not public: the
+    /// only way in is `execute_prepared_kline_read_as_probe`, which takes a
+    /// prepared transaction.
+    pub(crate) fn transmit_line_bytes(&mut self, bytes: &[u8]) -> Result<(), ProtocolError> {
+        let open_route = self.open_route.ok_or(ProtocolError::NoOpenRoute)?;
+        let sequence = self.sequences.allocate();
+        let request =
+            crate::kline::outbound_line_request(sequence, open_route.device_channel_id, bytes);
+        self.transport.write_all(&request)?;
+        self.wait_for_outbound_response(sequence, open_route)?;
+        Ok(())
+    }
+
+    /// Whatever the line carried back, until it goes quiet.
+    pub(crate) fn receive_line_bytes(
+        &mut self,
+        timeout: Duration,
+    ) -> Result<Option<Vec<u8>>, ProtocolError> {
+        self.require_open_transport()?;
+        let open_route = self.open_route.ok_or(ProtocolError::NoOpenRoute)?;
+        self.transport.set_read_timeout(timeout)?;
+        loop {
+            if let Some(frame) = self.decoder.next_frame()? {
+                if !passive::is_inbound_data(&frame) {
+                    self.counters.dropped_frames += 1;
+                    continue;
+                }
+                return crate::kline::parse_inbound_line(&frame, open_route).map(Some);
+            }
+            let mut read_buffer = [0_u8; 512];
+            match self.transport.read(&mut read_buffer) {
+                Ok(0) => return Err(TransportError::Closed.into()),
+                Ok(read) => self.decoder.push(&read_buffer[..read]),
+                Err(TransportError::Timeout) => return Ok(None),
+                Err(error) => return Err(error.into()),
+            }
+        }
+    }
+
     pub fn close_route(&mut self) -> Result<(), ProtocolError> {
         self.require_open_transport()?;
         let open_route = self.open_route.ok_or(ProtocolError::NoOpenRoute)?;

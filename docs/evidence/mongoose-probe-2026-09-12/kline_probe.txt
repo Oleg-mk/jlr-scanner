@@ -1,0 +1,127 @@
+port COM3 open at 115200
+no vehicle is needed for any of this; nothing is written to the adapter
+
+
+>>> cGetBoardInfo
+    TX 0C 00 EA 51 01 00 00 00 09 01 01 00 00 00 00 00
+    RX FRAME 00 00 01 00 09 81 01 00 00 00 00 00 00 00 00 00 1C C7 DA 05 05 01 01 01 B4 B0 00 00 D8 55 00 00 00 08 01 01 00 10 01 01 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+       route_a=0x0000 route_b=0x0001 command=0x8109 seq=1 body[168]=00 00 00 00 1C C7 DA 05 05 01 01 01 B4 B0 00 00 D8 55 00 00 00 08 01 01… | status=0x00000000
+
+=== resource 3 (route 0x0301) — ISO 9141 / DS2 at 9600 baud
+
+>>> cOpenChannel diagnostic on 0x0301 at 9600
+    TX 14 00 F2 51 01 03 00 00 06 00 02 00 00 00 00 00 00 00 00 00 80 25 00 00
+    RX FRAME 00 00 01 03 06 80 02 00 00 00 00 00 00 00 00 00 D8 82 EA 05 00
+       route_a=0x0000 route_b=0x0301 command=0x8006 seq=2 body[9]=00 00 00 00 D8 82 EA 05 00 | status=0x00000000
+   -> open status 0x00000000 text=''
+
+>>> cSetPin(1, 7, 0) on 0x0301
+    TX 18 00 FE 51 01 03 00 00 12 00 03 00 00 00 00 00 01 00 00 00 07 00 00 00 00 00 00 00
+    RX FRAME 00 00 01 03 12 80 03 00 00 00 00 00 00 00 00 00 E8 30 FA 05 00
+       route_a=0x0000 route_b=0x0301 command=0x8012 seq=3 body[9]=00 00 00 00 E8 30 FA 05 00 | status=0x00000000
+    RX FRAME 00 00 01 03 0A 00 00 00 00 00 00 00 08 01 00 00 D0 34 FA 05
+       route_a=0x0000 route_b=0x0301 command=0x000A seq=0 body[8]=08 01 00 00 D0 34 FA 05 | status=0x00000108
+   -> setpin(1, 7, 0) status 0x00000000 text=''
+
+>>> parity=even through command 0x0010 on 0x0301
+    TX 18 00 FE 51 01 03 00 00 10 00 04 00 00 00 00 00 01 00 00 00 16 00 00 00 02 00 00 00
+    RX FRAME 00 00 01 03 10 80 04 00 00 00 00 00 00 00 00 00 5C 94 09 06 00
+       route_a=0x0000 route_b=0x0301 command=0x8010 seq=4 body[9]=00 00 00 00 5C 94 09 06 00 | status=0x00000000
+   -> 0x0010 status 0x00000000 text=''
+
+>>> refusal check: pin 99 — no such pin
+    TX 18 00 FE 51 01 03 00 00 12 00 05 00 00 00 00 00 01 00 00 00 63 00 00 00 00 00 00 00
+    RX FRAME 00 00 01 03 12 80 05 00 00 00 00 00 06 02 00 00 A4 F6 18 06 4D 6F 6E 67 6F 6F 73 65 50 72 6F 20 4A 4C 52 20 62 6F 61 72 64 20 73 75 70 70 6F 72 74 73 20 49 53 4F 39 31 34 31 20 4B 20 6C 69 6E 65 20 6F 6E 20 70 69 6E 20 33 2C 20 37 20 6F 72 20 38 00
+       route_a=0x0000 route_b=0x0301 command=0x8012 seq=5 body[71]=06 02 00 00 A4 F6 18 06 4D 6F 6E 67 6F 6F 73 65 50 72 6F 20 4A 4C 52 20… | status=0x00000206
+   -> pin 99 — no such pin: refused: 'MongoosePro JLR board supports ISO9141 K line on pin 3, 7 or 8'
+
+>>> refusal check: pin 0 — no pin at all
+    TX 18 00 FE 51 01 03 00 00 12 00 06 00 00 00 00 00 01 00 00 00 00 00 00 00 00 00 00 00
+    RX FRAME 00 00 01 03 12 80 06 00 00 00 00 00 06 02 00 00 BC 9D 22 06 4D 6F 6E 67 6F 6F 73 65 50 72 6F 20 4A 4C 52 20 62 6F 61 72 64 20 73 75 70 70 6F 72 74 73 20 49 53 4F 39 31 34 31 20 4B 20 6C 69 6E 65 20 6F 6E 20 70 69 6E 20 33 2C 20 37 20 6F 72 20 38 00
+       route_a=0x0000 route_b=0x0301 command=0x8012 seq=6 body[71]=06 02 00 00 BC 9D 22 06 4D 6F 6E 67 6F 6F 73 65 50 72 6F 20 4A 4C 52 20… | status=0x00000206
+   -> pin 0 — no pin at all: refused: 'MongoosePro JLR board supports ISO9141 K line on pin 3, 7 or 8'
+
+>>> refusal check: parity 99 — no such parity
+    TX 18 00 FE 51 01 03 00 00 10 00 07 00 00 00 00 00 01 00 00 00 16 00 00 00 63 00 00 00
+    RX FRAME 00 00 01 03 10 80 07 00 00 00 00 00 00 00 00 00 04 D9 2B 06 00
+       route_a=0x0000 route_b=0x0301 command=0x8010 seq=7 body[9]=00 00 00 00 04 D9 2B 06 00 | status=0x00000000
+   -> parity 99 — no such parity: TAKEN — so an acceptance proves nothing here
+
+>>> refusal check: parameter 0xFFFF — no such parameter
+    TX 18 00 FE 51 01 03 00 00 10 00 08 00 00 00 00 00 01 00 00 00 FF FF 00 00 02 00 00 00
+    RX FRAME 00 00 01 03 10 80 08 00 00 00 00 00 00 00 00 00 7C 70 35 06 00
+       route_a=0x0000 route_b=0x0301 command=0x8010 seq=8 body[9]=00 00 00 00 7C 70 35 06 00 | status=0x00000000
+   -> parameter 0xFFFF — no such parameter: TAKEN — so an acceptance proves nothing here
+
+>>> cCloseChannel 0x0301
+    TX 0C 00 EA 51 01 03 00 00 07 00 09 00 00 00 00 00
+    RX FRAME 00 00 01 03 07 80 09 00 00 00 00 00 00 00 00 00 E0 1B 3F 06 00
+       route_a=0x0000 route_b=0x0301 command=0x8007 seq=9 body[9]=00 00 00 00 E0 1B 3F 06 00 | status=0x00000000
+
+=== resource 4 (route 0x0401) — ISO 14230 / KWP2000 at 10400 baud
+
+>>> cOpenChannel diagnostic on 0x0401 at 10400
+    TX 14 00 F2 51 01 04 00 00 06 00 0A 00 00 00 00 00 00 00 00 00 A0 28 00 00
+    RX FRAME 00 00 01 04 06 80 0A 00 00 00 00 00 00 00 00 00 20 90 4E 06 00
+       route_a=0x0000 route_b=0x0401 command=0x8006 seq=10 body[9]=00 00 00 00 20 90 4E 06 00 | status=0x00000000
+   -> open status 0x00000000 text=''
+
+>>> cSetPin(1, 7, 0) on 0x0401
+    TX 18 00 FE 51 01 04 00 00 12 00 0B 00 00 00 00 00 01 00 00 00 07 00 00 00 00 00 00 00
+    RX FRAME 00 00 01 04 12 80 0B 00 00 00 00 00 00 00 00 00 58 FD 5D 06 00
+       route_a=0x0000 route_b=0x0401 command=0x8012 seq=11 body[9]=00 00 00 00 58 FD 5D 06 00 | status=0x00000000
+    RX FRAME 00 00 01 04 0A 00 00 00 00 00 00 00 08 01 00 00 DC 00 5E 06
+       route_a=0x0000 route_b=0x0401 command=0x000A seq=0 body[8]=08 01 00 00 DC 00 5E 06 | status=0x00000108
+   -> setpin(1, 7, 0) status 0x00000000 text=''
+
+>>> parity=even through command 0x0010 on 0x0401
+    TX 18 00 FE 51 01 04 00 00 10 00 0C 00 00 00 00 00 01 00 00 00 16 00 00 00 02 00 00 00
+    RX FRAME 00 00 01 04 10 80 0C 00 00 00 00 00 00 00 00 00 44 66 6D 06 00
+       route_a=0x0000 route_b=0x0401 command=0x8010 seq=12 body[9]=00 00 00 00 44 66 6D 06 00 | status=0x00000000
+   -> 0x0010 status 0x00000000 text=''
+
+>>> refusal check: pin 99 — no such pin
+    TX 18 00 FE 51 01 04 00 00 12 00 0D 00 00 00 00 00 01 00 00 00 63 00 00 00 00 00 00 00
+    RX FRAME 00 00 01 04 12 80 0D 00 00 00 00 00 06 02 00 00 28 AF 7C 06 4D 6F 6E 67 6F 6F 73 65 50 72 6F 20 4A 4C 52 20 62 6F 61 72 64 20 73 75 70 70 6F 72 74 73 20 49 53 4F 39 31 34 31 20 4B 20 6C 69 6E 65 20 6F 6E 20 70 69 6E 20 33 2C 20 37 20 6F 72 20 38 00
+       route_a=0x0000 route_b=0x0401 command=0x8012 seq=13 body[71]=06 02 00 00 28 AF 7C 06 4D 6F 6E 67 6F 6F 73 65 50 72 6F 20 4A 4C 52 20… | status=0x00000206
+   -> pin 99 — no such pin: refused: 'MongoosePro JLR board supports ISO9141 K line on pin 3, 7 or 8'
+
+>>> refusal check: pin 0 — no pin at all
+    TX 18 00 FE 51 01 04 00 00 12 00 0E 00 00 00 00 00 01 00 00 00 00 00 00 00 00 00 00 00
+    RX FRAME 00 00 01 04 12 80 0E 00 00 00 00 00 06 02 00 00 3C 14 86 06 4D 6F 6E 67 6F 6F 73 65 50 72 6F 20 4A 4C 52 20 62 6F 61 72 64 20 73 75 70 70 6F 72 74 73 20 49 53 4F 39 31 34 31 20 4B 20 6C 69 6E 65 20 6F 6E 20 70 69 6E 20 33 2C 20 37 20 6F 72 20 38 00
+       route_a=0x0000 route_b=0x0401 command=0x8012 seq=14 body[71]=06 02 00 00 3C 14 86 06 4D 6F 6E 67 6F 6F 73 65 50 72 6F 20 4A 4C 52 20… | status=0x00000206
+   -> pin 0 — no pin at all: refused: 'MongoosePro JLR board supports ISO9141 K line on pin 3, 7 or 8'
+
+>>> refusal check: parity 99 — no such parity
+    TX 18 00 FE 51 01 04 00 00 10 00 0F 00 00 00 00 00 01 00 00 00 16 00 00 00 63 00 00 00
+    RX FRAME 00 00 01 04 10 80 0F 00 00 00 00 00 00 00 00 00 04 A7 8F 06 00
+       route_a=0x0000 route_b=0x0401 command=0x8010 seq=15 body[9]=00 00 00 00 04 A7 8F 06 00 | status=0x00000000
+   -> parity 99 — no such parity: TAKEN — so an acceptance proves nothing here
+
+>>> refusal check: parameter 0xFFFF — no such parameter
+    TX 18 00 FE 51 01 04 00 00 10 00 10 00 00 00 00 00 01 00 00 00 FF FF 00 00 02 00 00 00
+    RX FRAME 00 00 01 04 10 80 10 00 00 00 00 00 00 00 00 00 90 F8 98 06 00
+       route_a=0x0000 route_b=0x0401 command=0x8010 seq=16 body[9]=00 00 00 00 90 F8 98 06 00 | status=0x00000000
+   -> parameter 0xFFFF — no such parameter: TAKEN — so an acceptance proves nothing here
+
+>>> cCloseChannel 0x0401
+    TX 0C 00 EA 51 01 04 00 00 07 00 11 00 00 00 00 00
+    RX FRAME 00 00 01 04 07 80 11 00 00 00 00 00 00 00 00 00 38 6F A2 06 00
+       route_a=0x0000 route_b=0x0401 command=0x8007 seq=17 body[9]=00 00 00 00 38 6F A2 06 00 | status=0x00000000
+
+=== summary — what the adapter answered
+    (3, 'pin shape', (1, 7, 0))
+    (3, 'parity command accepted', True)
+    (3, 'refusal check: pin 99 — no such pin', "refused: 'MongoosePro JLR board supports ISO9141 K line on pin 3, 7 or 8'")
+    (3, 'refusal check: pin 0 — no pin at all', "refused: 'MongoosePro JLR board supports ISO9141 K line on pin 3, 7 or 8'")
+    (3, 'refusal check: parity 99 — no such parity', 'TAKEN — so an acceptance proves nothing here')
+    (3, 'refusal check: parameter 0xFFFF — no such parameter', 'TAKEN — so an acceptance proves nothing here')
+    (4, 'pin shape', (1, 7, 0))
+    (4, 'parity command accepted', True)
+    (4, 'refusal check: pin 99 — no such pin', "refused: 'MongoosePro JLR board supports ISO9141 K line on pin 3, 7 or 8'")
+    (4, 'refusal check: pin 0 — no pin at all', "refused: 'MongoosePro JLR board supports ISO9141 K line on pin 3, 7 or 8'")
+    (4, 'refusal check: parity 99 — no such parity', 'TAKEN — so an acceptance proves nothing here')
+    (4, 'refusal check: parameter 0xFFFF — no such parameter', 'TAKEN — so an acceptance proves nothing here')
+
+A resource that opens, a pin shape that is accepted and a parity command that answers
+are the three things ADR-0029 needs before a K-line read stops being a guess.

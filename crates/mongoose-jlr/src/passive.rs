@@ -3,7 +3,7 @@ use std::fmt;
 use std::str::FromStr;
 
 const FRAME_HEADER_LENGTH: usize = 4;
-const COMMAND_HEADER_LENGTH: usize = 12;
+pub(crate) const COMMAND_HEADER_LENGTH: usize = 12;
 const VERIFIER_XOR: u16 = 0x51E6;
 /// The device route every board command travels on (board-info, the jump
 /// to firmware): route word A of the request, echoed in route word B of
@@ -29,7 +29,7 @@ pub(crate) const OPEN_CHANNEL_RESPONSE: u16 = 0x8006;
 pub(crate) const CLOSE_CHANNEL: u16 = 0x0007;
 pub(crate) const CLOSE_CHANNEL_RESPONSE: u16 = 0x8007;
 pub(crate) const OUTBOUND_DATA: u16 = 0x0008;
-const INBOUND_DATA: u16 = 0x0009;
+pub(crate) const INBOUND_DATA: u16 = 0x0009;
 pub(crate) const OUTBOUND_DATA_RESPONSE: u16 = 0x8008;
 pub(crate) const SET_PIN: u16 = 0x0012;
 pub(crate) const SET_PIN_RESPONSE: u16 = 0x8012;
@@ -423,7 +423,7 @@ pub(crate) fn parse_inbound_can(
     })
 }
 
-fn parse_command_response(
+pub(crate) fn parse_command_response(
     frame: &Frame,
     expected_command: u16,
     expected_sequence: u16,
@@ -460,7 +460,7 @@ fn parse_command_response(
     })
 }
 
-fn require_channel(
+pub(crate) fn require_channel(
     response: CommandResponse,
     expected: u16,
 ) -> Result<CommandResponse, ProtocolError> {
@@ -491,7 +491,7 @@ fn firmware_message(body: &[u8]) -> String {
     }
 }
 
-fn command(route_a: u16, command: u16, sequence: u16, body: &[u8]) -> Vec<u8> {
+pub(crate) fn command(route_a: u16, command: u16, sequence: u16, body: &[u8]) -> Vec<u8> {
     let mut payload = Vec::with_capacity(COMMAND_HEADER_LENGTH + body.len());
     payload.extend_from_slice(&route_a.to_le_bytes());
     payload.extend_from_slice(&0_u16.to_le_bytes());
@@ -503,7 +503,7 @@ fn command(route_a: u16, command: u16, sequence: u16, body: &[u8]) -> Vec<u8> {
     outer_frame(&payload)
 }
 
-fn outer_frame(payload: &[u8]) -> Vec<u8> {
+pub(crate) fn outer_frame(payload: &[u8]) -> Vec<u8> {
     let length = u16::try_from(payload.len()).expect("F2 commands have bounded static lengths");
     let mut bytes = Vec::with_capacity(FRAME_HEADER_LENGTH + payload.len());
     bytes.extend_from_slice(&length.to_le_bytes());
@@ -512,14 +512,14 @@ fn outer_frame(payload: &[u8]) -> Vec<u8> {
     bytes
 }
 
-fn read_u16(bytes: &[u8], offset: usize) -> Option<u16> {
+pub(crate) fn read_u16(bytes: &[u8], offset: usize) -> Option<u16> {
     Some(u16::from_le_bytes([
         *bytes.get(offset)?,
         *bytes.get(offset + 1)?,
     ]))
 }
 
-fn read_u32(bytes: &[u8], offset: usize) -> Option<u32> {
+pub(crate) fn read_u32(bytes: &[u8], offset: usize) -> Option<u32> {
     Some(u32::from_le_bytes([
         *bytes.get(offset)?,
         *bytes.get(offset + 1)?,

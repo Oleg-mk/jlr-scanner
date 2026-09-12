@@ -218,6 +218,54 @@ where the probe can confirm it. Decision 4's "the survey says *protocol
 KW2000STAR: not spoken by this product*" reads *named in the data and not
 spoken by this product*.
 
-**Slice B — not built.** The `kline-execution` crate, the device's K-line
-commands as hypotheses, the probe script, the shell read through the shared
-record and intake, the bench's DS2 and KWP2000 answers.
+**Slice B, 2026-09-12 — the line is built and the adapter has answered about
+it.** `IMPLEMENTED / FIXTURE_TESTED`, and `HARDWARE_CONFIRMED` for what the
+probe settled. No K-line module has answered, because no such car has been
+met.
+
+- *The crate.* `kline-execution`: the four reads of decision 4 and no fifth
+  — the architecture check counts them — compiled from a resolved plan into
+  bytes, and the bytes read back. It refuses what it cannot know: a protocol
+  this product does not speak, an addressing mode that is not a node
+  address, a plan carrying a CAN identifier format, a bus that states no
+  framing or no wake-up. `SerialFraming::parse` reads the ingest's own
+  `data_bits=8;parity=even;stop_bits=1` and names each field it does not
+  find rather than assuming one. 8 golden tests.
+- *The resolver.* The plan gained two optional fields, `serial_framing` and
+  `serial_wakeup`, filled from the two text claims the platform ingest
+  already wrote on the bus (`sdd_iso_settings`, `sdd_iso_wakeup`). A CAN
+  plan carries neither. That closed the last gap between what the data says
+  about a line and what an execution layer needs to open one.
+- *The adapter answered.* `scripts/mongoose-probe/mongoose_kline_probe.py`
+  on the bench, no vehicle
+  (`docs/evidence/mongoose-probe-2026-09-12/`): **resource 3 opens at 9600
+  and resource 4 at 10400**, both status 0; **`cSetPin(1, 7, 0)` is taken on
+  both**, and pin 99 and pin 0 are refused with the firmware's own
+  *"MongoosePro JLR board supports ISO9141 K line on pin 3, 7 or 8"* — a
+  refusal that is what makes the acceptance mean something. The outbound
+  record this product writes was taken and failed at the line, which is what
+  an empty line should do.
+- *What the same run named.* `0x0011` is **Fast Init** — it answered *"Fast
+  Init: Timeout on response"* with nothing on the line — so the
+  `kw2000_fast` wake-up of the platform documents is a command this adapter
+  performs itself, and the product does not time a wire. `0x0013` is
+  `cGetString`; `0x0014` is `SetData`, **a write to the adapter**, and the
+  architecture check now fails if either the K-line module or the live path
+  so much as names it in code; `0x0016` and above are unhandled.
+- *What is still a guess, and said so.* The parity. Both protocols this
+  product speaks on a K-line ask for even parity — DS2 9600 8E1, KWP2000
+  10400 8E1 — and `0x0010` is a handled command that takes J2534's own
+  `SCONFIG` shape, but it takes a parity of 99 and a parameter that does not
+  exist just as readily, so its acceptance proves nothing. The first module
+  that answers confirms it. The inbound record is unconfirmed for the same
+  reason: nothing has come back on a K-line yet.
+- *The device.* `MongooseJlrDevice::execute_prepared_kline_read` takes a
+  prepared transaction and nothing else — the architecture check asserts the
+  signature — opens the line for its protocol, selects the pin, sets the
+  framing, performs the bus's own wake-up where the adapter has one, sends
+  once, listens until the line is quiet, and closes whatever happens. A
+  wake-up SDD names and this adapter has not been shown to do (`bmw_kw2000_star`,
+  `rosco`) is refused rather than skipped.
+
+**Still owed on slice B:** the shell read through the shared record and the
+intake, and the bench's DS2 and KWP2000 answers.

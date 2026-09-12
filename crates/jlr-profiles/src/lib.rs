@@ -242,6 +242,10 @@ pub fn x250_2010_supercharged_ecm_environment() -> DiagnosticEnvironmentResoluti
             vec![addressing.clone()],
             ValidationState::SourceBacked,
         )),
+        // A CAN profile states no serial framing and no wake-up: those
+        // belong to a K-line (ADR-0029) and are never invented.
+        serial_framing: None,
+        serial_wakeup: None,
         physical_request_id: field(
             0x7e0,
             vec![addressing.clone()],

@@ -134,6 +134,25 @@ const manifestRules = [
     "windows",
     "winreg",
   ]],
+  // ADR-0029 slice B: the K-line execution crate compiles a plan into bytes
+  // and reads bytes back. No transport, no adapter, no UDS, no shell.
+  ["crates/kline-execution/Cargo.toml", [
+    "tauri",
+    "react",
+    "frontend",
+    "serialport",
+    "mongoose-jlr",
+    "transport-api",
+    "transport-serial",
+    "transport-replay",
+    "diagnostics-core",
+    "obd-j1979",
+    "isotp",
+    "uds",
+    "uds-execution",
+    "windows",
+    "winreg",
+  ]],
   ["crates/mongoose-jlr/Cargo.toml", ["tauri", "react", "frontend", "serialport", "transport-serial", "windows", "winreg"]],
   ["crates/jlr-profiles/Cargo.toml", [
     "tauri",
@@ -307,6 +326,74 @@ for (const forbidden of [
   if (forbidden.test(mongooseUdsSource)) {
     failures.push("Mongoose live UDS path exposes forbidden behaviour");
   }
+}
+
+// ADR-0029 slice B: the live K-line path takes only a prepared K-line
+// transaction, speaks no service beyond the four reads, and never writes to
+// the adapter — 0x0014 is that firmware's SetData, and nothing sends it.
+const mongooseKlineSource = await readFile(
+  new URL("crates/mongoose-jlr/src/kline_live.rs", root),
+  "utf8",
+);
+if (!/pub\s+fn\s+execute_prepared_kline_read\s*\([\s\S]*?transaction:\s*&PreparedKlineTransaction/.test(mongooseKlineSource)) {
+  failures.push("Mongoose live K-line execution does not require PreparedKlineTransaction");
+}
+// Comments may name the write command in order to forbid it; code may not.
+const withoutComments = (source) =>
+  source
+    .split(String.fromCharCode(10))
+    .filter((line) => !line.trim().startsWith("//"))
+    .join(" ");
+const klineSources = [
+  withoutComments(mongooseKlineSource),
+  withoutComments(await readFile(new URL("crates/mongoose-jlr/src/kline.rs", root), "utf8")),
+];
+for (const source of klineSources) {
+  for (const forbidden of [
+    /0x0014/,
+    /SetData/,
+    /\bclear_fault/i,
+    /\bsecurity_access/i,
+    /start_diagnostic_session/i,
+    /routine_control/i,
+  ]) {
+    if (forbidden.test(source)) {
+      failures.push("Mongoose K-line path names a write or a non-read-only service");
+    }
+  }
+}
+
+const klineExecutionSource = await readFile(
+  new URL("crates/kline-execution/src/lib.rs", root),
+  "utf8",
+);
+for (const forbidden of [
+  /pub\s+fn\s+execute_raw\b/,
+  /pub\s+fn\s+send_\w*\(/,
+  /pub\s+fn\s+transmit\w*\(/,
+  /\bclear_fault\b/i,
+  /\bsecurity_access\b/i,
+  /\bstart_diagnostic_session\b/i,
+  /\broutine_control\b/i,
+  /\bwrite_memory\b/i,
+]) {
+  if (forbidden.test(klineExecutionSource)) {
+    failures.push("kline-execution exposes forbidden raw or non-read-only behaviour");
+  }
+}
+// The four reads of ADR-0029 and no fifth.
+const enumStart = klineExecutionSource.indexOf("pub enum ReadOnlyKlineIntent {");
+const enumEnd =
+  enumStart >= 0
+    ? klineExecutionSource.indexOf(String.fromCharCode(10) + "}", enumStart)
+    : -1;
+const klineIntentBlock =
+  enumStart >= 0 && enumEnd > enumStart
+    ? klineExecutionSource.slice(enumStart, enumEnd)
+    : "";
+const klineIntents = (klineIntentBlock.match(/^\s{4}(Ds2|Kwp)\w+\s*\{/gm) ?? []).length;
+if (klineIntents !== 4) {
+  failures.push(`kline-execution declares ${klineIntents} read intents, expected 4`);
 }
 
 const frontendSources = await Promise.all(

@@ -6,6 +6,9 @@ mod codec;
 mod device;
 mod error;
 mod j1979_live;
+/// The adapter's K-line words, every one of them a hypothesis (ADR-0029).
+pub mod kline;
+mod kline_live;
 mod passive;
 mod uds_live;
 
@@ -20,6 +23,7 @@ pub use device::{
 };
 pub use error::ProtocolError;
 pub use j1979_live::{MongooseJ1979ReadResult, J1979_PENDING_TIMEOUT};
+pub use kline_live::{MongooseKlineReadResult, KLINE_QUIET_GAP};
 pub use passive::{
     list_vehicle_routes, CanIdFormat, NetworkType, OpenReceiveRoute, PassiveCapability,
     RawCanFrame, VehicleRoute, VehicleRouteId,

@@ -9,6 +9,7 @@ rust-version.workspace = true
 core-types.workspace = true
 diagnostic-execution.workspace = true
 isotp.workspace = true
+kline-execution.workspace = true
 obd-j1979.workspace = true
 transport-api.workspace = true
 uds-execution.workspace = true

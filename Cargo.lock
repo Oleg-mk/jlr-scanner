@@ -1868,6 +1868,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "kline-execution"
+version = "0.9.8"
+dependencies = [
+ "diagnostic-environment",
+ "ds2",
+ "knowledge",
+ "kwp2000",
+ "sdd-ingest",
+]
+
+[[package]]
 name = "knowledge"
 version = "0.9.8"
 dependencies = [
@@ -2041,6 +2052,7 @@ dependencies = [
  "diagnostic-execution",
  "isotp",
  "jlr-profiles",
+ "kline-execution",
  "obd-j1979",
  "transport-api",
  "uds-execution",

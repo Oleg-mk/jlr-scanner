@@ -12,6 +12,7 @@ members = [
   "crates/ds2",
   "crates/isotp",
   "crates/jlr-profiles",
+  "crates/kline-execution",
   "crates/knowledge",
   "crates/kwp2000",
   "crates/mongoose-jlr",
@@ -48,6 +49,7 @@ flate2 = "1"
 getrandom = "0.2"
 isotp = { path = "crates/isotp" }
 jlr-profiles = { path = "crates/jlr-profiles" }
+kline-execution = { path = "crates/kline-execution" }
 knowledge = { path = "crates/knowledge" }
 kwp2000 = { path = "crates/kwp2000" }
 mongoose-jlr = { path = "crates/mongoose-jlr" }
