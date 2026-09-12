@@ -177,6 +177,28 @@ Written 2026-09-12 at the owner's request: what a person gets from SDD at its fu
 | Works offline | **partly** — authentication and updates online | **built** | **—** | **built** | CURRENT_JLR_AUTHENTICATION_RUNTIME |
 | Knowledge library separate from the app, stamped and dated | **—** | **built** | **—** | **built** | ADR-0019; G4 |
 
+## The theoretical ceiling — could the excluded rows be done at all?
+
+Recorded 2026-09-12 from the owner's question, so the analysis is not run twice. Of the rows SDD does and ProwlOne will never do, what is a true technical wall and what is only a line this project draws? **For information; it decides nothing. `ADR-0005` and `ADR-0024` stand.**
+
+The honest answer is that almost all of it is technically possible. The hardware transmits — the adapter already sends frames on the read path (`transmit_diagnostic_frame` in `mongoose-jlr`); the protocol is standard UDS, so a write is the same machinery with a different service (`0x2E` write, `0x31` routine, `0x34`/`0x36`/`0x37` download, `0x27` security access); and the data is mostly on disk — 371 `.vbf` firmware payloads, the DID access classes, the routine ids, even `AlgData.dll`. Three barriers stand, and only one is a true technical wall:
+
+1. **Security access (`0x27`, seed→key) — the real wall.** Keys, immobiliser, most coding, reflashing, PDI and odometer write all sit behind it: the module issues a seed and the tool must return the correct key or is refused. That key is computed by JLR's secret algorithm. It exists physically on the owner's disk as `CURRENT_JLR_ALGDATA_RUNTIME/Runtime/AlgData.dll` (104 KB, a compiled JLR binary), but using it means reverse-engineering a proprietary secret — the exact *security programming* line `ADR-0005` draws. This project has never touched it. Without it, everything secured is unreachable no matter what is built.
+2. **Arbitrary CAN transmit — no wall at all.** Technically trivial: the wire write already exists, and a `send_raw` would only expose it. It is blocked purely by this project's own architecture checker.
+3. **Risk and policy — decisions, not limits.** A wrong or interrupted flash bricks a module (recovery is a bench or a tow); an odometer write is the fraud the mileage survey exists to expose (`ADR-0024`). These are chosen lines, not technical ceilings.
+
+| Excluded capability | Technically possible? | What stands in the way |
+| --- | --- | --- |
+| Arbitrary CAN transmit | **trivial, now** | The wire write already exists (transmit_diagnostic_frame); send_raw would only expose it. Blocked solely by our own rule (check-architecture.mjs). |
+| ECU coding (0x2E) | **partly now** | Unsecured writes are reachable now; secured ones sit behind security access. |
+| Odometer write | **technically yes** | A simple write/routine protocol-wise (SDD's own SA_OdoWrite). It is the exact fraud the mileage feature exists to expose. |
+| Keys | **yes, behind 0x27** | The protocol is simple (0x27 + routines/writes); the key computation is JLR's secret. |
+| Immobiliser | **yes, behind 0x27** | The same target IDs and start authorisation, all behind security access. |
+| VBF reflashing | **yes, behind 0x27** | 0x34/0x36/0x37 + routines; the .vbf format is known and 371 files sit on disk. An interrupted flash bricks the module irreversibly; recovery is a bench job. |
+| PDI programming / software service actions | **yes, behind 0x27** | A superset of reflashing plus IVS orchestration (part lineage, SOTA). |
+
+So the answer to *could we, in theory* is **yes — except for the secured operations, where a secret that is JLR's stands in the way**. The ceiling is not in the code and not in the hardware; it is in the three lines this project chooses not to cross.
+
 ## Where the SDD column comes from
 
 Read on 2026-09-12 from the locally extracted SDD 169 corpus (never committed, see `research/sdd/PROVENANCE.md`), by component:

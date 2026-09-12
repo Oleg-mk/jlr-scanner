@@ -14,9 +14,19 @@ The knowledge this project derives from SDD traces to one artifact:
   delivery channel and this hash.
 - Container: InstallShield media, read with the installer's own
   `/extract_all` switch and `unshield`; 159,510 files across 232
-  components. Every component whose name contains `FLASH` — the 479 `.vbf`
-  ECU firmware payloads — is excluded from every extraction, and the
-  extractions are verified to contain zero `.vbf` files (`ADR-0005`).
+  components. The installer's `FLASH`-named components carry the ECU
+  firmware — `.vbf` payloads and a few `.iso` images. The boundary this
+  project enforces is at **ingestion** and at the **repository**:
+  `sdd-ingest` never reads a firmware file, none enters the knowledge
+  base, and the repository is verified to hold zero `.vbf`, `.iso` or
+  other firmware, with no crate depending on one (`ADR-0005`). The
+  owner's own local research extraction does contain them — 371 `.vbf`
+  and 4 `.iso` across six `FLASH` components in `SDD169_EXTRACTED` —
+  because a full `unshield` writes every component to disk. An earlier
+  revision of this note claimed the extraction itself contained no
+  `.vbf` and named a count of 479; that was wrong about the disk, and it
+  is corrected here rather than quietly, because a provenance chain that
+  hides its own mistakes is worth less.
 
 ## Handling rules
 
