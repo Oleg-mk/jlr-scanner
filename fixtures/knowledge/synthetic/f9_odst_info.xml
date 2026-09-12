@@ -32,14 +32,24 @@
 <helpScreenQualification>
 <helpScreenDataName id="4274" name="DR_ODST_14_SYNTHMOD">
 <helpScreenSelection helpScreenId="5032" helpScreenName="DR_ODST_14_SYNTHMOD_HLP_000">
-<helpScreenQualifier model="BASE" year="BASE"/>
+<helpScreenQualifier model="SYNTHA" year="MY03"/>
 </helpScreenSelection>
 </helpScreenDataName>
 </helpScreenQualification>
 <helpScreenList>
-<helpScreen id="5032" name="DR_ODST_14_SYNTHMOD_HLP_000"/>
+<helpScreen id="5032" name="DR_ODST_14_SYNTHMOD_HLP_000">
+<helpScreenItem mnemonicName="J_I_SYNTH_ODST_DESC"/>
+<helpScreenItem mnemonicName="empty$I"/>
+<helpScreenItem mnemonicName="J_A_ENS_IGN_ON"/>
+<helpScreenItem mnemonicName="J_I_SYNTH_NO_TEXT"/>
+</helpScreen>
+<helpScreen id="5033" name="DR_ODST_UNUSED_HLP_000">
+<helpScreenItem mnemonicName="J_A_ENS_IGN_ON"/>
+</helpScreen>
 </helpScreenList>
 <helpScreenMnemonicList>
 <mnemonic name="J_A_ENS_IGN_ON"><![CDATA[Make sure the ignition is switched on.]]></mnemonic>
+<mnemonic name="J_I_SYNTH_ODST_DESC"><![CDATA[The synthetic module runs its own check and logs what it finds.]]></mnemonic>
+<mnemonic name="empty$I"><![CDATA[  ]]></mnemonic>
 </helpScreenMnemonicList>
 </odstInfo>

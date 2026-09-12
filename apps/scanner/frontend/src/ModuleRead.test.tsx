@@ -102,6 +102,20 @@ const surveyed: ModuleSurveyEntry[] = [
     identifierRead: { status: "HYPOTHESIS", reasons: ["the adapter route for this bus is an unverified hypothesis"] },
     dtcRead: { status: "HYPOTHESIS", reasons: ["the adapter route for this bus is an unverified hypothesis"] },
     readableIdentifiers: [{ identifier: "0xF190", parameters: ["VIN"] }],
+    selfTests: [
+      {
+        testId: "7",
+        name: "Synthetic door lock cycle",
+        timeMs: 9_000,
+        timeoutMs: 20_000,
+        description: [
+          "Synthetic screen text, first line.",
+          "Synthetic screen text, second line.",
+        ],
+        modelYears: ["MY10"],
+        safetyClass: "SERVICE_ROUTINE",
+      },
+    ],
   },
   {
     ecuFamily: "PCM",
@@ -119,6 +133,7 @@ const surveyed: ModuleSurveyEntry[] = [
     identifierRead: { status: "REACHABLE", reasons: [] },
     dtcRead: { status: "REACHABLE", reasons: [] },
     readableIdentifiers: [{ identifier: "0x1945", parameters: ["Synthetic module-scoped value"] }],
+    selfTests: [],
   },
 ];
 
@@ -254,6 +269,33 @@ describe("module read", () => {
     expect(screen.getByText("Cylinder 1 misfire detected")).toBeVisible();
     expect(screen.getByText("BCM on hs-can (UNVERIFIED)")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Save read report" })).toBeEnabled();
+  });
+
+  it("lists the self tests a module declares and offers no way to run one", async () => {
+    renderApp(new ControlledModuleReadClient());
+    await screen.findByRole("button", { name: "Read" });
+    fireEvent.change(screen.getByLabelText("Programme"), { target: { value: "L405" } });
+    fireEvent.click(screen.getByRole("button", { name: "Survey modules" }));
+    fireEvent.click(await screen.findByRole("button", { name: "BCM: Unverified route" }));
+    await screen.findByRole("heading", { name: "BCM" });
+
+    expect(screen.getByRole("heading", { name: "Self tests this module declares" })).toBeVisible();
+    expect(screen.getByText("Synthetic door lock cycle")).toBeVisible();
+    // SDD's identifier, the time it states, and the class that keeps it out
+    // of this stage, on one line.
+    expect(screen.getByText(/test 7 · MY10 · 9 s · SERVICE_ROUTINE/)).toBeVisible();
+    expect(screen.getByText("Synthetic screen text, second line.")).toBeVisible();
+    expect(screen.getByText(/this application does not/)).toBeVisible();
+    // Nothing in the section is a control: the only buttons are the reads.
+    const buttons = screen.getAllByRole("button").map((button) => button.textContent);
+    expect(buttons.some((label) => label?.includes("Synthetic door lock cycle"))).toBe(false);
+
+    // A module that declares none shows no section at all.
+    fireEvent.click(screen.getByRole("button", { name: "PCM: Reachable" }));
+    await screen.findByRole("heading", { name: "PCM" });
+    expect(
+      screen.queryByRole("heading", { name: "Self tests this module declares" }),
+    ).toBeNull();
   });
 
   it("requires an identifier for an identifier read", async () => {

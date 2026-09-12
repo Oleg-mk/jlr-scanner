@@ -6,9 +6,9 @@
 //! this file supports that guarantee.
 
 use knowledge::{
-    sha256_bytes, ContentFingerprint, DiagnosticSafetyClass, DimensionConstraint, EntityKind,
-    EvidenceClass, KnowledgeQuery, KnowledgeStore, KnowledgeValue, RedistributionStatus, SourceId,
-    SourceRecord, SourceType, ValidationState, YearConstraint,
+    sha256_bytes, ClaimKey, ContentFingerprint, DiagnosticSafetyClass, DimensionConstraint,
+    EntityKind, EvidenceClass, KnowledgeQuery, KnowledgeStore, KnowledgeValue,
+    RedistributionStatus, SourceId, SourceRecord, SourceType, ValidationState, YearConstraint,
 };
 use sdd_ingest::{OdstInfoAdapter, MODEL_YEAR_DESIGNATION_DIMENSION, QUAL_DIMENSION_PREFIX};
 
@@ -59,6 +59,7 @@ fn every_self_test_is_a_service_routine_and_never_read_only() {
     let all = store.query(&KnowledgeQuery::default().include_indeterminate(true));
     assert!(!all.records.is_empty());
 
+    let mut capabilities = 0;
     for entry in &all.records {
         let KnowledgeValue::Capability {
             safety_class,
@@ -66,8 +67,17 @@ fn every_self_test_is_a_service_routine_and_never_read_only() {
             ..
         } = &entry.record.value
         else {
-            panic!("expected a capability value for {}", entry.record.id);
+            // Beside every capability the adapter records what the test is
+            // and what SDD tells the technician about it (ADR-0032). Those
+            // are texts; they command nothing.
+            assert!(
+                matches!(&entry.record.value, KnowledgeValue::Text { .. }),
+                "unexpected value for {}",
+                entry.record.id
+            );
+            continue;
         };
+        capabilities += 1;
         assert!(*supported);
         assert_eq!(
             *safety_class,
@@ -82,6 +92,7 @@ fn every_self_test_is_a_service_routine_and_never_read_only() {
             entry.record.id
         );
     }
+    assert_eq!(capabilities, 4, "four qualified self tests are declared");
 }
 
 #[test]
@@ -155,6 +166,59 @@ fn unrecognised_qualifier_attributes_and_malformed_input_are_rejected() {
     assert!(reject(&no_tests).contains("no qualified self tests"));
 }
 
+/// ADR-0032: the list carries SDD's own description of each test, and the
+/// screen a car is given is recorded apart from what the screen says, so a
+/// screen many cars select is written once.
+#[test]
+fn a_test_carries_its_timings_and_the_words_sdd_writes_for_whoever_runs_it() {
+    let store = ingest(SourceType::Documented);
+
+    let described = store
+        .get_record("f9-odst.odst.SYNTHMOD.14.0.described")
+        .expect("the test is described");
+    let KnowledgeValue::Text { value } = &described.value else {
+        panic!("expected a text");
+    };
+    assert_eq!(
+        value,
+        "test=14;name=DR_ODST_14_SYNTHMOD;time_ms=40000;timeout_ms=40000"
+    );
+    assert_eq!(
+        described.key,
+        ClaimKey::Custom {
+            name: "sdd_odst_test".into()
+        }
+    );
+
+    // Which screen this car is given, on the test's own entity.
+    let given = store
+        .get_record("f9-odst.odst.SYNTHMOD.14.help.0.0")
+        .expect("a car is given a screen");
+    assert_eq!(
+        given.key,
+        ClaimKey::Custom {
+            name: "sdd_odst_help.DR_ODST_14_SYNTHMOD_HLP_000".into()
+        }
+    );
+
+    // What that screen says, written once for the module: SDD's lines in
+    // order, the blank item and the item with no text left out.
+    let screen = store
+        .get_record("f9-odst.odst.SYNTHMOD.screen.DR_ODST_14_SYNTHMOD_HLP_000")
+        .expect("the screen says something");
+    let KnowledgeValue::Text { value } = &screen.value else {
+        panic!("expected a text");
+    };
+    assert_eq!(
+        value,
+        "The synthetic module runs its own check and logs what it finds.\nMake sure the ignition is switched on."
+    );
+    // A screen no test points at is not recorded at all.
+    assert!(store
+        .get_record("f9-odst.odst.SYNTHMOD.screen.DR_ODST_UNUSED_HLP_000")
+        .is_none());
+}
+
 #[test]
 fn classification_follows_the_source_type_and_ingestion_is_idempotent() {
     let synthetic = ingest(SourceType::Synthetic);
@@ -177,7 +241,9 @@ fn classification_follows_the_source_type_and_ingestion_is_idempotent() {
     let first = store.ingest(&adapter, FIXTURE).unwrap();
     let second = store.ingest(&adapter, FIXTURE).unwrap();
     assert_eq!(first, second);
-    assert_eq!(first.record_ids.len(), 4);
+    // Four qualified capabilities, four descriptions beside them, the
+    // screen a car is given and the screen's own text (ADR-0032).
+    assert_eq!(first.record_ids.len(), 10);
     assert_eq!(
         store
             .get_record("f9-odst.odst.SYNTHMOD.14.0")

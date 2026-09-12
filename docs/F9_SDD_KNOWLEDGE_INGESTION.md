@@ -218,6 +218,21 @@ read-only intent and the architecture checker rejects adding another path.
 Knowing which self tests a module declares is useful for planning stage 2; it
 does not bring stage 2 forward.
 
+**2026-09-12 (`ADR-0032`): the test's own words are recorded too.** Beside
+the capability, each test now carries `sdd_odst_test` — its identifier,
+SDD's name for it, its `time` and its `timeout` in milliseconds — and the
+help chain is recorded the way `ADR-0026` records the fault-code help:
+`sdd_odst_help.<screen>` on the test's entity says which screen a given car
+is given, and `sdd_odst_screen.<screen>`, written once per module, holds
+what that screen says. A blank item and an item whose mnemonic has no text
+are left out; a screen no test points at is not recorded at all. The slice
+grew from 1,153 records to 4,085 over the same 93 documents: 1,153 test
+descriptions, 1,257 screen bindings, 522 screen records over 462 distinct
+screens, 238,504 characters. The texts enter in SDD's English; the pack
+holds English and Chinese only, so Ukrainian and Russian wording is this
+project's own and comes later. Nothing became executable: every record still
+carries `ServiceRoutine`.
+
 Each test becomes a `DiagnosticCapability` named from its help-screen data name,
 falling back to `ODST test <id>` when the document does not name it. Qualifiers
 narrow applicability: `model` to `vehicle_program`, `moduleType` to
@@ -233,7 +248,7 @@ designations, consistently with the DTC slice.
 | --- | --- |
 | files scanned | 93 |
 | files rejected | 0 |
-| knowledge records | 1,153 |
+| knowledge records | 4,085 (1,153 before `ADR-0032`) |
 | distinct self tests | 123 |
 | distinct modules | 93 |
 | distinct vehicle programs | 23 |

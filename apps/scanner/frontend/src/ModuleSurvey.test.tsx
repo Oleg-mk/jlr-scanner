@@ -88,6 +88,7 @@ const surveyOf = (vehicle: VehicleDescription): VehicleSurveySnapshot => ({
         reasons: ["diagnostic protocol: no applicable evidence-backed value"],
       },
       readableIdentifiers: [],
+      selfTests: [],
     },
     {
       ecuFamily: "SYNTHMOD",
@@ -108,6 +109,7 @@ const surveyOf = (vehicle: VehicleDescription): VehicleSurveySnapshot => ({
         { identifier: "0x0347", parameters: ["Synthetic fully qualified value"] },
         { identifier: "0x1945", parameters: ["Synthetic module-scoped value"] },
       ],
+      selfTests: [],
     },
   ],
   reachable: 1,

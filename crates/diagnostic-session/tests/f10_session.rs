@@ -5,14 +5,17 @@
 //! checked for what it shows and, as importantly, for what it refuses to hide.
 
 use app_contracts::{LibraryState, ModuleApplicability, RouteStatus, VehicleContextInput};
-use diagnostic_session::{survey_vehicle, KnowledgeLibrary, SDD_YEAR_BREAKPOINT_DIMENSION};
+use diagnostic_session::{
+    survey_vehicle, vehicle_context, KnowledgeLibrary, SDD_MODEL_YEAR_DIMENSION,
+    SDD_YEAR_BREAKPOINT_DIMENSION,
+};
 use knowledge::{
     sha256_bytes, ContentFingerprint, IngestionAdapter, RedistributionStatus, SourceId,
     SourceRecord, SourceType,
 };
 use sdd_ingest::{
     ConverterCatalogue, DidFormattingAdapter, ModelYearTimeline, ModuleTextAdapter,
-    PlatformAdapter, VinDecodeAdapter,
+    OdstInfoAdapter, PlatformAdapter, VinDecodeAdapter,
 };
 
 const PLATFORM: &str = include_str!("../../../fixtures/knowledge/synthetic/f9_platform.xml");
@@ -22,6 +25,7 @@ const CONVERTER_KM: &str =
     include_str!("../../../fixtures/knowledge/synthetic/f9_converter_km.xml");
 const MODULE_TEXT: &str = include_str!("../../../fixtures/knowledge/synthetic/f9_module_text.xml");
 const VIN_DECODE: &str = include_str!("../../../fixtures/knowledge/synthetic/f9_vin_decode.xml");
+const ODST: &str = include_str!("../../../fixtures/knowledge/synthetic/f9_odst_info.xml");
 
 fn synthetic_source(id: &str, text: &str) -> SourceRecord {
     SourceRecord {
@@ -72,6 +76,10 @@ fn exported_manifests() -> Vec<(String, String)> {
         .unwrap()
         .parse(VIN_DECODE)
         .unwrap();
+    let odst_batch = OdstInfoAdapter::new(synthetic_source("f10-session-odst", ODST))
+        .unwrap()
+        .parse(ODST)
+        .unwrap();
     vec![
         (
             "platform.json".to_string(),
@@ -79,7 +87,7 @@ fn exported_manifests() -> Vec<(String, String)> {
         ),
         (
             "bundle.json".to_string(),
-            serde_json::to_string(&vec![did_batch, text_batch, vin_batch]).unwrap(),
+            serde_json::to_string(&vec![did_batch, text_batch, vin_batch, odst_batch]).unwrap(),
         ),
     ]
 }
@@ -125,12 +133,12 @@ fn exported_manifests_and_bundles_load_and_are_counted_honestly() {
     let library = library();
     let snapshot = library.snapshot();
     assert_eq!(snapshot.state, LibraryState::Loaded);
-    // Six built-in plus one manifest plus one bundle of three.
-    assert_eq!(snapshot.manifests_loaded, 10);
+    // Six built-in plus one manifest plus one bundle of four.
+    assert_eq!(snapshot.manifests_loaded, 11);
     assert_eq!(snapshot.manifests_failed, 0);
-    assert_eq!(snapshot.sources, 10);
+    assert_eq!(snapshot.sources, 11);
     assert!(snapshot.records > 20);
-    assert!(snapshot.message.starts_with("Loaded 4 manifests"));
+    assert!(snapshot.message.starts_with("Loaded 5 manifests"));
 }
 
 #[test]
@@ -157,7 +165,7 @@ fn a_broken_manifest_is_reported_and_the_rest_still_load() {
     assert_eq!(files, vec!["broken.json", "wrong-shape.json"]);
     assert!(snapshot.failures[0].message.contains("not valid JSON"));
     // The good data is still there.
-    assert_eq!(snapshot.sources, 10);
+    assert_eq!(snapshot.sources, 11);
 }
 
 #[test]
@@ -367,6 +375,66 @@ fn vehicle_context_dimension_names_match_the_ingester() {
             .module_names(mnemonic)),
         library.survey(&vehicle())
     );
+}
+
+#[test]
+fn the_self_tests_a_module_declares_are_listed_with_sdds_own_words_and_never_offered_to_run() {
+    // The claim names and the dimension are the ingest's; the session reads
+    // them back by the same literals.
+    assert_eq!(
+        SDD_MODEL_YEAR_DIMENSION,
+        sdd_ingest::MODEL_YEAR_DESIGNATION_DIMENSION
+    );
+
+    let library = library();
+    let context = vehicle_context(&vehicle());
+    let tests = library.self_tests(&context, "SYNTHMOD");
+    assert_eq!(
+        tests
+            .iter()
+            .map(|test| test.test_id.as_str())
+            .collect::<Vec<_>>(),
+        ["14", "99"],
+        "both tests the data does not rule out for this car, in SDD's order"
+    );
+
+    let named = &tests[0];
+    assert_eq!(named.name, "DR_ODST_14_SYNTHMOD");
+    assert_eq!(named.time_ms, Some(40_000));
+    assert_eq!(named.timeout_ms, Some(40_000));
+    // SDD's own marker, shown rather than matched.
+    assert_eq!(named.model_years, ["MY03"]);
+    // What SDD tells whoever runs it, its blank line and its line with no
+    // text left out by the ingest.
+    assert_eq!(
+        named.description,
+        [
+            "The synthetic module runs its own check and logs what it finds.",
+            "Make sure the ignition is switched on.",
+        ]
+    );
+    // The class is what keeps every one of them out of this stage.
+    assert!(tests
+        .iter()
+        .all(|test| test.safety_class == "SERVICE_ROUTINE"));
+
+    // A module the data declares no test for gets none, and so does a car
+    // the tests are not qualified for.
+    assert!(library.self_tests(&context, "SYNTHMOD2").is_empty());
+    let other_car = vehicle_context(&VehicleContextInput {
+        vehicle_program: "SYNTHZ".into(),
+        ..vehicle()
+    });
+    assert!(library.self_tests(&other_car, "SYNTHMOD").is_empty());
+
+    // And the survey carries them, so the interface needs no second call.
+    let survey = library.survey(&vehicle());
+    let entry = survey
+        .modules
+        .iter()
+        .find(|entry| entry.ecu_family == "SYNTHMOD")
+        .expect("the module is surveyed");
+    assert_eq!(entry.self_tests, tests);
 }
 
 #[test]

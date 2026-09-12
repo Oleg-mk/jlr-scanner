@@ -34,7 +34,11 @@ Actuator commands whose effects end with the session or power cycle.
 
 ### `SERVICE_ROUTINE`
 
-Explicit, validated service procedures.
+Explicit, validated service procedures. SDD's on-demand self tests are
+classified here and are therefore unavailable in stage 1. Since `ADR-0032`
+the product **lists** them per module, with SDD's own name, timings and
+instructions, and runs none: listing is knowledge, running is a routine, and
+the class is what keeps the two apart.
 
 ### `PERSISTENT_CHANGE`
 

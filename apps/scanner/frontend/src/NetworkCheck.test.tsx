@@ -102,6 +102,7 @@ const documented = (ecuFamily: string, bus: string): ModuleSurveyEntry => ({
   identifierRead: { status: "REACHABLE", reasons: [] },
   dtcRead: { status: "REACHABLE", reasons: [] },
   readableIdentifiers: [],
+  selfTests: [],
 });
 
 const surveyed: ModuleSurveyEntry[] = [

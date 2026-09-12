@@ -21,7 +21,7 @@ Written 2026-09-12 at the owner's request: what a person gets from SDD at its fu
 | `not found in the data` | not found in SDD 169's data; may still exist in its runtime |
 | `—` | not applicable, or already answered by the column before |
 
-**Counts.** 99 rows. SDD does 63 of them. ProwlOne today: 40 built, 2 partly, 2 open inside stage 1. The roadmap: 20 in stage 2, 8 in stage 3. The ceiling: 53 possible, 3 need other hardware, 8 excluded for good. 10 rows are things SDD does not do and ProwlOne already does; 8 rows are things SDD does that ProwlOne will never do.
+**Counts.** 99 rows. SDD does 63 of them. ProwlOne today: 41 built, 1 partly, 2 open inside stage 1. The roadmap: 20 in stage 2, 8 in stage 3. The ceiling: 53 possible, 3 need other hardware, 8 excluded for good. 10 rows are things SDD does not do and ProwlOne already does; 8 rows are things SDD does that ProwlOne will never do.
 
 ## Vehicle, modules, network
 
@@ -81,7 +81,7 @@ Written 2026-09-12 at the owner's request: what a person gets from SDD at its fu
 | Symptom-driven tree without a code, pinpoint tests | **yes** — RULES: 56 documents, 78 MB | **no** | **—** — needs its own ADR | **possible** | COMMON_SDD_DATA_RULES |
 | Symptom help pages | **yes** — 15 pages | **no** | **—** | **possible** | COMMON_SDD_DATA_SYMPTOM_HELP |
 | Code leads to a parameter ('watch this signal') | **partly** — named in the prose | **no** — 223 codes name an identifier | **—** | **possible** | F9 2026-09-10 |
-| What tests and routines a module declares | **yes** | **partly** — 1,153 ODST records known, unavailable | **—** | **built** | COMMON_SDD_DATA_ODST (93 modules, 123 tests) |
+| What tests and routines a module declares | **yes** | **built** — listed per module with SDD's name, timings and words; none run | **—** | **built** | ADR-0032; COMMON_SDD_DATA_ODST (93 modules, 123 tests) |
 | Bulletins, campaigns, recalls | **JLR online services** — TOPIx | **no** | **no** | **possible** — from open sources only | — |
 | Wiring diagrams | **JLR online services** — TOPIx | **no** | **no** | **possible** — from open sources only | — |
 | Reference documents (heated seats, oscilloscope…) | **yes** — 13 PDFs | **no** | **—** | **possible** — the product's own texts | COMMON_SDD_DATA_PDF |
@@ -113,7 +113,7 @@ Written 2026-09-12 at the owner's request: what a person gets from SDD at its fu
 
 | Function | SDD 169 | ProwlOne now (stage 1) | Roadmap (stages 2–3) | Ceiling | Source |
 | --- | --- | --- | --- | --- | --- |
-| On-demand self test (ODST, routine 0x0202) | **yes** — 123 tests, 93 modules | **no** — known, unavailable | **stage 2** | **possible** | COMMON_SDD_DATA_ODST; MDX ROUTINE_IDENTIFIERS |
+| On-demand self test (ODST, routine 0x0202) | **yes** — 123 tests, 93 modules | **no** — listed with SDD's own words, run by nothing | **stage 2** | **possible** | ADR-0032; COMMON_SDD_DATA_ODST; MDX ROUTINE_IDENTIFIERS |
 | Actuator control (0x2F) | **yes** — ≈120 controllable identifiers in the data | **no** | **stage 2** | **possible** | MDX_*.xml CONTROLLABLE |
 | Routines (0x31): calibrations, resets, checks | **yes** | **no** | **stage 2** | **possible** | MDX_*.xml ROUTINE; UMF scripts |
 | Extended diagnostic session (0x10 03) | **yes** | **no** — everything is read in the default session | **stage 2** — most routines need it | **possible** | PLATFORM diag/prog sessions |

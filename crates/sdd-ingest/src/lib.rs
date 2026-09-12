@@ -47,7 +47,10 @@ pub use model_year::{
     parse_marker, parse_relative_marker, ModelYearPoint, ModelYearTimeline, RelativeMarker,
     BASE_MARKER, FIRST_MODEL_YEAR, LAST_MODEL_YEAR,
 };
-pub use odst::{OdstInfoAdapter, ODST_PARSER_ID, QUAL_DIMENSION_PREFIX};
+pub use odst::{
+    OdstInfoAdapter, ODST_HELP_CLAIM_PREFIX, ODST_PARSER_ID, ODST_SCREEN_CLAIM_PREFIX,
+    ODST_TEST_CLAIM, QUAL_DIMENSION_PREFIX,
+};
 pub use platform::{
     BatteryFormatting, BatteryFormattingRow, PlatformAdapter, DS2_DIAGNOSTIC_PROTOCOL,
     DS2_ECU_IDENTIFICATION_CAPABILITY, DS2_FAULT_MEMORY_CAPABILITY, IDENTIFICATION_ENCODING,

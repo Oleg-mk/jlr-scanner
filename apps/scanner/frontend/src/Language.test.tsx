@@ -92,6 +92,7 @@ class NamedSurveyClient implements LibraryClient {
           identifierRead: { status: "REACHABLE", reasons: [] },
           dtcRead: { status: "REACHABLE", reasons: [] },
           readableIdentifiers: [],
+          selfTests: [],
         },
       ],
       reachable: 1,

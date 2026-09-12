@@ -380,6 +380,38 @@ pub struct ModuleSurveyEntry {
     pub identifier_read: RouteSummary,
     pub dtc_read: RouteSummary,
     pub readable_identifiers: Vec<ReadableIdentifierSummary>,
+    /// The self tests the data declares for this module on this car
+    /// (`ADR-0032`); listed, never run.
+    #[serde(default)]
+    pub self_tests: Vec<SelfTestSummary>,
+}
+
+/// One on-demand self test a module declares for this car (`ADR-0032`).
+/// It is knowledge, not an operation: this product lists these and runs
+/// none of them.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SelfTestSummary {
+    /// SDD's own identifier for the test, as it writes it.
+    pub test_id: String,
+    /// SDD's own name for the test.
+    pub name: String,
+    /// How long the test runs, and how long the tester waits, in
+    /// milliseconds, where SDD states them.
+    pub time_ms: Option<u32>,
+    pub timeout_ms: Option<u32>,
+    /// What SDD tells whoever runs it, line by line, for this car. Empty
+    /// when the data carries no screen for it.
+    pub description: Vec<String>,
+    /// SDD's own model-year markers for this test, as the data writes them
+    /// (`MY10`, `MY02_5`, `BASE`). Shown rather than matched: the marker
+    /// sits on a dimension this session does not state, so the list is what
+    /// the data does not rule out for this car, not what it confirms.
+    #[serde(default)]
+    pub model_years: Vec<String>,
+    /// The class every one of these carries: `SERVICE_ROUTINE`. Stage 1
+    /// runs none of them, and the row says so.
+    pub safety_class: String,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]

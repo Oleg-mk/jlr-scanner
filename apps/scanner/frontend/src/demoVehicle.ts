@@ -1,5 +1,6 @@
 import type {
   ModuleSurveyEntry,
+  SelfTestSummary,
   VehicleCatalogueSnapshot,
   VehicleDescription,
   VehicleSurveySnapshot,
@@ -132,6 +133,39 @@ const MY14_ROWS: Row[] = [
   ["AAM", null, null, NGI, null, null],
 ];
 
+/**
+ * Synthetic self tests for the demo (ADR-0032). They are listed and never
+ * run — in the demo there is nothing to run them on — and they exist here
+ * only so the section has something to show.
+ */
+const DEMO_SELF_TESTS: Record<string, SelfTestSummary[]> = {
+  ABS: [
+    {
+      testId: "1",
+      name: "Synthetic pump motor self test",
+      timeMs: 12_000,
+      timeoutMs: 30_000,
+      description: [
+        "A demonstration entry, not a procedure: nothing here was taken from a vehicle.",
+        "The real list comes from the loaded library, module by module.",
+      ],
+      modelYears: ["MY10"],
+      safetyClass: "SERVICE_ROUTINE",
+    },
+  ],
+  RCM: [
+    {
+      testId: "2",
+      name: "Synthetic lamp check",
+      timeMs: 4_000,
+      timeoutMs: 10_000,
+      description: [],
+      modelYears: [],
+      safetyClass: "SERVICE_ROUTINE",
+    },
+  ],
+};
+
 function entry([family, requestId, responseId, bus, identifier, parameter]: Row): ModuleSurveyEntry {
   const [eng, rus] = NAMES[family] ?? [family, null];
   const names: Record<string, string> = { eng };
@@ -154,6 +188,7 @@ function entry([family, requestId, responseId, bus, identifier, parameter]: Row)
     dtcRead: summary,
     readableIdentifiers:
       identifier && parameter ? [{ identifier, parameters: [parameter] }] : [],
+    selfTests: DEMO_SELF_TESTS[family] ?? [],
   };
 }
 

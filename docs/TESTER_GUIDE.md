@@ -292,6 +292,26 @@ this application does not guess a scale.
 
 Nothing is written: the battery is read, never registered or reset.
 
+## What a module can be asked to do
+
+A module's panel ends with **Self tests this module declares** when the
+loaded data declares any. These are SDD's on-demand self tests: the pump
+motor test on an ABS, a lamp check, an actuator cycle — things the module
+runs on itself when a technician commands it. Each row gives SDD's own name
+for the test, its identifier, the model-year markers the data qualifies it
+by, how long it takes, and what SDD tells whoever runs it, line by line.
+
+**This application does not run them, and this section has no button.** A
+self test is a routine, not a read; routines belong to a later stage with
+their own safety rules. The list is here because knowing what a module can
+be asked to do is worth having before anything can ask it — when you take
+the car somewhere else, you know the name of the test to ask for.
+
+One caveat is printed above the list: the year markers are SDD's own and
+this version does not check them, so a test qualified for another year of
+the same model can appear. On an X250 the data declares one test for each of
+37 modules; on an X351, 43.
+
 ## The K-line modules of the older cars
 
 A Range Rover L322 of 2006–2007 keeps its body electronics — light control,

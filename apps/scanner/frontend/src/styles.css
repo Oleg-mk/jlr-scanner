@@ -1289,6 +1289,60 @@ summary:focus-visible {
   height: 1.1rem;
 }
 
+/* The self tests a module declares (ADR-0032): a list, never a control. */
+.self-tests {
+  margin: 1.25rem 0;
+  padding: 0.9rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  background: var(--surface-subtle);
+}
+
+.self-tests h3 {
+  margin: 0;
+  font-size: 0.95rem;
+}
+
+.self-test-list {
+  list-style: none;
+  margin: 0.75rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.self-test-list > li {
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--border);
+}
+
+.self-test-list > li:first-child {
+  padding-top: 0;
+  border-top: 0;
+}
+
+.self-test-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.5rem;
+}
+
+.self-test-head strong {
+  font-size: 0.9rem;
+}
+
+.self-test-head .module-validation {
+  margin-top: 0;
+}
+
+.self-test-line {
+  margin: 0.35rem 0 0;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
 .details-actions {
   display: flex;
   flex-wrap: wrap;

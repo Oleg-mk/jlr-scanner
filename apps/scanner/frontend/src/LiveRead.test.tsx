@@ -92,6 +92,7 @@ function module(ecuFamily: string, identifiers: string[]): ModuleSurveyEntry {
       identifier,
       parameters: [`parameter ${identifier}`],
     })),
+    selfTests: [],
   };
 }
 

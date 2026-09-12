@@ -428,6 +428,12 @@ const uk: Record<string, string> = {
   "Save the series (CSV)": "Зберегти серію (CSV)",
   "Series written to {path}": "Серію записано у {path}",
   // The readable report (ADR-0031)
+  // The self tests a module declares (ADR-0032)
+  "Self tests this module declares": "Самотести, які оголошує цей модуль",
+  "The year markers are SDD's own and this session does not check them, so a test listed here can belong to another year of the same programme.": "Маркери року — власні позначки SDD, і цей сеанс їх не перевіряє, тож наведений тут тест може належати іншому року тієї самої програми.",
+  "SDD can command these; this application does not. A self test is a routine, not a read, and routines belong to a later stage with their own safety rules. The list is here because knowing what a module can be asked to do is worth having.": "SDD може їх запускати; цей застосунок — ні. Самотест — це процедура, а не читання, і процедури належать до пізнішого етапу з власними правилами безпеки. Перелік тут тому, що знати, про що можна попросити модуль, само по собі корисно.",
+  "test {id}": "тест {id}",
+  "{seconds} s": "{seconds} с",
   "Readable report": "Звіт для читання",
   "The same session as a document: the car, the library, the modules and every read, in the language of this window. Print it, or save it as a web page any browser turns into a PDF. The bundle beside it stays the record.": "Той самий сеанс як документ: авто, бібліотека, модулі й кожне читання, мовою цього вікна. Надрукуйте його або збережіть як вебсторінку, яку будь-який браузер перетворить на PDF. Пакет поряд лишається записом.",
   "Mask the VIN and the adapter's serial in the document": "Сховати VIN і серійний номер адаптера в документі",
@@ -1488,6 +1494,12 @@ const ru: Record<string, string> = {
   "Save the series (CSV)": "Сохранить серию (CSV)",
   "Series written to {path}": "Серия записана в {path}",
   // The readable report (ADR-0031)
+  // The self tests a module declares (ADR-0032)
+  "Self tests this module declares": "Самотесты, которые объявляет этот модуль",
+  "The year markers are SDD's own and this session does not check them, so a test listed here can belong to another year of the same programme.": "Маркеры года — собственные обозначения SDD, и этот сеанс их не проверяет, поэтому приведённый здесь тест может относиться к другому году той же программы.",
+  "SDD can command these; this application does not. A self test is a routine, not a read, and routines belong to a later stage with their own safety rules. The list is here because knowing what a module can be asked to do is worth having.": "SDD может их запускать; это приложение — нет. Самотест — это процедура, а не чтение, и процедуры относятся к более позднему этапу со своими правилами безопасности. Перечень здесь потому, что знать, о чём можно попросить модуль, само по себе полезно.",
+  "test {id}": "тест {id}",
+  "{seconds} s": "{seconds} с",
   "Readable report": "Отчёт для чтения",
   "The same session as a document: the car, the library, the modules and every read, in the language of this window. Print it, or save it as a web page any browser turns into a PDF. The bundle beside it stays the record.": "Тот же сеанс как документ: автомобиль, библиотека, модули и каждое чтение, на языке этого окна. Напечатайте его или сохраните как веб-страницу, которую любой браузер превратит в PDF. Пакет рядом остаётся записью.",
   "Mask the VIN and the adapter's serial in the document": "Скрыть VIN и серийный номер адаптера в документе",

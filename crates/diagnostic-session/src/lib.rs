@@ -27,7 +27,7 @@ pub use knowledge::VehicleContext;
 use app_contracts::{
     LibraryIssue, LibraryIssueIntegrity, LibrarySnapshot, LibraryState, ManifestFailure,
     MarkerEntry, ModuleApplicability, ModuleSurveyEntry, ProgrammeEntry, ReadableIdentifierSummary,
-    RouteStatus, RouteSummary, VehicleCatalogueSnapshot, VehicleContextInput,
+    RouteStatus, RouteSummary, SelfTestSummary, VehicleCatalogueSnapshot, VehicleContextInput,
     VehicleSurveySnapshot, VinDecodeSnapshot,
 };
 use diagnostic_environment::{
@@ -50,6 +50,18 @@ use vin::{VinRule, VinTables};
 /// The SDD ingestion adapters write it under this name; a test asserts the two
 /// literals agree.
 pub const SDD_YEAR_BREAKPOINT_DIMENSION: &str = "sdd_year_breakpoint";
+
+/// The dimension SDD's `year` attribute is recorded on by the ODST and DTC
+/// ingests (`sdd_model_year`). It holds the same markers as the DID
+/// catalogue's `sdd_year_breakpoint` — one vocabulary written down twice —
+/// and a test asserts the literal agrees with the ingest.
+pub const SDD_MODEL_YEAR_DIMENSION: &str = "sdd_model_year";
+
+/// Claims the ODST ingest writes for the self tests a module declares
+/// (ADR-0032). The literals are the adapter's; a test asserts they agree.
+const ODST_TEST_CLAIM: &str = "sdd_odst_test";
+const ODST_HELP_CLAIM_PREFIX: &str = "sdd_odst_help.";
+const ODST_SCREEN_CLAIM_PREFIX: &str = "sdd_odst_screen.";
 
 /// Manifests that ship with the application: the documented adapter route
 /// bindings (ADR-0013), the X250 CCP connector route, the relayed-route
@@ -566,6 +578,14 @@ impl KnowledgeLibrary {
             }
         }
         found
+    }
+
+    /// The self tests the loaded data declares for this module on this car
+    /// (ADR-0032): SDD's own identifier and name, its timings, and what SDD
+    /// tells whoever runs it. This product lists them and runs none: every
+    /// one carries `SERVICE_ROUTINE`, which is what keeps it out of stage 1.
+    pub fn self_tests(&self, context: &VehicleContext, ecu_family: &str) -> Vec<SelfTestSummary> {
+        self_tests_for(&self.store, context, ecu_family)
     }
 
     /// The battery parameters the loaded data declares for this module
@@ -1165,6 +1185,7 @@ pub fn survey_vehicle(
             identifier_read: not_applicable(),
             dtc_read: not_applicable(),
             readable_identifiers: Vec::new(),
+            self_tests: Vec::new(),
         };
 
         if applicability != ModuleApplicability::Applicable {
@@ -1220,6 +1241,7 @@ pub fn survey_vehicle(
                 }
             }
         }
+        entry.self_tests = self_tests_for(store, &context, family);
         entry.readable_identifiers =
             DiagnosticEnvironmentResolver::readable_identifiers(store, &context, family)
                 .into_iter()
@@ -1273,6 +1295,135 @@ fn not_applicable() -> RouteSummary {
         status: RouteStatus::NotApplicable,
         reasons: Vec::new(),
     }
+}
+
+/// The self tests a module declares on this car (ADR-0032). A free
+/// function over a store, because the survey is one too.
+fn self_tests_for(
+    store: &KnowledgeStore,
+    context: &VehicleContext,
+    ecu_family: &str,
+) -> Vec<SelfTestSummary> {
+    let result =
+        store.query(&KnowledgeQuery::for_vehicle(context.clone()).include_indeterminate(true));
+    // What the data does not rule out for this car, which is the same rule
+    // `describe_dtc_with_help` uses for a help screen and for the same
+    // reason: SDD qualifies a test by a model-year marker on a dimension
+    // this session does not state, so requiring a match would list nothing
+    // at all. The programme still rules out what belongs to another car,
+    // and the marker itself is carried to the surface below.
+    let applicable: Vec<_> = result
+        .records
+        .iter()
+        .filter(|entry| entry.applicability_resolution != ApplicabilityResolution::NotApplicable)
+        .collect();
+
+    // The screens this car is given, by test entity, and what each
+    // screen says, by name.
+    let mut given: BTreeMap<String, Vec<String>> = BTreeMap::new();
+    let mut screens: BTreeMap<String, String> = BTreeMap::new();
+    for entry in &applicable {
+        let ClaimKey::Custom { name } = &entry.record.key else {
+            continue;
+        };
+        let KnowledgeValue::Text { value } = &entry.record.value else {
+            continue;
+        };
+        if let Some(screen) = name.strip_prefix(ODST_HELP_CLAIM_PREFIX) {
+            given
+                .entry(entry.record.entity.id.clone())
+                .or_default()
+                .push(screen.to_string());
+        } else if let Some(screen) = name.strip_prefix(ODST_SCREEN_CLAIM_PREFIX) {
+            screens.insert(screen.to_string(), value.clone());
+        }
+    }
+
+    let prefix = format!("ODST-{ecu_family}-");
+    let mut found: Vec<SelfTestSummary> = Vec::new();
+    for entry in &applicable {
+        if entry.record.entity.kind != EntityKind::DiagnosticCapability
+            || !entry.record.entity.id.starts_with(&prefix)
+        {
+            continue;
+        }
+        let ClaimKey::Custom { name } = &entry.record.key else {
+            continue;
+        };
+        if name != ODST_TEST_CLAIM {
+            continue;
+        }
+        let KnowledgeValue::Text { value } = &entry.record.value else {
+            continue;
+        };
+        let fields = parse_fields(value);
+        let description = given
+            .get(&entry.record.entity.id)
+            .and_then(|names| names.first())
+            .and_then(|screen| screens.get(screen))
+            .map(|text| text.lines().map(str::to_string).collect())
+            .unwrap_or_default();
+        let summary = SelfTestSummary {
+            test_id: fields.get("test").cloned().unwrap_or_default(),
+            name: fields.get("name").cloned().unwrap_or_default(),
+            time_ms: fields.get("time_ms").and_then(|value| value.parse().ok()),
+            timeout_ms: fields
+                .get("timeout_ms")
+                .and_then(|value| value.parse().ok()),
+            description,
+            model_years: year_markers(&entry.record.applicability),
+            safety_class: "SERVICE_ROUTINE".into(),
+        };
+        match found
+            .iter_mut()
+            .find(|known| known.test_id == summary.test_id)
+        {
+            // One test, one row: SDD qualifies the same test once per car it
+            // applies to, so the markers are gathered rather than the row
+            // repeated.
+            Some(known) => {
+                for marker in summary.model_years {
+                    if !known.model_years.contains(&marker) {
+                        known.model_years.push(marker);
+                    }
+                }
+                known.model_years.sort();
+            }
+            None => found.push(summary),
+        }
+    }
+    found.sort_by(|left, right| {
+        left.test_id
+            .parse::<u32>()
+            .unwrap_or(u32::MAX)
+            .cmp(&right.test_id.parse::<u32>().unwrap_or(u32::MAX))
+            .then_with(|| left.test_id.cmp(&right.test_id))
+    });
+    found
+}
+
+/// SDD's own model-year markers on one record, verbatim (ADR-0032).
+/// `Any` and `Unknown` state no marker and give none.
+fn year_markers(applicability: &knowledge::Applicability) -> Vec<String> {
+    match applicability.other.get(SDD_MODEL_YEAR_DIMENSION) {
+        Some(DimensionConstraint::OneOf { values }) => values.clone(),
+        _ => Vec::new(),
+    }
+}
+
+/// The escaped `key=value;…` text of `ADR-0028`, read back.
+fn parse_fields(text: &str) -> BTreeMap<String, String> {
+    let unescape = |value: &str| {
+        value
+            .replace("%3D", "=")
+            .replace("%7C", "|")
+            .replace("%3B", ";")
+            .replace("%25", "%")
+    };
+    text.split(';')
+        .filter_map(|part| part.split_once('='))
+        .map(|(key, value)| (unescape(key.trim()), unescape(value.trim())))
+        .collect()
 }
 
 /// ADR-0029: why a K-line module is not read by this build even where its

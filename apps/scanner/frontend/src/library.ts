@@ -94,6 +94,29 @@ export interface ModuleSurveyEntry {
   identifierRead: RouteSummary;
   dtcRead: RouteSummary;
   readableIdentifiers: ReadableIdentifierSummary[];
+  /**
+   * The on-demand self tests the data declares for this module on this car
+   * (ADR-0032). Listed, never run: each carries `SERVICE_ROUTINE`, which is
+   * what keeps it out of stage 1.
+   */
+  selfTests: SelfTestSummary[];
+}
+
+export interface SelfTestSummary {
+  testId: string;
+  /** SDD's own name for the test. */
+  name: string;
+  /** How long it runs, and how long the tester waits, in milliseconds. */
+  timeMs: number | null;
+  timeoutMs: number | null;
+  /** What SDD tells whoever runs it, line by line, for this car. */
+  description: string[];
+  /**
+   * SDD's own model-year markers for this test (`MY10`, `MY02_5`, `BASE`),
+   * shown rather than matched: the session does not state that dimension.
+   */
+  modelYears: string[];
+  safetyClass: string;
 }
 
 export interface VehicleSurveySnapshot {

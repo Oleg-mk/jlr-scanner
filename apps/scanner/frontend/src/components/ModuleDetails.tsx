@@ -169,6 +169,45 @@ export function ModuleDetails({
               </label>
             ) : null}
           </div>
+          {module.selfTests.length > 0 ? (
+            <div className="self-tests">
+              <h3>{t("Self tests this module declares")}</h3>
+              <p className="module-validation">
+                {t(
+                  "SDD can command these; this application does not. A self test is a routine, not a read, and routines belong to a later stage with their own safety rules. The list is here because knowing what a module can be asked to do is worth having.",
+                )}
+              </p>
+              <p className="module-validation">
+                {t(
+                  "The year markers are SDD's own and this session does not check them, so a test listed here can belong to another year of the same programme.",
+                )}
+              </p>
+              <ul className="self-test-list">
+                {module.selfTests.map((test) => (
+                  <li key={test.testId}>
+                    <div className="self-test-head">
+                      <strong>{test.name}</strong>
+                      <span className="module-validation">
+                        {t("test {id}", { id: test.testId })}
+                        {test.modelYears.length === 0
+                          ? ""
+                          : ` · ${test.modelYears.join(", ")}`}
+                        {test.timeMs === null
+                          ? ""
+                          : ` · ${t("{seconds} s", { seconds: Math.round(test.timeMs / 1000) })}`}
+                        {` · ${test.safetyClass}`}
+                      </span>
+                    </div>
+                    {test.description.map((line, index) => (
+                      <p className="self-test-line" key={`${test.testId}-${index}`}>
+                        {line}
+                      </p>
+                    ))}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
           <div className="details-actions">
             <button
               className="button button--primary"
