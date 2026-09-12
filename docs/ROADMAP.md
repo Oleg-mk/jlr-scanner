@@ -603,6 +603,12 @@ their use — and, separately, the review's open items above it.
 Service functions and configuration follow only after an explicit owner decision
 and the ADRs described under "Scope". Not scheduled here yet.
 
+`CAPABILITY_MATRIX.md` (2026-09-12) lists, row by row, what SDD 169 does at
+its fullest — read from its own scripts and module documents — against what
+ProwlOne does today, what stages 2 and 3 would add, what is technically
+reachable, and what is excluded for good. It is the list to plan those
+stages from; it decides nothing by itself.
+
 ## Currently prohibited
 
 Under `SAFETY_BOUNDARIES.md` and `ADR-0005`, unchanged by the staged scope above:
