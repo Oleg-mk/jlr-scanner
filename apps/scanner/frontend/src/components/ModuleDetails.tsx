@@ -1,4 +1,4 @@
-import { codeText, dataText, parameterNote, t, useLanguage } from "../i18n";
+import { codeText, dataText, helpLines, parameterNote, t, useLanguage } from "../i18n";
 import { DtcHelp } from "./DtcHelp";
 import type { ModuleSurveyEntry } from "../library";
 import type { ModuleReadKind, ModuleReadSnapshot } from "../moduleRead";
@@ -213,11 +213,13 @@ export function ModuleDetails({
                         {` · ${test.safetyClass}`}
                       </span>
                     </div>
-                    {test.description.map((line, index) => (
-                      <p className="self-test-line" key={`${test.testId}-${index}`}>
-                        {line}
-                      </p>
-                    ))}
+                    {helpLines(test.descriptionTexts, test.description, language).map(
+                      (line, index) => (
+                        <p className="self-test-line" key={`${test.testId}-${index}`}>
+                          {line}
+                        </p>
+                      ),
+                    )}
                   </li>
                 ))}
               </ul>

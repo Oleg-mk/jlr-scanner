@@ -112,6 +112,11 @@ export interface SelfTestSummary {
   /** What SDD tells whoever runs it, line by line, for this car. */
   description: string[];
   /**
+   * The same lines in this project's own words, by interface language
+   * (ADR-0026): a line we have no wording for keeps SDD's English.
+   */
+  descriptionTexts: Record<string, string[]>;
+  /**
    * SDD's own model-year markers for this test (`MY10`, `MY02_5`, `BASE`),
    * shown rather than matched: the session does not state that dimension.
    */

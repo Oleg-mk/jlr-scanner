@@ -403,6 +403,13 @@ pub struct SelfTestSummary {
     /// What SDD tells whoever runs it, line by line, for this car. Empty
     /// when the data carries no screen for it.
     pub description: Vec<String>,
+    /// The same lines in this project's own words, by interface language
+    /// (`ADR-0026`'s rule, applied to the self tests): each list is the same
+    /// length and order as `description`. A line this project has no wording
+    /// for keeps SDD's English, and a language with no wording at all is
+    /// absent rather than half filled.
+    #[serde(default)]
+    pub description_texts: BTreeMap<String, Vec<String>>,
     /// SDD's own model-year markers for this test, as the data writes them
     /// (`MY10`, `MY02_5`, `BASE`). Shown rather than matched: the marker
     /// sits on a dimension this session does not state, so the list is what

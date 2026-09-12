@@ -193,8 +193,8 @@ mod tests {
         let table = table();
         assert_eq!(
             table.by_name.len(),
-            26_893,
-            "one row per named text in SDD's help layer, all of them"
+            27_350,
+            "one row per named text: SDD's help layer and the self tests"
         );
         for (name, (english, ukrainian, russian)) in &table.by_name {
             assert!(!english.trim().is_empty(), "{name} has no English");

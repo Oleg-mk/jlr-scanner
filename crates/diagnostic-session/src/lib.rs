@@ -1430,12 +1430,15 @@ fn self_tests_for(
             continue;
         };
         let fields = parse_fields(value);
-        let description = given
+        let lines: Vec<String> = given
             .get(&entry.record.entity.id)
             .and_then(|names| names.first())
             .and_then(|screen| screens.get(screen))
             .map(|text| text.lines().map(str::to_string).collect())
             .unwrap_or_default();
+        // The words a person reads are this project's own where it has them,
+        // and SDD's English line by line where it does not (`ADR-0026`).
+        let (description, description_texts) = help_text::screen(&lines);
         let summary = SelfTestSummary {
             test_id: fields.get("test").cloned().unwrap_or_default(),
             name: fields.get("name").cloned().unwrap_or_default(),
@@ -1444,6 +1447,7 @@ fn self_tests_for(
                 .get("timeout_ms")
                 .and_then(|value| value.parse().ok()),
             description,
+            description_texts,
             model_years: year_markers(&entry.record.applicability),
             safety_class: "SERVICE_ROUTINE".into(),
         };

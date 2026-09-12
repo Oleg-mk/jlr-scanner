@@ -1,6 +1,7 @@
 import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import { App } from "./App";
+import { LANGUAGE_STORAGE_KEY, setCurrentLanguage } from "./i18n";
 import { createEmptySnapshot, type AdapterClient, type AdapterSnapshot } from "./adapter";
 import {
   createDiagnosticSnapshot,
@@ -112,6 +113,12 @@ const surveyed: ModuleSurveyEntry[] = [
           "Synthetic screen text, first line.",
           "Synthetic screen text, second line.",
         ],
+        descriptionTexts: {
+          ukr: [
+            "Синтетичний текст екрана, перший рядок.",
+            "Синтетичний текст екрана, другий рядок.",
+          ],
+        },
         modelYears: ["MY10"],
         safetyClass: "SERVICE_ROUTINE",
       },
@@ -238,6 +245,11 @@ function renderApp(client: ControlledModuleReadClient) {
 }
 
 describe("module read", () => {
+  afterEach(() => {
+    setCurrentLanguage("en");
+    window.localStorage.removeItem(LANGUAGE_STORAGE_KEY);
+  });
+
   it("marks a hypothesised route on the map and reads its fault codes with wording", async () => {
     const client = new ControlledModuleReadClient();
     renderApp(client);
@@ -296,6 +308,29 @@ describe("module read", () => {
     expect(
       screen.queryByRole("heading", { name: "Self tests this module declares" }),
     ).toBeNull();
+  });
+
+  it("says a self test's words in the interface's language where we have them", async () => {
+    renderApp(new ControlledModuleReadClient());
+    await screen.findByRole("button", { name: "Read" });
+    fireEvent.change(screen.getByLabelText("Programme"), { target: { value: "L405" } });
+    fireEvent.click(screen.getByRole("button", { name: "Survey modules" }));
+    fireEvent.click(await screen.findByRole("button", { name: "BCM: Unverified route" }));
+    await screen.findByRole("heading", { name: "BCM" });
+    expect(screen.getByText("Synthetic screen text, second line.")).toBeVisible();
+
+    // The interface's own language picker, the way a reader changes it.
+    fireEvent.change(screen.getByRole("combobox", { name: "Language" }), {
+      target: { value: "uk" },
+    });
+    // Our own words for the lines we have wording for; SDD's English stays
+    // where we have none (ADR-0026).
+    expect(
+      await screen.findByText("Синтетичний текст екрана, другий рядок."),
+    ).toBeVisible();
+    expect(
+      screen.getByRole("heading", { name: "Самотести, які оголошує цей модуль" }),
+    ).toBeVisible();
   });
 
   it("requires an identifier for an identifier read", async () => {
