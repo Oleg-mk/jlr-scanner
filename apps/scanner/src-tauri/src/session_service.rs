@@ -111,7 +111,7 @@ mod tests {
         let mut service = SessionService::new();
         let initial = service.library_snapshot();
         assert_eq!(initial.state, LibraryState::NotLoaded);
-        assert_eq!(initial.sources, 5);
+        assert_eq!(initial.sources, 6);
 
         // The documented fixture directory carries no issue stamp, so the
         // application refuses it (ADR-0019) and keeps its built-in data.
@@ -122,7 +122,7 @@ mod tests {
             Some(app_contracts::LibraryIssueIntegrity::NoStamp)
         );
         assert!(loaded.message.contains("no issue stamp"));
-        assert_eq!(loaded.sources, 5);
+        assert_eq!(loaded.sources, 6);
         assert!(loaded.directory.is_some());
     }
 
@@ -133,7 +133,7 @@ mod tests {
         assert_eq!(snapshot.state, LibraryState::Failed);
         assert!(snapshot.message.starts_with("Cannot read"));
         // Built-in data survives so the adapter bindings are still known.
-        assert_eq!(snapshot.sources, 5);
+        assert_eq!(snapshot.sources, 6);
     }
 
     #[test]

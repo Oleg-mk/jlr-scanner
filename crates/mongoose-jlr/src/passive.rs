@@ -38,6 +38,12 @@ pub(crate) const SET_PIN_RESPONSE: u16 = 0x8012;
 pub enum VehicleRouteId {
     HsCan,
     MsCan,
+    /// K-line on J1962 pin 7 (ADR-0029): DS2 of the L322's body modules,
+    /// KWP2000 of the L316's ABS. The bit rate is the bus's, 9600 or 10400.
+    KLine7,
+    /// K-line on J1962 pin 8 (ADR-0029): ROSCO of the L316's VIM, KWP2000*
+    /// of the L322's transfer case. Neither protocol is spoken yet.
+    KLine8,
 }
 
 impl VehicleRouteId {
@@ -45,6 +51,8 @@ impl VehicleRouteId {
         match self {
             Self::HsCan => "hs-can",
             Self::MsCan => "ms-can",
+            Self::KLine7 => "k-line-7",
+            Self::KLine8 => "k-line-8",
         }
     }
 }
@@ -62,6 +70,8 @@ impl FromStr for VehicleRouteId {
         match value {
             "hs-can" => Ok(Self::HsCan),
             "ms-can" => Ok(Self::MsCan),
+            "k-line-7" => Ok(Self::KLine7),
+            "k-line-8" => Ok(Self::KLine8),
             _ => Err(format!("unknown route {value}")),
         }
     }
@@ -91,6 +101,14 @@ pub struct VehicleRoute {
 
 const HS_CAN_PINS: &[u8] = &[6, 14];
 const MS_CAN_PINS: &[u8] = &[3, 11];
+const K_LINE_7_PINS: &[u8] = &[7];
+const K_LINE_8_PINS: &[u8] = &[8];
+/// A K-line is not opened by this build (ADR-0029): the pin selection and
+/// the wake-up on this adapter are unverified until the second slice's probe
+/// has run, and a K-line has no listen-only mode in any case — a module on
+/// it answers only when asked. Every open of one of these routes is refused
+/// with this reason.
+pub(crate) const K_LINE_NOT_OPENED: &str = "K-line is not opened by this build: the adapter's pin selection and wake-up for it are unverified (ADR-0029), and a K-line module answers only when asked";
 
 const VEHICLE_ROUTES: &[VehicleRoute] = &[
     VehicleRoute {
@@ -109,17 +127,39 @@ const VEHICLE_ROUTES: &[VehicleRoute] = &[
         bitrate: Some(125_000),
         passive_capability: PassiveCapability::Ready,
     },
+    VehicleRoute {
+        id: VehicleRouteId::KLine7,
+        network_name: "K-line pin 7",
+        network_type: NetworkType::Other,
+        obd_pins: K_LINE_7_PINS,
+        // The bus states its baud rate; the route has none of its own.
+        bitrate: None,
+        passive_capability: PassiveCapability::Blocked(K_LINE_NOT_OPENED),
+    },
+    VehicleRoute {
+        id: VehicleRouteId::KLine8,
+        network_name: "K-line pin 8",
+        network_type: NetworkType::Other,
+        obd_pins: K_LINE_8_PINS,
+        bitrate: None,
+        passive_capability: PassiveCapability::Blocked(K_LINE_NOT_OPENED),
+    },
 ];
 
 pub fn list_vehicle_routes() -> &'static [VehicleRoute] {
     VEHICLE_ROUTES
 }
 
-/// The firmware resource a vehicle route opens (ADR-0018).
-pub(crate) fn resource_route(id: VehicleRouteId) -> u16 {
+/// The firmware resource a vehicle route opens (ADR-0018), where one has
+/// been seen to answer. The K-line routes have none yet (ADR-0029): the resource is
+/// chosen by the protocol's physical layer when the second slice opens a
+/// line, and until the adapter has answered that open it stays unknown
+/// rather than guessed.
+pub(crate) fn resource_route(id: VehicleRouteId) -> Option<u16> {
     match id {
-        VehicleRouteId::HsCan => CAN1_RESOURCE_ROUTE,
-        VehicleRouteId::MsCan => CAN2_RESOURCE_ROUTE,
+        VehicleRouteId::HsCan => Some(CAN1_RESOURCE_ROUTE),
+        VehicleRouteId::MsCan => Some(CAN2_RESOURCE_ROUTE),
+        VehicleRouteId::KLine7 | VehicleRouteId::KLine8 => None,
     }
 }
 
@@ -688,7 +728,7 @@ mod tests {
 
     #[test]
     fn production_can_routes_exclude_unsupported_pins_12_and_13() {
-        assert_eq!(list_vehicle_routes().len(), 2);
+        assert_eq!(list_vehicle_routes().len(), 4);
         assert_eq!(
             list_vehicle_routes()
                 .iter()
@@ -703,5 +743,36 @@ mod tests {
             .all(|pin| !matches!(pin, 12 | 13)));
         assert!("ccp-hs-can".parse::<VehicleRouteId>().is_err());
         assert!("tcm-comms".parse::<VehicleRouteId>().is_err());
+    }
+
+    /// ADR-0029: the two K-line routes are known by pin and by name, have no
+    /// bit rate of their own, no resource word yet, and refuse every open —
+    /// passive or diagnostic — with the reason.
+    #[test]
+    fn k_line_routes_are_named_pinned_and_blocked_until_the_second_slice() {
+        for (id, text, pin) in [
+            (VehicleRouteId::KLine7, "k-line-7", 7u8),
+            (VehicleRouteId::KLine8, "k-line-8", 8u8),
+        ] {
+            assert_eq!(id.as_str(), text);
+            assert_eq!(text.parse::<VehicleRouteId>(), Ok(id));
+            let route = route_by_id(id);
+            assert_eq!(route.obd_pins, &[pin]);
+            assert_eq!(route.bitrate, None);
+            assert_eq!(route.network_type, NetworkType::Other);
+            assert_eq!(
+                route.passive_capability,
+                PassiveCapability::Blocked(K_LINE_NOT_OPENED)
+            );
+            assert_eq!(resource_route(id), None);
+        }
+        assert_eq!(
+            resource_route(VehicleRouteId::HsCan),
+            Some(CAN1_RESOURCE_ROUTE)
+        );
+        assert_eq!(
+            resource_route(VehicleRouteId::MsCan),
+            Some(CAN2_RESOURCE_ROUTE)
+        );
     }
 }

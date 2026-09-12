@@ -384,7 +384,20 @@ fn an_answered_read_turns_a_hypothesised_route_into_a_capture_validated_one() {
         (RouteStatus::Reachable, "CAPTURE_VALIDATED".into())
     );
     let survey = after.survey(&vehicle());
-    assert_eq!(survey.hypothesis, 0);
+    // The capture confirmed the relayed route and nothing else: the K-line
+    // module's adapter route (ADR-0029) stays the hypothesis it was, because
+    // no K-line read was in the report.
+    let still_hypothesised: Vec<&str> = survey
+        .modules
+        .iter()
+        .filter(|module| {
+            module.identifier_read.status == RouteStatus::Hypothesis
+                || module.dtc_read.status == RouteStatus::Hypothesis
+        })
+        .map(|module| module.ecu_family.as_str())
+        .collect();
+    assert_eq!(still_hypothesised, vec!["DS2MOD"]);
+    assert_eq!(survey.hypothesis, 1);
 }
 
 #[test]

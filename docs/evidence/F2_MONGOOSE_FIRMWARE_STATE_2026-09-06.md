@@ -226,3 +226,18 @@ five-second cap (`ADR-0018`), which leaves room.
 Validation: the medium-speed diagnostic path — resource 21, pins 3/11, the
 outbound record — is `HARDWARE_CONFIRMED` on the bench to the same extent
 as the high-speed one. `VEHICLE_CONFIRMED` remains empty for both.
+
+## Part 4 — resources 3 and 4 bound as hypotheses (2026-09-12, `ADR-0029`)
+
+Nothing new was measured; the sweep above is what the K-line decision rests
+on. Resources 3 and 4 open and name pins 3, 7 and 8 for ISO 9141 K-line; in
+the J2534 numbering the firmware appears to follow, 3 is ISO 9141 and 4 is
+ISO 14230. The adapter now carries two routes, `k-line-7` and `k-line-8`,
+with no resource word of their own: which of 3 and 4 a line is opened on is
+chosen by the protocol's physical layer (3 for DS2 and ROSCO, 4 for
+KWP2000), and until the second slice's probe
+(`scripts/mongoose-probe/mongoose_kline_probe.py`) has asked the firmware,
+the pin-select word for a single line, the wake-up command and the outbound
+record for K-line bytes stay **unknown** — the routes refuse every open with
+that reason. `HARDWARE_CONFIRMED` for K-line means, and will mean, the
+firmware's own status texts to those three commands, adapter alone, no car.

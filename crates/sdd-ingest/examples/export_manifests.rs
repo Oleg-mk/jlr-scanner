@@ -162,7 +162,7 @@ fn source(found: &Found, text: &str) -> Result<SourceRecord, KnowledgeError> {
 /// The manifests the application carries built in, in the order it loads
 /// them; the exporter's store starts with the same so that what is exported
 /// validates the way it will load.
-const BUILT_IN_MANIFESTS: [(&str, &str); 5] = [
+const BUILT_IN_MANIFESTS: [(&str, &str); 6] = [
     (
         "mongoose_jlr_route_bindings.json",
         include_str!("../../../fixtures/knowledge/documented/mongoose_jlr_route_bindings.json"),
@@ -181,6 +181,12 @@ const BUILT_IN_MANIFESTS: [(&str, &str); 5] = [
         "mongoose_jlr_relayed_route_hypotheses.json",
         include_str!(
             "../../../fixtures/knowledge/research/mongoose_jlr_relayed_route_hypotheses.json"
+        ),
+    ),
+    (
+        "mongoose_jlr_kline_route_hypotheses.json",
+        include_str!(
+            "../../../fixtures/knowledge/research/mongoose_jlr_kline_route_hypotheses.json"
         ),
     ),
     (

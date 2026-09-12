@@ -895,3 +895,62 @@ a readable block with padding, two blocks in one identifier at two offsets,
 a copy narrowed by an engine, an address stamped with a neighbouring year, a
 span written backwards, texts carrying every separator, and a paged
 document that yields no identifier.
+
+## 2026-09-12 — the K-line buses (ADR-0029)
+
+Six of the platform documents' networks are not CAN: `<network>` elements
+whose `<iso>` child states the physical layer — `rate` in baud, `settings`
+with `data_bits`, `parity` and `stop_bits`, a `<wakeup type="…">`
+(`bmw_ds2`, `bmw_kw2000_star`, `kw2000_fast`, `rosco`) and, for four of the
+six, a `<connection>` naming a connector pin (`K_LINE_PIN_7`, `K_LINE_PIN_8`,
+`ISO_K_KW2000`, `ISO_K_ROSCO`) that the document's own `<connector>` maps to
+a J1962 pin number. Their protocols are `DS2`, `KW2000`, `KW2000STAR` and
+`ROSCO`; a module on one of them has a one-byte `<address type="phys">` and
+no CAN identifier.
+
+`PlatformAdapter` records, per such bus, a `NetworkRoute` on the bus's own
+name — connector and pin where stated, the rate as the bit rate — and two
+text claims, `sdd_iso_settings` (`data_bits=8;parity=even;stop_bits=1`) and
+`sdd_iso_wakeup`; per module, a `DiagnosticAddressing` with the node address
+in both identifier fields, no CAN identifier format and the addressing mode
+`iso9141_node` (a word the `knowledge` crate owns, because the resolver reads
+it), beside the `sdd_physical_address` text every physically addressed
+module already had; and read-only capabilities by protocol — `DS2`:
+`ds2.ecu_identification.read_only` and `ds2.fault_memory.read_only`;
+`KW2000`: `kwp2000.service1a.read_ecu_identification.read_only` and
+`kwp2000.service18.read_dtc_by_status.read_only`; `KW2000STAR` and `ROSCO`:
+none, so the survey says the protocol is named and not spoken rather than
+trying the wrong one. Nothing about a bus is assumed: a bus that states no
+pin gets no pin and no connector, and the adapter route is not the
+document's to state — it is the hypothesis manifest's
+(`mongoose_jlr_kline_route_hypotheses.json`, `unverified_research`).
+
+### Real-source run
+
+| | |
+| --- | --- |
+| platform documents with a K-line bus | 14 |
+| K-line bus records (`.iso.<bus>.route`) | 18 |
+| …by protocol | `DS2` 3, `ISO` 9, `KW2000` 1, `KW2000STAR` 2, `ROSCO` 3 |
+| …with a stated pin | 6 |
+| node-addressed module records | 70 |
+| …by protocol | `?` 8, `DS2` 15, `KW2000` 1, `NVJCOM` 43, `ROSCO` 3 |
+| K-line capability records | 44 |
+| rejected | 0 |
+| the library | 353,626 records (from 353,450), 21 MB on disk |
+
+The count is larger than the six buses the ADR set out from because the
+older Jaguars — X100, X103, X204, X206, X350, X356, X358, X400, X404 —
+describe their `ISO` bus in the same `<iso>` shape: 10400 baud, 8N1, no
+wake-up, no pin, and 43 NVJCOM modules with node addresses on it. They are
+recorded as the documents state them and nothing more: no hypothesis
+manifest names a route for `ISO`, no capability is recorded for NVJCOM, and
+the survey shows each such module with both reasons — the route unresolved,
+the protocol named and not spoken — as `ADR-0029` leaves them under *What
+this does not decide*. Eight node-addressed modules sit on a bus whose
+document declares no protocol at all; they are shown with that reason.
+
+Golden test: `k_line_buses_carry_pin_rate_framing_and_wakeup_and_their_modules_a_node_address`
+in `f9_platform_golden.rs`, over the synthetic platform's two K-line buses —
+one pinned and spoken (`DS2_PIN7`, `DS2MOD` at `0x72`), one unpinned and only
+named (`KW2000STAR`, `STARMOD` at `0x12`).

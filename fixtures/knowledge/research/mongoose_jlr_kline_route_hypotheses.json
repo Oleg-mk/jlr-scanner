@@ -1,0 +1,200 @@
+{
+  "schema_version": 1,
+  "source": {
+    "id": "jlr-scanner-kline-route-hypotheses",
+    "title": "Hypothesis: the K-line buses of the L322 and the L316 are reached through the adapter's routes k-line-7 and k-line-8",
+    "source_type": "unverified_research",
+    "origin": "JLR Scanner reasoning over the SDD platform documents' <iso> buses, the MongoosePro JLR user guide's pinout and the firmware's own status texts (ADR-0029)",
+    "source_locator": "repository:docs/adr/ADR-0029-k-line-ds2-and-kwp2000-for-the-legacy-buses.md",
+    "content_fingerprint": null,
+    "acquired_on": "2026-09-12",
+    "declared_vehicle_programs": [],
+    "provenance": "Not a documented fact. The platform documents state, for four of the six K-line buses, the J1962 pin the bus is on: DS2_PIN7 and KW2000 on pin 7, KW2000STAR_PIN8 and ROSCO on pin 8. The adapter's firmware opens resources 3 and 4 and answers a wrong pin pair with 'supports ISO9141 K line on pin 3, 7 or 8'; its user guide gives the JLR variant K-Line on pin 7 and ROSCO on pin 8. Hence the hypothesis that a bus on pin 7 is carried by route k-line-7 and a bus on pin 8 by route k-line-8 — the pin is the document's, the route is the hypothesis, because this adapter has never opened a K-line with a pin selected. Two buses, DS2 and KW2000STAR, state no pin at all: they are hypothesised on pin 7 through k-line-7 on a weaker footing — the same documents name DS2_PIN7 for the one module they had to place explicitly, and the user guide gives K-Line on pin 7 — and are refuted the day a module on one of them answers on pin 8. Confirmed by the first read-only answer from a module on the bus; refuted by its absence.",
+    "redistribution_status": "permitted",
+    "notes": "Records here resolve as Unverified and the survey shows them as a hypothesis, never as a reachable route. Until the second slice of ADR-0029 opens a K-line on the adapter, no request travels on these routes at all."
+  },
+  "evidence": [
+    {
+      "id": "evidence-kline-route-from-stated-pin",
+      "source_id": "jlr-scanner-kline-route-hypotheses",
+      "evidence_class": "unverified_research",
+      "locator": {
+        "description": "docs/adr/ADR-0029, 'What SDD says, measured' and decision 3: the platform documents state pin 7 for DS2_PIN7 (K_LINE_PIN_7) and KW2000 (ISO_K_KW2000), pin 8 for KW2000STAR_PIN8 (K_LINE_PIN_8) and ROSCO (ISO_K_ROSCO); the adapter's resources 3 and 4 name pins 3, 7 and 8 for K-line; the user guide gives K-Line on pin 7 and ROSCO on pin 8",
+        "document_page": null,
+        "document_section": "Decisions, 3. The bindings",
+        "record_key": "DS2_PIN7 KW2000 KW2000STAR_PIN8 ROSCO",
+        "capture_timestamp_us": null
+      },
+      "excerpt": "pin 7: DS2_PIN7, KW2000; pin 8: KW2000STAR_PIN8, ROSCO; adapter: 'supports ISO9141 K line on pin 3, 7 or 8'",
+      "notes": "Reasoning from a stated pin to an adapter route, not an observation of the route"
+    },
+    {
+      "id": "evidence-kline-route-for-unpinned-bus",
+      "source_id": "jlr-scanner-kline-route-hypotheses",
+      "evidence_class": "unverified_research",
+      "locator": {
+        "description": "docs/adr/ADR-0029, decision 3: DS2 and KW2000STAR state no pin; the same documents name DS2_PIN7 for the one module they had to place explicitly, and the user guide gives the JLR variant K-Line on pin 7",
+        "document_page": null,
+        "document_section": "Decisions, 3. The bindings",
+        "record_key": "DS2 KW2000STAR",
+        "capture_timestamp_us": null
+      },
+      "excerpt": "no pin stated; hypothesised on pin 7 through k-line-7; refuted by an answer on pin 8",
+      "notes": "The weaker hypothesis of the two: the pin itself is guessed, not only the route"
+    }
+  ],
+  "records": [
+    {
+      "id": "hypothesis-kline-ds2-pin7-backend",
+      "entity": { "kind": "network_route", "id": "DS2_PIN7" },
+      "key": { "kind": "custom", "name": "backend_route" },
+      "value": { "kind": "backend_route", "backend": "mongoose-jlr", "route_id": "k-line-7" },
+      "applicability": {
+        "vehicle_program": { "state": "any" },
+        "model_year": { "state": "any" },
+        "architecture_generation": { "state": "any" },
+        "ecu_family": { "state": "any" },
+        "powertrain": { "state": "any" },
+        "variant": { "state": "any" },
+        "market": { "state": "any" },
+        "diagnostic_implementation": { "state": "any" },
+        "other": {}
+      },
+      "evidence_ids": ["evidence-kline-route-from-stated-pin"],
+      "validation_state": "unverified"
+    },
+    {
+      "id": "hypothesis-kline-kw2000-backend",
+      "entity": { "kind": "network_route", "id": "KW2000" },
+      "key": { "kind": "custom", "name": "backend_route" },
+      "value": { "kind": "backend_route", "backend": "mongoose-jlr", "route_id": "k-line-7" },
+      "applicability": {
+        "vehicle_program": { "state": "any" },
+        "model_year": { "state": "any" },
+        "architecture_generation": { "state": "any" },
+        "ecu_family": { "state": "any" },
+        "powertrain": { "state": "any" },
+        "variant": { "state": "any" },
+        "market": { "state": "any" },
+        "diagnostic_implementation": { "state": "any" },
+        "other": {}
+      },
+      "evidence_ids": ["evidence-kline-route-from-stated-pin"],
+      "validation_state": "unverified"
+    },
+    {
+      "id": "hypothesis-kline-kw2000star-pin8-backend",
+      "entity": { "kind": "network_route", "id": "KW2000STAR_PIN8" },
+      "key": { "kind": "custom", "name": "backend_route" },
+      "value": { "kind": "backend_route", "backend": "mongoose-jlr", "route_id": "k-line-8" },
+      "applicability": {
+        "vehicle_program": { "state": "any" },
+        "model_year": { "state": "any" },
+        "architecture_generation": { "state": "any" },
+        "ecu_family": { "state": "any" },
+        "powertrain": { "state": "any" },
+        "variant": { "state": "any" },
+        "market": { "state": "any" },
+        "diagnostic_implementation": { "state": "any" },
+        "other": {}
+      },
+      "evidence_ids": ["evidence-kline-route-from-stated-pin"],
+      "validation_state": "unverified"
+    },
+    {
+      "id": "hypothesis-kline-rosco-backend",
+      "entity": { "kind": "network_route", "id": "ROSCO" },
+      "key": { "kind": "custom", "name": "backend_route" },
+      "value": { "kind": "backend_route", "backend": "mongoose-jlr", "route_id": "k-line-8" },
+      "applicability": {
+        "vehicle_program": { "state": "any" },
+        "model_year": { "state": "any" },
+        "architecture_generation": { "state": "any" },
+        "ecu_family": { "state": "any" },
+        "powertrain": { "state": "any" },
+        "variant": { "state": "any" },
+        "market": { "state": "any" },
+        "diagnostic_implementation": { "state": "any" },
+        "other": {}
+      },
+      "evidence_ids": ["evidence-kline-route-from-stated-pin"],
+      "validation_state": "unverified"
+    },
+    {
+      "id": "hypothesis-kline-ds2-route",
+      "entity": { "kind": "network_route", "id": "DS2" },
+      "key": { "kind": "network_route" },
+      "value": { "kind": "network_route", "logical_name": "DS2", "connector": "J1962", "pins": [7], "bitrate_bps": 9600 },
+      "applicability": {
+        "vehicle_program": { "state": "any" },
+        "model_year": { "state": "any" },
+        "architecture_generation": { "state": "any" },
+        "ecu_family": { "state": "any" },
+        "powertrain": { "state": "any" },
+        "variant": { "state": "any" },
+        "market": { "state": "any" },
+        "diagnostic_implementation": { "state": "any" },
+        "other": {}
+      },
+      "evidence_ids": ["evidence-kline-route-for-unpinned-bus"],
+      "validation_state": "unverified"
+    },
+    {
+      "id": "hypothesis-kline-ds2-backend",
+      "entity": { "kind": "network_route", "id": "DS2" },
+      "key": { "kind": "custom", "name": "backend_route" },
+      "value": { "kind": "backend_route", "backend": "mongoose-jlr", "route_id": "k-line-7" },
+      "applicability": {
+        "vehicle_program": { "state": "any" },
+        "model_year": { "state": "any" },
+        "architecture_generation": { "state": "any" },
+        "ecu_family": { "state": "any" },
+        "powertrain": { "state": "any" },
+        "variant": { "state": "any" },
+        "market": { "state": "any" },
+        "diagnostic_implementation": { "state": "any" },
+        "other": {}
+      },
+      "evidence_ids": ["evidence-kline-route-for-unpinned-bus"],
+      "validation_state": "unverified"
+    },
+    {
+      "id": "hypothesis-kline-kw2000star-route",
+      "entity": { "kind": "network_route", "id": "KW2000STAR" },
+      "key": { "kind": "network_route" },
+      "value": { "kind": "network_route", "logical_name": "KW2000STAR", "connector": "J1962", "pins": [7], "bitrate_bps": 9600 },
+      "applicability": {
+        "vehicle_program": { "state": "any" },
+        "model_year": { "state": "any" },
+        "architecture_generation": { "state": "any" },
+        "ecu_family": { "state": "any" },
+        "powertrain": { "state": "any" },
+        "variant": { "state": "any" },
+        "market": { "state": "any" },
+        "diagnostic_implementation": { "state": "any" },
+        "other": {}
+      },
+      "evidence_ids": ["evidence-kline-route-for-unpinned-bus"],
+      "validation_state": "unverified"
+    },
+    {
+      "id": "hypothesis-kline-kw2000star-backend",
+      "entity": { "kind": "network_route", "id": "KW2000STAR" },
+      "key": { "kind": "custom", "name": "backend_route" },
+      "value": { "kind": "backend_route", "backend": "mongoose-jlr", "route_id": "k-line-7" },
+      "applicability": {
+        "vehicle_program": { "state": "any" },
+        "model_year": { "state": "any" },
+        "architecture_generation": { "state": "any" },
+        "ecu_family": { "state": "any" },
+        "powertrain": { "state": "any" },
+        "variant": { "state": "any" },
+        "market": { "state": "any" },
+        "diagnostic_implementation": { "state": "any" },
+        "other": {}
+      },
+      "evidence_ids": ["evidence-kline-route-for-unpinned-bus"],
+      "validation_state": "unverified"
+    }
+  ]
+}

@@ -45,6 +45,16 @@ const capabilities: VehicleInterfaceCapability[] = [
     vehicleValidation: "NOT_YET_VALIDATED",
   },
   {
+    id: "k-line-7",
+    name: "K-line (pin 7)",
+    pins: "7",
+    nominalBitrate: null,
+    hardwareConfirmed: false,
+    fixtureTested: false,
+    implementation: "HYPOTHESIS",
+    vehicleValidation: "NOT_YET_VALIDATED",
+  },
+  {
     id: "ccp-hs-can",
     name: "CCP HS-CAN",
     pins: "12/13 on X250",

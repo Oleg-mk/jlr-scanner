@@ -549,7 +549,11 @@ mod tests {
         else {
             unreachable!("profile environment is RESOLVED");
         };
-        fixed.can_id_format.value = IdFormat::Extended29Bit;
+        fixed
+            .can_id_format
+            .as_mut()
+            .expect("a CAN plan carries its identifier format")
+            .value = IdFormat::Extended29Bit;
         fixed.physical_request_id.value = 0x18DA_60F1;
         fixed.physical_response_id.value = 0x18DA_F160;
         let readable = ReadableIdentifier {

@@ -26,6 +26,8 @@ const manifestRules = [
     "obd-j1979",
     "isotp",
     "uds",
+    "ds2",
+    "kwp2000",
     "windows",
     "winreg",
   ]],
@@ -47,6 +49,8 @@ const manifestRules = [
     "obd-j1979",
     "isotp",
     "uds",
+    "ds2",
+    "kwp2000",
     "windows",
     "winreg",
   ]],
@@ -65,6 +69,8 @@ const manifestRules = [
     "diagnostic-simulator",
     "isotp",
     "uds",
+    "ds2",
+    "kwp2000",
     "windows",
   ]],
   ["crates/diagnostic-execution/Cargo.toml", [
@@ -75,6 +81,8 @@ const manifestRules = [
     "transport-serial",
     "diagnostics-core",
     "uds",
+    "ds2",
+    "kwp2000",
     "windows",
     "winreg",
   ]],
@@ -94,6 +102,8 @@ const manifestRules = [
     "diagnostic-execution",
     "uds-execution",
     "uds",
+    "ds2",
+    "kwp2000",
     "isotp",
     "obd-j1979",
     "windows",
@@ -140,14 +150,20 @@ const manifestRules = [
     "obd-j1979",
     "isotp",
     "uds",
+    "ds2",
+    "kwp2000",
     "windows",
     "winreg",
   ]],
-  ["crates/transport-serial/Cargo.toml", ["tauri", "react", "frontend", "mongoose-jlr", "diagnostics-core", "uds", "isotp", "knowledge"]],
-  ["crates/transport-api/Cargo.toml", ["tauri", "react", "frontend", "mongoose-jlr", "diagnostics-core", "uds", "isotp", "knowledge"]],
-  ["crates/transport-replay/Cargo.toml", ["tauri", "react", "frontend", "mongoose-jlr", "diagnostics-core", "uds", "isotp", "knowledge", "windows"]],
-  ["crates/isotp/Cargo.toml", ["tauri", "react", "frontend", "mongoose-jlr", "diagnostics-core", "uds", "knowledge", "windows"]],
+  ["crates/transport-serial/Cargo.toml", ["tauri", "react", "frontend", "mongoose-jlr", "diagnostics-core", "uds", "ds2", "kwp2000", "isotp", "knowledge"]],
+  ["crates/transport-api/Cargo.toml", ["tauri", "react", "frontend", "mongoose-jlr", "diagnostics-core", "uds", "ds2", "kwp2000", "isotp", "knowledge"]],
+  ["crates/transport-replay/Cargo.toml", ["tauri", "react", "frontend", "mongoose-jlr", "diagnostics-core", "uds", "ds2", "kwp2000", "isotp", "knowledge", "windows"]],
+  ["crates/isotp/Cargo.toml", ["tauri", "react", "frontend", "mongoose-jlr", "diagnostics-core", "uds", "ds2", "kwp2000", "knowledge", "windows"]],
   ["crates/uds/Cargo.toml", ["tauri", "react", "frontend", "mongoose-jlr", "diagnostics-core", "isotp", "knowledge", "windows"]],
+  // ADR-0029: the K-line protocol crates know a frame and nothing else — no
+  // transport, no knowledge, no adapter, no other protocol.
+  ["crates/ds2/Cargo.toml", ["tauri", "react", "frontend", "serialport", "tokio", "reqwest", "rusqlite", "mongoose-jlr", "transport-api", "transport-serial", "transport-replay", "diagnostic-simulator", "diagnostic-environment", "diagnostic-execution", "diagnostics-core", "knowledge", "sdd-ingest", "obd-j1979", "isotp", "uds", "kwp2000", "windows", "winreg"]],
+  ["crates/kwp2000/Cargo.toml", ["tauri", "react", "frontend", "serialport", "tokio", "reqwest", "rusqlite", "mongoose-jlr", "transport-api", "transport-serial", "transport-replay", "diagnostic-simulator", "diagnostic-environment", "diagnostic-execution", "diagnostics-core", "knowledge", "sdd-ingest", "obd-j1979", "isotp", "uds", "ds2", "windows", "winreg"]],
   ["crates/diagnostic-simulator/Cargo.toml", ["tauri", "react", "frontend", "mongoose-jlr", "diagnostics-core", "knowledge", "windows"]],
   // ADR-0020: the vehicle on the bench answers from the library and never sees the adapter protocol or the shell.
   ["crates/bench-vehicle/Cargo.toml", ["tauri", "react", "frontend", "mongoose-jlr", "transport-serial", "serialport", "windows", "winreg"]],
@@ -172,6 +188,8 @@ const manifestRules = [
     "jlr-profiles",
     "isotp",
     "uds",
+    "ds2",
+    "kwp2000",
     "windows",
     "winreg",
   ]],
@@ -322,6 +340,8 @@ for (const directory of [
   "crates/diagnostic-execution/src/",
   "crates/uds-execution/src/",
   "crates/obd-j1979/src/",
+  "crates/ds2/src/",
+  "crates/kwp2000/src/",
 ]) {
   const absolute = fileURLToPath(new URL(directory, root));
   for (const file of await rustFiles(absolute)) {
@@ -383,6 +403,37 @@ for (const forbidden of [
 ]) {
   if (forbidden.test(udsSource)) failures.push("UDS exposes an out-of-scope active/programming service");
 }
+
+// ADR-0029 decision 7: the K-line protocol crates speak their read-only
+// services and nothing that writes. DS2 has no clear-fault (0x05) and no
+// public frame encoder; KWP2000 has no session control beyond the link
+// handshake, no tester-present, no clear (0x14), no security access, no
+// routine, no write, no download or upload, and no public encoder either.
+const ds2Source = await readFile(new URL("crates/ds2/src/lib.rs", root), "utf8");
+for (const forbidden of [
+  /^\s*pub\s+fn\s+(clear|erase|reset|write|program|code|secur|session|frame|encode|raw|send|transmit)\w*\(/im,
+  /COMMAND_CLEAR/,
+  /CLEAR_FAULT/i,
+]) {
+  if (forbidden.test(ds2Source)) failures.push("DS2 exposes a service or an encoder outside ADR-0029");
+}
+const kwpSource = await readFile(new URL("crates/kwp2000/src/lib.rs", root), "utf8");
+for (const forbidden of [
+  /^\s*pub\s+fn\s+(clear|erase|reset|write|program|secur|routine|session|tester_present|stop_communication|input_output|download|upload|transfer|memory|frame|encode|raw|send|transmit)\w*\(/im,
+  /SID_(CLEAR|SECURITY|WRITE|ROUTINE|ECU_RESET|START_DIAGNOSTIC_SESSION|TESTER_PRESENT|INPUT_OUTPUT|REQUEST_DOWNLOAD|REQUEST_UPLOAD|TRANSFER_DATA|STOP_COMMUNICATION|ACCESS_TIMING)/,
+  /\bClearDiagnosticInformation\b/,
+  /\bSecurityAccess\b/,
+  /\bWriteDataBy/,
+  /\bStartDiagnosticSession\b/,
+]) {
+  if (forbidden.test(kwpSource)) failures.push("KWP2000 exposes a service or an encoder outside ADR-0029");
+}
+// The K-line request types must have exactly the constructors ADR-0029
+// names: two for DS2, three for KWP2000.
+const ds2Constructors = (ds2Source.match(/^\s{4}pub fn \w+\(node_address: u8/gm) ?? []).length;
+if (ds2Constructors !== 2) failures.push(`DS2 has ${ds2Constructors} request constructors, ADR-0029 names 2`);
+const kwpConstructors = (kwpSource.match(/^\s{4}pub fn \w+\(target: u8/gm) ?? []).length;
+if (kwpConstructors !== 3) failures.push(`KWP2000 has ${kwpConstructors} request constructors, ADR-0029 names 3`);
 
 for (const path of [
   "crates/transport-api/src/can.rs",

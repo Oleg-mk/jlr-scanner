@@ -305,7 +305,14 @@ impl<T: ByteTransport> MongooseJlrDevice<T> {
             .bitrate
             .expect("ready CAN route must have a confirmed bitrate");
         self.ensure_firmware()?;
-        let route_word = passive::resource_route(route_id);
+        // A route without a known resource word cannot be opened; the K-line
+        // routes are refused above already, and this keeps it so should a
+        // route ever be marked ready before its word is known (ADR-0029).
+        let route_word =
+            passive::resource_route(route_id).ok_or(ProtocolError::PassiveRouteUnavailable {
+                route: route.id.as_str(),
+                reason: passive::K_LINE_NOT_OPENED,
+            })?;
 
         let open_sequence = self.sequences.allocate();
         self.transport.set_read_timeout(COMMAND_READ_TIMEOUT)?;

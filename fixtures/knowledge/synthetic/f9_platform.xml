@@ -20,6 +20,8 @@
 			<pin><name>CAN_P_HS</name><number>6</number></pin>
 			<pin><name>CAN_N_HS</name><number>14</number></pin>
 			<pin><name>SIGNAL_GROUND</name><number>5</number></pin>
+			<pin><name>K_LINE_PIN_7</name><number>7</number></pin>
+			<pin><name>K_LINE_PIN_8</name><number>8</number></pin>
 		</connector>
 		<network net_id="CAN_HS" main_net="CAN_HS">
 			<protocol type="diagnostic">ISO14229</protocol>
@@ -50,6 +52,34 @@
 					</normal_fixed>
 				</can_iso15765>
 			</addressing>
+		</network>
+		<!--
+		  Two K-line buses (ADR-0029): one states its pin, its framing and its
+		  wake-up and speaks a protocol this product implements; the other
+		  states no pin and speaks one it only names.
+		-->
+		<network net_id="DS2_PIN7" main_net="ISO">
+			<protocol type="diagnostic">DS2</protocol>
+			<protocol type="network">ISO9141</protocol>
+			<iso>
+				<rate>9600</rate>
+				<settings data_bits="8" parity="even" start_bits="1" stop_bits="1"/>
+				<wakeup type="bmw_ds2"/>
+				<connection>
+					<pin type="K_LINE">K_LINE_PIN_7</pin>
+				</connection>
+			</iso>
+			<addressing><iso_9141><normal/></iso_9141></addressing>
+		</network>
+		<network net_id="KW2000STAR" main_net="ISO">
+			<protocol type="diagnostic">KW2000STAR</protocol>
+			<protocol type="network">ISO9141</protocol>
+			<iso>
+				<rate>9600</rate>
+				<settings data_bits="8" parity="none" start_bits="1" stop_bits="1"/>
+				<wakeup type="bmw_kw2000_star"/>
+			</iso>
+			<addressing><iso_9141><normal/></iso_9141></addressing>
 		</network>
 	</network_architecture>
 	<car_configuration>
@@ -101,6 +131,20 @@
 			<address type="can_tx" session="prog">0x333</address>
 			<address type="can_rx" session="prog">0x33B</address>
 			<network>CAN_HS</network>
+		</module>
+		<!-- K-line modules (ADR-0029): a one-byte node address, no CAN identifier. -->
+		<module>
+			<module_code_name acronym="DS2MOD" ISOName="DS2MOD">DS2MOD_SYSTEM_A</module_code_name>
+			<address type="phys" session="diag">0x72</address>
+			<address type="phys" session="prog">0x72</address>
+			<network>DS2_PIN7</network>
+			<fitment>optional</fitment>
+		</module>
+		<module>
+			<module_code_name acronym="STARMOD" ISOName="STARMOD">STARMOD_SYSTEM_A</module_code_name>
+			<address type="phys" session="diag">0x12</address>
+			<network>KW2000STAR</network>
+			<fitment>mandatory</fitment>
 		</module>
 	</module_fitment>
 	<!--

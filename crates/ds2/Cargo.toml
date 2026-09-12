@@ -1,0 +1,9 @@
+[package]
+name = "ds2"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+description = "BMW DS2 over K-line: framing and the read-only requests this product makes (ADR-0029)"
+
+[dependencies]

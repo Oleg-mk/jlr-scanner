@@ -52,7 +52,7 @@ export interface VehicleInterfaceCapability {
   nominalBitrate: number | null;
   hardwareConfirmed: boolean;
   fixtureTested: boolean;
-  implementation: "AVAILABLE" | "UNSUPPORTED_BY_ADAPTER";
+  implementation: "AVAILABLE" | "UNSUPPORTED_BY_ADAPTER" | "HYPOTHESIS";
   vehicleValidation: "NOT_YET_VALIDATED" | "NOT_APPLICABLE";
 }
 

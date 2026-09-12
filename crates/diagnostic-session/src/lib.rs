@@ -41,7 +41,9 @@ use knowledge::{
 };
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
-use uds_execution::{READ_DATA_BY_IDENTIFIER_CAPABILITY, READ_DTC_INFORMATION_CAPABILITY};
+use uds_execution::{
+    READ_DATA_BY_IDENTIFIER_CAPABILITY, READ_DTC_INFORMATION_CAPABILITY, UDS_PROTOCOL_FAMILY,
+};
 use vin::{VinRule, VinTables};
 
 /// Custom applicability dimension carrying SDD's model-year breakpoint marker.
@@ -50,11 +52,12 @@ use vin::{VinRule, VinTables};
 pub const SDD_YEAR_BREAKPOINT_DIMENSION: &str = "sdd_year_breakpoint";
 
 /// Manifests that ship with the application: the documented adapter route
-/// bindings (ADR-0013), the X250 CCP connector route, and the relayed-route
-/// hypotheses for the 2014-and-later high-speed buses (ADR-0015). They
-/// describe the adapter, public wiring documentation and this project's own
+/// bindings (ADR-0013), the X250 CCP connector route, the relayed-route
+/// hypotheses for the 2014-and-later high-speed buses (ADR-0015), and the
+/// K-line route hypotheses for the legacy buses (ADR-0029). They describe
+/// the adapter, public wiring documentation and this project's own
 /// reasoning, never SDD content.
-const BUILT_IN_MANIFESTS: [(&str, &str); 5] = [
+const BUILT_IN_MANIFESTS: [(&str, &str); 6] = [
     (
         "built-in:mongoose_jlr_route_bindings.json",
         include_str!("../../../fixtures/knowledge/documented/mongoose_jlr_route_bindings.json"),
@@ -73,6 +76,12 @@ const BUILT_IN_MANIFESTS: [(&str, &str); 5] = [
         "built-in:mongoose_jlr_relayed_route_hypotheses.json",
         include_str!(
             "../../../fixtures/knowledge/research/mongoose_jlr_relayed_route_hypotheses.json"
+        ),
+    ),
+    (
+        "built-in:mongoose_jlr_kline_route_hypotheses.json",
+        include_str!(
+            "../../../fixtures/knowledge/research/mongoose_jlr_kline_route_hypotheses.json"
         ),
     ),
     (
@@ -1116,24 +1125,45 @@ pub fn survey_vehicle(
         }
 
         let family = presence.ecu_family.as_str();
-        entry.identifier_read = route_summary(
-            &mut entry,
-            DiagnosticEnvironmentResolver::resolve_ecu_family(
-                store,
-                &context,
-                family,
-                READ_DATA_BY_IDENTIFIER_CAPABILITY,
-            ),
-        );
-        entry.dtc_read = route_summary(
-            &mut entry,
-            DiagnosticEnvironmentResolver::resolve_ecu_family(
-                store,
-                &context,
-                family,
-                READ_DTC_INFORMATION_CAPABILITY,
-            ),
-        );
+        let resolve = |capability: &str| {
+            DiagnosticEnvironmentResolver::resolve_ecu_family(store, &context, family, capability)
+        };
+        entry.identifier_read =
+            route_summary(&mut entry, resolve(READ_DATA_BY_IDENTIFIER_CAPABILITY));
+        // ADR-0029: a module on a K-line speaks DS2 or KWP2000, whose
+        // read-only services carry their own names. The first resolution
+        // has told us the protocol; a K-line module is resolved again
+        // against the services its protocol crate speaks, and the reason
+        // the line is not open yet is said beside the route.
+        match k_line_read_capabilities(entry.protocol.as_deref()) {
+            Some((identification, faults)) => {
+                entry.identifier_read = route_summary(&mut entry, resolve(identification));
+                entry.dtc_read = route_summary(&mut entry, resolve(faults));
+                entry
+                    .identifier_read
+                    .reasons
+                    .push(K_LINE_NOT_OPENED_REASON.to_string());
+                entry
+                    .dtc_read
+                    .reasons
+                    .push(K_LINE_NOT_OPENED_REASON.to_string());
+            }
+            None => {
+                entry.dtc_read =
+                    route_summary(&mut entry, resolve(READ_DTC_INFORMATION_CAPABILITY));
+                // A protocol the data names and this product does not speak
+                // — KWP2000*, ROSCO — is the reason, said in those words.
+                if let Some(protocol) = entry.protocol.clone() {
+                    if protocol != UDS_PROTOCOL_FAMILY {
+                        let reason = format!(
+                            "protocol {protocol}: named in the data and not spoken by this product"
+                        );
+                        entry.identifier_read.reasons.push(reason.clone());
+                        entry.dtc_read.reasons.push(reason);
+                    }
+                }
+            }
+        }
         entry.readable_identifiers =
             DiagnosticEnvironmentResolver::readable_identifiers(store, &context, family)
                 .into_iter()
@@ -1186,6 +1216,27 @@ fn not_applicable() -> RouteSummary {
     RouteSummary {
         status: RouteStatus::NotApplicable,
         reasons: Vec::new(),
+    }
+}
+
+/// ADR-0029: why a K-line module is not read by this build even where its
+/// route resolves.
+const K_LINE_NOT_OPENED_REASON: &str = "the adapter has not opened a K-line yet: the read path is the second slice of ADR-0029, and until it lands the module is shown with what the data says about it";
+
+/// The read-only services a K-line protocol crate speaks, in the names the
+/// knowledge base records — the identification first, the faults second —
+/// or none for a protocol this product does not speak.
+fn k_line_read_capabilities(protocol: Option<&str>) -> Option<(&'static str, &'static str)> {
+    match protocol {
+        Some(ds2::PROTOCOL_FAMILY) => Some((
+            ds2::ECU_IDENTIFICATION_CAPABILITY,
+            ds2::FAULT_MEMORY_CAPABILITY,
+        )),
+        Some(kwp2000::PROTOCOL_FAMILY) => Some((
+            kwp2000::READ_ECU_IDENTIFICATION_CAPABILITY,
+            kwp2000::READ_DTC_BY_STATUS_CAPABILITY,
+        )),
+        _ => None,
     }
 }
 

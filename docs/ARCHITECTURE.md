@@ -54,6 +54,15 @@ This must never become `knowledge -> protocol hacks`.
 - diagnostic-simulator: deterministic offline UDS behavior plus a protocol-neutral fixture-payload seam rendered through the existing ISO-TP implementation; no vehicle knowledge or live transport.
 - isotp: vehicle-independent ISO 15765-2 framing, segmentation, flow control, timing, and reassembly.
 - uds: vehicle-independent request/response correlation and the F4 safe typed service subset.
+- ds2: BMW DS2 over K-line (ADR-0029) — the frame (node address, length,
+  data, XOR) and the two read-only requests, identification and fault
+  memory; the encoder is private, the clear-fault command absent; no
+  dependency at all.
+- kwp2000: ISO 14230 over K-line (ADR-0029) — the data link with both length
+  forms and the three requests, `StartCommunication` as the link handshake,
+  `ReadEcuIdentification`, `ReadDiagnosticTroubleCodesByStatus`; no session
+  control, tester-present, clear, security, routine or write; no dependency
+  at all.
 - knowledge: source registry, ingestion, JLR semantics, applicability,
   evidence, validation, conflict reporting, and query; no protocol, transport,
   OS, database, or UI access.
@@ -76,7 +85,9 @@ This must never become `knowledge -> protocol hacks`.
   snapshots; since F11 it also indexes the vehicle catalogue and fault-code
   wording at load and decodes identifier payloads with the catalogue's own
   encodings (`decode`); depends on app-contracts, diagnostic-environment,
-  knowledge, uds-execution and serde_json only; opens no transport.
+  knowledge, uds-execution, serde_json and — for the names of the K-line
+  read-only services the survey resolves against (ADR-0029) — ds2 and
+  kwp2000 only; opens no transport.
 - report-intake: the F13 intake (ADR-0016) — reads a tester's session report
   and the library, writes one `Captured` manifest; depends on app-contracts,
   diagnostic-session, knowledge and serde only; never on a transport or a
@@ -188,14 +199,22 @@ The architecture checker enforces:
 - no vehicle-program hardcoding in either production crate;
 - no raw/live/non-read-only public execution methods;
 - no F5/F6 query symbols in diagnostics-core;
-- no new frontend access to execution or protocol crates.
+- no new frontend access to execution or protocol crates;
+- the K-line protocol crates `ds2` and `kwp2000` depend on nothing, expose
+  exactly the request constructors `ADR-0029` names — two and three — and
+  no public function that clears, resets, writes, programs, opens a session,
+  or frames an arbitrary command; wherever a rule forbids `uds` it forbids
+  them too.
 
 ## SDD-era protocol scope
 
 ProwlOne targets Jaguar, Land Rover, and Range Rover across the JLR SDD era.
 That era is not UDS-only. F4 establishes the ISO-TP/UDS foundation without
 assuming that future KWP, ISO 9141, or other legacy protocol support will pass
-through UDS.
+through UDS — and `ADR-0029` bears that out: DS2 and KWP2000 arrive as
+protocol crates of their own beside `uds`, the resolver's plan carries a CAN
+identifier format only under a CAN addressing, and the K-line execution path
+of the second slice will sit beside `uds-execution`, not inside it.
 
 Architectural changes require an ADR before code changes.
 

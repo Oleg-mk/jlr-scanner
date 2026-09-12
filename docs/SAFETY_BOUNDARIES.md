@@ -56,3 +56,11 @@ ECU firmware/VBF programming, bootloader or recovery flashing, immobilizer/key p
   or bitrates.
 - Automatic adapter detection, USB connection, and board-info never authorize
   or trigger vehicle CAN transmission.
+- The K-line protocols (`ADR-0029`) carry the same rule as UDS: the `ds2`
+  crate has no clear-fault request (`0x05`) and the `kwp2000` crate no
+  `ClearDiagnosticInformation` (`0x14`), no `StartDiagnosticSession`, no
+  `SecurityAccess`, no routine, no write, no download or upload; the frame
+  encoders are private and the architecture check names the forbidden
+  constructors. `StartCommunication 0x81` is the link handshake ISO 14230
+  requires, not a diagnostic session. Until the second slice's probe has run
+  on the adapter, the K-line routes refuse every open.

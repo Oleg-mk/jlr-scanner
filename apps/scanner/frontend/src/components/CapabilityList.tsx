@@ -33,6 +33,7 @@ export function CapabilityList({
         {capabilities.map((capability) => {
           const unsupported =
             capability.implementation === "UNSUPPORTED_BY_ADAPTER";
+          const hypothesis = capability.implementation === "HYPOTHESIS";
           return (
             <div className="capability-row" role="row" key={capability.id}>
               <strong role="cell">{capability.name}</strong>
@@ -41,10 +42,21 @@ export function CapabilityList({
                 {bitrateLabel(capability.nominalBitrate)}
               </span>
               <div role="cell" data-label="Implementation" className="capability-status">
-                <StatusBadge tone={unsupported ? "negative" : "positive"}>
-                  {unsupported ? "Unsupported by adapter" : "Implemented"}
+                <StatusBadge
+                  tone={unsupported ? "negative" : hypothesis ? "pending" : "positive"}
+                >
+                  {unsupported
+                    ? "Unsupported by adapter"
+                    : hypothesis
+                      ? "Route hypothesis"
+                      : "Implemented"}
                 </StatusBadge>
-                {!unsupported ? (
+                {hypothesis ? (
+                  <span className="capability-evidence">
+                    Not opened by this build; the pin is the documents&apos;, the
+                    route unverified
+                  </span>
+                ) : !unsupported ? (
                   <span className="capability-evidence">
                     {capability.hardwareConfirmed ? "Hardware confirmed" : null}
                     {capability.hardwareConfirmed && capability.fixtureTested ? ", " : null}

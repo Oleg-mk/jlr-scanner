@@ -9,9 +9,11 @@ members = [
   "crates/diagnostic-environment",
   "crates/diagnostic-session",
   "crates/diagnostic-simulator",
+  "crates/ds2",
   "crates/isotp",
   "crates/jlr-profiles",
   "crates/knowledge",
+  "crates/kwp2000",
   "crates/mongoose-jlr",
   "crates/obd-j1979",
   "crates/report-intake",
@@ -40,12 +42,14 @@ diagnostic-execution = { path = "crates/diagnostic-execution" }
 diagnostic-simulator = { path = "crates/diagnostic-simulator" }
 diagnostic-environment = { path = "crates/diagnostic-environment" }
 diagnostic-session = { path = "crates/diagnostic-session" }
+ds2 = { path = "crates/ds2" }
 ed25519-dalek = "2"
 flate2 = "1"
 getrandom = "0.2"
 isotp = { path = "crates/isotp" }
 jlr-profiles = { path = "crates/jlr-profiles" }
 knowledge = { path = "crates/knowledge" }
+kwp2000 = { path = "crates/kwp2000" }
 mongoose-jlr = { path = "crates/mongoose-jlr" }
 obd-j1979 = { path = "crates/obd-j1979" }
 report-intake = { path = "crates/report-intake" }

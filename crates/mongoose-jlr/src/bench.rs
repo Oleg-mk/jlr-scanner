@@ -365,8 +365,10 @@ fn read_u32(bytes: &[u8], offset: usize) -> Option<u32> {
     ]))
 }
 
-/// The route word the bench answers a vehicle route on.
-pub fn route_word(route: VehicleRouteId) -> u16 {
+/// The route word the bench answers a vehicle route on; none for a route
+/// the adapter has no word for yet (ADR-0029), which the bench then does not
+/// answer either.
+pub fn route_word(route: VehicleRouteId) -> Option<u16> {
     passive::resource_route(route)
 }
 

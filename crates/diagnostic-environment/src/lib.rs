@@ -174,7 +174,10 @@ pub struct DiagnosticEnvironmentPlan {
     pub bitrate_bps: PlanField<u32>,
     pub protocol_family: PlanField<String>,
     pub addressing_mode: PlanField<String>,
-    pub can_id_format: PlanField<CanIdFormat>,
+    /// Absent under a serial node addressing (ADR-0029): a K-line module has
+    /// a node address and no CAN identifier, so none is required or
+    /// invented. Required under every CAN addressing mode.
+    pub can_id_format: Option<PlanField<CanIdFormat>>,
     pub physical_request_id: PlanField<u32>,
     pub physical_response_id: PlanField<u32>,
     pub functional_request_id: Option<PlanField<u32>>,
@@ -482,6 +485,35 @@ impl DiagnosticEnvironmentResolver {
             })
             .collect();
 
+        let addressing_mode = select_field(
+            EnvironmentField::AddressingMode,
+            addressing_modes,
+            &mut unresolved,
+            &mut conflicts,
+        );
+        // ADR-0029: on a serial line the node address is the whole of the
+        // addressing, so a CAN identifier format is required only where the
+        // addressing is CAN's. Nothing is invented for the K-line; a CAN
+        // module without a format stays unresolved as before.
+        let serial_line = addressing_mode
+            .as_ref()
+            .is_some_and(|mode| mode.value == knowledge::ISO9141_NODE_ADDRESSING_MODE);
+        let can_id_format = if serial_line {
+            select_optional_field(
+                EnvironmentField::CanIdFormat,
+                id_formats,
+                &mut unresolved,
+                &mut conflicts,
+            )
+        } else {
+            select_field(
+                EnvironmentField::CanIdFormat,
+                id_formats,
+                &mut unresolved,
+                &mut conflicts,
+            )
+        };
+
         let partial = PartialDiagnosticEnvironment {
             vehicle_applicability: select_field(
                 EnvironmentField::VehicleApplicability,
@@ -542,18 +574,8 @@ impl DiagnosticEnvironmentResolver {
                 &mut unresolved,
                 &mut conflicts,
             ),
-            addressing_mode: select_field(
-                EnvironmentField::AddressingMode,
-                addressing_modes,
-                &mut unresolved,
-                &mut conflicts,
-            ),
-            can_id_format: select_field(
-                EnvironmentField::CanIdFormat,
-                id_formats,
-                &mut unresolved,
-                &mut conflicts,
-            ),
+            addressing_mode,
+            can_id_format,
             physical_request_id: select_field(
                 EnvironmentField::PhysicalRequestId,
                 request_ids,
@@ -626,11 +648,13 @@ impl PartialDiagnosticEnvironment {
             self.bitrate_bps.as_ref().unwrap().validation_state,
             self.protocol_family.as_ref().unwrap().validation_state,
             self.addressing_mode.as_ref().unwrap().validation_state,
-            self.can_id_format.as_ref().unwrap().validation_state,
             self.physical_request_id.as_ref().unwrap().validation_state,
             self.physical_response_id.as_ref().unwrap().validation_state,
             self.read_only_capability.as_ref().unwrap().validation_state,
         ];
+        if let Some(can_id_format) = &self.can_id_format {
+            fields.push(can_id_format.validation_state);
+        }
         if let Some(functional) = &self.functional_request_id {
             fields.push(functional.validation_state);
         }
@@ -652,7 +676,7 @@ impl PartialDiagnosticEnvironment {
             bitrate_bps: self.bitrate_bps.unwrap(),
             protocol_family: self.protocol_family.unwrap(),
             addressing_mode: self.addressing_mode.unwrap(),
-            can_id_format: self.can_id_format.unwrap(),
+            can_id_format: self.can_id_format,
             physical_request_id: self.physical_request_id.unwrap(),
             physical_response_id: self.physical_response_id.unwrap(),
             functional_request_id: self.functional_request_id,

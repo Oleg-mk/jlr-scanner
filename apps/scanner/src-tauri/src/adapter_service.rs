@@ -653,24 +653,36 @@ fn summary_from_device(device: SerialDevice) -> AdapterSummary {
 fn interface_capabilities() -> Vec<VehicleInterfaceCapability> {
     let mut capabilities = list_vehicle_routes()
         .iter()
-        .map(|route| VehicleInterfaceCapability {
-            id: route.id.as_str().to_owned(),
-            name: match route.id {
-                VehicleRouteId::HsCan => "HS-CAN",
-                VehicleRouteId::MsCan => "MS-CAN",
+        .map(|route| {
+            // ADR-0029: the K-line routes exist by pin and by name; the
+            // adapter has never opened one, so they are a hypothesis, not an
+            // implemented interface, and nothing about them is confirmed.
+            let k_line = matches!(route.id, VehicleRouteId::KLine7 | VehicleRouteId::KLine8);
+            VehicleInterfaceCapability {
+                id: route.id.as_str().to_owned(),
+                name: match route.id {
+                    VehicleRouteId::HsCan => "HS-CAN",
+                    VehicleRouteId::MsCan => "MS-CAN",
+                    VehicleRouteId::KLine7 => "K-line (pin 7)",
+                    VehicleRouteId::KLine8 => "K-line (pin 8)",
+                }
+                .to_owned(),
+                pins: route
+                    .obd_pins
+                    .iter()
+                    .map(u8::to_string)
+                    .collect::<Vec<_>>()
+                    .join("/"),
+                nominal_bitrate: route.bitrate,
+                hardware_confirmed: !k_line,
+                fixture_tested: !k_line,
+                implementation: if k_line {
+                    InterfaceImplementationState::Hypothesis
+                } else {
+                    InterfaceImplementationState::Available
+                },
+                vehicle_validation: VehicleValidationState::NotYetValidated,
             }
-            .to_owned(),
-            pins: route
-                .obd_pins
-                .iter()
-                .map(u8::to_string)
-                .collect::<Vec<_>>()
-                .join("/"),
-            nominal_bitrate: route.bitrate,
-            hardware_confirmed: true,
-            fixture_tested: true,
-            implementation: InterfaceImplementationState::Available,
-            vehicle_validation: VehicleValidationState::NotYetValidated,
         })
         .collect::<Vec<_>>();
 
@@ -925,13 +937,36 @@ mod tests {
     #[test]
     fn capability_statuses_do_not_claim_vehicle_validation() {
         let capabilities = interface_capabilities();
-        assert_eq!(capabilities.len(), 3);
+        // HS-CAN, MS-CAN, the two K-line routes (ADR-0029), CCP.
+        assert_eq!(capabilities.len(), 5);
         assert!(capabilities[..2].iter().all(|capability| {
             capability.implementation == InterfaceImplementationState::Available
+                && capability.hardware_confirmed
+                && capability.fixture_tested
                 && capability.vehicle_validation == VehicleValidationState::NotYetValidated
         }));
+        // A K-line route is a hypothesis with nothing confirmed and no bit
+        // rate of its own; the bus states the rate.
+        for (capability, name, pins) in [
+            (&capabilities[2], "K-line (pin 7)", "7"),
+            (&capabilities[3], "K-line (pin 8)", "8"),
+        ] {
+            assert_eq!(capability.name, name);
+            assert_eq!(capability.pins, pins);
+            assert_eq!(capability.nominal_bitrate, None);
+            assert_eq!(
+                capability.implementation,
+                InterfaceImplementationState::Hypothesis
+            );
+            assert!(!capability.hardware_confirmed);
+            assert!(!capability.fixture_tested);
+            assert_eq!(
+                capability.vehicle_validation,
+                VehicleValidationState::NotYetValidated
+            );
+        }
         assert_eq!(
-            capabilities[2].implementation,
+            capabilities[4].implementation,
             InterfaceImplementationState::UnsupportedByAdapter
         );
     }

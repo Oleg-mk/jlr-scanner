@@ -674,9 +674,11 @@ version = "0.9.8"
 dependencies = [
  "app-contracts",
  "diagnostic-environment",
+ "ds2",
  "ed25519-dalek",
  "getrandom 0.2.17",
  "knowledge",
+ "kwp2000",
  "sdd-ingest",
  "serde_json",
  "sha2",
@@ -803,6 +805,10 @@ checksum = "d8b14ccef22fc6f5a8f4d7d768562a182c04ce9a3b3157b91390b52ddfdf1a76"
 dependencies = [
  "serde",
 ]
+
+[[package]]
+name = "ds2"
+version = "0.9.8"
 
 [[package]]
 name = "dtoa"
@@ -1870,6 +1876,10 @@ dependencies = [
  "serde_json",
  "sha2",
 ]
+
+[[package]]
+name = "kwp2000"
+version = "0.9.8"
 
 [[package]]
 name = "libappindicator"

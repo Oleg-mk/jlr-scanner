@@ -267,6 +267,23 @@ guessing.
 
 Nothing is written — the configuration is read, never set.
 
+## The K-line modules of the older cars
+
+A Range Rover L322 of 2006–2007 keeps its body electronics — light control,
+seat and door modules, the climate control and others — on a single serial
+wire, the *K-line*, not on CAN, and speaks BMW's DS2 protocol on it; a base
+Freelander L316 has its ABS and its VIM on the same kind of wire. The survey
+lists these modules like every other, with their bus, the connector pin the
+data states (7 or 8), the baud rate, the protocol and the module's one-byte
+address. Their row says **hypothesis**: the adapter's route to that pin has
+never been opened by this application, and this version does not read a
+K-line module yet — the row also says so in as many words. A protocol the
+data names and the application does not speak (KWP2000\*, ROSCO) is shown
+with that reason.
+
+Nothing to do for you here: no request travels on a K-line in this version.
+The interface table shows the two K-line routes as a *route hypothesis*.
+
 ## What the data says about a code
 
 Under every fault code there is a fold: **What the data says about this code**.

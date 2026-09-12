@@ -24,6 +24,12 @@ pub enum EntityKind {
     ConfigurationParameter,
 }
 
+/// The addressing mode of a module on a single serial line — a K-line — where
+/// the one-byte node address is the whole of the addressing and no CAN
+/// identifier format exists (ADR-0029). The ingest records it, the resolver
+/// asks for no CAN identifier format under it, and a CAN path refuses it.
+pub const ISO9141_NODE_ADDRESSING_MODE: &str = "iso9141_node";
+
 #[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
 #[serde(rename_all = "snake_case")]
 pub enum CanIdFormat {

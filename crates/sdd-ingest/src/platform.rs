@@ -117,7 +117,56 @@ struct Network {
     /// The physical-addressing identifier prefix a `normal_fixed` bus
     /// declares (`0x18DA`), verbatim as a number.
     physical_prefix: Option<u32>,
+    /// A serial K-line bus (`<iso>`), as the platform states it (ADR-0029).
+    iso: Option<IsoBus>,
 }
+
+/// The physical layer of a K-line bus: the baud rate, the byte framing, the
+/// wake-up SDD names, and the J1962 pin the document connects it to — when
+/// it states one; the L322's `DS2` bus states none.
+#[derive(Clone, Debug, PartialEq, Eq)]
+struct IsoBus {
+    baud: u32,
+    data_bits: Option<String>,
+    parity: Option<String>,
+    stop_bits: Option<String>,
+    wakeup: Option<String>,
+    pin: Option<u8>,
+}
+
+impl IsoBus {
+    /// `data_bits=8;parity=even;stop_bits=1`, as SDD states it.
+    fn settings(&self) -> String {
+        let mut parts = Vec::new();
+        if let Some(bits) = &self.data_bits {
+            parts.push(format!("data_bits={bits}"));
+        }
+        if let Some(parity) = &self.parity {
+            parts.push(format!("parity={parity}"));
+        }
+        if let Some(stop) = &self.stop_bits {
+            parts.push(format!("stop_bits={stop}"));
+        }
+        parts.join(";")
+    }
+}
+
+/// Addressing mode of a module on a K-line bus: the one-byte node address
+/// SDD states, in both identifier fields, never a CAN identifier (ADR-0029).
+/// The word is the knowledge model's, because the resolver reads it too.
+pub use knowledge::ISO9141_NODE_ADDRESSING_MODE;
+/// Claim keys on a K-line bus's own name: its byte framing and its wake-up.
+pub const ISO_SETTINGS_CLAIM: &str = "sdd_iso_settings";
+pub const ISO_WAKEUP_CLAIM: &str = "sdd_iso_wakeup";
+/// The K-line protocols this product speaks (ADR-0029), by SDD's name.
+pub const DS2_DIAGNOSTIC_PROTOCOL: &str = "DS2";
+pub const KWP2000_DIAGNOSTIC_PROTOCOL: &str = "KW2000";
+pub const DS2_ECU_IDENTIFICATION_CAPABILITY: &str = "ds2.ecu_identification.read_only";
+pub const DS2_FAULT_MEMORY_CAPABILITY: &str = "ds2.fault_memory.read_only";
+pub const KWP2000_READ_ECU_IDENTIFICATION_CAPABILITY: &str =
+    "kwp2000.service1a.read_ecu_identification.read_only";
+pub const KWP2000_READ_DTC_BY_STATUS_CAPABILITY: &str =
+    "kwp2000.service18.read_dtc_by_status.read_only";
 
 /// Diagnostic protocol name SDD declares for buses spoken to with ISO 14229.
 pub const UDS_DIAGNOSTIC_PROTOCOL: &str = "ISO14229";
@@ -341,6 +390,75 @@ impl PlatformAdapter {
                 evidence,
                 records,
             )?;
+        }
+
+        // A K-line bus (ADR-0029) states what a CAN bus never does: the pin
+        // it is connected to, its baud rate, its byte framing and its wake-up.
+        // These are recorded on the bus's own name, where the resolver looks
+        // for a physical route, so the document's statement reaches the plan;
+        // the adapter route that carries the bus stays a hypothesis elsewhere.
+        if let Some(iso) = &network.iso {
+            let bus_locator = format!("network_architecture/network[@net_id='{}']/iso", network.id);
+            let bus = KnowledgeEntity {
+                kind: EntityKind::NetworkRoute,
+                id: network.id.clone(),
+            };
+            self.push(
+                format!("{}.iso.{segment}.route", self.source.id.0),
+                bus_locator.clone(),
+                format!(
+                    "{program} {} K-line at {} baud{}",
+                    network.id,
+                    iso.baud,
+                    iso.pin
+                        .map(|pin| format!(" on J1962 pin {pin}"))
+                        .unwrap_or_else(|| ", pin not stated".to_string())
+                ),
+                bus.clone(),
+                ClaimKey::NetworkRoute,
+                KnowledgeValue::NetworkRoute {
+                    logical_name: network.id.clone(),
+                    connector: iso.pin.map(|_| "J1962".to_string()),
+                    pins: iso.pin.into_iter().collect(),
+                    bitrate_bps: Some(iso.baud),
+                },
+                base.clone(),
+                evidence,
+                records,
+            )?;
+            let settings = iso.settings();
+            if !settings.is_empty() {
+                self.push(
+                    format!("{}.iso.{segment}.settings", self.source.id.0),
+                    format!("{bus_locator}/settings"),
+                    format!("{program} {} framing {settings}", network.id),
+                    bus.clone(),
+                    ClaimKey::Custom {
+                        name: ISO_SETTINGS_CLAIM.into(),
+                    },
+                    KnowledgeValue::Text { value: settings },
+                    base.clone(),
+                    evidence,
+                    records,
+                )?;
+            }
+            if let Some(wakeup) = &iso.wakeup {
+                self.push(
+                    format!("{}.iso.{segment}.wakeup", self.source.id.0),
+                    format!("{bus_locator}/wakeup"),
+                    format!("{program} {} wake-up {wakeup}", network.id),
+                    bus,
+                    ClaimKey::Custom {
+                        name: ISO_WAKEUP_CLAIM.into(),
+                    },
+                    KnowledgeValue::Text {
+                        value: wakeup.clone(),
+                    },
+                    base.clone(),
+                    evidence,
+                    records,
+                )?;
+            }
         }
         Ok(())
     }
@@ -570,6 +688,36 @@ impl PlatformAdapter {
                 records,
             )?;
             }
+            // On a K-line bus the one-byte node address is the address the
+            // protocol speaks to (ADR-0029): recorded as the module's
+            // addressing, in both fields, under a mode no CAN path accepts.
+            if let (Some(physical), Some(network)) = (physical.as_deref(), network) {
+                if network.iso.is_some() && request.is_none() && response.is_none() {
+                    if let Some(node) = parse_hex(physical.trim()).filter(|node| *node <= 0xFF) {
+                        self.push(
+                            format!("{}.module.{segment}.node_address{suffix}", self.source.id.0),
+                            format!(
+                                "module_fitment/module[module_code_name/@acronym='{acronym}']/address[@type='phys'][@session='diag']; network_architecture/network[@net_id='{network_id}']/iso"
+                            ),
+                            format!(
+                                "{program} {acronym} K-line node address {physical} on {network_id} fitment={fitment_note} qualifier={qualifier_note}"
+                            ),
+                            entity.clone(),
+                            ClaimKey::DiagnosticAddressing,
+                            KnowledgeValue::DiagnosticAddressing {
+                                request_id: Some(node),
+                                response_id: Some(node),
+                                functional_request_id: None,
+                                can_id_format: None,
+                                addressing_mode: Some(ISO9141_NODE_ADDRESSING_MODE.to_string()),
+                            },
+                            base.clone(),
+                            evidence,
+                            records,
+                        )?;
+                    }
+                }
+            }
             if let Some(physical) = physical.as_deref() {
                 self.push(
                     format!("{}.module.{segment}.physical_address{suffix}", self.source.id.0),
@@ -788,16 +936,42 @@ impl PlatformAdapter {
             records,
         )?;
 
-        if protocol != UDS_DIAGNOSTIC_PROTOCOL {
+        // Only a protocol this product speaks gets read-only capabilities:
+        // ISO 14229 over CAN, and over K-line DS2 and KWP2000 (ADR-0029).
+        // KWP2000* and ROSCO are named on their modules and get none, so the
+        // survey says the protocol is not spoken rather than trying another.
+        let read_services: &[(&str, &str)] = match protocol.as_str() {
+            UDS_DIAGNOSTIC_PROTOCOL => &[
+                (
+                    "read_data_by_identifier",
+                    UDS_READ_DATA_BY_IDENTIFIER_CAPABILITY,
+                ),
+                ("read_dtc_information", UDS_READ_DTC_INFORMATION_CAPABILITY),
+            ],
+            DS2_DIAGNOSTIC_PROTOCOL => &[
+                ("ds2_identification", DS2_ECU_IDENTIFICATION_CAPABILITY),
+                ("ds2_fault_memory", DS2_FAULT_MEMORY_CAPABILITY),
+            ],
+            KWP2000_DIAGNOSTIC_PROTOCOL => &[
+                (
+                    "kwp_read_ecu_identification",
+                    KWP2000_READ_ECU_IDENTIFICATION_CAPABILITY,
+                ),
+                (
+                    "kwp_read_dtc_by_status",
+                    KWP2000_READ_DTC_BY_STATUS_CAPABILITY,
+                ),
+            ],
+            _ => return Ok(()),
+        };
+        // ADR-0029: DS2 and KWP2000 are spoken on a K-line only. The same
+        // names on a CAN bus — KWP2000 over ISO 15765, should a document
+        // ever declare it — are not what the protocol crates speak, so a
+        // module there earns none of their capabilities.
+        if protocol.as_str() != UDS_DIAGNOSTIC_PROTOCOL && network.iso.is_none() {
             return Ok(());
         }
-        for (suffix, capability) in [
-            (
-                "read_data_by_identifier",
-                UDS_READ_DATA_BY_IDENTIFIER_CAPABILITY,
-            ),
-            ("read_dtc_information", UDS_READ_DTC_INFORMATION_CAPABILITY),
-        ] {
+        for &(suffix, capability) in read_services {
             self.push(
                 format!(
                     "{}.module.{segment}.capability.{suffix}{variant}",
@@ -1008,17 +1182,75 @@ fn networks(root: roxmltree::Node<'_, '_>) -> Result<BTreeMap<String, Network>, 
     let Some(architecture) = child_element(root, "network_architecture") else {
         return Ok(networks);
     };
+    // The connector's pin names, so a K-line bus that states its connection
+    // by name can be placed on the pin the same document numbers.
+    let mut pin_numbers: BTreeMap<String, u8> = BTreeMap::new();
+    if let Some(connector) = child_element(architecture, "connector") {
+        for pin in connector
+            .children()
+            .filter(|node| node.is_element() && node.tag_name().name() == "pin")
+        {
+            if let (Some(name), Some(number)) = (child_text(pin, "name"), child_text(pin, "number"))
+            {
+                if let Ok(number) = number.trim().parse::<u8>() {
+                    pin_numbers.insert(name.trim().to_string(), number);
+                }
+            }
+        }
+    }
     for node in architecture
         .children()
         .filter(|node| node.is_element() && node.tag_name().name() == "network")
     {
         let id = require_attribute(node, "net_id")?.to_string();
         let can = child_element(node, "can");
-        let bitrate_bps = can
-            .and_then(|can| child_text(can, "rate"))
-            .and_then(|rate| rate.parse::<u32>().ok())
-            // SDD states the rate in kbit/s.
-            .and_then(|rate| rate.checked_mul(1000));
+        // A K-line bus states its rate in baud, its byte framing, its wake-up
+        // and, sometimes, the pin it is connected to (ADR-0029).
+        let iso = match child_element(node, "iso") {
+            Some(iso) => {
+                let Some(baud) =
+                    child_text(iso, "rate").and_then(|rate| rate.trim().parse::<u32>().ok())
+                else {
+                    return Err(KnowledgeError::Parse(format!(
+                        "network '{id}' is a K-line bus that states no rate"
+                    )));
+                };
+                let settings = child_element(iso, "settings");
+                let attribute = |name: &str| {
+                    settings
+                        .and_then(|settings| settings.attribute(name))
+                        .map(str::trim)
+                        .filter(|value| !value.is_empty())
+                        .map(str::to_string)
+                };
+                let pin = child_element(iso, "connection")
+                    .and_then(|connection| child_text(connection, "pin"))
+                    .map(str::trim)
+                    .and_then(|name| pin_numbers.get(name).copied());
+                Some(IsoBus {
+                    baud,
+                    data_bits: attribute("data_bits"),
+                    parity: attribute("parity"),
+                    stop_bits: attribute("stop_bits"),
+                    wakeup: child_element(iso, "wakeup")
+                        .and_then(|wakeup| wakeup.attribute("type"))
+                        .map(str::trim)
+                        .filter(|value| !value.is_empty())
+                        .map(str::to_string),
+                    pin,
+                })
+            }
+            None => None,
+        };
+        let bitrate_bps = match &iso {
+            // A K-line bus's rate is its baud rate, stated as such.
+            Some(iso) => Some(iso.baud),
+            None => can
+                .and_then(|can| child_text(can, "rate"))
+                .and_then(|rate| rate.parse::<u32>().ok())
+                // SDD states the CAN rate in kbit/s.
+                .and_then(|rate| rate.checked_mul(1000)),
+        };
         let can_id_format = match can.and_then(|can| child_text(can, "identifier")) {
             Some("11") => Some(CanIdFormat::Standard11Bit),
             Some("29") => Some(CanIdFormat::Extended29Bit),
@@ -1066,6 +1298,7 @@ fn networks(root: roxmltree::Node<'_, '_>) -> Result<BTreeMap<String, Network>, 
                 addressing_mode,
                 diagnostic_protocol,
                 physical_prefix,
+                iso,
             },
         );
     }

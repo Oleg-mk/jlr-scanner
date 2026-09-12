@@ -237,11 +237,11 @@ pub fn x250_2010_supercharged_ecm_environment() -> DiagnosticEnvironmentResoluti
             vec![addressing.clone()],
             ValidationState::SourceBacked,
         ),
-        can_id_format: field(
+        can_id_format: Some(field(
             CanIdFormat::Standard11Bit,
             vec![addressing.clone()],
             ValidationState::SourceBacked,
-        ),
+        )),
         physical_request_id: field(
             0x7e0,
             vec![addressing.clone()],

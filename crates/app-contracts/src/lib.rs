@@ -29,6 +29,9 @@ pub enum BoardCommunicationState {
 pub enum InterfaceImplementationState {
     Available,
     UnsupportedByAdapter,
+    /// The adapter provides the interface and this build has not opened it:
+    /// the route is a hypothesis until the adapter has answered (ADR-0029).
+    Hypothesis,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]

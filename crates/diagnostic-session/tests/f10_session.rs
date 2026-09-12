@@ -110,7 +110,7 @@ fn built_in_library_holds_the_documented_and_research_manifests() {
     let snapshot = library.snapshot();
     assert_eq!(snapshot.state, LibraryState::NotLoaded);
     assert_eq!(snapshot.directory, None);
-    assert_eq!(snapshot.sources, 5);
+    assert_eq!(snapshot.sources, 6);
     assert_eq!(snapshot.manifests_failed, 0);
     assert!(snapshot.message.contains("Built-in data only"));
 
@@ -125,10 +125,10 @@ fn exported_manifests_and_bundles_load_and_are_counted_honestly() {
     let library = library();
     let snapshot = library.snapshot();
     assert_eq!(snapshot.state, LibraryState::Loaded);
-    // Five built-in plus one manifest plus one bundle of three.
-    assert_eq!(snapshot.manifests_loaded, 9);
+    // Six built-in plus one manifest plus one bundle of three.
+    assert_eq!(snapshot.manifests_loaded, 10);
     assert_eq!(snapshot.manifests_failed, 0);
-    assert_eq!(snapshot.sources, 9);
+    assert_eq!(snapshot.sources, 10);
     assert!(snapshot.records > 20);
     assert!(snapshot.message.starts_with("Loaded 4 manifests"));
 }
@@ -157,22 +157,25 @@ fn a_broken_manifest_is_reported_and_the_rest_still_load() {
     assert_eq!(files, vec!["broken.json", "wrong-shape.json"]);
     assert!(snapshot.failures[0].message.contains("not valid JSON"));
     // The good data is still there.
-    assert_eq!(snapshot.sources, 9);
+    assert_eq!(snapshot.sources, 10);
 }
 
 #[test]
 fn the_survey_shows_reachable_and_unreachable_modules_with_reasons() {
     let survey = library().survey(&vehicle());
-    // SYNTHMOD, OTHERMOD, LEGACYMOD and FIXEDMOD; only the first has a route.
-    assert_eq!(survey.modules.len(), 4);
+    // SYNTHMOD, OTHERMOD, LEGACYMOD, FIXEDMOD, and the two K-line modules
+    // DS2MOD and STARMOD (ADR-0029); only SYNTHMOD has a confirmed route,
+    // DS2MOD sits on a hypothesised one.
+    assert_eq!(survey.modules.len(), 6);
     assert_eq!(survey.reachable, 1);
-    assert_eq!(survey.unreachable, 3);
+    assert_eq!(survey.hypothesis, 1);
+    assert_eq!(survey.unreachable, 4);
     assert!(survey.message.starts_with(
-        "4 modules known: 1 reachable over the adapter, 0 on a hypothesised route, 3 not"
+        "6 modules known: 1 reachable over the adapter, 1 on a hypothesised route, 4 not"
     ));
 
-    // Sorted by mnemonic: FIXEDMOD, LEGACYMOD, OTHERMOD, SYNTHMOD.
-    let reachable = &survey.modules[3];
+    // Sorted by mnemonic: DS2MOD, FIXEDMOD, LEGACYMOD, OTHERMOD, STARMOD, SYNTHMOD.
+    let reachable = &survey.modules[5];
     assert_eq!(reachable.ecu_family, "SYNTHMOD");
     assert_eq!(reachable.applicability, ModuleApplicability::Applicable);
     assert_eq!(reachable.identifier_read.status, RouteStatus::Reachable);
@@ -200,9 +203,81 @@ fn the_survey_shows_reachable_and_unreachable_modules_with_reasons() {
         vec!["0x0347", "0x1945", "0xDD01", "0xF111", "0xF188", "0xF18C", "0xF190", "0xF1A0"]
     );
 
+    // DS2MOD speaks DS2 on the K-line bus the document pins to 7; the
+    // document's pin and baud reach the plan, the adapter route is the
+    // hypothesis, and the read-only capabilities are DS2's own.
+    let ds2 = &survey.modules[0];
+    assert_eq!(ds2.ecu_family, "DS2MOD");
+    assert_eq!(
+        ds2.identifier_read.status,
+        RouteStatus::Hypothesis,
+        "{ds2:?}"
+    );
+    assert_eq!(ds2.logical_network.as_deref(), Some("DS2_PIN7"));
+    assert_eq!(ds2.backend_route.as_deref(), Some("k-line-7"));
+    assert_eq!(ds2.pins.as_deref(), Some("7"));
+    assert_eq!(ds2.bitrate_bps, Some(9600));
+    assert_eq!(ds2.protocol.as_deref(), Some("DS2"));
+    assert_eq!(ds2.request_id.as_deref(), Some("0x72"));
+    assert_eq!(ds2.response_id.as_deref(), Some("0x72"));
+    assert_eq!(ds2.route_validation, "UNVERIFIED");
+    assert!(
+        ds2.readable_identifiers.is_empty(),
+        "no catalogue parameter names a DS2 identifier"
+    );
+
+    // STARMOD speaks a protocol this product only names, on a bus whose pin
+    // the document does not state: the survey says the capability is missing.
+    let star = &survey.modules[4];
+    assert_eq!(star.ecu_family, "STARMOD");
+    assert_eq!(
+        star.identifier_read.status,
+        RouteStatus::Indeterminate,
+        "{star:?}"
+    );
+    assert_eq!(star.protocol.as_deref(), Some("KW2000STAR"));
+    assert!(
+        star.identifier_read
+            .reasons
+            .iter()
+            .any(|reason| reason.starts_with("read-only capability:")),
+        "{:?}",
+        star.identifier_read.reasons
+    );
+
+    assert!(
+        star.identifier_read.reasons.iter().any(|reason| reason
+            == "protocol KW2000STAR: named in the data and not spoken by this product"),
+        "{:?}",
+        star.identifier_read.reasons
+    );
+    // The names the ingest records and the names the protocol crates speak
+    // are one and the same, or the survey would look for the wrong thing.
+    assert_eq!(ds2::PROTOCOL_FAMILY, sdd_ingest::DS2_DIAGNOSTIC_PROTOCOL);
+    assert_eq!(
+        ds2::ECU_IDENTIFICATION_CAPABILITY,
+        sdd_ingest::DS2_ECU_IDENTIFICATION_CAPABILITY
+    );
+    assert_eq!(
+        ds2::FAULT_MEMORY_CAPABILITY,
+        sdd_ingest::DS2_FAULT_MEMORY_CAPABILITY
+    );
+    assert_eq!(
+        kwp2000::PROTOCOL_FAMILY,
+        sdd_ingest::KWP2000_DIAGNOSTIC_PROTOCOL
+    );
+    assert_eq!(
+        kwp2000::READ_ECU_IDENTIFICATION_CAPABILITY,
+        sdd_ingest::KWP2000_READ_ECU_IDENTIFICATION_CAPABILITY
+    );
+    assert_eq!(
+        kwp2000::READ_DTC_BY_STATUS_CAPABILITY,
+        sdd_ingest::KWP2000_READ_DTC_BY_STATUS_CAPABILITY
+    );
+
     // OTHERMOD sits on a bound bus that declares no diagnostic protocol, so
     // the survey says exactly that instead of dropping the row.
-    let unreachable = &survey.modules[2];
+    let unreachable = &survey.modules[3];
     assert_eq!(unreachable.ecu_family, "OTHERMOD");
     assert_eq!(
         unreachable.identifier_read.status,
@@ -234,9 +309,9 @@ fn the_survey_shows_reachable_and_unreachable_modules_with_reasons() {
     // its bus, and unreachable for exactly that reason. (FIXEDMOD, first in
     // the order, has a physical address on a normal_fixed bus and is derived
     // only when the ingester is asked to; this library did not ask.)
-    let legacy = &survey.modules[1];
-    assert_eq!(survey.modules[0].ecu_family, "FIXEDMOD");
-    assert_eq!(survey.modules[0].request_id, None);
+    let legacy = &survey.modules[2];
+    assert_eq!(survey.modules[1].ecu_family, "FIXEDMOD");
+    assert_eq!(survey.modules[1].request_id, None);
     assert_eq!(legacy.ecu_family, "LEGACYMOD");
     assert_eq!(legacy.logical_network.as_deref(), Some("CAN_HS"));
     assert_eq!(legacy.request_id, None);
@@ -309,9 +384,11 @@ fn a_module_on_a_hypothesised_bus_is_shown_as_a_hypothesis_not_as_reachable() {
     assert_eq!(module.backend_route.as_deref(), Some("hs-can"));
     assert_eq!(module.route_validation, "UNVERIFIED");
     assert!(module.identifier_read.reasons[0].contains("unverified hypothesis"));
-    assert_eq!(survey.hypothesis, 1);
+    // SYNTHMOD on its relayed bus, and DS2MOD on its K-line (ADR-0029): the
+    // two hypotheses of this library, and nothing reachable.
+    assert_eq!(survey.hypothesis, 2);
     assert_eq!(survey.reachable, 0);
-    assert!(survey.message.contains("1 on a hypothesised route"));
+    assert!(survey.message.contains("2 on a hypothesised route"));
 }
 
 #[test]

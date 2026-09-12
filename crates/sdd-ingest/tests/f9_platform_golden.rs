@@ -283,17 +283,142 @@ fn connector_pins_are_recorded_as_listed_and_not_assigned_to_buses() {
     };
     assert_eq!(logical_name, "J1962");
     assert_eq!(name.as_deref(), Some("J1962"));
-    assert_eq!(pins, &vec![5, 6, 14]);
+    assert_eq!(pins, &vec![5, 6, 7, 8, 14]);
     // A connector has no bit rate of its own.
     assert_eq!(*bitrate_bps, None);
 
     // The pin names imply which bus each belongs to, but implying is not
-    // stating, so the bus records still carry no pins.
+    // stating, so the CAN bus records still carry no pins. A K-line bus that
+    // states its connection by name is the one exception (ADR-0029, below).
     let bus = store.get_record("f9-plat.network.CAN_HS").unwrap();
     let KnowledgeValue::NetworkRoute { pins, .. } = &bus.value else {
         panic!("expected a network route");
     };
     assert!(pins.is_empty());
+}
+
+/// ADR-0029: a K-line bus states what a CAN bus never does — its pin, its
+/// baud rate, its byte framing and its wake-up — and those statements are
+/// recorded on the bus's own name, where the resolver looks for a physical
+/// route. A module on it gets its one-byte node address as its addressing
+/// under a mode no CAN path accepts. Only a protocol this product speaks
+/// earns read-only capabilities; one it merely names earns none.
+#[test]
+fn k_line_buses_carry_pin_rate_framing_and_wakeup_and_their_modules_a_node_address() {
+    let store = ingest(SourceType::Documented);
+    let all = store.query(&KnowledgeQuery::default().include_indeterminate(true));
+
+    // The pinned bus, on its own name.
+    let pinned = store.get_record("f9-plat.iso.DS2_PIN7.route").unwrap();
+    assert_eq!(pinned.entity.id, "DS2_PIN7");
+    assert_eq!(
+        pinned.value,
+        KnowledgeValue::NetworkRoute {
+            logical_name: "DS2_PIN7".into(),
+            connector: Some("J1962".into()),
+            pins: vec![7],
+            bitrate_bps: Some(9600),
+        }
+    );
+    let settings = store.get_record("f9-plat.iso.DS2_PIN7.settings").unwrap();
+    assert_eq!(
+        settings.value,
+        KnowledgeValue::Text {
+            value: "data_bits=8;parity=even;stop_bits=1".into()
+        }
+    );
+    let wakeup = store.get_record("f9-plat.iso.DS2_PIN7.wakeup").unwrap();
+    assert_eq!(
+        wakeup.value,
+        KnowledgeValue::Text {
+            value: "bmw_ds2".into()
+        }
+    );
+    // The bus that states no pin gets no pin and no connector: nothing is
+    // assumed; its rate and framing are still its own.
+    let unpinned = store.get_record("f9-plat.iso.KW2000STAR.route").unwrap();
+    assert_eq!(
+        unpinned.value,
+        KnowledgeValue::NetworkRoute {
+            logical_name: "KW2000STAR".into(),
+            connector: None,
+            pins: vec![],
+            bitrate_bps: Some(9600),
+        }
+    );
+
+    // The DS2 module: its node address in both fields, under the K-line mode.
+    let ds2 = store
+        .get_record("f9-plat.module.DS2MOD.node_address")
+        .unwrap();
+    assert_eq!(
+        ds2.value,
+        KnowledgeValue::DiagnosticAddressing {
+            request_id: Some(0x72),
+            response_id: Some(0x72),
+            functional_request_id: None,
+            can_id_format: None,
+            addressing_mode: Some("iso9141_node".into()),
+        }
+    );
+    // The physical address text is still there beside it, as for every
+    // physically addressed module.
+    assert!(store
+        .get_record("f9-plat.module.DS2MOD.physical_address")
+        .is_some());
+    // No CAN identifier was invented for it.
+    assert!(store
+        .get_record("f9-plat.module.DS2MOD.addressing")
+        .is_none());
+
+    let capabilities = |family: &str| -> Vec<String> {
+        let mut found: Vec<String> = all
+            .records
+            .iter()
+            .filter(|resolved| {
+                resolved.record.entity.kind == EntityKind::EcuFamily
+                    && resolved.record.entity.id == family
+            })
+            .filter_map(|resolved| match &resolved.record.value {
+                KnowledgeValue::Capability {
+                    name,
+                    supported: true,
+                    ..
+                } => Some(name.clone()),
+                _ => None,
+            })
+            .collect();
+        found.sort();
+        found
+    };
+    assert_eq!(
+        capabilities("DS2MOD"),
+        vec![
+            "ds2.ecu_identification.read_only".to_string(),
+            "ds2.fault_memory.read_only".to_string()
+        ]
+    );
+    // KWP2000* is named on its module and not spoken: no capability.
+    assert!(capabilities("STARMOD").is_empty());
+    let star_protocol = store.get_record("f9-plat.module.STARMOD.protocol").unwrap();
+    assert_eq!(
+        star_protocol.value,
+        KnowledgeValue::ProtocolFamily {
+            name: "KW2000STAR".into()
+        }
+    );
+    assert!(store
+        .get_record("f9-plat.module.STARMOD.node_address")
+        .is_some());
+    // Every K-line capability is read-only, like every other.
+    for resolved in &all.records {
+        if let KnowledgeValue::Capability { safety_class, .. } = &resolved.record.value {
+            assert_eq!(
+                *safety_class,
+                Some(knowledge::DiagnosticSafetyClass::ReadOnly)
+            );
+        }
+    }
 }
 
 #[test]

@@ -26,6 +26,7 @@ pub use ingestion::{
 pub use model::{
     CanIdFormat, ClaimKey, DiagnosticSafetyClass, EntityKind, ImplementationMarkerKind,
     KnowledgeEntity, KnowledgeRecord, KnowledgeValue, ValidationState,
+    ISO9141_NODE_ADDRESSING_MODE,
 };
 pub use source::{
     sha256_bytes, sha256_file, ContentFingerprint, RedistributionStatus, RegistrationOutcome,

@@ -280,16 +280,29 @@ pub enum PreparationError {
     EnvironmentIndeterminate(Vec<UnresolvedFact>),
     EnvironmentConflict(Vec<ResolutionConflict>),
     EmptyTargetIdentity,
-    TargetEcuMismatch { expected: String, actual: String },
-    TargetImplementationMismatch { expected: String, actual: String },
+    TargetEcuMismatch {
+        expected: String,
+        actual: String,
+    },
+    TargetImplementationMismatch {
+        expected: String,
+        actual: String,
+    },
     MissingDiagnosticImplementation,
     UnsupportedProtocol(String),
     UnsupportedCapability(String),
     InvalidRoute(&'static str),
     InvalidBitrate(u32),
+    /// The plan names no CAN identifier format; UDS over ISO-TP has one.
+    MissingCanIdFormat,
     UnsupportedAddressingMode(String),
-    InvalidCanId { field: &'static str, value: u32 },
-    IdentifierNotReadable { identifier: u16 },
+    InvalidCanId {
+        field: &'static str,
+        value: u32,
+    },
+    IdentifierNotReadable {
+        identifier: u16,
+    },
 }
 
 impl fmt::Display for PreparationError {
@@ -323,6 +336,9 @@ impl fmt::Display for PreparationError {
                 write!(formatter, "invalid mandatory route field: {field}")
             }
             Self::InvalidBitrate(value) => write!(formatter, "invalid CAN bitrate: {value}"),
+            Self::MissingCanIdFormat => {
+                formatter.write_str("the plan names no CAN identifier format")
+            }
             Self::UnsupportedAddressingMode(mode) => {
                 write!(formatter, "unsupported addressing mode: {mode}")
             }
@@ -420,7 +436,10 @@ pub fn prepare_read_only_transaction(
         ));
     }
 
-    let can_id = |field, value| match plan.can_id_format.value {
+    let Some(can_id_format) = plan.can_id_format.as_ref() else {
+        return Err(PreparationError::MissingCanIdFormat);
+    };
+    let can_id = |field, value| match can_id_format.value {
         CanIdFormat::Standard11Bit => u16::try_from(value)
             .ok()
             .and_then(|value| CanId::standard(value).ok())
@@ -493,10 +512,7 @@ pub fn prepare_read_only_transaction(
         ProvenanceField::AddressingMode,
         plan.addressing_mode.evidence.clone(),
     );
-    traces.insert(
-        ProvenanceField::CanIdFormat,
-        plan.can_id_format.evidence.clone(),
-    );
+    traces.insert(ProvenanceField::CanIdFormat, can_id_format.evidence.clone());
     traces.insert(
         ProvenanceField::PhysicalRequest,
         plan.physical_request_id.evidence.clone(),

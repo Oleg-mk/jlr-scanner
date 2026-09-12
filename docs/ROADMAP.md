@@ -261,8 +261,13 @@ MY10 onward, L405 MY13 — to confirm the documented routes, and one
 refute the gateway-relay hypothesis. Each first read yields the first
 `VEHICLE_CONFIRMED` records the project has ever had.
 
-After M6: F14 K-line for the early Range Rover's body modules; then, only by
-explicit owner decision, stage 2.
+F14, K-line for the early Range Rover's body modules and the base
+Freelander's ABS and VIM, was to follow M6; on 2026-09-12 the owner brought
+it forward ("робимо зараз, з внесенням необхідних правок; якщо будуть
+проблеми — вирішимо на діагностиці саме цих старих авто"), and its first
+slice is built (`ADR-0029`). After M6: the second slice's probe on the
+adapter and the first such car; then, only by explicit owner decision,
+stage 2.
 
 ### What "ready to connect to a live car" means, concretely
 
@@ -489,15 +494,39 @@ application does and does not do, report submission, and the intake path that
 turns a returned report into F5 evidence. Testers operate their own vehicles at
 their own discretion; the application must never imply otherwise.
 
-### F14 — K-line transport for the legacy buses (after F10; not gating F13)
+### F14 — K-line transport for the legacy buses (brought forward 2026-09-12, `ADR-0029`)
 
 ISO 9141 / ISO 14230 over J1962 pins 7 and 8, which the MongoosePro JLR variant
 provides as K-Line and ROSCO. Needed only for the BMW-era body electronics of
-L322 MY06–MY07 over `DS2_PIN7` and for ABS and VIM on the base L316; every
-other programme is fully served over CAN. A new transport implementation, so it
-gets its own ADR and its own fixtures, and it must not be debugged alongside
-the first multi-module pipeline. Until it lands, modules on those buses are
-shown with the reason they are unreachable, never omitted.
+L322 MY06–MY07 over `DS2` and `DS2_PIN7`, its diesel PCM and TCCM over
+KWP2000\*, and for ABS and VIM on the base L316 over KWP2000 and ROSCO; every
+other programme is fully served over CAN. The plan had it after M6 so that a
+new transport would not be debugged alongside the first multi-module
+pipeline; the owner weighed that against having the code ready for the first
+such car and chose to build now and correct on the car — a decision on order,
+his to take, recorded in `ADR-0029`.
+
+**Slice A — built 2026-09-12.** The platform ingest reads the `<iso>` buses
+(baud, byte framing, wake-up, the stated pin) and each module's one-byte node
+address; a hypothesis manifest binds the six bus names to the adapter routes
+`k-line-7` and `k-line-8`; two crates, `ds2` and `kwp2000`, hold the framing
+and the read-only requests — identification and fault memory, the link
+handshake, `ReadEcuIdentification`, `ReadDTCByStatus` — with the clear-fault
+services and every write absent and the architecture check enforcing it; the
+resolver asks for no CAN identifier format under a serial node addressing;
+the survey shows every such module with its bus, pin, baud, protocol and node
+address, as a hypothesis where the protocol is spoken and with the reason
+where it is only named (KWP2000\*, ROSCO). No request travels on a K-line
+yet: the routes refuse every open.
+
+**Slice B — next.** A `kline-execution` crate preparing a K-line transaction
+from the resolver's plan; the Mongoose device opening resource 3 or 4,
+selecting the pin, waking the bus as the bus says, sending and reading; the
+pin-select word, the wake-up and the outbound record as hypotheses tried by
+`scripts/mongoose-probe/mongoose_kline_probe.py` against the adapter alone,
+no car needed; the shell reading a K-line module through the same record and
+intake as a CAN one; the bench answering DS2 and KWP2000. Until the probe has
+run, the path stays `IMPLEMENTED / UNVERIFIED` and the shell says so.
 
 ### F15 — live reading: the same reads, repeated (decided 2026-09-10, `ADR-0022`)
 

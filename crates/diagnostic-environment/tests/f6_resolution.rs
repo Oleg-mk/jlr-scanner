@@ -382,7 +382,11 @@ fn complete_resolution_is_typed_deterministic_and_traced() {
     assert_eq!(plan.logical_network.value, "HS-CAN");
     assert_eq!(plan.physical_route.value.pins, vec![6, 14]);
     assert_eq!(plan.bitrate_bps.value, 500_000);
-    assert_eq!(plan.can_id_format.value, CanIdFormat::Standard11Bit);
+    let can_id_format = plan
+        .can_id_format
+        .as_ref()
+        .expect("a CAN plan carries its identifier format");
+    assert_eq!(can_id_format.value, CanIdFormat::Standard11Bit);
     assert_eq!(plan.physical_request_id.value, 0x7e0);
     assert_eq!(plan.physical_response_id.value, 0x7e8);
     assert_eq!(plan.functional_request_id.unwrap().value, 0x7df);
@@ -402,7 +406,7 @@ fn complete_resolution_is_typed_deterministic_and_traced() {
         &plan.bitrate_bps.evidence,
         &plan.protocol_family.evidence,
         &plan.addressing_mode.evidence,
-        &plan.can_id_format.evidence,
+        &can_id_format.evidence,
         &plan.physical_request_id.evidence,
         &plan.physical_response_id.evidence,
         &plan.read_only_capability.evidence,
@@ -958,7 +962,11 @@ fn real_x250_mode09_positive_golden_resolves_with_distinct_source_roles() {
     assert_eq!(plan.backend_route.value.backend, "mongoose-jlr");
     assert_eq!(plan.backend_route.value.route_id, "hs-can");
     assert_eq!(plan.protocol_family.value, "ISO15765-4 / SAE J1979");
-    assert_eq!(plan.can_id_format.value, CanIdFormat::Standard11Bit);
+    let can_id_format = plan
+        .can_id_format
+        .as_ref()
+        .expect("a CAN plan carries its identifier format");
+    assert_eq!(can_id_format.value, CanIdFormat::Standard11Bit);
     assert_eq!(plan.functional_request_id.as_ref().unwrap().value, 0x7df);
     assert_eq!(plan.physical_request_id.value, 0x7e0);
     assert_eq!(plan.physical_response_id.value, 0x7e8);
@@ -1078,4 +1086,106 @@ fn can_id_width_validation_is_explicit() {
     }
     .validate()
     .is_ok());
+}
+
+/// ADR-0029: a module on a K-line has a one-byte node address and no CAN
+/// identifier. Under the serial node addressing the resolver requires no
+/// CAN identifier format and invents none; under a CAN addressing the
+/// missing format still leaves the plan indeterminate.
+#[test]
+fn a_serial_node_addressing_needs_no_can_identifier_format() {
+    fn add_k_line_environment(store: &mut KnowledgeStore, addressing_mode: &str) {
+        let applies = || {
+            applicability(
+                &["PROGRAM-A"],
+                IMPLEMENTATION,
+                ECU,
+                DimensionConstraint::Any,
+            )
+        };
+        add_record(
+            store,
+            "kline-route",
+            KnowledgeValue::NetworkRoute {
+                logical_name: "DS2_PIN7".into(),
+                connector: Some("J1962".into()),
+                pins: vec![7],
+                bitrate_bps: Some(9600),
+            },
+            applies(),
+            Some(EvidenceClass::SyntheticTest),
+        );
+        add_record(
+            store,
+            "kline-backend",
+            KnowledgeValue::BackendRoute {
+                backend: "TEST-BACKEND".into(),
+                route_id: "k-line-7".into(),
+            },
+            applies(),
+            Some(EvidenceClass::SyntheticTest),
+        );
+        add_record(
+            store,
+            "kline-protocol",
+            KnowledgeValue::ProtocolFamily { name: "DS2".into() },
+            applies(),
+            Some(EvidenceClass::SyntheticTest),
+        );
+        add_record(
+            store,
+            "kline-address",
+            KnowledgeValue::DiagnosticAddressing {
+                request_id: Some(0x72),
+                response_id: Some(0x72),
+                functional_request_id: None,
+                can_id_format: None,
+                addressing_mode: Some(addressing_mode.into()),
+            },
+            applies(),
+            Some(EvidenceClass::SyntheticTest),
+        );
+        add_record(
+            store,
+            "kline-capability",
+            KnowledgeValue::Capability {
+                name: CAPABILITY.into(),
+                supported: true,
+                safety_class: Some(DiagnosticSafetyClass::ReadOnly),
+            },
+            applies(),
+            Some(EvidenceClass::SyntheticTest),
+        );
+    }
+
+    let mut serial = KnowledgeStore::new();
+    add_k_line_environment(&mut serial, knowledge::ISO9141_NODE_ADDRESSING_MODE);
+    let DiagnosticEnvironmentResolution::Resolved(plan) =
+        DiagnosticEnvironmentResolver::resolve(&serial, &query("PROGRAM-A", 2012))
+    else {
+        panic!("the K-line environment did not resolve");
+    };
+    assert!(plan.can_id_format.is_none());
+    assert_eq!(plan.addressing_mode.value, "iso9141_node");
+    assert_eq!(plan.physical_request_id.value, 0x72);
+    assert_eq!(plan.physical_response_id.value, 0x72);
+    assert_eq!(plan.functional_request_id, None);
+    assert_eq!(plan.bitrate_bps.value, 9600);
+    assert_eq!(plan.physical_route.value.pins, vec![7]);
+    assert_eq!(plan.backend_route.value.route_id, "k-line-7");
+    assert_eq!(plan.protocol_family.value, "DS2");
+
+    // The same records under a CAN addressing: the format is missing, and
+    // the resolver says so rather than guessing one.
+    let mut can = KnowledgeStore::new();
+    add_k_line_environment(&mut can, "normal_physical");
+    let DiagnosticEnvironmentResolution::Indeterminate {
+        unresolved_facts, ..
+    } = DiagnosticEnvironmentResolver::resolve(&can, &query("PROGRAM-A", 2012))
+    else {
+        panic!("a CAN addressing without a format did not fail closed");
+    };
+    assert!(unresolved_facts
+        .iter()
+        .any(|fact| fact.field == EnvironmentField::CanIdFormat));
 }
