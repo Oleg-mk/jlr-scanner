@@ -6,7 +6,7 @@
 - Decision: the buses the platform documents call `ISO` — the BMW-era
   body electronics of the Range Rover L322 of 2006–2007 over **DS2**, its
   diesel engine and transfer case over **KWP2000\***, the ABS of the base
-  Freelander L316 over **KWP2000**, its VIM over **ROSCO** — enter the
+  Defender L316 over **KWP2000**, its VIM over **ROSCO** — enter the
   product in three layers with three different standings: the buses, the
   modules and their node addresses as *documented* knowledge from SDD's own
   platform documents; the adapter routes `k-line-7` and `k-line-8` as

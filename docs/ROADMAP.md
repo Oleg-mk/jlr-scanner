@@ -261,8 +261,8 @@ MY10 onward, L405 MY13 — to confirm the documented routes, and one
 refute the gateway-relay hypothesis. Each first read yields the first
 `VEHICLE_CONFIRMED` records the project has ever had.
 
-F14, K-line for the early Range Rover's body modules and the base
-Freelander's ABS and VIM, was to follow M6; on 2026-09-12 the owner brought
+F14, K-line for the early Range Rover's body modules and the Defender's
+ABS and VIM, was to follow M6; on 2026-09-12 the owner brought
 it forward ("робимо зараз, з внесенням необхідних правок; якщо будуть
 проблеми — вирішимо на діагностиці саме цих старих авто"), and its first
 slice is built (`ADR-0029`). After M6: the second slice's probe on the

@@ -329,7 +329,7 @@ the same model can appear. On an X250 the data declares one test for each of
 A Range Rover L322 of 2006–2007 keeps its body electronics — light control,
 seat and door modules, the climate control and others — on a single serial
 wire, the *K-line*, not on CAN, and speaks BMW's DS2 protocol on it; a base
-Freelander L316 has its ABS and its VIM on the same kind of wire. The survey
+Defender L316 has its ABS and its VIM on the same kind of wire. The survey
 lists these modules like every other, with their bus, the connector pin the
 data states (7 or 8), the baud rate, the protocol and the module's one-byte
 address. Their row says **hypothesis**: the adapter's route to that pin has

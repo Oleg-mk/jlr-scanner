@@ -1,7 +1,7 @@
 //! KWP2000 — ISO 14230 over K-line — as far as this product speaks it
 //! (ADR-0029).
 //!
-//! The ABS of the base Freelander L316 answers KWP2000 on J1962 pin 7 at
+//! The ABS of the Defender L316 answers KWP2000 on J1962 pin 7 at
 //! 10400 baud after a fast initialisation. A message is a format byte
 //! carrying the addressing mode and the length, the target and source
 //! addresses, the service bytes and a sum checksum; a length that does not
