@@ -143,7 +143,18 @@ recorded and not read.
   is how SDD knows a car from its CCF, and it is the deferred "digital car"
   of `ROADMAP.md`: a read CCF could fill the picker. A separate ADR.
 - The VDF read scheme of the 2014-and-later gateway cars.
-- The product's own words for the configuration texts.
+- ~~The product's own words for the configuration texts.~~ **Decided by
+  the owner later the same day:** the texts are this project's own in both
+  languages, Ukrainian and Russian, made the way the parameter names and
+  the fault-code help were — SDD's English worded first, then translated,
+  then reviewed — and never taken from SDD one to one, so that no sentence
+  of SDD's is reproduced. The unit is small: the 48 documents use 2,782
+  distinct texts (1,436 option texts, 443 parameter titles, 428 group
+  titles, 475 mnemonics SDD has no text for), and 124 of them cover half
+  of all 138,683 uses. The input file is `prowlone-ccf-texts.csv` on the
+  owner's desk, ordered by use; it goes through the pipeline after the
+  help texts and the parameter names. Where the dictionary lives follows
+  `ADR-0025` (the repository, keyed by SDD's text id).
 - Comparing a car with its as-built file, which SDD holds as a VBF.
 
 ## Built, 2026-09-12

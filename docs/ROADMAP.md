@@ -661,8 +661,11 @@ re-exported, the decoder, the bench's plausible blocks, `CcfService`, the
 panel with SDD's rows behind one switch, the session bundle's `ccf_reads`,
 the intake's `ccf_reads[i].reads[j]`. `IMPLEMENTED / FIXTURE_TESTED`; no
 build, the owner batches the work. Not decided: describing the vehicle from
-its configuration (SDD's `qualifier_map` — the "digital car"), the VDF read,
-the product's own words for the 2,313 texts.
+its configuration (SDD's `qualifier_map` — the "digital car"), the VDF read.
+*Decided later the same day:* the configuration's texts become this
+project's own in both languages, the way the names and the help were —
+2,782 distinct texts, `prowlone-ccf-texts.csv` on the owner's desk, queued
+on the GPU after the help texts and the parameter names; see `ADR-0028`.
 
 ### Beyond stage 1
 
