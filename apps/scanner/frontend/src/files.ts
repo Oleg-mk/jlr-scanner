@@ -17,12 +17,22 @@ export function hasTauriRuntime() {
   );
 }
 
-/** Save text under a suggested name; resolves to the path written, or null when the user cancelled. */
-export async function saveTextFile(suggestedName: string, contents: string): Promise<string | null> {
+/**
+ * Save text under a suggested name; resolves to the path written, or null
+ * when the user cancelled. The format picks the dialog's filter and, in the
+ * browser preview, the type of the offered download; `json` unless the
+ * caller says `csv` (ADR-0022 §5, amended).
+ */
+export async function saveTextFile(
+  suggestedName: string,
+  contents: string,
+  format: "json" | "csv" = "json",
+): Promise<string | null> {
   if (hasTauriRuntime()) {
-    return invoke<string | null>("save_text_file", { suggestedName, contents });
+    return invoke<string | null>("save_text_file", { suggestedName, contents, format });
   }
-  const url = URL.createObjectURL(new Blob([contents], { type: "application/json" }));
+  const type = format === "csv" ? "text/csv" : "application/json";
+  const url = URL.createObjectURL(new Blob([contents], { type }));
   const anchor = document.createElement("a");
   anchor.href = url;
   anchor.download = suggestedName;

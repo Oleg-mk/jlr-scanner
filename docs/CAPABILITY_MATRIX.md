@@ -21,7 +21,7 @@ Written 2026-09-12 at the owner's request: what a person gets from SDD at its fu
 | `not found in the data` | not found in SDD 169's data; may still exist in its runtime |
 | `—` | not applicable, or already answered by the column before |
 
-**Counts.** 99 rows. SDD does 63 of them. ProwlOne today: 38 built, 4 partly, 2 open inside stage 1. The roadmap: 20 in stage 2, 8 in stage 3. The ceiling: 53 possible, 3 need other hardware, 8 excluded for good. 10 rows are things SDD does not do and ProwlOne already does; 8 rows are things SDD does that ProwlOne will never do.
+**Counts.** 99 rows. SDD does 63 of them. ProwlOne today: 39 built, 3 partly, 2 open inside stage 1. The roadmap: 20 in stage 2, 8 in stage 3. The ceiling: 53 possible, 3 need other hardware, 8 excluded for good. 10 rows are things SDD does not do and ProwlOne already does; 8 rows are things SDD does that ProwlOne will never do.
 
 ## Vehicle, modules, network
 
@@ -68,7 +68,7 @@ Written 2026-09-12 at the owner's request: what a person gets from SDD at its fu
 | Repeated reads at a stated cadence (16 pairs, 100 ms floor, 10 min cap) | **yes** — datalogger | **built** | **—** | **built** | ADR-0022 |
 | Several modules in one live set | **likely** | **built** | **—** | **built** | ADR-0022 |
 | Graphs and gauges | **yes** | **stage 1, open** — F15 visual layer; the first real report outranks it | **—** | **possible** | ROADMAP F15 |
-| Recording to a file, CSV export | **likely** | **partly** — every sample in the report; no CSV yet | **—** | **possible** | ADR-0022 §5 |
+| Recording to a file, CSV export | **likely** | **built** — every sample in the session bundle; the series exports as CSV, every row saying what it is worth | **—** | **possible** — streamed to a file during the run itself | ADR-0022 §5, amended 2026-09-12 |
 | Legislated live data (mode 01) | **likely** | **built** | **—** | **built** | obd-j1979 |
 | Derived channels, triggers, two-signal compare | **likely** | **no** | **—** | **possible** | — |
 

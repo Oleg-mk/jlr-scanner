@@ -439,6 +439,86 @@ impl LiveReadService {
         serde_json::to_string_pretty(report).map_err(|error| error.to_string())
     }
 
+    /// The run's samples as a spreadsheet (ADR-0022 §5, amended
+    /// 2026-09-12): one row per parameter per sample, in the order they were
+    /// read, each row carrying what its value is worth — `SYNTHETIC` on the
+    /// bench — so a row cut from the file still says what it is. A sample
+    /// that carries no decoded parameter is one row all the same: the module
+    /// answered, or refused, or said nothing, and that is the reading.
+    ///
+    /// This is a rendering of what the session bundle already holds, not a
+    /// second record of it: the bundle stays the evidence, the file is for
+    /// the person with a spreadsheet.
+    pub fn samples_csv(&self) -> Result<String, String> {
+        let run = self
+            .run
+            .as_ref()
+            .ok_or_else(|| "No live read run has been recorded yet".to_owned())?;
+        if run.samples.is_empty() {
+            return Err("The run recorded no samples".to_owned());
+        }
+        let validation = |sample: &Sample| -> String {
+            if run.synthetic {
+                return "SYNTHETIC".to_string();
+            }
+            run.entries
+                .iter()
+                .find(|entry| {
+                    entry.ecu_family == sample.ecu_family && entry.identifier == sample.identifier
+                })
+                .map(|entry| entry.route_validation.clone())
+                .unwrap_or_default()
+        };
+
+        let mut csv = String::from(CSV_HEADER);
+        csv.push('\n');
+        for sample in &run.samples {
+            let worth = validation(sample);
+            let common = |value: &str| -> String { csv_field(value) };
+            if sample.parameters.is_empty() {
+                // No parameter: the module refused, said nothing, or the
+                // request failed. One row, with the reason where the value
+                // would be.
+                let reason = sample
+                    .negative_response
+                    .clone()
+                    .or_else(|| sample.failure.clone())
+                    .unwrap_or_else(|| "no decoded parameter".to_string());
+                csv.push_str(&format!(
+                    "{},{},{},,,,{},{},{}\n",
+                    sample.at_ms,
+                    common(&sample.ecu_family),
+                    common(&sample.identifier),
+                    common(&reason),
+                    common(sample.response_hex.as_deref().unwrap_or_default()),
+                    common(&worth),
+                ));
+                continue;
+            }
+            for parameter in &sample.parameters {
+                csv.push_str(&format!(
+                    "{},{},{},{},{},{},{},{},{}\n",
+                    sample.at_ms,
+                    common(&sample.ecu_family),
+                    common(&sample.identifier),
+                    common(&parameter.name),
+                    common(parameter.value.as_deref().unwrap_or_default()),
+                    common(parameter.unit.as_deref().unwrap_or_default()),
+                    common(
+                        parameter
+                            .state
+                            .as_deref()
+                            .or(parameter.note.as_deref())
+                            .unwrap_or_default()
+                    ),
+                    common(sample.response_hex.as_deref().unwrap_or_default()),
+                    common(&worth),
+                ));
+            }
+        }
+        Ok(csv)
+    }
+
     /// The report is handed to the session bundle once; this forgets it so a
     /// second stop cannot record the same run twice.
     pub fn take_report_json(&mut self) -> Option<String> {
@@ -686,6 +766,21 @@ fn build_report(run: &Run) -> Value {
     })
 }
 
+/// The columns of the exported series. `worth` is what the reading is
+/// worth — the route's validation state, or `SYNTHETIC` on the bench — so
+/// that a row pasted anywhere still carries it.
+const CSV_HEADER: &str =
+    "at_ms,ecu_family,identifier,parameter,value,unit,state_or_note,response_hex,worth";
+
+/// One field, quoted where a spreadsheet would otherwise misread it.
+fn csv_field(value: &str) -> String {
+    if value.contains([',', '"', '\n', '\r']) {
+        format!("\"{}\"", value.replace('"', "\"\""))
+    } else {
+        value.to_string()
+    }
+}
+
 fn idle(report_available: bool) -> LiveReadSnapshot {
     LiveReadSnapshot {
         state: LiveReadState::Idle,
@@ -721,4 +816,24 @@ fn hex(bytes: &[u8]) -> String {
         .map(|byte| format!("{byte:02X}"))
         .collect::<Vec<_>>()
         .join(" ")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::csv_field;
+
+    /// A spreadsheet reads a comma as a new column and a quote as a quote;
+    /// SDD's own parameter names carry both, so a field that holds either
+    /// is quoted and its quotes doubled. Everything else is left alone.
+    #[test]
+    fn a_field_is_quoted_only_where_a_spreadsheet_would_misread_it() {
+        assert_eq!(csv_field("Engine speed"), "Engine speed");
+        assert_eq!(csv_field("750"), "750");
+        assert_eq!(
+            csv_field("Battery monitor  -  Status, bit 2"),
+            "\"Battery monitor  -  Status, bit 2\""
+        );
+        assert_eq!(csv_field("he said \"no\""), "\"he said \"\"no\"\"\"");
+        assert_eq!(csv_field("two\nlines"), "\"two\nlines\"");
+    }
 }

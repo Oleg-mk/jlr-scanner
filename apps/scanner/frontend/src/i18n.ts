@@ -425,6 +425,8 @@ const uk: Record<string, string> = {
   "the module answered with padding only": "модуль відповів лише заповненням",
   "not printable text; shown as bytes": "не друкований текст; показано байтами",
   "the answer does not carry this parameter": "у відповіді немає цього параметра",
+  "Save the series (CSV)": "Зберегти серію (CSV)",
+  "Series written to {path}": "Серію записано у {path}",
   // The battery (ADR-0030)
   "Battery": "Акумулятор",
   "What the battery monitor holds": "Що тримає монітор акумулятора",
@@ -1443,6 +1445,8 @@ const ru: Record<string, string> = {
   "the module answered with padding only": "модуль ответил только заполнением",
   "not printable text; shown as bytes": "непечатный текст; показано байтами",
   "the answer does not carry this parameter": "в ответе нет этого параметра",
+  "Save the series (CSV)": "Сохранить серию (CSV)",
+  "Series written to {path}": "Серия записана в {path}",
   // The battery (ADR-0030)
   "Battery": "Аккумулятор",
   "What the battery monitor holds": "Что хранит монитор аккумулятора",

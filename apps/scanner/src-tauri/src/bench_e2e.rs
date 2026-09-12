@@ -352,9 +352,34 @@ fn the_bench_connects_without_a_port_reads_the_surveyed_vehicle_and_marks_everyt
         live_json.contains("\"at_ms\""),
         "the series carries its clock"
     );
+    // The same series as a spreadsheet (ADR-0022 §5, amended): one header,
+    // one row per parameter per sample, every row carrying what it is
+    // worth. On the bench that is SYNTHETIC, in the file as on the screen.
+    let csv = live.samples_csv().expect("a run with samples exports");
+    let lines: Vec<&str> = csv.lines().collect();
+    assert_eq!(
+        lines[0],
+        "at_ms,ecu_family,identifier,parameter,value,unit,state_or_note,response_hex,worth"
+    );
+    assert!(lines.len() > 1, "{csv}");
+    for row in &lines[1..] {
+        assert!(
+            row.ends_with(",SYNTHETIC"),
+            "every exported row says what it is worth: {row}"
+        );
+        assert!(row.starts_with(char::is_numeric), "the clock leads: {row}");
+    }
+    assert!(
+        csv.contains("SYNTHMOD"),
+        "the module the sample came from: {csv}"
+    );
+
     // Handed over once: a second stop cannot record the same run twice.
     assert!(live.take_report_json().is_some());
     assert!(live.take_report_json().is_none());
+    // The export is a rendering of the run, not of the report: it survives
+    // the bundle taking the report away.
+    assert!(live.samples_csv().is_ok());
     // The odometer read from every module (ADR-0024): the catalogue names a
     // distance for SYNTHMOD, and the legislated counter beside it must not be
     // mistaken for one.

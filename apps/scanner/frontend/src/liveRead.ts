@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import { saveTextFile } from "./files";
 import { browserDemoEnabled } from "./adapter";
 import type { DiagnosticError } from "./diagnostic";
 import { hasTauriRuntime } from "./files";
@@ -67,6 +68,12 @@ export interface LiveReadSnapshot {
 }
 
 export interface LiveReadClient {
+  /**
+   * The run's samples as a spreadsheet (ADR-0022 §5, amended): a rendering
+   * of what the session bundle already holds. Rejects when no run has been
+   * recorded or it took no samples.
+   */
+  samplesCsv?(): Promise<string>;
   getState(): Promise<LiveReadSnapshot>;
   start(request: LiveReadRequest): Promise<LiveReadSnapshot>;
   step(): Promise<LiveReadSnapshot>;
@@ -98,6 +105,10 @@ export function entryKey(entry: LiveReadEntryRequest): string {
 }
 
 class TauriLiveReadClient implements LiveReadClient {
+  samplesCsv() {
+    return invoke<string>("live_read_csv");
+  }
+
   getState() {
     return invoke<LiveReadSnapshot>("get_live_read_state");
   }
@@ -219,3 +230,18 @@ class BrowserLiveReadClient implements LiveReadClient {
 export const defaultLiveReadClient: LiveReadClient = hasTauriRuntime()
   ? new TauriLiveReadClient()
   : new BrowserLiveReadClient();
+
+/**
+ * Save the run's samples as a spreadsheet (ADR-0022 §5, amended). The
+ * session bundle stays the evidence; this is the same series in the shape a
+ * person with a spreadsheet can use. On the bench the shell refuses to
+ * write anything to disk (ADR-0020), and the refusal comes back as it is.
+ */
+export async function saveLiveReadCsv(
+  client: LiveReadClient,
+  session: string,
+): Promise<string | null> {
+  if (client.samplesCsv === undefined) return null;
+  const csv = await client.samplesCsv();
+  return saveTextFile(`prowlone-live-${session}.csv`, csv, "csv");
+}

@@ -1,7 +1,8 @@
-import { act, render, renderHook, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, renderHook, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { LANGUAGE_STORAGE_KEY, setCurrentLanguage } from "./i18n";
 import { LiveReadPanel } from "./components/LiveReadPanel";
+import { saveLiveReadCsv } from "./liveRead";
 import { createVehicleDescription, type ModuleSurveyEntry } from "./library";
 import {
   createLiveReadSnapshot,
@@ -99,6 +100,8 @@ const idleHandlers = {
   onClearSet: () => {},
   onStart: () => {},
   onStop: () => {},
+  onSaveCsv: () => {},
+  saved: null,
 };
 
 describe("live reading", () => {
@@ -348,5 +351,61 @@ describe("live reading", () => {
     // SDD's own name for the parameter is English because SDD holds it in
     // English; inventing a translation would be inventing data.
     expect(screen.getByText("engine speed")).toBeInTheDocument();
+  });
+
+  it("offers the series as a spreadsheet once a run has samples", async () => {
+    const saveCsv = vi.fn();
+    const { rerender } = render(
+      <LiveReadPanel
+        snapshot={createLiveReadSnapshot()}
+        set={[]}
+        modules={[]}
+        running={false}
+        busy={false}
+        adapterReady
+        {...idleHandlers}
+        onSaveCsv={saveCsv}
+      />,
+    );
+    // Nothing read yet: nothing to save.
+    expect(screen.queryByRole("button", { name: "Save the series (CSV)" })).toBeNull();
+
+    rerender(
+      <LiveReadPanel
+        snapshot={{ ...createLiveReadSnapshot(), state: "STOPPED", samples: 12 }}
+        set={[]}
+        modules={[]}
+        running={false}
+        busy={false}
+        adapterReady
+        {...idleHandlers}
+        onSaveCsv={saveCsv}
+        saved={{ path: "C:/reports/prowlone-live-1.csv" }}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Save the series (CSV)" }));
+    expect(saveCsv).toHaveBeenCalledTimes(1);
+    expect(
+      screen.getByText("Series written to C:/reports/prowlone-live-1.csv"),
+    ).toBeInTheDocument();
+  });
+
+  it("passes the spreadsheet to the saver as a spreadsheet", async () => {
+    const client = {
+      samplesCsv: () => Promise.resolve("at_ms,ecu_family\n0,PCM\n"),
+      getState: () => Promise.resolve(createLiveReadSnapshot()),
+      start: () => Promise.resolve(createLiveReadSnapshot()),
+      step: () => Promise.resolve(createLiveReadSnapshot()),
+      stop: () => Promise.resolve(createLiveReadSnapshot()),
+    };
+    // jsdom has no object URLs and no real download; the browser path is
+    // stubbed the way Files.test.tsx stubs it.
+    vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
+    URL.createObjectURL = vi.fn(() => "blob:series");
+    URL.revokeObjectURL = vi.fn();
+    const path = await saveLiveReadCsv(client, "42");
+    // In the browser preview the file is offered as a download and the
+    // suggested name comes back.
+    expect(path).toBe("prowlone-live-42.csv");
   });
 });

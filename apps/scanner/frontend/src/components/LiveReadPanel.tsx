@@ -22,6 +22,10 @@ interface LiveReadPanelProps {
   onClearSet: () => void;
   onStart: () => void;
   onStop: () => void;
+  /** Save the series as a spreadsheet (ADR-0022 §5, amended). */
+  onSaveCsv: () => void;
+  /** Where the last export went, or why it did not. */
+  saved: { path?: string; error?: string } | null;
   /** On the bench (ADR-0020): every sample is synthetic. */
   bench?: boolean;
 }
@@ -74,6 +78,8 @@ export function LiveReadPanel({
   onClearSet,
   onStart,
   onStop,
+  onSaveCsv,
+  saved,
   bench = false,
 }: LiveReadPanelProps) {
   const language = useLanguage();
@@ -173,11 +179,26 @@ export function LiveReadPanel({
             {t("Clear the set")}
           </button>
         ) : null}
+        {snapshot.samples > 0 && !running ? (
+          <button className="button button--quiet" type="button" onClick={onSaveCsv}>
+            {t("Save the series (CSV)")}
+          </button>
+        ) : null}
         <span className="button-hint">
           {t("{count} of {max} chosen", { count: set.length, max: LIVE_READ_MAX_ENTRIES })}
         </span>
       </div>
       {!adapterReady ? <p className="button-hint">{t("Connect and verify the adapter, or the bench, first.")}</p> : null}
+      {saved?.path !== undefined ? (
+        <p className="button-hint" role="status">
+          {t("Series written to {path}", { path: saved.path })}
+        </p>
+      ) : null}
+      {saved?.error !== undefined ? (
+        <p className="button-hint" role="status">
+          {saved.error}
+        </p>
+      ) : null}
       {snapshot.error !== null ? (
         <div className="error-banner" role="alert">
           <h3>{t(snapshot.error.message)}</h3>

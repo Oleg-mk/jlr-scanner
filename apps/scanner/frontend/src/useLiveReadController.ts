@@ -4,6 +4,7 @@ import {
   LIVE_READ_MAX_ENTRIES,
   createLiveReadSnapshot,
   entryKey,
+  saveLiveReadCsv,
   type LiveReadClient,
   type LiveReadEntryRequest,
   type LiveReadSnapshot,
@@ -47,6 +48,8 @@ export function useLiveReadController(
   const [snapshot, setSnapshot] = useState<LiveReadSnapshot>(createLiveReadSnapshot);
   const [set, setSet] = useState<LiveReadEntryRequest[]>([]);
   const [busy, setBusy] = useState(false);
+  /** Where the last export went, or why it did not. */
+  const [saved, setSaved] = useState<{ path?: string; error?: string } | null>(null);
   const timer = useRef<ReturnType<typeof setInterval> | null>(null);
   const stepping = useRef(false);
 
@@ -131,6 +134,24 @@ export function useLiveReadController(
     }
   }, [clearTimer, client, set, stepIntervalMs, vehicle]);
 
+  /**
+   * Save the series as a spreadsheet (ADR-0022 §5, amended). Resolves to
+   * where it was written, null when the dialog was cancelled, and rejects
+   * with the shell's own words when there is nothing to write or the bench
+   * refuses the disk.
+   */
+  const saveCsv = useCallback(async () => {
+    setSaved(null);
+    try {
+      const path = await saveLiveReadCsv(client, String(Date.now()));
+      setSaved(path === null ? null : { path });
+      return path;
+    } catch (error) {
+      setSaved({ error: error instanceof Error ? error.message : String(error) });
+      return null;
+    }
+  }, [client]);
+
   return {
     snapshot,
     set,
@@ -140,5 +161,7 @@ export function useLiveReadController(
     clearSet,
     start,
     stop,
+    saveCsv,
+    saved,
   };
 }

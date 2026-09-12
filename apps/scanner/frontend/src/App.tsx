@@ -568,6 +568,8 @@ export function App({
                     onClearSet={liveRead.clearSet}
                     onStart={() => void liveRead.start()}
                     onStop={() => void liveRead.stop()}
+                    onSaveCsv={() => void liveRead.saveCsv()}
+                    saved={liveRead.saved}
                   />
                 ) : null}
                 {section.id === "listen" ? (

@@ -236,3 +236,37 @@ the library's readable identifiers and never typed, at most sixteen
 entries, one request in flight, no `0x10` and no `0x3E`, an entry that
 fails three rounds running is dropped with its reason, and every sample
 carries the validation the single read carries — `SYNTHETIC` on the bench.
+
+## Amendment, 2026-09-12: the series leaves as a spreadsheet
+
+Decision 5 made every sample part of the session bundle and said nothing
+about what a person does with it. A tester who watches a value move wants
+that series in a spreadsheet, not inside a JSON document, and the matrix row
+said as much: *recording to a file, CSV export — partly; every sample in the
+report, no CSV yet*.
+
+The export is a **rendering of what the bundle already holds**, not a second
+record of it. The bundle stays the evidence; the file is for the person with
+a spreadsheet. Concretely:
+
+- `LiveReadService::samples_csv` writes one header and one row per parameter
+  per sample, in the order they were read: `at_ms`, the module, the
+  identifier, the parameter under SDD's own name, the value, the unit, the
+  state or the decoder's note, the response bytes, and `worth` — what the
+  reading is worth, the route's validation state or `SYNTHETIC` on the
+  bench. Every row carries that last column, so a row pasted anywhere still
+  says what it is.
+- A sample that carries no decoded parameter is one row all the same, with
+  the module's refusal or the failure where the value would be: a silence is
+  a reading.
+- Fields are quoted only where a spreadsheet would misread them — SDD's
+  parameter names carry commas — and quotes inside are doubled.
+- The file is written when the person asks, from the run that is still in
+  hand; it is not streamed during the run and nothing is written to disk
+  while a run is going on.
+- It goes through the one command that writes files, so `ADR-0020` holds:
+  **on the bench nothing reaches the disk**, and the refusal is the same
+  sentence as for a session report.
+
+No new operation, no new safety class: `LIVE_READ` is unchanged, and
+`SAFETY_BOUNDARIES.md` gains a note, not a row.

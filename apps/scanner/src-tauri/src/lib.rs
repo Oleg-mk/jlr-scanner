@@ -556,11 +556,16 @@ async fn get_session_report_json(
 /// writes the file itself; a webview's own download link is not something a
 /// tester can rely on. Resolves to the path written, or `None` when the
 /// dialog was cancelled.
+///
+/// `format` is `json` unless the caller says `csv` — an exported live
+/// series (ADR-0022 §5, amended). It picks the dialog's filter and nothing
+/// else about the write changes; the bench still writes nothing.
 #[tauri::command]
 async fn save_text_file(
     app: tauri::AppHandle,
     suggested_name: String,
     contents: String,
+    format: Option<String>,
 ) -> Result<Option<String>, String> {
     use tauri::Manager;
     use tauri_plugin_dialog::DialogExt;
@@ -577,11 +582,15 @@ async fn save_text_file(
             "bench session: nothing is written to disk; the report is shown on screen only".into(),
         );
     }
+    let (label, extension) = match format.as_deref() {
+        Some("csv") => ("CSV", "csv"),
+        _ => ("JSON", "json"),
+    };
     let Some(chosen) = app
         .dialog()
         .file()
         .set_file_name(&suggested_name)
-        .add_filter("JSON", &["json"])
+        .add_filter(label, &[extension])
         .blocking_save_file()
     else {
         return Ok(None);
@@ -910,6 +919,14 @@ async fn read_standard_obd(
 // cadence. The service owns the rules, the interface owns the timer, and the
 // adapter is taken for one request at a time and released.
 // ---------------------------------------------------------------------------
+
+/// The live series as a spreadsheet (ADR-0022 §5, amended): a rendering of
+/// what the session bundle already holds, for the person with a
+/// spreadsheet. The bundle stays the evidence.
+#[tauri::command]
+async fn live_read_csv(state: State<'_, SharedLiveReadService>) -> Result<String, String> {
+    lock_live_read(&state).samples_csv()
+}
 
 #[tauri::command]
 async fn get_live_read_state(
@@ -1632,6 +1649,7 @@ pub fn run() {
             get_standard_obd_state,
             read_standard_obd,
             get_live_read_state,
+            live_read_csv,
             start_live_read,
             live_read_step,
             stop_live_read,
