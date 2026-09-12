@@ -596,6 +596,33 @@ pub(crate) fn inbound_can_frame(
     outer_frame(&payload)
 }
 
+/// An inbound record carrying line bytes (`ADR-0029` slice B): the same
+/// record as a CAN frame's, with no identifier in front of the data.
+pub(crate) fn inbound_line_bytes(
+    channel_id: u16,
+    rx_status: u32,
+    timestamp: u32,
+    data: &[u8],
+) -> Vec<u8> {
+    let mut payload = Vec::with_capacity(24 + data.len());
+    payload.extend_from_slice(&0_u16.to_le_bytes());
+    payload.extend_from_slice(&channel_id.to_le_bytes());
+    payload.extend_from_slice(&INBOUND_DATA.to_le_bytes());
+    payload.extend_from_slice(&0_u16.to_le_bytes());
+    payload.extend_from_slice(&1_u16.to_le_bytes());
+    payload.extend_from_slice(&0_u16.to_le_bytes());
+    payload.extend_from_slice(&rx_status.to_le_bytes());
+    payload.extend_from_slice(&timestamp.to_le_bytes());
+    payload.extend_from_slice(
+        &u16::try_from(data.len())
+            .expect("a K-line answer is bounded")
+            .to_le_bytes(),
+    );
+    payload.extend_from_slice(&0_u16.to_le_bytes());
+    payload.extend_from_slice(data);
+    outer_frame(&payload)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

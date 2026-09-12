@@ -6,6 +6,8 @@ license.workspace = true
 rust-version.workspace = true
 
 [dependencies]
+ds2.workspace = true
+kwp2000.workspace = true
 app-contracts.workspace = true
 diagnostic-environment.workspace = true
 diagnostic-session.workspace = true

@@ -6,6 +6,7 @@ use super::adapter_service::{AdapterService, SystemAdapterBackend, BENCH_PORT, B
 use super::battery_service::{BatteryService, BATTERY_READ_TIMEOUT};
 use super::capture_service::CaptureService;
 use super::ccf_service::{CcfService, CCF_READ_TIMEOUT};
+use super::kline_read_service::KlineReadService;
 use super::live_read_service::{LiveReadService, LIVE_READ_TIMEOUT};
 use super::mileage_service::{MileageService, MILEAGE_READ_TIMEOUT};
 use super::module_read_service::{map_live_error, ModuleReadService, PreparedModuleRead};
@@ -196,6 +197,82 @@ fn the_bench_connects_without_a_port_reads_the_surveyed_vehicle_and_marks_everyt
     assert_eq!(reads.mark_synthetic().route_validation, "SYNTHETIC");
     let read_json = reads.report_json().unwrap();
     assert!(read_json.contains("SYNTHETIC"));
+
+    // A module on a K-line, read over the K-line (ADR-0029 slice B): the
+    // same stack, a serial line instead of a bus. DS2MOD is on DS2_PIN7 at
+    // node 0x72, and the bench answers in DS2's own framing.
+    let ds2_request = ModuleReadRequest {
+        ecu_family: "DS2MOD".into(),
+        kind: ModuleReadKind::Identifier,
+        identifier: None,
+        context: vehicle(),
+    };
+    let ds2_prepared = KlineReadService::prepare(session.library(), &ds2_request)
+        .expect("DS2MOD is a K-line module")
+        .expect("its identification prepares from the library");
+    assert_eq!(ds2_prepared.transaction.backend_route(), "k-line-7");
+    assert_eq!(ds2_prepared.transaction.node_address(), 0x72);
+    assert_eq!(ds2_prepared.transaction.protocol_family(), "DS2");
+    let ds2_result = adapter
+        .execute_kline_read(&ds2_prepared.transaction, Duration::from_secs(2))
+        .expect("the bench is connected")
+        .map_err(map_live_error);
+    let (ds2_read, ds2_record) = KlineReadService::finish(
+        &ds2_request,
+        &ds2_prepared,
+        Some(&info),
+        Some(session.library()),
+        true,
+        ds2_result,
+    );
+    assert_eq!(ds2_read.state, ModuleReadState::Succeeded, "{ds2_read:?}");
+    // Every value the bench gives is synthetic and says so (ADR-0020).
+    assert_eq!(ds2_read.route_validation, "SYNTHETIC");
+    assert_eq!(ds2_record.route_validation, "SYNTHETIC");
+    assert_eq!(ds2_record.protocol, "DS2");
+    assert_eq!(ds2_record.request_id, "node 0x72");
+    let identification = ds2_read
+        .parameters
+        .first()
+        .expect("the module answered its identification");
+    let text = identification
+        .value
+        .as_deref()
+        .expect("the identification is text");
+    assert!(
+        text.starts_with("BN"),
+        "the bench's own prefix, which no real part carries: {text}"
+    );
+
+    // And its fault memory, in the same shape a CAN module's codes arrive in.
+    let ds2_faults = ModuleReadRequest {
+        kind: ModuleReadKind::FaultCodes,
+        ..ds2_request.clone()
+    };
+    let faults_prepared = KlineReadService::prepare(session.library(), &ds2_faults)
+        .expect("DS2MOD is a K-line module")
+        .expect("its fault memory prepares too");
+    assert_eq!(
+        faults_prepared.transaction.capability_id(),
+        "ds2.fault_memory.read_only"
+    );
+    let faults_result = adapter
+        .execute_kline_read(&faults_prepared.transaction, Duration::from_secs(2))
+        .expect("the bench is connected")
+        .map_err(map_live_error);
+    let (faults_read, _) = KlineReadService::finish(
+        &ds2_faults,
+        &faults_prepared,
+        Some(&info),
+        Some(session.library()),
+        true,
+        faults_result,
+    );
+    assert_eq!(
+        faults_read.state,
+        ModuleReadState::Succeeded,
+        "{faults_read:?}"
+    );
 
     // Fault codes: the bench answers with codes the library describes.
     let request = ModuleReadRequest {

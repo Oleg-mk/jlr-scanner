@@ -285,6 +285,19 @@ impl ModuleReadService {
         self.snapshot()
     }
 
+    /// Take in a read another path made — today the K-line's (`ADR-0029`
+    /// slice B). The panel and the session report read from here, so a read
+    /// that does not pass through this service would otherwise be invisible
+    /// to both.
+    pub fn adopt(
+        &mut self,
+        snapshot: ModuleReadSnapshot,
+        report: ModuleReadReport,
+    ) -> ModuleReadSnapshot {
+        self.last = Some((snapshot.clone(), report));
+        snapshot
+    }
+
     pub fn report_json(&self) -> Result<String, String> {
         let (_, report) = self
             .last
@@ -327,7 +340,7 @@ fn idle() -> ModuleReadSnapshot {
     }
 }
 
-fn preparation_error(details: String) -> DiagnosticError {
+pub(crate) fn preparation_error(details: String) -> DiagnosticError {
     DiagnosticError {
         category: DiagnosticErrorCategory::UnsupportedVehicleProfile,
         message: "The module cannot be read with the loaded data".into(),
@@ -349,7 +362,7 @@ fn parse_identifier(text: Option<&str>) -> Result<u16, DiagnosticError> {
         .map_err(|_| preparation_error(format!("'{text}' is not a 16-bit identifier")))
 }
 
-fn hex(bytes: &[u8]) -> String {
+pub(crate) fn hex(bytes: &[u8]) -> String {
     bytes
         .iter()
         .map(|byte| format!("{byte:02X}"))

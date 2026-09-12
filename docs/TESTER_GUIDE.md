@@ -338,8 +338,21 @@ K-line module yet — the row also says so in as many words. A protocol the
 data names and the application does not speak (KWP2000\*, ROSCO) is shown
 with that reason.
 
-Nothing to do for you here: no request travels on a K-line in this version.
-The interface table shows the two K-line routes as a *route hypothesis*.
+**This version reads them.** Pick such a module and the operations are its
+own protocol's: *Fault memory*, and on a DS2 module *Identification*. There
+is no identifier to choose — a serial line has none. The row still says
+*hypothesis* until a module answers, because no K-line module anywhere has
+answered this application yet; your first read is what settles it, whichever
+way it goes.
+
+One thing is worth knowing if a DS2 module stays silent. The adapter was
+asked on the bench, without a car, and it takes everything this read needs —
+the line opens, the pin is selected, and it refuses a wrong pin with its own
+words. The one command still unproven is the one that sets the line's byte
+framing: both these protocols want even parity, and the adapter accepts that
+request without saying whether it acted on it. So silence from a DS2 module
+may be the module, or it may be that. Save the report either way: it is
+exactly the evidence that settles it.
 
 ## What the data says about a code
 

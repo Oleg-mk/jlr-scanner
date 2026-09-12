@@ -5,6 +5,7 @@ mod battery_service;
 mod capture_service;
 mod ccf_service;
 mod diagnostic_service;
+mod kline_read_service;
 mod live_read_service;
 mod mileage_service;
 mod module_read_service;
@@ -17,11 +18,11 @@ mod standard_obd_service;
 use adapter_service::{lock_service, shared_service, SharedAdapterService};
 use app_contracts::{
     AdapterSnapshot, AdapterState, BatteryReadRequest, BatteryReadSnapshot, CaptureSnapshot,
-    CcfReadRequest, CcfReadSnapshot, DiagnosticSnapshot, LibrarySnapshot, LiveReadRequest,
-    LiveReadSnapshot, MileageSurveyRequest, MileageSurveySnapshot, ModulePassportRequest,
-    ModulePassportSnapshot, ModuleReadRequest, ModuleReadSnapshot, SessionReportSnapshot,
-    StandardObdRequest, StandardObdSnapshot, VehicleCatalogueSnapshot, VehicleContextInput,
-    VehicleSurveySnapshot, VinDecodeSnapshot,
+    CcfReadRequest, CcfReadSnapshot, DiagnosticError, DiagnosticSnapshot, LibrarySnapshot,
+    LiveReadRequest, LiveReadSnapshot, MileageSurveyRequest, MileageSurveySnapshot,
+    ModulePassportRequest, ModulePassportSnapshot, ModuleReadRequest, ModuleReadSnapshot,
+    SessionReportSnapshot, StandardObdRequest, StandardObdSnapshot, VehicleCatalogueSnapshot,
+    VehicleContextInput, VehicleSurveySnapshot, VinDecodeSnapshot,
 };
 use battery_service::{BatteryService, BATTERY_READ_TIMEOUT};
 use bench_vehicle::BenchVehicle;
@@ -29,6 +30,7 @@ use capture_service::CaptureService;
 use ccf_service::{CcfService, CCF_READ_TIMEOUT};
 use diagnostic_service::DiagnosticService;
 use diagnostic_session::parameter_text;
+use kline_read_service::{KlineReadService, PreparedKlineRead, KLINE_READ_TIMEOUT};
 use live_read_service::{LiveReadService, LIVE_READ_TIMEOUT};
 use mileage_service::{MileageService, MILEAGE_READ_TIMEOUT};
 use module_read_service::{adapter_unavailable, map_live_error, ModuleReadService};
@@ -445,6 +447,66 @@ async fn get_module_read_state(
     Ok(lock_module_read(&state).snapshot())
 }
 
+/// One read on a serial line, from the plan to the record (`ADR-0029`
+/// slice B). The shape is the CAN read's: refuse without an adapter, execute
+/// once, record whatever came back, hand the record to the session bundle.
+fn read_kline_module_now(
+    adapter_state: State<'_, SharedAdapterService>,
+    session_state: State<'_, SharedSessionService>,
+    module_read_state: State<'_, SharedModuleReadService>,
+    report_state: State<'_, SharedSessionReportService>,
+    request: ModuleReadRequest,
+    prepared: Result<PreparedKlineRead, DiagnosticError>,
+) -> ModuleReadSnapshot {
+    let prepared = match prepared {
+        Ok(prepared) => prepared,
+        Err(error) => {
+            return lock_module_read(&module_read_state).finish(
+                &request,
+                None,
+                None,
+                None,
+                Err(error),
+            )
+        }
+    };
+
+    let (adapter, result, bench) = {
+        let mut service = lock_service(&adapter_state);
+        let adapter = service.connected_adapter();
+        let bench = service.is_bench();
+        let result = service.execute_kline_read(&prepared.transaction, KLINE_READ_TIMEOUT);
+        match (adapter, result) {
+            (Some(adapter), Some(result)) => (Some(adapter), result.map_err(map_live_error), bench),
+            _ => (None, Err(adapter_unavailable()), bench),
+        }
+    };
+
+    let (snapshot, record) = {
+        let session = lock_session(&session_state);
+        KlineReadService::finish(
+            &request,
+            &prepared,
+            adapter.as_ref(),
+            Some(session.library()),
+            bench,
+            result,
+        )
+    };
+    let json = serde_json::to_string(&record).ok();
+    let snapshot = lock_module_read(&module_read_state).adopt(snapshot, record);
+    if let Some(json) = json {
+        let mut session_report = lock_session_report(&report_state);
+        session_report.set_mode(if bench {
+            SESSION_MODE_BENCH
+        } else {
+            SESSION_MODE_REAL
+        });
+        let _ = session_report.add_module_read(&json);
+    }
+    snapshot
+}
+
 fn read_module_now(
     adapter_state: State<'_, SharedAdapterService>,
     session_state: State<'_, SharedSessionService>,
@@ -452,6 +514,23 @@ fn read_module_now(
     report_state: State<'_, SharedSessionReportService>,
     request: ModuleReadRequest,
 ) -> ModuleReadSnapshot {
+    // A module on a K-line is read over the K-line (`ADR-0029` slice B);
+    // every other module is read the way it always was.
+    let kline = {
+        let session = lock_session(&session_state);
+        KlineReadService::prepare(session.library(), &request)
+    };
+    if let Some(kline) = kline {
+        return read_kline_module_now(
+            adapter_state,
+            session_state,
+            module_read_state,
+            report_state,
+            request,
+            kline,
+        );
+    }
+
     let prepared = {
         let session = lock_session(&session_state);
         ModuleReadService::prepare(session.library(), &request)

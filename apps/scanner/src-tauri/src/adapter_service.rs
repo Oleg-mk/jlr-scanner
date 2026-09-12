@@ -4,8 +4,10 @@ use app_contracts::{
     VehicleInterfaceCapability, VehicleValidationState,
 };
 use diagnostic_execution::PreparedDiagnosticTransaction;
+use kline_execution::PreparedKlineTransaction;
 use mongoose_jlr::bench::{BenchTransport, SharedBenchBus};
 use mongoose_jlr::MongooseJ1979ReadResult;
+use mongoose_jlr::MongooseKlineReadResult;
 use mongoose_jlr::{list_vehicle_routes, MongooseJlrDevice, VehicleRouteId};
 use mongoose_jlr::{MongooseCalibrationIdentificationResult, MongooseDiagnosticError};
 use mongoose_jlr::{
@@ -127,6 +129,18 @@ impl Link {
         match self {
             Self::Serial(device) => device.execute_prepared_uds_read(transaction, timeout),
             Self::Bench(device) => device.execute_prepared_uds_read(transaction, timeout),
+        }
+    }
+
+    /// One read on a serial line (`ADR-0029` slice B), on either link.
+    fn execute_prepared_kline_read(
+        &mut self,
+        transaction: &PreparedKlineTransaction,
+        timeout: Duration,
+    ) -> Result<MongooseKlineReadResult, MongooseDiagnosticError> {
+        match self {
+            Self::Serial(device) => device.execute_prepared_kline_read(transaction, timeout),
+            Self::Bench(device) => device.execute_prepared_kline_read(transaction, timeout),
         }
     }
 
@@ -585,6 +599,21 @@ impl AdapterService<SystemAdapterBackend> {
             connection
                 .device
                 .execute_prepared_uds_read(transaction, timeout)
+        })
+    }
+
+    /// One prepared read on a serial line, live (`ADR-0029` slice B). The
+    /// device method accepts nothing but a transaction `kline-execution`
+    /// prepared from a resolved plan.
+    pub fn execute_kline_read(
+        &mut self,
+        transaction: &PreparedKlineTransaction,
+        timeout: Duration,
+    ) -> Option<Result<MongooseKlineReadResult, MongooseDiagnosticError>> {
+        self.connection.as_mut().map(|connection| {
+            connection
+                .device
+                .execute_prepared_kline_read(transaction, timeout)
         })
     }
 

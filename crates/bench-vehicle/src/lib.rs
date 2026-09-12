@@ -119,6 +119,10 @@ struct ModuleResponder {
     /// VIN field holds the bench's VIN, built from the same layout the
     /// decoder uses.
     configuration: BTreeMap<u16, Vec<u8>>,
+    /// SDD's own name for the module's diagnostic protocol. On a CAN bus it
+    /// is `ISO14229` and nothing reads it; on a serial line it decides which
+    /// framing the module answers in (`ADR-0029`).
+    protocol: String,
     /// Faults as they go on the wire: code high, code low, failure type.
     faults: Vec<[u8; 3]>,
     /// Consecutive frames waiting for the tester's flow control.
@@ -196,6 +200,7 @@ impl BenchVehicle {
                 .collect();
             modules.push(ModuleResponder {
                 family: entry.ecu_family.clone(),
+                protocol: entry.protocol.clone().unwrap_or_default(),
                 route,
                 request_id: request,
                 response_id: response,
@@ -478,7 +483,94 @@ impl BenchVehicle {
     }
 }
 
+impl BenchVehicle {
+    /// What a module on a serial line answers (`ADR-0029` slice B): the
+    /// request echoed, as a K-line echoes, then the module's own frame.
+    /// Synthetic like everything else here — the identification is a string
+    /// with a `BN` prefix no real part carries, and the fault memory is the
+    /// same codes the CAN modules draw, in DS2's own 16-bit shape.
+    fn answer_line(module: &mut ModuleResponder, request: &[u8]) -> Option<Vec<u8>> {
+        let node = u8::try_from(module.request_id).ok()?;
+        let mut answer = request.to_vec();
+        match module.protocol.as_str() {
+            ds2::PROTOCOL_FAMILY => {
+                let frame = ds2::parse_frame(request).ok()?;
+                if frame.node_address != node {
+                    return None;
+                }
+                let payload = match frame.payload().first().copied() {
+                    Some(ds2::COMMAND_IDENTIFICATION) => {
+                        module.answered += 1;
+                        synthetic_identification(&module.family, module.answered)
+                    }
+                    Some(ds2::COMMAND_FAULT_MEMORY) => {
+                        module.answered += 1;
+                        let mut bytes = Vec::new();
+                        for fault in &module.faults {
+                            bytes.extend_from_slice(&fault[..2]);
+                        }
+                        bytes
+                    }
+                    // A command this bench does not answer draws the
+                    // module's own refusal, as a real one would.
+                    _ => return Some(ds2_reply(node, 0x00, &[])),
+                };
+                answer.extend_from_slice(&ds2_reply(node, ds2::REPLY_ACCEPTED, &payload));
+            }
+            kwp2000::PROTOCOL_FAMILY => {
+                let message = kwp2000::parse_message(request).ok()?;
+                if message.target != node {
+                    return None;
+                }
+                let service = *message.payload.first()?;
+                let data = match service {
+                    kwp2000::SID_START_COMMUNICATION => vec![0xEF, 0x8F],
+                    kwp2000::SID_READ_ECU_IDENTIFICATION => {
+                        module.answered += 1;
+                        let option = *message.payload.get(1)?;
+                        let mut bytes = vec![option];
+                        bytes.extend_from_slice(&synthetic_identification(
+                            &module.family,
+                            module.answered,
+                        ));
+                        bytes
+                    }
+                    kwp2000::SID_READ_DTC_BY_STATUS => {
+                        module.answered += 1;
+                        let mut bytes = vec![u8::try_from(module.faults.len()).unwrap_or(u8::MAX)];
+                        for fault in &module.faults {
+                            bytes.extend_from_slice(&fault[..2]);
+                            bytes.push(0x60);
+                        }
+                        bytes
+                    }
+                    _ => return Some(answer),
+                };
+                answer.extend_from_slice(&kwp_reply(node, service, &data));
+            }
+            _ => return None,
+        }
+        Some(answer)
+    }
+}
+
 impl BenchBus for BenchVehicle {
+    fn on_line_bytes(&mut self, route: BenchRoute, bytes: &[u8]) -> Vec<u8> {
+        if bytes.is_empty() {
+            return Vec::new();
+        }
+        let Some(module) = self.modules.iter_mut().find(|module| {
+            module.route == route && bytes.first() == u8::try_from(module.request_id).ok().as_ref()
+        }) else {
+            return Vec::new();
+        };
+        Self::answer_line(module, bytes).unwrap_or_default()
+    }
+
+    fn has_serial_modules(&self, route: BenchRoute) -> bool {
+        self.modules.iter().any(|module| module.route == route)
+    }
+
     fn on_frame(&mut self, route: BenchRoute, frame: &CanFrame) -> Vec<CanFrame> {
         let vin = self.vin.clone();
         // A frame at the functional request reaches whoever sits at one of
@@ -546,10 +638,55 @@ fn parse_id(text: &str) -> Option<u32> {
     u32::from_str_radix(hex, 16).ok()
 }
 
+/// A DS2 reply frame: node, length, status, payload, XOR checksum.
+fn ds2_reply(node: u8, status: u8, payload: &[u8]) -> Vec<u8> {
+    let mut frame = vec![node, 0, status];
+    frame.extend_from_slice(payload);
+    frame[1] = u8::try_from(frame.len() + 1).unwrap_or(u8::MAX);
+    let checksum = ds2::xor_checksum(&frame);
+    frame.push(checksum);
+    frame
+}
+
+/// A KWP2000 positive response, physically addressed back to the tester.
+fn kwp_reply(node: u8, service: u8, data: &[u8]) -> Vec<u8> {
+    let mut message = vec![0x80, kwp2000::TESTER_ADDRESS, node];
+    let mut payload = vec![service.wrapping_add(kwp2000::POSITIVE_RESPONSE_OFFSET)];
+    payload.extend_from_slice(data);
+    message[0] = 0x80 | u8::try_from(payload.len().min(0x3F)).unwrap_or(0x3F);
+    message.extend_from_slice(&payload);
+    let checksum = kwp2000::sum_checksum(&message);
+    message.push(checksum);
+    message
+}
+
+/// A part-number-shaped string no real part carries, the same for the same
+/// module (`ADR-0020`: every bench value is synthetic and says so).
+fn synthetic_identification(family: &str, answered: u32) -> Vec<u8> {
+    let mut seed = scenario_seed(answered, family);
+    let letter = |seed: &mut u32| -> u8 { b'A' + (next_draw(seed) % 26) as u8 };
+    let digit = |seed: &mut u32| -> u8 { b'0' + (next_draw(seed) % 10) as u8 };
+    let mut text = vec![b'B', b'N'];
+    for _ in 0..2 {
+        text.push(digit(&mut seed));
+    }
+    text.push(b'-');
+    for _ in 0..2 {
+        text.push(letter(&mut seed));
+    }
+    for _ in 0..3 {
+        text.push(digit(&mut seed));
+    }
+    text
+}
+
 fn parse_route(text: &str) -> Option<BenchRoute> {
     match text.trim() {
         "hs-can" => Some(BenchRoute::HsCan),
         "ms-can" => Some(BenchRoute::MsCan),
+        // ADR-0029 slice B: a serial line, where the module answers bytes.
+        "k-line-7" => Some(BenchRoute::KLine7),
+        "k-line-8" => Some(BenchRoute::KLine8),
         _ => None,
     }
 }

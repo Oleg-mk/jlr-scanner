@@ -79,7 +79,11 @@ export function ModuleDetails({
   const route = moduleRoute(module);
   const status = nodeStatus(module, outcome, busy);
   const readable = route !== "none";
-  const canRead = adapterReady && !busy && readable && (kind === "FAULT_CODES" || identifier !== "");
+  // A module on a K-line is read over its own protocol (ADR-0029): the
+  // operations are that protocol's, and there is no identifier to choose.
+  const serial = module.protocol === "DS2" || module.protocol === "KW2000";
+  const canRead =
+    adapterReady && !busy && readable && (serial || kind === "FAULT_CODES" || identifier !== "");
   const reasons = moduleReasons(module);
 
   return (
@@ -147,11 +151,22 @@ export function ModuleDetails({
                 value={kind}
                 onChange={(event) => onKindChange(event.target.value as ModuleReadKind)}
               >
-                <option value="FAULT_CODES">{t("Confirmed fault codes")}</option>
-                <option value="IDENTIFIER">{t("Identifier")}</option>
+                {serial ? (
+                  <>
+                    <option value="FAULT_CODES">{t("Fault memory")}</option>
+                    {module.protocol === "DS2" ? (
+                      <option value="IDENTIFIER">{t("Identification")}</option>
+                    ) : null}
+                  </>
+                ) : (
+                  <>
+                    <option value="FAULT_CODES">{t("Confirmed fault codes")}</option>
+                    <option value="IDENTIFIER">{t("Identifier")}</option>
+                  </>
+                )}
               </select>
             </label>
-            {kind === "IDENTIFIER" ? (
+            {kind === "IDENTIFIER" && !serial ? (
               <label className="field">
                 <span>{t("Identifier")}</span>
                 <select

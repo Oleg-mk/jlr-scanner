@@ -267,5 +267,30 @@ met.
   wake-up SDD names and this adapter has not been shown to do (`bmw_kw2000_star`,
   `rosco`) is refused rather than skipped.
 
-**Still owed on slice B:** the shell read through the shared record and the
-intake, and the bench's DS2 and KWP2000 answers.
+- *The shell.* `kline_read_service`: a module the data places on a K-line
+  protocol this product speaks is read over that line, in the panel the
+  reader already uses. It keeps no state — the snapshot and the record go to
+  the module read service, which is where the panel and the session report
+  look — and it offers only what `ADR-0029` allows: on DS2 the
+  identification and the fault memory, on KWP2000 the fault codes. A
+  KWP2000 identification is refused in as many words, because the local
+  identifier SDD states per module does not reach this library yet and this
+  product does not send a default option to a car. Every read leaves the
+  record a single read leaves (`SerialRead`, beside the CAN one), so the
+  intake needed no change at all: the node address stands where a CAN
+  identifier would, said as `node 0x72`.
+- *The interface.* A K-line module's operations are its protocol's —
+  *Fault memory*, and *Identification* on DS2 — and no identifier is asked
+  for, because a serial line has none to choose.
+- *The bench.* `BenchRoute` gained the two lines, the bench transport takes
+  the K-line resources, the single-pin selection and the two line commands
+  (answering the fast init as the real firmware does, with a timeout where
+  nothing is on the line), and `bench-vehicle` answers DS2 and KWP2000 in
+  their own framing — the identification a `BN`-prefixed string no real part
+  carries, the fault memory the same codes the CAN modules draw. The shell's
+  end-to-end bench test now reads DS2MOD's identification and its fault
+  memory over a K-line, through the whole stack, and fails if either row
+  reads anything but `SYNTHETIC`.
+
+**Slice B is complete.** What remains is not code: a K-line module has still
+never answered, and the parity command stays a guess until one does.

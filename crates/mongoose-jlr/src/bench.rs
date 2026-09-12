@@ -145,6 +145,13 @@ impl BenchTransport {
             }
             passive::OPEN_CHANNEL => self.open_channel(route, sequence, &body),
             passive::SET_PIN => self.set_pin(route, sequence, &body),
+            // The two line commands (ADR-0029 slice B). The real firmware
+            // takes the config word without validating it, and answers the
+            // fast init when a module replies; the bench does the same.
+            crate::kline::SET_CONFIG => {
+                self.accept(route, crate::kline::SET_CONFIG_RESPONSE, sequence)
+            }
+            crate::kline::FAST_INIT => self.fast_init(route, sequence),
             passive::CLOSE_CHANNEL => {
                 self.channels.remove(&route);
                 self.accept(route, passive::CLOSE_CHANNEL_RESPONSE, sequence);
@@ -164,6 +171,9 @@ impl BenchTransport {
         let bench_route = match route {
             CAN1_RESOURCE_ROUTE => BenchRoute::HsCan,
             CAN2_RESOURCE_ROUTE => BenchRoute::MsCan,
+            crate::kline::ISO9141_RESOURCE_ROUTE | crate::kline::ISO14230_RESOURCE_ROUTE => {
+                BenchRoute::KLine7
+            }
             other => {
                 let text = format!(
                     "cOpenChannel: Unsupported or Invalid Resource ID {}",
@@ -206,6 +216,16 @@ impl BenchTransport {
                 (Some(3), Some(11)),
                 "SetPins: MongoosePro JLR board only supports CAN2 on pin 3 and 11",
             ),
+            // One wire, and the firmware's own words for a wrong one, read
+            // off the adapter on 2026-09-12.
+            BenchRoute::KLine7 => (
+                (Some(7), Some(0)),
+                "MongoosePro JLR board supports ISO9141 K line on pin 3, 7 or 8",
+            ),
+            BenchRoute::KLine8 => (
+                (Some(8), Some(0)),
+                "MongoosePro JLR board supports ISO9141 K line on pin 3, 7 or 8",
+            ),
         };
         if pins != expected {
             self.refuse(route, passive::SET_PIN_RESPONSE, sequence, 0x206, text);
@@ -213,6 +233,33 @@ impl BenchTransport {
         }
         channel.pins_selected = true;
         self.accept(route, passive::SET_PIN_RESPONSE, sequence);
+    }
+
+    /// The wake-up ISO 14230 asks for. With a module on the line the real
+    /// adapter answers it; with none it times out, in the firmware's own
+    /// words.
+    fn fast_init(&mut self, route: u16, sequence: u16) {
+        let route_on_the_bench = self
+            .channels
+            .get(&route)
+            .map(|channel| channel.route)
+            .unwrap_or(BenchRoute::KLine7);
+        let has_modules = self
+            .bus
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .has_serial_modules(route_on_the_bench);
+        if has_modules {
+            self.accept(route, crate::kline::FAST_INIT_RESPONSE, sequence);
+        } else {
+            self.refuse(
+                route,
+                crate::kline::FAST_INIT_RESPONSE,
+                sequence,
+                0x208,
+                "Fast Init: Timeout on response",
+            );
+        }
     }
 
     fn outbound(&mut self, route: u16, sequence: u16, body: &[u8]) {
@@ -232,6 +279,23 @@ impl BenchTransport {
         // an inbound frame ahead of it would be dropped (`wait_for_response`).
         self.accept(route, passive::OUTBOUND_DATA_RESPONSE, sequence);
         if !forward {
+            return;
+        }
+        // A serial line carries bytes, not frames: the record's data is the
+        // whole of it and the vehicle answers in bytes (ADR-0029 slice B).
+        if bench_route.is_serial() {
+            let Some(bytes) = parse_outbound_line(body) else {
+                return;
+            };
+            let answer = self
+                .bus
+                .lock()
+                .unwrap_or_else(PoisonError::into_inner)
+                .on_line_bytes(bench_route, &bytes);
+            if !answer.is_empty() {
+                let tick = self.tick();
+                self.emit(passive::inbound_line_bytes(route, 0, tick, &answer));
+            }
             return;
         }
         let Some(frame) = parse_outbound(body, bench_route) else {
@@ -354,6 +418,13 @@ fn parse_outbound(body: &[u8], route: BenchRoute) -> Option<CanFrame> {
         CanId::standard(u16::try_from(id).ok()?).ok()?
     };
     CanFrame::new(0, route.as_str(), id, data).ok()
+}
+
+/// The bytes of a serial outbound record: the same header as a CAN one,
+/// and the data where the identifier would be (`ADR-0029` slice B).
+fn parse_outbound_line(body: &[u8]) -> Option<Vec<u8>> {
+    let size = read_u32(body, 8)? as usize;
+    Some(body.get(12..12 + size)?.to_vec())
 }
 
 fn read_u32(bytes: &[u8], offset: usize) -> Option<u32> {
