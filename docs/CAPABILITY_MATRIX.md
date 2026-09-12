@@ -21,7 +21,7 @@ Written 2026-09-12 at the owner's request: what a person gets from SDD at its fu
 | `not found in the data` | not found in SDD 169's data; may still exist in its runtime |
 | `—` | not applicable, or already answered by the column before |
 
-**Counts.** 99 rows. SDD does 63 of them. ProwlOne today: 39 built, 3 partly, 2 open inside stage 1. The roadmap: 20 in stage 2, 8 in stage 3. The ceiling: 53 possible, 3 need other hardware, 8 excluded for good. 10 rows are things SDD does not do and ProwlOne already does; 8 rows are things SDD does that ProwlOne will never do.
+**Counts.** 99 rows. SDD does 63 of them. ProwlOne today: 40 built, 2 partly, 2 open inside stage 1. The roadmap: 20 in stage 2, 8 in stage 3. The ceiling: 53 possible, 3 need other hardware, 8 excluded for good. 10 rows are things SDD does not do and ProwlOne already does; 8 rows are things SDD does that ProwlOne will never do.
 
 ## Vehicle, modules, network
 
@@ -161,7 +161,7 @@ Written 2026-09-12 at the owner's request: what a person gets from SDD at its fu
 | A tester's report becomes evidence (intake) | **no** | **built** | **—** | **built** | F13; ADR-0016 |
 | Unknown stays unknown: validation states | **no** | **built** | **—** | **built** | DEVELOPMENT_PRINCIPLES |
 | Vehicle history across sessions, trends | **likely** — dealer database | **no** | **—** | **possible** | CURRENT_JLR_DEALER_DATABASE_RUNTIME |
-| Print, PDF, sharing | **likely** | **partly** — the bundle file | **—** | **possible** | — |
+| Print, PDF, sharing | **likely** | **built** — the session as a document: print, PDF through the system dialog, saved as one web page, VIN masking (ADR-0031) | **—** | **possible** — a workshop template with its own letterhead | ADR-0031 |
 
 ## Platform and ease of use
 

@@ -627,6 +627,15 @@ export function App({
                     onSave={() => void session.save()}
                     onPreview={() => void session.showPreview()}
                     onHidePreview={session.hidePreview}
+                    document={session.document}
+                    mask={session.mask}
+                    onMaskChange={(masked) => void session.setMasked(masked)}
+                    onShowDocument={() => void session.showDocument()}
+                    onHideDocument={session.hideDocument}
+                    onPrint={() => void session.print()}
+                    onSaveDocument={() => void session.saveDocument()}
+                    savedPath={session.savedPath}
+                    onReveal={() => void session.reveal()}
                   />
                 ) : null}
               </section>

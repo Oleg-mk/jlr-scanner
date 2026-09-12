@@ -1968,6 +1968,49 @@ main.flow {
    reads at a glance, the three readings a session turns on, and the rest in
    groups. No colour here says good or bad — the application states no
    threshold of its own. */
+/* The readable report (ADR-0031): on screen it sits under the report panel;
+   when the page is printed, it is the only thing on it. */
+.print-portal {
+  margin-top: 1rem;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  overflow: hidden;
+  background: #fff;
+}
+
+.report-document {
+  margin-top: 1.25rem;
+  border-top: 1px solid var(--line);
+  padding-top: 0.75rem;
+}
+
+.report-document h3 {
+  margin: 0 0 0.35rem;
+  font-size: 0.95rem;
+}
+
+/* Printing hides the application and leaves the document alone on the page.
+   Visibility rather than display, so the rule holds however deep the portal
+   sits in the tree; the portal is lifted to the top of the sheet. */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  .print-portal,
+  .print-portal * {
+    visibility: visible;
+  }
+  .print-portal {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    border: none;
+    margin: 0;
+    border-radius: 0;
+  }
+}
+
 .battery-card {
   margin: 1.25rem 0 0.75rem;
   padding: 0.85rem 0.9rem 0.75rem;

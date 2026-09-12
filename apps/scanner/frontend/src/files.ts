@@ -26,12 +26,13 @@ export function hasTauriRuntime() {
 export async function saveTextFile(
   suggestedName: string,
   contents: string,
-  format: "json" | "csv" = "json",
+  format: "json" | "csv" | "html" = "json",
 ): Promise<string | null> {
   if (hasTauriRuntime()) {
     return invoke<string | null>("save_text_file", { suggestedName, contents, format });
   }
-  const type = format === "csv" ? "text/csv" : "application/json";
+  const type =
+    format === "csv" ? "text/csv" : format === "html" ? "text/html" : "application/json";
   const url = URL.createObjectURL(new Blob([contents], { type }));
   const anchor = document.createElement("a");
   anchor.href = url;

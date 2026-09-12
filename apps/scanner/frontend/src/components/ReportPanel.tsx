@@ -1,5 +1,7 @@
 import { t, useLanguage } from "../i18n";
+import type { PrintableReport as ReportModel } from "../printableReport";
 import type { SessionReportSnapshot } from "../sessionReport";
+import { PrintableReport } from "./PrintableReport";
 
 interface ReportPanelProps {
   snapshot: SessionReportSnapshot;
@@ -11,6 +13,19 @@ interface ReportPanelProps {
   preview?: string | null;
   onPreview?: () => void;
   onHidePreview?: () => void;
+  /**
+   * The readable report (ADR-0031): the same session as a document to
+   * print, save as a web page, and hand over.
+   */
+  document?: ReportModel | null;
+  mask?: boolean;
+  onMaskChange?: (masked: boolean) => void;
+  onShowDocument?: () => void;
+  onHideDocument?: () => void;
+  onPrint?: () => void;
+  onSaveDocument?: () => void;
+  savedPath?: string | null;
+  onReveal?: () => void;
 }
 
 /** What the session has recorded so far, and the one file it becomes. */
@@ -23,6 +38,15 @@ export function ReportPanel({
   preview = null,
   onPreview,
   onHidePreview,
+  document = null,
+  mask = false,
+  onMaskChange,
+  onShowDocument,
+  onHideDocument,
+  onPrint,
+  onSaveDocument,
+  savedPath = null,
+  onReveal,
 }: ReportPanelProps) {
   useLanguage();
   return (
@@ -79,6 +103,62 @@ export function ReportPanel({
           {error}
         </p>
       ) : null}
+          <div className="report-document">
+        <h3>{t("Readable report")}</h3>
+        <p className="operation-copy">
+          {t(
+            "The same session as a document: the car, the library, the modules and every read, in the language of this window. Print it, or save it as a web page any browser turns into a PDF. The bundle beside it stays the record.",
+          )}
+        </p>
+        <label className="check-option">
+          <input
+            type="checkbox"
+            checked={mask}
+            onChange={(event) => onMaskChange?.(event.target.checked)}
+          />
+          <span>{t("Mask the VIN and the adapter's serial in the document")}</span>
+        </label>
+        <div className="diagnostic-actions">
+          <button
+            className="button button--secondary"
+            type="button"
+            onClick={document === null ? onShowDocument : onHideDocument}
+            disabled={!snapshot.reportAvailable}
+          >
+            {document === null ? t("Prepare the document") : t("Hide the document")}
+          </button>
+          <button
+            className="button button--secondary"
+            type="button"
+            onClick={onPrint}
+            disabled={!snapshot.reportAvailable}
+          >
+            {t("Print / save as PDF")}
+          </button>
+          <button
+            className="button button--secondary"
+            type="button"
+            onClick={onSaveDocument}
+            disabled={!snapshot.reportAvailable || bench}
+            title={bench ? t("Bench session: nothing is written to disk.") : undefined}
+          >
+            {t("Save as a web page")}
+          </button>
+        </div>
+        {savedPath === null ? null : (
+          <p className="button-hint" role="status">
+            {t("Document written to {path}", { path: savedPath })}{" "}
+            <button className="button button--quiet" type="button" onClick={onReveal}>
+              {t("Show in folder")}
+            </button>
+          </p>
+        )}
+      </div>
+      {document === null ? null : (
+        <div className="print-portal">
+          <PrintableReport report={document} />
+        </div>
+      )}
     </div>
   );
 }

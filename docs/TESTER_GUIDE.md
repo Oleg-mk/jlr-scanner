@@ -406,6 +406,31 @@ socket. Then, in order:
 If a step fails, save the report anyway and go on to the next step. A car
 that stays silent is evidence too.
 
+## The readable report
+
+The session bundle is one JSON file, written for the intake, and it reads
+like one. Beside it, at the foot of the report section, the application
+builds the **same session as a document**: the car, the adapter, the data
+library, the modules with the reason beside each one that could not be
+read, and every read of the session in tables.
+
+- **Print / save as PDF** opens your system's print dialog, where "Microsoft
+  Print to PDF" (Windows) or "Save as PDF" (macOS) is a printer like any
+  other.
+- **Save as a web page** writes one file that carries its own styles. Any
+  browser opens it and prints it; nothing else is needed to read it.
+- **Mask the VIN and the adapter's serial** hides all but the last four
+  characters in the document. The bundle keeps them: the mask is a property
+  of what you hand over, not of the evidence.
+
+After saving, the application says where the file went and offers to show
+it in the folder, so you can attach it to a message. It never sends
+anything itself.
+
+The document shows what the modules answered and draws no conclusion. On
+the bench it carries a band across the head and the word `SYNTHETIC` on
+every table.
+
 ## What to send
 
 The build you run is written at the foot of the window, for example `0.9.3 · a1b2c3d`; quote it in every message, and it is also inside the report file.

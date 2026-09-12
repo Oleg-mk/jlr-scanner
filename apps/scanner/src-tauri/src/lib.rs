@@ -558,8 +558,9 @@ async fn get_session_report_json(
 /// dialog was cancelled.
 ///
 /// `format` is `json` unless the caller says `csv` — an exported live
-/// series (ADR-0022 §5, amended). It picks the dialog's filter and nothing
-/// else about the write changes; the bench still writes nothing.
+/// series (ADR-0022 §5, amended) — or `html`, the readable report
+/// (ADR-0031). It picks the dialog's filter and nothing else about the
+/// write changes; the bench still writes nothing.
 #[tauri::command]
 async fn save_text_file(
     app: tauri::AppHandle,
@@ -584,6 +585,8 @@ async fn save_text_file(
     }
     let (label, extension) = match format.as_deref() {
         Some("csv") => ("CSV", "csv"),
+        // The readable report (ADR-0031): one web page any browser prints.
+        Some("html") => ("Web page", "html"),
         _ => ("JSON", "json"),
     };
     let Some(chosen) = app
@@ -599,6 +602,37 @@ async fn save_text_file(
     std::fs::write(&path, contents)
         .map_err(|error| format!("could not write {}: {error}", path.display()))?;
     Ok(Some(path.display().to_string()))
+}
+
+/// Show a file the application has just written in the system's own file
+/// manager, so it can be attached to a message (ADR-0031). Nothing is sent
+/// anywhere and nothing is opened: the folder is shown with the file
+/// selected. A path the application did not just write is not revealed —
+/// the caller passes back what `save_text_file` returned.
+#[tauri::command]
+async fn reveal_in_folder(path: String) -> Result<(), String> {
+    let file = std::path::Path::new(&path);
+    if !file.is_file() {
+        return Err(format!("{path} is not a file this application wrote"));
+    }
+    let result = if cfg!(target_os = "windows") {
+        std::process::Command::new("explorer")
+            .arg(format!("/select,{path}"))
+            .spawn()
+    } else if cfg!(target_os = "macos") {
+        std::process::Command::new("open")
+            .arg("-R")
+            .arg(&path)
+            .spawn()
+    } else {
+        let folder = file.parent().unwrap_or(file);
+        std::process::Command::new("xdg-open").arg(folder).spawn()
+    };
+    // Windows Explorer answers with a non-zero exit code even when it
+    // opens, so only a failure to start the program is an error here.
+    result
+        .map(|_| ())
+        .map_err(|error| format!("could not show {path}: {error}"))
 }
 
 /// Start a new session once the user confirms in a native dialog: the
@@ -1673,6 +1707,7 @@ pub fn run() {
             get_session_report_state,
             get_session_report_json,
             save_text_file,
+            reveal_in_folder,
             pick_directory,
             start_new_session
         ])
