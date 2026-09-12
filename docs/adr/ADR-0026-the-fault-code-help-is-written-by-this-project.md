@@ -130,6 +130,60 @@ by how many screens carry each — and translating the first few hundred closes
 most of the gap. Until then they are shown in English, one line at a time,
 which is what fail-closed means here.
 
+## Amendment, 2026-09-12: the row is found by the mnemonic's name
+
+The 88 % of decision 3 had a cause the review of 2026-09-12 named plainly: the
+ingest joins a screen's mnemonics with a newline and the loader splits on
+one, so a mnemonic with a newline inside it reaches the product as fragments
+— `Control module pin:` on 311 screens — and a fragment has no row because as
+a unit it does not exist. Fingerprinting the text could never reach those
+lines. The name can: it is the identifier the owner's file is keyed by, and
+every line the library shows has one.
+
+1. **The ingest writes a second claim beside the text**,
+   `sdd_help_screen_items.<screen>`: one line per item, the mnemonic's name,
+   U+001F, its text flattened to one line. The text claim stays exactly as it
+   was, so a library issued before this date still loads, and a library from
+   after it reads either way.
+
+2. **The table carries both keys**: five columns — name, fingerprint,
+   English, Ukrainian, Russian — 26,893 rows, one per named text, 13.0 MB.
+   The name is tried first, the fingerprint when the name has no row, and a
+   line with neither stays the library's English. Neither key is a sentence
+   of SDD's.
+
+3. **A synthetic fixture may not borrow a real name.** The first run of the
+   name-keyed lookup found the owner's real wording for an inertia switch
+   under the fixture's `H_CAUSE_1`, which is a real name in the corpus. That
+   was the lookup working and the fixture lying; the fixture's mnemonics are
+   `SYNTH_*` now, except the two structural ones every real screen carries,
+   which are there precisely to prove that a name reaches its row even where
+   the fixture's text differs from the corpus's.
+
+4. **A name is a key only within the corpus the table was built from.** SDD
+   169 is the last release, so that is every corpus there will be; recorded
+   so nobody reuses the table against a different one.
+
+5. **The library must be re-exported for the gain**, and every issued copy
+   re-made. Done the same day: 279,674 records against 242,691, one items
+   claim per screen, `dtc_help.json.gz` 11.7 MB against 9.6; the owner's copy
+   re-stamped as `656D-B4C9` and read back. Coverage by fingerprint on an
+   older library stays at the 88 % measured above.
+
+6. **Measured on the re-exported library, and a second cause found.** Of the
+   272,730 items on its 36,983 screens, 88.9 % find a row by name, 0.35 % by
+   fingerprint, and 10.8 % stay English. The names that stay English —
+   `H_CAUSE_12230`, `H_ACTION_11829` — are real, and absent from the table
+   because they were absent from the file the owner was given: that file was
+   built from a copy of the help pack holding 3,451 documents and 26,893
+   named texts, while the library was exported from the full pack of 6,168
+   documents and 42,636. The other 15,743 named texts, 1.4 MB at a mean of
+   93 characters, filling 30,289 screen places, were never offered for
+   translation. This was the assistant's error in preparing the work, twice
+   over; the newline was real but the smaller cause. Those texts are now
+   listed by name in the order of their use, and they are the first input to
+   the translation pipeline of 2026-09-12 rather than to the owner's hand.
+
 ## Consequences
 
 - Ukrainian gets a fault-code help layer that has never existed in any tool.

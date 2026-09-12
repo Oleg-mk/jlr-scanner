@@ -578,6 +578,26 @@ its English, one name at a time.
 
 Ukrainian becomes a full interface for vehicle data for the first time.
 
+### F18 — the fault-code help is written by this project (decided 2026-09-11, `ADR-0026`; amended 2026-09-12)
+
+The help a code gets — possible causes, actions required, the conditions the
+module sets it under — was SDD's English in all three interfaces. The owner
+wrote all 26,893 named texts in three languages, in two rounds measured
+against the source each time; two faults were corrected here and logged line
+by line. The words are this project's own; the library still decides which
+lines a car is given.
+
+`ADR-0026` decides where it lives and how a line finds its row: in the
+repository beside the parameter names, keyed first by the mnemonic's name and
+then by a fingerprint of the line, never by the line itself. The first build
+reached 88 % of what a screen shows because the library split named texts on
+the newlines inside them; the 2026-09-12 amendment has the ingest name a
+screen's items, so a library exported from that day reaches every line the
+owner wrote. Ukrainian has this layer for the first time in any tool.
+
+What remains is the owner's remaining lines — listed for him in the order of
+their use — and, separately, the review's open items above it.
+
 ### Beyond stage 1
 
 Service functions and configuration follow only after an explicit owner decision

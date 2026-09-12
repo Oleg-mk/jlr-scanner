@@ -11,8 +11,9 @@ use knowledge::{
     SourceRecord, SourceType, ValidationState, VehicleContext, YearConstraint,
 };
 use sdd_ingest::{
-    DtcHelpAdapter, DTC_FAULT_TYPE_DIMENSION, DTC_HELP_CLAIM, DTC_TYPE_DIMENSION,
-    MODEL_YEAR_DESIGNATION_DIMENSION, MODULE_DATA_NAME_DIMENSION,
+    DtcHelpAdapter, DTC_FAULT_TYPE_DIMENSION, DTC_HELP_CLAIM, DTC_HELP_ITEM_SEPARATOR,
+    DTC_HELP_SCREEN_ITEMS_CLAIM_PREFIX, DTC_TYPE_DIMENSION, MODEL_YEAR_DESIGNATION_DIMENSION,
+    MODULE_DATA_NAME_DIMENSION,
 };
 use std::collections::BTreeMap;
 
@@ -181,7 +182,9 @@ fn a_designation_filters_correctly_but_never_reaches_applicable() {
         .map(|entry| entry.record.id)
         .collect();
     assert!(
-        non_matching.iter().all(|id| id.contains(".helpscreen.")),
+        non_matching
+            .iter()
+            .all(|id| id.contains(".helpscreen.") || id.contains(".helpscreenitems.")),
         "{non_matching:?}"
     );
 }
@@ -207,6 +210,8 @@ fn a_selection_without_a_defined_description_is_skipped() {
             "f9-dtc.dtc.0x0000.help.synthmod-syntha-my07-17",
             "f9-dtc.dtc.0x0000.helpscreen.flt-type-17-synth-default-hlp-001",
             "f9-dtc.dtc.0x0000.helpscreen.flt-type-17-synth-default-hlp-002",
+            "f9-dtc.dtc.0x0000.helpscreenitems.flt-type-17-synth-default-hlp-001",
+            "f9-dtc.dtc.0x0000.helpscreenitems.flt-type-17-synth-default-hlp-002",
         ]
     );
 }
@@ -340,6 +345,53 @@ fn the_help_screen_a_car_is_given_is_recorded_apart_from_what_the_screen_says() 
             "Synthetic sensor circuit – short to ground",
         ]
     );
+
+    // The same screen by the names of its items (2026-09-12): the unit a
+    // translation is keyed by, one line each whatever the text does, with
+    // the name and the text parted by U+001F. A mnemonic the string table
+    // does not define is left out here as it is above.
+    let items = store
+        .get_record("f9-dtc.dtc.0x0000.helpscreenitems.flt-type-17-synth-default-hlp-001")
+        .expect("the screen is named item by item");
+    assert_eq!(
+        items.key,
+        ClaimKey::Custom {
+            name: format!(
+                "{}FLT_TYPE_17_SYNTH_DEFAULT_HLP_001",
+                DTC_HELP_SCREEN_ITEMS_CLAIM_PREFIX
+            )
+        }
+    );
+    let KnowledgeValue::Text { value } = &items.value else {
+        panic!("{:?}", items.value)
+    };
+    assert_eq!(
+        value
+            .lines()
+            .map(|line| line
+                .split_once(DTC_HELP_ITEM_SEPARATOR)
+                .expect("name and text"))
+            .collect::<Vec<_>>(),
+        vec![
+            ("J_I_POSSIBLE_CAUSES", "Possible causes:"),
+            (
+                "SYNTH_CAUSE_1",
+                "Synthetic sensor circuit open, resistance above 2.30 ohms between -40°C and +85°C"
+            ),
+            ("J_I_ACTIONS_REQUIRED", "Actions required:"),
+            (
+                "SYNTH_ACTION_1",
+                "Refer to the synthetic circuit diagrams and test the sensor circuit."
+            ),
+        ]
+    );
+    let sparse_items = store
+        .get_record("f9-dtc.dtc.0x0000.helpscreenitems.flt-type-17-synth-default-hlp-002")
+        .expect("the sparse screen is named too");
+    let KnowledgeValue::Text { value } = &sparse_items.value else {
+        panic!("{:?}", sparse_items.value)
+    };
+    assert_eq!(value.lines().count(), 2, "{value}");
 
     // A screen with no items at all is no help: two thirds of the real corpus
     // is such screens, and they must produce no claim.

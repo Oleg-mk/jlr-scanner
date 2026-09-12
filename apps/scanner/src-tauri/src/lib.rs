@@ -1048,21 +1048,23 @@ fn start_mileage_survey_now(
     request: MileageSurveyRequest,
 ) -> MileageSurveySnapshot {
     let adapter = { lock_service(&adapter_state).connected_adapter() };
+    // Without an adapter the honest answer is that, not that the data
+    // names no mileage.
+    let Some(adapter) = adapter else {
+        return lock_mileage(&mileage_state).refuse(adapter_unavailable());
+    };
     let mut session = lock_session(&session_state);
     // Every module the survey reaches is asked; the point is breadth.
-    let families: Vec<String> = match adapter {
-        Some(_) => session
-            .survey(&request.context)
-            .modules
-            .iter()
-            .map(|module| module.ecu_family.clone())
-            .collect(),
-        None => Vec::new(),
-    };
+    let families: Vec<String> = session
+        .survey(&request.context)
+        .modules
+        .iter()
+        .map(|module| module.ecu_family.clone())
+        .collect();
     let mut mileage = lock_mileage(&mileage_state);
     mileage.start(
         session.library(),
-        adapter.as_ref(),
+        Some(&adapter),
         &request.context,
         &families,
     )
@@ -1088,6 +1090,7 @@ fn mileage_survey_step_now(
             .map(|result| result.map_err(map_live_error));
         (result, bench)
     };
+    let connected = result.is_some();
     let outcome = result.unwrap_or_else(|| Err(adapter_unavailable()));
 
     {
@@ -1095,6 +1098,11 @@ fn mileage_survey_step_now(
         mileage.record(due.index, outcome);
         if bench {
             mileage.mark_synthetic();
+        }
+        // An adapter that is gone will not come back for the next module;
+        // what was read stays, as the live read does.
+        if !connected {
+            mileage.finish();
         }
     }
     record_mileage_survey(&mileage_state, &report_state, bench);

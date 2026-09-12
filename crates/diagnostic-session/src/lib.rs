@@ -162,6 +162,10 @@ struct DtcIndex {
     help: BTreeMap<String, Vec<HelpSelection>>,
     /// `DTC-<code>` → screen name → what that screen says, line by line.
     help_screens: BTreeMap<String, BTreeMap<String, Vec<String>>>,
+    /// `DTC-<code>` → screen name → the screen's items, each the mnemonic's
+    /// name and its text on one line. Present in libraries exported since
+    /// 2026-09-12; absent before, when `help_screens` alone is used.
+    help_screen_items: BTreeMap<String, BTreeMap<String, Vec<(String, String)>>>,
 }
 
 /// Everything indexed in one pass over the store after a load.
@@ -488,16 +492,28 @@ impl KnowledgeLibrary {
             );
             return description;
         }
-        if let Some(lines) = self
+        // The library says which lines this car is given; the words are this
+        // project's own (`ADR-0026`), and a line it has no wording for keeps
+        // the library's English. A library that names the screen's items
+        // is read by name, the unit a translation is keyed by; an older one
+        // is read by the text of each line.
+        if let Some(items) = self
+            .indexes
+            .dtc_index
+            .help_screen_items
+            .get(&entity)
+            .and_then(|screens| screens.get(*screen))
+        {
+            let (shown, texts) = help_text::screen_by_names(items);
+            description.help = shown;
+            description.help_texts = texts;
+        } else if let Some(lines) = self
             .indexes
             .dtc_index
             .help_screens
             .get(&entity)
             .and_then(|screens| screens.get(*screen))
         {
-            // The library says which lines this car is given; the words are
-            // this project's own (`ADR-0026`), and a line it has no wording
-            // for keeps the library's English.
             let (shown, texts) = help_text::screen(lines);
             description.help = shown;
             description.help_texts = texts;
@@ -807,6 +823,22 @@ fn build_indexes(store: &KnowledgeStore) -> Indexes {
                                     applicability: record.applicability.clone(),
                                     fault_type,
                                     screen: value.clone(),
+                                });
+                        } else if let Some(screen) = name.strip_prefix("sdd_help_screen_items.") {
+                            // One line per item: the name, U+001F, the text.
+                            dtc_index
+                                .help_screen_items
+                                .entry(id.to_string())
+                                .or_default()
+                                .entry(screen.to_string())
+                                .or_insert_with(|| {
+                                    value
+                                        .lines()
+                                        .filter_map(|line| {
+                                            let (name, text) = line.split_once('\u{1F}')?;
+                                            Some((name.to_string(), text.to_string()))
+                                        })
+                                        .collect()
                                 });
                         } else if let Some(screen) = name.strip_prefix("sdd_help_screen.") {
                             dtc_index

@@ -3,7 +3,10 @@
   SYNTHETIC F9 FIXTURE. Not JLR evidence and not promotable to evidence.
 
   Reproduces only the element shape of an SDD per-code DTC help document so the
-  parser can be tested offline. Values exercise parsing branches:
+  parser can be tested offline. Mnemonic names are synthetic (SYNTH_*)
+  except the two structural ones SDD uses on every screen, because a name
+  is a key the product resolves wording by, and a real name here would
+  find real wording. Values exercise parsing branches:
 
     * two descriptions selected by different module/model qualifiers;
     * several model-year designations for one description, including the
@@ -54,13 +57,13 @@
 <helpScreen id="9101" name="SYNTH_DEFAULT_HLP_001"/>
 <helpScreen id="9102" name="FLT_TYPE_17_SYNTH_DEFAULT_HLP_001">
 <helpScreenItem mnemonicName="J_I_POSSIBLE_CAUSES"/>
-<helpScreenItem mnemonicName="H_CAUSE_1"/>
+<helpScreenItem mnemonicName="SYNTH_CAUSE_1"/>
 <helpScreenItem mnemonicName="J_I_ACTIONS_REQUIRED"/>
-<helpScreenItem mnemonicName="H_ACTION_1"/>
+<helpScreenItem mnemonicName="SYNTH_ACTION_1"/>
 </helpScreen>
 <helpScreen id="9103" name="FLT_TYPE_17_SYNTH_DEFAULT_HLP_002">
 <helpScreenItem mnemonicName="J_I_POSSIBLE_CAUSES"/>
-<helpScreenItem mnemonicName="H_CAUSE_2"/>
+<helpScreenItem mnemonicName="SYNTH_CAUSE_2"/>
 <helpScreenItem mnemonicName="MNEMONIC_THE_TABLE_DOES_NOT_DEFINE"/>
 <helpScreenItem mnemonicName="empty$I"/>
 </helpScreen>
@@ -69,9 +72,9 @@
 <mnemonic name="J_H_NO_HELP_AVAIL"><![CDATA[No help currently available]]></mnemonic>
 <mnemonic name="J_I_POSSIBLE_CAUSES"><![CDATA[Possible causes:]]></mnemonic>
 <mnemonic name="J_I_ACTIONS_REQUIRED"><![CDATA[Actions required:]]></mnemonic>
-<mnemonic name="H_CAUSE_1"><![CDATA[Synthetic sensor circuit open, resistance above 2.30 ohms between -40°C and +85°C]]></mnemonic>
-<mnemonic name="H_CAUSE_2"><![CDATA[Synthetic sensor circuit – short to ground]]></mnemonic>
-<mnemonic name="H_ACTION_1"><![CDATA[Refer to the synthetic circuit diagrams and test the sensor circuit.]]></mnemonic>
+<mnemonic name="SYNTH_CAUSE_1"><![CDATA[Synthetic sensor circuit open, resistance above 2.30 ohms between -40°C and +85°C]]></mnemonic>
+<mnemonic name="SYNTH_CAUSE_2"><![CDATA[Synthetic sensor circuit – short to ground]]></mnemonic>
+<mnemonic name="SYNTH_ACTION_1"><![CDATA[Refer to the synthetic circuit diagrams and test the sensor circuit.]]></mnemonic>
 <mnemonic name="empty$I"></mnemonic>
 </helpScreenMnemonicList>
 </dtcHelp>

@@ -44,6 +44,14 @@ pub const DTC_HELP_CLAIM: &str = "sdd_help";
 /// Claim prefix under which one help screen's text is recorded, the screen's
 /// name following the dot.
 pub const DTC_HELP_SCREEN_CLAIM_PREFIX: &str = "sdd_help_screen.";
+/// Claim key prefix for what a screen is made of: one line per item,
+/// the mnemonic's name, U+001F, its text flattened to one line. Beside
+/// the text claim, not instead of it, so a library issued before
+/// 2026-09-12 still loads (`ADR-0026`, amendment).
+pub const DTC_HELP_SCREEN_ITEMS_CLAIM_PREFIX: &str = "sdd_help_screen_items.";
+/// The separator between an item's name and its text: a control
+/// character no SDD text carries.
+pub const DTC_HELP_ITEM_SEPARATOR: char = '\u{1F}';
 
 /// Adapter for a single SDD `rdsDtcHelp0x____.xml` document.
 ///
@@ -204,7 +212,9 @@ impl IngestionAdapter for DtcHelpAdapter {
         let mnemonics = mnemonic_texts(root);
         let screens = help_screens(root);
         let data_names = help_screen_selections(root);
-        let mut used_screens: BTreeMap<String, String> = BTreeMap::new();
+        // Screen name → (what it says, joined by newline; its items by name
+        // with each text flattened).
+        let mut used_screens: BTreeMap<String, (String, String)> = BTreeMap::new();
 
         if let Some(qualification) = child_element(root, "dtcDescriptionQualification") {
             for selection in qualification.children().filter(|node| {
@@ -246,16 +256,33 @@ impl IngestionAdapter for DtcHelpAdapter {
                     let Some((screen_name, items)) = screens.get(screen_id) else {
                         continue;
                     };
-                    let text = items
+                    let named: Vec<(&String, &String)> = items
                         .iter()
-                        .filter_map(|item| mnemonics.get(item))
-                        .cloned()
+                        .filter_map(|item| mnemonics.get(item).map(|text| (item, text)))
+                        .collect();
+                    let text = named
+                        .iter()
+                        .map(|(_, text)| text.as_str())
                         .collect::<Vec<_>>()
                         .join("\n");
                     // A screen with nothing in it is no help; SDD has many.
                     if text.trim().is_empty() {
                         continue;
                     }
+                    // The same screen by name: a mnemonic's text may hold a
+                    // newline, and the name is the unit a translation is
+                    // keyed by, so each item is one line here whatever its
+                    // text does.
+                    let item_lines = named
+                        .iter()
+                        .map(|(name, text)| {
+                            format!(
+                                "{name}{DTC_HELP_ITEM_SEPARATOR}{}",
+                                text.split_whitespace().collect::<Vec<_>>().join(" ")
+                            )
+                        })
+                        .collect::<Vec<_>>()
+                        .join("\n");
 
                     let mut applicability =
                         applicability_from_qualifier(qualifier, self.timeline.as_ref())?;
@@ -316,13 +343,13 @@ impl IngestionAdapter for DtcHelpAdapter {
                             validation_state: ValidationState::Unverified,
                         },
                     );
-                    used_screens.insert(screen_name.clone(), text);
+                    used_screens.insert(screen_name.clone(), (text, item_lines));
                 }
             }
         }
 
         // What each selected screen says, written once whatever selects it.
-        for (screen_name, text) in used_screens {
+        for (screen_name, (text, item_lines)) in used_screens {
             let screen_slug = slugify(&screen_name, "helpScreen name")?;
             let record_id = format!(
                 "{}.dtc.{code_slug}.helpscreen.{screen_slug}",
@@ -357,6 +384,26 @@ impl IngestionAdapter for DtcHelpAdapter {
                     value: KnowledgeValue::Text { value: text },
                     // A screen's text is the same wherever it is selected; the
                     // selection above is what a car has to match.
+                    applicability: qualified_applicability(),
+                    evidence_ids: vec![EvidenceId::new(evidence_id.clone())?],
+                    validation_state: ValidationState::Unverified,
+                },
+            );
+            // The same screen as the names of its items, on the same
+            // evidence, so a translation keyed by name reaches every line.
+            let items_record_id = format!(
+                "{}.dtc.{code_slug}.helpscreenitems.{screen_slug}",
+                self.source.id.0
+            );
+            records.insert(
+                items_record_id.clone(),
+                KnowledgeRecord {
+                    id: items_record_id,
+                    entity: entity.clone(),
+                    key: ClaimKey::Custom {
+                        name: format!("{DTC_HELP_SCREEN_ITEMS_CLAIM_PREFIX}{screen_name}"),
+                    },
+                    value: KnowledgeValue::Text { value: item_lines },
                     applicability: qualified_applicability(),
                     evidence_ids: vec![EvidenceId::new(evidence_id)?],
                     validation_state: ValidationState::Unverified,

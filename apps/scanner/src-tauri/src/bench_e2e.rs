@@ -378,6 +378,16 @@ fn the_bench_connects_without_a_port_reads_the_surveyed_vehicle_and_marks_everyt
         .expect("a finished survey is a report");
     assert!(mileage_json.contains("prowlone.mileage-survey"));
     assert!(mileage_json.contains("\"safety_class\": \"READ_ONLY\""));
+    // Every row of the report says what its value is worth, not only the
+    // head (ADR-0020, decision 6): a bench row must never read as real.
+    assert!(
+        !mileage_json.contains("SOURCE_BACKED"),
+        "a bench reading is marked as real inside the report: {mileage_json}"
+    );
+    assert!(
+        mileage_json.matches("\"SYNTHETIC\"").count() >= 2,
+        "the head and every row carry the mark"
+    );
     // Readings, never a verdict: no word for what a difference might mean.
     for verdict in ["rolled", "tamper", "fraud", "clocked"] {
         assert!(

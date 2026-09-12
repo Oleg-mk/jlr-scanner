@@ -177,17 +177,6 @@ const manifestRules = [
   ]],
 ];
 
-const failures = [];
-
-for (const [path, forbidden] of manifestRules) {
-  const source = (await readFile(new URL(path, root), "utf8")).toLowerCase();
-  for (const dependency of forbidden) {
-    if (source.includes(dependency)) {
-      failures.push(`${path} contains forbidden dependency: ${dependency}`);
-    }
-  }
-}
-
 async function sourceFiles(directory) {
   const entries = await readdir(directory, { withFileTypes: true });
   const files = [];
@@ -210,6 +199,17 @@ async function rustFiles(directory) {
   return files;
 }
 
+const failures = [];
+
+for (const [path, forbidden] of manifestRules) {
+  const source = (await readFile(new URL(path, root), "utf8")).toLowerCase();
+  for (const dependency of forbidden) {
+    if (source.includes(dependency)) {
+      failures.push(`${path} contains forbidden dependency: ${dependency}`);
+    }
+  }
+}
+
 const frontendRoot = fileURLToPath(new URL("apps/scanner/frontend/src/", root));
 for (const file of await sourceFiles(frontendRoot)) {
   const source = (await readFile(file, "utf8")).toLowerCase();
@@ -230,14 +230,14 @@ for (const file of await sourceFiles(frontendRoot)) {
   }
 }
 
-for (const path of [
-  "crates/mongoose-jlr/src/lib.rs",
-  "crates/mongoose-jlr/src/device.rs",
-  "crates/mongoose-jlr/src/passive.rs",
-  "crates/mongoose-jlr/src/capture.rs",
-  "crates/mongoose-jlr/src/uds_live.rs",
-]) {
-  const source = await readFile(new URL(path, root), "utf8");
+// Every file in the adapter crate and in the vehicle on the bench, not a
+// list that a new file can fall outside of: bench.rs did, until 2026-09-12.
+const transmitRuleFiles = [];
+for (const directory of ["crates/mongoose-jlr/src/", "crates/bench-vehicle/src/"]) {
+  transmitRuleFiles.push(...(await rustFiles(fileURLToPath(new URL(directory, root)))));
+}
+for (const path of transmitRuleFiles) {
+  const source = await readFile(path, "utf8");
   for (const forbidden of [
     /pub\s+fn\s+send_can_frame\b/,
     /pub\s+fn\s+raw_can_tx\b/,

@@ -87,6 +87,16 @@ impl MileageService {
         }
     }
 
+    /// No survey begins, and the reason is the real one — no adapter — not
+    /// a claim about the data.
+    pub fn refuse(&mut self, error: DiagnosticError) -> MileageSurveySnapshot {
+        self.run = None;
+        let mut snapshot = idle(self.last_report.is_some());
+        snapshot.state = MileageSurveyState::Finished;
+        snapshot.error = Some(error);
+        snapshot
+    }
+
     /// Plan a survey: every module the survey can reach, every identifier the
     /// loaded data says carries a distance for it.
     pub fn start(
@@ -314,6 +324,7 @@ impl Run {
                             .map(|identifier| identifier.parameters.clone())
                             .unwrap_or_default();
                         let decoded = decode_parameters(&parameters, &data);
+                        let mut any = false;
                         for row in rows.iter_mut() {
                             match decoded.iter().find(|value| value.name == row.parameter) {
                                 Some(value) => {
@@ -326,13 +337,19 @@ impl Run {
                                         .value
                                         .as_deref()
                                         .and_then(|text| text.parse::<f64>().ok());
-                                    self.answered += 1;
+                                    any = true;
                                 }
                                 None => {
                                     row.reason =
                                         Some("the answer does not carry this parameter".to_string())
                                 }
                             }
+                        }
+                        // One read answered, however many of its parameters
+                        // are mileages: `asked` and `answered` count the
+                        // same thing.
+                        if any {
+                            self.answered += 1;
                         }
                     }
                     Ok(Some(UdsReadOutcome::Negative(negative))) => {
@@ -366,23 +383,41 @@ impl Run {
 
     /// The reference is the highest running total on the car, not the
     /// cluster's: the cluster is precisely what gets rewritten.
+    ///
+    /// A difference is arithmetic between two numbers counted in the same
+    /// unit. A module answering in miles, or in a raw count the catalogue
+    /// does not scale, is not subtracted from one answering in kilometres:
+    /// its row carries no difference and says so.
     fn recompute_differences(&mut self) {
-        let highest = self
-            .readings
-            .iter()
-            .filter(|row| row.kind == MileageKind::Current)
-            .filter_map(|row| row.number)
-            .fold(None::<f64>, |best, value| {
-                Some(best.map_or(value, |best| best.max(value)))
-            });
-        let Some(highest) = highest else {
+        let Some((reference, unit)) = self
+            .highest()
+            .map(|(row, number)| (number, row.unit.clone()))
+        else {
             for row in self.readings.iter_mut() {
                 row.difference = None;
             }
             return;
         };
         for row in self.readings.iter_mut() {
-            row.difference = row.number.map(|value| value - highest);
+            if row.unit == unit {
+                row.difference = row.number.map(|value| value - reference);
+            } else {
+                row.difference = None;
+                if row.number.is_some() && row.note.is_none() {
+                    row.note = Some(match (&row.unit, &unit) {
+                        (Some(theirs), Some(ours)) => {
+                            format!(
+                                "counted in {theirs}, the highest reading in {ours}; not compared"
+                            )
+                        }
+                        (None, Some(ours)) => {
+                            format!("a raw count with no unit, the highest reading in {ours}; not compared")
+                        }
+                        _ => "counted in a different unit from the highest reading; not compared"
+                            .to_string(),
+                    });
+                }
+            }
         }
     }
 
@@ -390,10 +425,13 @@ impl Run {
         self.state = MileageSurveyState::Finished;
     }
 
+    /// The highest running total that carries a unit. A raw count the
+    /// catalogue does not scale cannot be the reference, because nothing
+    /// could be compared with it.
     fn highest(&self) -> Option<(&MileageReading, f64)> {
         self.readings
             .iter()
-            .filter(|row| row.kind == MileageKind::Current)
+            .filter(|row| row.kind == MileageKind::Current && row.unit.is_some())
             .filter_map(|row| row.number.map(|number| (row, number)))
             .fold(None, |best, (row, number)| match best {
                 Some((_, seen)) if seen >= number => best,
@@ -463,7 +501,14 @@ fn build_report(run: &Run) -> Value {
             "value": number,
             "unit": row.unit,
         })),
-        "readings": run.readings,
+        // Every row says what its value is worth, on the bench as on
+        // screen (ADR-0020, decision 6).
+        "readings": run.readings.iter().cloned().map(|mut row| {
+            if run.synthetic {
+                row.route_validation = "SYNTHETIC".into();
+            }
+            row
+        }).collect::<Vec<_>>(),
         "not_planned": run.refused.iter().map(|(family, reason)| json!({
             "ecu_family": family,
             "reason": reason,
