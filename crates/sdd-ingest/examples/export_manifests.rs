@@ -22,10 +22,10 @@ use knowledge::{
 use sdd_ingest::{
     is_text_item_id, BatteryFormatting, CanLinkMonitorAdapter, CcfAdapter, ConverterCatalogue,
     DidFormattingAdapter, DtcDescriptionAdapter, DtcFaultTypeAdapter, DtcHelpAdapter,
-    ModelYearTimeline, ModuleTextAdapter, OdstInfoAdapter, PlatformAdapter, TextLookup,
-    VinDecodeAdapter, YEAR_BREAKPOINT_DIMENSION,
+    IvsLineageAdapter, ModelYearTimeline, ModuleTextAdapter, OdstInfoAdapter, PlatformAdapter,
+    TextLookup, VinDecodeAdapter, YEAR_BREAKPOINT_DIMENSION,
 };
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::io::Write;
 use std::path::{Path, PathBuf};
 
@@ -37,6 +37,9 @@ struct Corpus {
     dtc_help: Vec<Found>,
     dtc_index: Vec<Found>,
     odst: Vec<Found>,
+    /// JLR's IVS part lineage: which software belongs to which assembly
+    /// (ADR-0033).
+    ivs: Vec<Found>,
     link_monitor: Vec<Found>,
     vin: Vec<Found>,
     module_text: Vec<Found>,
@@ -105,6 +108,8 @@ fn walk(root: &Path, dir: &Path, corpus: &mut Corpus) -> std::io::Result<()> {
             corpus.dtc_index.push(found);
         } else if parent == "rds-odst-info" {
             corpus.odst.push(found);
+        } else if parent == "IVS" {
+            corpus.ivs.push(found);
         } else if name == "CANLinkMonitorData.xml" {
             corpus.link_monitor.push(found);
         } else if name == "VINDecode.xml" {
@@ -299,13 +304,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         walk(root, root, &mut corpus)?;
     }
     println!(
-        "found: {} platform, {} converter, {} DID snapshot, {} DTC help, {} DTC index, {} ODST, {} link monitor, {} VIN decode, {} module text, {} CCF, {} other text items",
+        "found: {} platform, {} converter, {} DID snapshot, {} DTC help, {} DTC index, {} ODST, {} IVS, {} link monitor, {} VIN decode, {} module text, {} CCF, {} other text items",
         corpus.platforms.len(),
         corpus.converters.len(),
         corpus.snapshots.len(),
         corpus.dtc_help.len(),
         corpus.dtc_index.len(),
         corpus.odst.len(),
+        corpus.ivs.len(),
         corpus.link_monitor.len(),
         corpus.vin.len(),
         corpus.module_text.len(),
@@ -494,6 +500,42 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         )?;
     }
     summary.push(bundle.finish()?);
+
+    // JLR's part lineage (ADR-0033). Only what SDD stamps as production
+    // data is ingested: its own test documents are the ones carrying service
+    // actions and coordinated flash lists, and they are skipped by name of
+    // that stamp rather than by file name. Three of the production files are
+    // byte-identical copies of one document, so the same content is ingested
+    // once.
+    let mut bundle = Bundle::create(out, "ivs_lineage.json")?;
+    let mut skipped_ivs = 0usize;
+    let mut seen_ivs: BTreeSet<String> = BTreeSet::new();
+    for found in &corpus.ivs {
+        let text = read(found)?;
+        if !IvsLineageAdapter::is_production(&text) {
+            skipped_ivs += 1;
+            continue;
+        }
+        if !seen_ivs.insert(sha256_bytes(text.as_bytes())) {
+            skipped_ivs += 1;
+            continue;
+        }
+        let adapter = IvsLineageAdapter::new(source(found, &text)?)?;
+        export(
+            &mut store,
+            &mut bundle,
+            &adapter,
+            &text,
+            "ivs",
+            &mut rejections,
+        )?;
+    }
+    summary.push(bundle.finish()?);
+    if skipped_ivs > 0 {
+        println!(
+            "IVS: {skipped_ivs} document(s) skipped — SDD's own test files and repeated copies (ADR-0033)"
+        );
+    }
 
     let mut bundle = Bundle::create(out, "can_link_monitor.json")?;
     for found in &corpus.link_monitor {

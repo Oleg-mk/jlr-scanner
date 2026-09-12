@@ -22,6 +22,10 @@ pub enum EntityKind {
     /// block, its type, its options and their texts (ADR-0028). A layout,
     /// not a value: the value comes from the car.
     ConfigurationParameter,
+    /// One assembly part number a module can carry, and the part numbers
+    /// JLR's own catalogue names inside it (ADR-0033). Knowledge about
+    /// numbers, never an instruction to change one.
+    ModuleAssembly,
 }
 
 /// The addressing mode of a module on a single serial line — a K-line — where

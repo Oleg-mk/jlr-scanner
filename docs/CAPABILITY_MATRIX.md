@@ -21,7 +21,7 @@ Written 2026-09-12 at the owner's request: what a person gets from SDD at its fu
 | `not found in the data` | not found in SDD 169's data; may still exist in its runtime |
 | `—` | not applicable, or already answered by the column before |
 
-**Counts.** 99 rows. SDD does 63 of them. ProwlOne today: 41 built, 1 partly, 2 open inside stage 1. The roadmap: 20 in stage 2, 8 in stage 3. The ceiling: 53 possible, 3 need other hardware, 8 excluded for good. 10 rows are things SDD does not do and ProwlOne already does; 8 rows are things SDD does that ProwlOne will never do.
+**Counts.** 99 rows. SDD does 63 of them. ProwlOne today: 42 built, 1 partly, 2 open inside stage 1. The roadmap: 20 in stage 2, 8 in stage 3. The ceiling: 53 possible, 3 need other hardware, 8 excluded for good. 10 rows are things SDD does not do and ProwlOne already does; 8 rows are things SDD does that ProwlOne will never do.
 
 ## Vehicle, modules, network
 
@@ -33,8 +33,8 @@ Written 2026-09-12 at the owner's request: what a person gets from SDD at its fu
 | Network map: buses, modules, gateways | **yes** | **built** — drawn as SDD draws it; every state explained | **—** | **built** | PLATFORM_*.xml; F11 M1 |
 | Module survey with the route and the reason when unreachable | **partly** — shows what it reaches | **built** | **—** | **built** | F10, ADR-0013/0014 |
 | Network check: who answers, codes from every reachable module | **yes** | **built** | **—** | **built** | CANLinkMonitorData.xml; F11 |
-| Module passport: part numbers, serial, software level (F111/F112/F113/F18C) | **yes** | **built** — ADR-0027, F19: one screen across all modules; 34,788 identification records | **—** | **possible** — + software currency from the IVS lineage — a separate decision | PLATFORM data_identifier_set NET/SWDL/PDI; ADR-0027 |
-| Software level checked against JLR's catalogue | **yes** — IVS part lineage, SOTA | **no** | **—** | **possible** — compare numbers; never download software | COMMON_JLR_SMPACK_XML/IVS (17 programmes) |
+| Module passport: part numbers, serial, software level (F111/F112/F113/F18C) | **yes** | **built** — ADR-0027, F19: one screen across all modules; 34,788 identification records, each set against JLR's own lineage (ADR-0033) | **—** | **built** | PLATFORM data_identifier_set NET/SWDL/PDI; ADR-0027; ADR-0033 |
+| Software level checked against JLR's catalogue | **yes** — IVS part lineage, SOTA | **built** — ADR-0033: every passport number set against the lineage, four states, no verdict | **—** | **built** — numbers only; software is never downloaded | ADR-0033; COMMON_JLR_SMPACK_XML/IVS (15 documents, 67,755 assemblies) |
 | CCF read (car configuration file) | **yes** | **built** — ADR-0028, F20: block by block from the keeper and the copies, SDD's layout; 28 programme-years; 18 gateway cars (2014+) are paged and not read, the reason shown | **—** | **possible** — + the VDF scheme of the gateway cars; + the 'digital car' from the CCF | CCF_DATA_*.xml (48); PLATFORM car_configuration; ADR-0028 |
 | Listen-only capture, nothing transmitted | **not found in the data** | **built** | **—** | **built** | F8/F10 capture |
 | Mileage from every module in one click, differences, event stamps | **no** — one module at a time; and it can write one | **built** — 92 module families declare 0xDD01 | **—** | **possible** — + compared with earlier sessions | ADR-0024; SA_OdoWrite, F2_CAL_ODO on SDD's side |

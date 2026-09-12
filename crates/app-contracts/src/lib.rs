@@ -994,6 +994,32 @@ pub struct PassportReading {
     pub note: Option<String>,
     /// Why the module said nothing.
     pub reason: Option<String>,
+    /// What JLR's own catalogue names for this number (`ADR-0033`), where
+    /// the catalogue carries the module at all. A comparison, never a
+    /// verdict: nothing here says a module should be programmed, and
+    /// nothing in this product could.
+    #[serde(default)]
+    pub catalogue: Option<CatalogueComparison>,
+}
+
+/// One number a module reported, set against JLR's IVS part lineage
+/// (`ADR-0033`).
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CatalogueComparison {
+    /// `AGREES`, `DIFFERS`, `NOT_NAMED` — the catalogue carries this
+    /// assembly and names no part for this identifier — or `NO_ASSEMBLY`,
+    /// the catalogue does not carry the assembly the module reports.
+    pub state: String,
+    /// The number the catalogue names, where it names one.
+    pub expected: Option<String>,
+    /// SDD's own part type: `Strategy`, `Calibration`, `Hardware`, …
+    pub part_type: Option<String>,
+    /// The assembly the comparison was made against, as the catalogue
+    /// writes it.
+    pub assembly: Option<String>,
+    /// The date the catalogue itself carries, so its age is visible.
+    pub dated: Option<String>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]

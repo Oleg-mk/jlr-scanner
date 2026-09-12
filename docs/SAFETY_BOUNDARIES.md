@@ -48,6 +48,16 @@ Adaptations or configuration changes. These are allowed only in the future Engin
 
 ECU firmware/VBF programming, bootloader or recovery flashing, immobilizer/key programming, and security programming. These operations are outside the product scope.
 
+Since `ADR-0033` the library carries JLR's own IVS part lineage — which
+software part number belongs to which assembly — and a passport read is
+compared with it. That is a comparison of numbers and changes nothing: the
+product downloads no software, writes nothing to a module, and proposes no
+programming action. The programming material in that same component, its
+service actions and coordinated flash lists, is refused by the ingest rather
+than filtered, and the attributes that exist only to drive programming
+(`SOTAEnabled`, `CertificationRequired`, `ProgInSvc`, `ConfigurationMethod`)
+never enter the library.
+
 ## Non-negotiable rules
 
 - No diagnostic write operation exists without an explicit safety classification.

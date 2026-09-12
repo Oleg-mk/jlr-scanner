@@ -8,8 +8,11 @@ import type { ModuleReadState } from "./moduleRead";
 /**
  * The module passport (ADR-0027): what a module says it is — the part numbers
  * fitted, its serial, the software it runs — read over the identification
- * identifiers SDD declares for it. The text is shown as the module holds it;
- * nothing is parsed out of a part number and nothing is compared.
+ * identifiers SDD declares for it. The text is shown as the module holds it
+ * and nothing is parsed out of a part number.
+ *
+ * Since ADR-0033 each number is also set against JLR's own IVS part lineage
+ * where the library carries it — a comparison, never a verdict.
  */
 export type ModulePassportState = "IDLE" | "RUNNING" | "FINISHED";
 
@@ -27,6 +30,25 @@ export interface PassportReading {
   negativeResponse: string | null;
   note: string | null;
   reason: string | null;
+  /**
+   * What JLR's catalogue names for this number (ADR-0033), where the
+   * catalogue carries the module. `null` when it does not, or when the
+   * module answered nothing to compare.
+   */
+  catalogue: CatalogueComparison | null;
+}
+
+export interface CatalogueComparison {
+  /** `AGREES`, `DIFFERS`, `NOT_NAMED` or `NO_ASSEMBLY`. */
+  state: string;
+  /** The number the catalogue names, where it names one. */
+  expected: string | null;
+  /** SDD's own part type: `Strategy`, `Calibration`, `Hardware`, … */
+  partType: string | null;
+  /** The assembly the comparison was made against. */
+  assembly: string | null;
+  /** The date the catalogue itself carries. */
+  dated: string | null;
 }
 
 export interface ModulePassportSnapshot {
@@ -82,13 +104,37 @@ class TauriPassportClient implements PassportClient {
 }
 
 /** Two modules' passports for the browser preview; nothing behind them. */
-const DEMO: Array<[string, string, string, string | null, string | null]> = [
-  ["PCM", "0xF111", "ECU Core Assembly Number", "8X23-14C088-AB", null],
-  ["PCM", "0xF188", "ECU Software Number", "8X23-14C204-CD", null],
-  ["PCM", "0xF18C", "ECU Serial Number", "0000471D3E92A1", null],
-  ["ABS", "0xF111", "ECU Core Assembly Number", "9X23-2C405-AE", null],
-  ["ABS", "0xF188", "ECU Software Number", null, "no answer within the timeout"],
+const DEMO: Array<
+  [string, string, string, string | null, string | null, CatalogueComparison | null]
+> = [
+  ["PCM", "0xF112", "ECU Assembly Number", "8X23-14C088-AB", null, demoCatalogue("AGREES")],
+  [
+    "PCM",
+    "0xF188",
+    "ECU Software Number",
+    "8X23-14C204-CD",
+    null,
+    demoCatalogue("DIFFERS", "8X23-14C204-CF", "Strategy"),
+  ],
+  ["PCM", "0xF18C", "ECU Serial Number", "0000471D3E92A1", null, demoCatalogue("NOT_NAMED")],
+  ["ABS", "0xF111", "ECU Core Assembly Number", "9X23-2C405-AE", null, demoCatalogue("NO_ASSEMBLY")],
+  ["ABS", "0xF188", "ECU Software Number", null, "no answer within the timeout", null],
 ];
+
+/** A demonstration comparison; the catalogue behind it is not a catalogue. */
+function demoCatalogue(
+  state: string,
+  expected: string | null = null,
+  partType: string | null = null,
+): CatalogueComparison {
+  return {
+    state,
+    expected,
+    partType,
+    assembly: state === "NO_ASSEMBLY" ? null : "8X23-14C088-AB",
+    dated: "Oct-17-2022 22:16:38",
+  };
+}
 
 class BrowserPassportClient implements PassportClient {
   private snapshot = createPassportSnapshot();
@@ -127,7 +173,7 @@ class BrowserPassportClient implements PassportClient {
       this.snapshot = { ...this.snapshot, state: "FINISHED", reportAvailable: true };
       return Promise.resolve(this.snapshot);
     }
-    const [ecuFamily, identifier, parameter, value, reason] = next;
+    const [ecuFamily, identifier, parameter, value, reason, catalogue] = next;
     this.snapshot = {
       ...this.snapshot,
       readings: [
@@ -144,6 +190,7 @@ class BrowserPassportClient implements PassportClient {
           negativeResponse: null,
           note: null,
           reason,
+          catalogue,
         },
       ],
       asked: this.snapshot.asked + 1,

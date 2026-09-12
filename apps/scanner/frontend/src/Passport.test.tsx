@@ -29,6 +29,7 @@ function reading(partial: Partial<PassportReading>): PassportReading {
     negativeResponse: null,
     note: null,
     reason: null,
+    catalogue: null,
     ...partial,
   };
 }
@@ -153,6 +154,99 @@ describe("the module passport", () => {
     expect(screen.getByText("no answer")).toBeInTheDocument();
     expect(screen.getByText(/4 of 4 identifier reads over 2 modules, 3 answered/)).toBeInTheDocument();
     for (const verdict of [/outdated/i, /obsolete/i, /wrong part/i, /застаріл/i]) {
+      expect(document.body.textContent).not.toMatch(verdict);
+    }
+  });
+
+  it("sets each number against JLR's catalogue in four states and calls none of them a fault", () => {
+    const dated = "Oct-17-2022 22:16:38";
+    render(
+      <PassportPanel
+        snapshot={{
+          ...createPassportSnapshot(),
+          state: "FINISHED",
+          planned: 4,
+          asked: 4,
+          answered: 4,
+          modules: 1,
+          readings: [
+            reading({
+              identifier: "0xF112",
+              parameter: "ECU Assembly Number",
+              value: "8X23-14C088-AB",
+              catalogue: {
+                state: "AGREES",
+                expected: "8X23-14C088-AB",
+                partType: "Assembly",
+                assembly: "8X23-14C088-AB",
+                dated,
+              },
+            }),
+            reading({
+              identifier: "0xF188",
+              parameter: "ECU Software Number",
+              value: "8X23-14C204-CD",
+              catalogue: {
+                state: "DIFFERS",
+                expected: "8X23-14C204-CF",
+                partType: "Strategy",
+                assembly: "8X23-14C088-AB",
+                dated,
+              },
+            }),
+            reading({
+              identifier: "0xF18C",
+              parameter: "ECU Serial Number",
+              value: "0000471D3E92A1",
+              catalogue: {
+                state: "NOT_NAMED",
+                expected: null,
+                partType: null,
+                assembly: "8X23-14C088-AB",
+                dated,
+              },
+            }),
+            reading({
+              identifier: "0xF111",
+              parameter: "ECU Core Assembly Number",
+              value: "9X23-2C405-AE",
+              catalogue: {
+                state: "NO_ASSEMBLY",
+                expected: null,
+                partType: null,
+                assembly: null,
+                dated,
+              },
+            }),
+          ],
+        }}
+        running={false}
+        adapterReady
+        surveyed
+      />,
+    );
+
+    expect(screen.getByRole("columnheader", { name: "JLR's catalogue" })).toBeInTheDocument();
+    expect(screen.getByText("the same number")).toBeInTheDocument();
+    // A difference shows the catalogue's own number beside the part type.
+    expect(screen.getByText("8X23-14C204-CF")).toBeInTheDocument();
+    expect(screen.getByText("Strategy")).toBeInTheDocument();
+    expect(screen.getByText("the catalogue names no part here")).toBeInTheDocument();
+    expect(screen.getByText("the catalogue does not carry this assembly")).toBeInTheDocument();
+    // The catalogue's own date is on the page, so its age is never hidden.
+    expect(document.body.textContent).toContain(dated);
+    // A difference is a difference: no word here turns it into a fault or an
+    // instruction, in any of the three languages.
+    for (const verdict of [
+      /outdated/i,
+      /obsolete/i,
+      /out of date/i,
+      /needs? updat/i,
+      /should be flashed/i,
+      /застаріл/i,
+      /оновіть/i,
+      /устарел/i,
+    ]) {
       expect(document.body.textContent).not.toMatch(verdict);
     }
   });

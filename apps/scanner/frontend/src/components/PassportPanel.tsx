@@ -1,6 +1,6 @@
 import { parameterNote, passportLabel, t, useLanguage } from "../i18n";
 import { parameterName } from "../parameterNames";
-import type { ModulePassportSnapshot, PassportReading } from "../passport";
+import type { CatalogueComparison, ModulePassportSnapshot, PassportReading } from "../passport";
 import { StatusBadge } from "./StatusBadge";
 
 interface PassportPanelProps {
@@ -33,6 +33,51 @@ function label(row: PassportReading): string {
   return passportLabel(row.identifier) ?? parameterName(row.parameter);
 }
 
+/**
+ * What the catalogue says about one number (ADR-0033). Four states, none of
+ * them a verdict: the word *outdated* appears nowhere, because the data
+ * cannot support it.
+ */
+function catalogue(comparison: CatalogueComparison | null) {
+  if (comparison === null) return <span className="module-validation">—</span>;
+  switch (comparison.state) {
+    case "AGREES":
+      return (
+        <span className="catalogue catalogue--agrees">
+          {t("the same number")}
+          {comparison.partType !== null ? (
+            <span className="module-validation"> {comparison.partType}</span>
+          ) : null}
+        </span>
+      );
+    case "DIFFERS":
+      return (
+        <span className="catalogue catalogue--differs">
+          {t("the catalogue names")} <code>{comparison.expected}</code>
+          {comparison.partType !== null ? (
+            <span className="module-validation"> {comparison.partType}</span>
+          ) : null}
+        </span>
+      );
+    case "NOT_NAMED":
+      return <span className="module-validation">{t("the catalogue names no part here")}</span>;
+    default:
+      return (
+        <span className="module-validation">
+          {t("the catalogue does not carry this assembly")}
+        </span>
+      );
+  }
+}
+
+/** The date the catalogue carries, as the readings report it. */
+function dated(snapshot: ModulePassportSnapshot): string | null {
+  for (const row of snapshot.readings) {
+    if (row.catalogue?.dated) return row.catalogue.dated;
+  }
+  return null;
+}
+
 export function PassportPanel({
   snapshot,
   running,
@@ -54,7 +99,7 @@ export function PassportPanel({
       </div>
       <p className="operation-copy">
         {t(
-          "The part numbers fitted, the serial, the software and hardware levels — read from the identifiers the data declares for each module, once each. The text is shown as the module holds it; nothing is compared with a catalogue. Read-only; nothing is written anywhere.",
+          "The part numbers fitted, the serial, the software and hardware levels — read from the identifiers the data declares for each module, once each. The text is shown as the module holds it. Where the loaded data carries JLR's own part lineage, each number is set against it. Read-only; nothing is written anywhere.",
         )}
       </p>
 
@@ -91,6 +136,7 @@ export function PassportPanel({
                 <th scope="col">{t("What")}</th>
                 <th scope="col">{t("Address")}</th>
                 <th scope="col">{t("The module holds")}</th>
+                <th scope="col">{t("JLR's catalogue")}</th>
               </tr>
             </thead>
             <tbody>
@@ -121,6 +167,7 @@ export function PassportPanel({
                         <div className="module-validation">{parameterNote(row.note)}</div>
                       ) : null}
                     </td>
+                    <td>{catalogue(row.catalogue)}</td>
                   </tr>
                 ))}
             </tbody>
@@ -131,7 +178,8 @@ export function PassportPanel({
       {snapshot.readings.length > 0 ? (
         <p className="button-hint passport-caveat">
           {t(
-            "These are the texts the modules hold, as they hold them. Whether a software level is current is a question for a catalogue this product does not carry; nothing here says so.",
+            "These are the texts the modules hold, as they hold them. The last column is JLR's own part lineage as SDD carries it, dated {dated}: a number that differs from it is a difference and not a fault — a replaced unit, another market, a later update all produce one. This product compares numbers and changes nothing.",
+            { dated: dated(snapshot) ?? t("unknown") },
           )}
         </p>
       ) : null}

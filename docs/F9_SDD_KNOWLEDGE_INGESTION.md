@@ -459,6 +459,50 @@ the corpus are physical node addresses (`type="phys"`) under `normal_fixed` or
 now recorded verbatim as `sdd_physical_address` claims with the module's bus,
 so the module is seen; identifiers are not derived (see the F10 document).
 
+## JLR's part lineage (IVS, 2026-09-12, `ADR-0033`)
+
+`IvsLineageAdapter` parses `COMMON_JLR_SMPACK_XML/IVS`, JLR's own record of
+which software and calibration part numbers belong to which assembly. It is
+the second slice whose source component is not read-only material, and the
+second whose rules are therefore about what is *not* taken.
+
+**Nothing that could programme a module is ingested.** The component also
+carries service actions and coordinated flash lists — programming
+orchestration. A document is ingested only when SDD stamps it `Environment`
+Production and `ValidationStatus` Yes, and never when it contains
+`ServiceActions` or `CoordinatedFlashList`; in SDD 169 those are exactly the
+three test-environment files. `SOTAEnabled`, `CertificationRequired`,
+`ProgInSvc` and `ConfigurationMethod` are not recorded at all: they mean
+something only to a tool that programmes, and this one does not. A golden
+test asserts that no record carries any of those words.
+
+One record per assembly, entity kind `ModuleAssembly`, claim
+`sdd_ivs_assembly`, applicability the programme and the module family: the
+assembly part number, the identifier SDD says it answers on (`F112` or
+`F113`), the catalogue's own date, and the parts inside it as three parallel
+lists — identifiers, part numbers, part types. A part the catalogue ties to
+no identifier is left out, because nothing a module answers could meet it.
+
+### Real-source run
+
+| | |
+| --- | --- |
+| documents found | 20 |
+| skipped | 5 — three SDD test files, two byte-identical copies |
+| documents ingested | 15 |
+| rejected | 0 |
+| knowledge records | 67,755 |
+| parts named | 258,704 |
+| programmes | 15 |
+| module families | 122 |
+| identifiers | 39 — `F188` 61,763, `F111` 58,624, `F124` 40,811, `F120` 19,475, `F108` 18,856 |
+
+The join to the passport was measured before the feature was built: the
+passport reads identifiers on 845 programme-and-module pairs, the catalogue
+names parts on 878, 581 are the same pair, and on every one of those the
+identifier the catalogue says the assembly answers on is one the passport
+reads. See `ADR-0033` for what is done with that.
+
 ## VIN decode tables and module names (F11, 2026-09-04)
 
 Two further adapters read parts of the payload outside the XCL data:

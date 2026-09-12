@@ -236,10 +236,22 @@ the name the report keeps), the address, and the text. A module that stayed
 silent says **no answer**; a text that is not printable is shown as bytes,
 with the reason.
 
-**The application does not judge a part number.** Whether the software in a
-module is current, or the part the right one for the car, is a question for
-a catalogue this application does not carry — and it will not pretend
-otherwise. What is here is what is in the car.
+The last column is **JLR's catalogue**. SDD carries JLR's own record of
+which software and calibration part numbers belong to which assembly, and
+each number a module reports is set against it. A row says one of four
+things: *the same number*; *the catalogue names …*, with the number it names
+and what kind of part it is; *the catalogue names no part here*, meaning the
+catalogue has this assembly and says nothing about that identifier; or *the
+catalogue does not carry this assembly*, which is ordinary — a replaced
+unit, another market, a car the snapshot does not cover.
+
+**A difference is a difference, not a fault.** The catalogue is SDD's own
+snapshot, dated 17 October 2022, and the line under the table says so. A
+unit replaced at a dealer, a car built for another market and a later update
+all produce a different number, and this application ranks none of them. It
+will never tell you a module is outdated or should be programmed: it
+compares numbers and changes nothing, and it has no way to write software to
+a module at all.
 
 Nothing is written — a part number is read, never set.
 

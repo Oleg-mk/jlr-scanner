@@ -1289,6 +1289,25 @@ summary:focus-visible {
   height: 1.1rem;
 }
 
+/* A part number set against JLR's catalogue (ADR-0033). Neither colour is
+   a verdict: one says the numbers are the same, the other that they are
+   not. */
+.catalogue {
+  font-size: 0.85rem;
+}
+
+.catalogue--agrees {
+  color: var(--positive);
+}
+
+.catalogue--differs {
+  color: var(--pending);
+}
+
+.catalogue code {
+  font-size: 0.85em;
+}
+
 /* The self tests a module declares (ADR-0032): a list, never a control. */
 .self-tests {
   margin: 1.25rem 0;

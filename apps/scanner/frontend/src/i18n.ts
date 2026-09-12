@@ -429,6 +429,16 @@ const uk: Record<string, string> = {
   "Series written to {path}": "Серію записано у {path}",
   // The readable report (ADR-0031)
   // The self tests a module declares (ADR-0032)
+  // The catalogue a part number is set against (ADR-0033)
+  "JLR's catalogue": "Каталог JLR",
+  "the same number": "той самий номер",
+  "the catalogue names": "каталог називає",
+  "the catalogue names no part here": "каталог не називає тут деталі",
+  "the catalogue does not carry this assembly": "каталог не містить цього вузла",
+  "unknown": "невідомо",
+  "The part numbers fitted, the serial, the software and hardware levels — read from the identifiers the data declares for each module, once each. The text is shown as the module holds it. Where the loaded data carries JLR's own part lineage, each number is set against it. Read-only; nothing is written anywhere.": "Номери встановлених деталей, серійний номер, версії програмного забезпечення й апаратної частини — з ідентифікаторів, які дані називають для кожного блока, по одному разу. Текст показано так, як його зберігає блок. Там, де завантажені дані містять власний родовід деталей JLR, кожен номер звіряється з ним. Лише читання; нічого нікуди не записується.",
+  "These are the texts the modules hold, as they hold them. The last column is JLR's own part lineage as SDD carries it, dated {dated}: a number that differs from it is a difference and not a fault — a replaced unit, another market, a later update all produce one. This product compares numbers and changes nothing.": "Це тексти, які зберігають блоки, такими, як вони їх зберігають. Останній стовпець — власний родовід деталей JLR, як його зберігає SDD, станом на {dated}: номер, що від нього відрізняється, — це відмінність, а не несправність: замінений блок, інший ринок, пізніше оновлення дають таку саму картину. Ця програма порівнює номери й нічого не змінює.",
+  "What each module says it is, as the text it holds. The last column is JLR's own part lineage as SDD carries it: a number that differs from it is a difference, not a fault.": "Те, чим кожен блок себе називає, тим текстом, який він зберігає. Останній стовпець — власний родовід деталей JLR, як його зберігає SDD: номер, що від нього відрізняється, — це відмінність, а не несправність.",
   "Self tests this module declares": "Самотести, які оголошує цей модуль",
   "The year markers are SDD's own and this session does not check them, so a test listed here can belong to another year of the same programme.": "Маркери року — власні позначки SDD, і цей сеанс їх не перевіряє, тож наведений тут тест може належати іншому року тієї самої програми.",
   "SDD can command these; this application does not. A self test is a routine, not a read, and routines belong to a later stage with their own safety rules. The list is here because knowing what a module can be asked to do is worth having.": "SDD може їх запускати; цей застосунок — ні. Самотест — це процедура, а не читання, і процедури належать до пізнішого етапу з власними правилами безпеки. Перелік тут тому, що знати, про що можна попросити модуль, само по собі корисно.",
@@ -1495,6 +1505,17 @@ const ru: Record<string, string> = {
   "Series written to {path}": "Серия записана в {path}",
   // The readable report (ADR-0031)
   // The self tests a module declares (ADR-0032)
+  // The catalogue a part number is set against (ADR-0033)
+  // The catalogue a part number is set against (ADR-0033)
+  "JLR's catalogue": "Каталог JLR",
+  "the same number": "тот же номер",
+  "the catalogue names": "каталог называет",
+  "the catalogue names no part here": "каталог не называет здесь детали",
+  "the catalogue does not carry this assembly": "каталог не содержит этого узла",
+  "unknown": "неизвестно",
+  "The part numbers fitted, the serial, the software and hardware levels — read from the identifiers the data declares for each module, once each. The text is shown as the module holds it. Where the loaded data carries JLR's own part lineage, each number is set against it. Read-only; nothing is written anywhere.": "Номера установленных деталей, серийный номер, версии программного обеспечения и аппаратной части — из идентификаторов, которые данные называют для каждого блока, по одному разу. Текст показан так, как его хранит блок. Там, где загруженные данные содержат собственный родослов деталей JLR, каждый номер сверяется с ним. Только чтение; ничего никуда не записывается.",
+  "These are the texts the modules hold, as they hold them. The last column is JLR's own part lineage as SDD carries it, dated {dated}: a number that differs from it is a difference and not a fault — a replaced unit, another market, a later update all produce one. This product compares numbers and changes nothing.": "Это тексты, которые хранят блоки, такими, как они их хранят. Последний столбец — собственный родослов деталей JLR, как его хранит SDD, по состоянию на {dated}: номер, отличающийся от него, — это отличие, а не неисправность: заменённый блок, другой рынок, более позднее обновление дают ту же картину. Эта программа сравнивает номера и ничего не меняет.",
+  "What each module says it is, as the text it holds. The last column is JLR's own part lineage as SDD carries it: a number that differs from it is a difference, not a fault.": "То, чем каждый блок себя называет, тем текстом, который он хранит. Последний столбец — собственный родослов деталей JLR, как его хранит SDD: номер, отличающийся от него, — это отличие, а не неисправность.",
   "Self tests this module declares": "Самотесты, которые объявляет этот модуль",
   "The year markers are SDD's own and this session does not check them, so a test listed here can belong to another year of the same programme.": "Маркеры года — собственные обозначения SDD, и этот сеанс их не проверяет, поэтому приведённый здесь тест может относиться к другому году той же программы.",
   "SDD can command these; this application does not. A self test is a routine, not a read, and routines belong to a later stage with their own safety rules. The list is here because knowing what a module can be asked to do is worth having.": "SDD может их запускать; это приложение — нет. Самотест — это процедура, а не чтение, и процедуры относятся к более позднему этапу со своими правилами безопасности. Перечень здесь потому, что знать, о чём можно попросить модуль, само по себе полезно.",

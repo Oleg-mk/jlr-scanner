@@ -6,8 +6,14 @@
 //! identifiers that hold those texts, and the library carries them in the
 //! catalogue's own shape, so reading a passport is reading identifiers: one
 //! request per module and identifier, once each, the text shown as the text
-//! it is. Nothing is parsed out of a part number and nothing is compared
-//! with a catalogue; no word such as *outdated* appears here or on screen.
+//! it is. Nothing is parsed out of a part number.
+//!
+//! Since `ADR-0033` each number is also set against JLR's own IVS part
+//! lineage, which the library carries: the number agrees with the catalogue,
+//! the catalogue names a different one, it names none for that identifier,
+//! or it does not carry the assembly at all. That is a comparison and not a
+//! verdict — no word such as *outdated* appears here or on screen, and this
+//! product could not act on one if it did.
 //!
 //! The shape is the mileage survey's: the shell owns the plan and the rules,
 //! the interface asks for one step at a time and can stop between any two;
@@ -21,10 +27,12 @@ use app_contracts::{
     ModuleReadRequest, ModuleReadState, PassportReading, VehicleContextInput,
 };
 use diagnostic_session::decode::decode_parameters;
-use diagnostic_session::{vehicle_context, KnowledgeLibrary};
+use diagnostic_session::{
+    catalogue_comparisons, vehicle_context, CatalogueAssembly, KnowledgeLibrary,
+};
 use mongoose_jlr::MongooseUdsReadResult;
 use serde_json::{json, Value};
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use uds_execution::{decode_response, PreparedUdsTransaction, UdsReadOutcome};
@@ -62,6 +70,10 @@ struct Run {
     adapter: Option<AdapterInfo>,
     entries: Vec<Entry>,
     readings: Vec<PassportReading>,
+    /// What JLR's catalogue names for each module of this run (ADR-0033),
+    /// read once at planning: the comparison is made as answers arrive, and
+    /// the library is not in hand by then.
+    catalogue: BTreeMap<String, Vec<CatalogueAssembly>>,
     /// One record per read made, answered or not, in the shape a single
     /// read leaves — what the intake turns into evidence.
     records: Vec<ModuleReadReport>,
@@ -115,8 +127,13 @@ impl PassportService {
         let resolved = vehicle_context(context);
         let mut entries: Vec<Entry> = Vec::new();
         let mut refused = Vec::new();
+        let mut catalogue: BTreeMap<String, Vec<CatalogueAssembly>> = BTreeMap::new();
 
         for family in families {
+            let known = library.catalogue_assemblies(&resolved, family);
+            if !known.is_empty() {
+                catalogue.insert(family.clone(), known);
+            }
             for (identifier, parameter) in library.identification_identifiers(&resolved, family) {
                 let request = ModuleReadRequest {
                     ecu_family: family.clone(),
@@ -155,6 +172,7 @@ impl PassportService {
             adapter: adapter.cloned(),
             entries,
             readings: Vec::new(),
+            catalogue,
             records: Vec::new(),
             refused,
             asked: 0,
@@ -306,6 +324,7 @@ impl Run {
             negative_response: None,
             note: None,
             reason: None,
+            catalogue: None,
         };
 
         match result {
@@ -359,6 +378,20 @@ impl Run {
         }
 
         self.readings.push(row);
+        self.compare_with_catalogue();
+    }
+
+    /// Set every reading against the catalogue (ADR-0033). Recomputed from
+    /// scratch each time, because the assembly a module reports can arrive
+    /// after a number it explains.
+    fn compare_with_catalogue(&mut self) {
+        if self.catalogue.is_empty() {
+            return;
+        }
+        let comparisons = catalogue_comparisons(&self.catalogue, &self.readings);
+        for (reading, comparison) in self.readings.iter_mut().zip(comparisons) {
+            reading.catalogue = comparison;
+        }
     }
 
     fn finish(&mut self) {
@@ -414,7 +447,7 @@ fn build_report(run: &Run) -> Value {
         "operation": PASSPORT_OPERATION,
         "safety_class": PASSPORT_SAFETY_CLASS,
         "route_validation": if run.synthetic { "SYNTHETIC" } else { "SOURCE_BACKED" },
-        "validation": "what each module holds in its identification identifiers, as the text it holds; nothing is parsed out of it and nothing is compared with a catalogue",
+        "validation": "what each module holds in its identification identifiers, as the text it holds; nothing is parsed out of it. Where the library carries JLR's IVS part lineage for the module, each number is also set against it (ADR-0033): AGREES, DIFFERS, NOT_NAMED or NO_ASSEMBLY, with the catalogue's own date. A comparison, not a verdict.",
         "started_unix_ms": run.started_unix_ms,
         "vehicle_context": run.context,
         "adapter": run.adapter,

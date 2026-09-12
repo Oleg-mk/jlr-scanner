@@ -110,8 +110,17 @@ interface PassportRun {
     parameter?: string;
     value?: string | null;
     routeValidation?: string;
+    /** What JLR's catalogue names for this number (ADR-0033). */
+    catalogue?: CatalogueLine | null;
   }>;
   route_validation?: string;
+}
+
+interface CatalogueLine {
+  state?: string;
+  expected?: string | null;
+  partType?: string | null;
+  dated?: string | null;
 }
 
 interface CcfRun {
@@ -172,6 +181,29 @@ export function maskTail(value: string): string {
   const text = value.trim();
   if (text.length <= 4) return text;
   return `${"•".repeat(Math.min(text.length - 4, 13))}${text.slice(-4)}`;
+}
+
+/**
+ * One comparison in a printed row (ADR-0033). Four states and no verdict,
+ * the same four the panel shows.
+ */
+function catalogueText(
+  comparison: CatalogueLine | null | undefined,
+  t: (key: string, values?: Record<string, string | number>) => string,
+): string {
+  if (!comparison) return "—";
+  switch (comparison.state) {
+    case "AGREES":
+      return t("the same number");
+    case "DIFFERS":
+      return `${t("the catalogue names")} ${comparison.expected ?? ""}`.trim();
+    case "NOT_NAMED":
+      return t("the catalogue names no part here");
+    case "NO_ASSEMBLY":
+      return t("the catalogue does not carry this assembly");
+    default:
+      return "—";
+  }
 }
 
 function stamp(unixMs: number | undefined): string {
@@ -272,14 +304,23 @@ export function buildReport(
       id: `passport-${index}`,
       title: t("Module passport"),
       worth: worthOf(run.route_validation),
-      columns: [t("Module"), t("Identifier"), t("Parameter"), t("Value")],
+      columns: [
+        t("Module"),
+        t("Identifier"),
+        t("Parameter"),
+        t("Value"),
+        t("JLR's catalogue"),
+      ],
       rows: rows.map((row) => [
         text(row.ecuFamily),
         text(row.identifier),
         text(row.parameter),
         text(row.value),
+        catalogueText(row.catalogue, t),
       ]),
-      note: t("What each module says it is, as the text it holds; nothing is compared with a catalogue."),
+      note: t(
+        "What each module says it is, as the text it holds. The last column is JLR's own part lineage as SDD carries it: a number that differs from it is a difference, not a fault.",
+      ),
     });
   }
 

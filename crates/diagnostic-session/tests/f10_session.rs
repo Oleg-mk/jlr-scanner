@@ -4,9 +4,13 @@
 //! documented manifests plus a directory of exported ones — and the survey is
 //! checked for what it shows and, as importantly, for what it refuses to hide.
 
-use app_contracts::{LibraryState, ModuleApplicability, RouteStatus, VehicleContextInput};
+use app_contracts::{
+    LibraryState, ModuleApplicability, ModuleReadState, PassportReading, RouteStatus,
+    VehicleContextInput,
+};
 use diagnostic_session::{
-    survey_vehicle, vehicle_context, KnowledgeLibrary, SDD_MODEL_YEAR_DIMENSION,
+    catalogue_comparisons, survey_vehicle, vehicle_context, KnowledgeLibrary, CATALOGUE_AGREES,
+    CATALOGUE_DIFFERS, CATALOGUE_NOT_NAMED, CATALOGUE_NO_ASSEMBLY, SDD_MODEL_YEAR_DIMENSION,
     SDD_YEAR_BREAKPOINT_DIMENSION,
 };
 use knowledge::{
@@ -14,9 +18,10 @@ use knowledge::{
     SourceRecord, SourceType,
 };
 use sdd_ingest::{
-    ConverterCatalogue, DidFormattingAdapter, ModelYearTimeline, ModuleTextAdapter,
-    OdstInfoAdapter, PlatformAdapter, VinDecodeAdapter,
+    ConverterCatalogue, DidFormattingAdapter, IvsLineageAdapter, ModelYearTimeline,
+    ModuleTextAdapter, OdstInfoAdapter, PlatformAdapter, VinDecodeAdapter,
 };
+use std::collections::BTreeMap;
 
 const PLATFORM: &str = include_str!("../../../fixtures/knowledge/synthetic/f9_platform.xml");
 const DIDS: &str = include_str!("../../../fixtures/knowledge/synthetic/f9_did_formatting.xml");
@@ -26,6 +31,7 @@ const CONVERTER_KM: &str =
 const MODULE_TEXT: &str = include_str!("../../../fixtures/knowledge/synthetic/f9_module_text.xml");
 const VIN_DECODE: &str = include_str!("../../../fixtures/knowledge/synthetic/f9_vin_decode.xml");
 const ODST: &str = include_str!("../../../fixtures/knowledge/synthetic/f9_odst_info.xml");
+const IVS: &str = include_str!("../../../fixtures/knowledge/synthetic/f9_ivs_lineage.xml");
 
 fn synthetic_source(id: &str, text: &str) -> SourceRecord {
     SourceRecord {
@@ -80,6 +86,10 @@ fn exported_manifests() -> Vec<(String, String)> {
         .unwrap()
         .parse(ODST)
         .unwrap();
+    let ivs_batch = IvsLineageAdapter::new(synthetic_source("f10-session-ivs", IVS))
+        .unwrap()
+        .parse(IVS)
+        .unwrap();
     vec![
         (
             "platform.json".to_string(),
@@ -87,7 +97,10 @@ fn exported_manifests() -> Vec<(String, String)> {
         ),
         (
             "bundle.json".to_string(),
-            serde_json::to_string(&vec![did_batch, text_batch, vin_batch, odst_batch]).unwrap(),
+            serde_json::to_string(&vec![
+                did_batch, text_batch, vin_batch, odst_batch, ivs_batch,
+            ])
+            .unwrap(),
         ),
     ]
 }
@@ -133,12 +146,12 @@ fn exported_manifests_and_bundles_load_and_are_counted_honestly() {
     let library = library();
     let snapshot = library.snapshot();
     assert_eq!(snapshot.state, LibraryState::Loaded);
-    // Six built-in plus one manifest plus one bundle of four.
-    assert_eq!(snapshot.manifests_loaded, 11);
+    // Six built-in plus one manifest plus one bundle of five.
+    assert_eq!(snapshot.manifests_loaded, 12);
     assert_eq!(snapshot.manifests_failed, 0);
-    assert_eq!(snapshot.sources, 11);
+    assert_eq!(snapshot.sources, 12);
     assert!(snapshot.records > 20);
-    assert!(snapshot.message.starts_with("Loaded 5 manifests"));
+    assert!(snapshot.message.starts_with("Loaded 6 manifests"));
 }
 
 #[test]
@@ -165,7 +178,7 @@ fn a_broken_manifest_is_reported_and_the_rest_still_load() {
     assert_eq!(files, vec!["broken.json", "wrong-shape.json"]);
     assert!(snapshot.failures[0].message.contains("not valid JSON"));
     // The good data is still there.
-    assert_eq!(snapshot.sources, 11);
+    assert_eq!(snapshot.sources, 12);
 }
 
 #[test]
@@ -375,6 +388,173 @@ fn vehicle_context_dimension_names_match_the_ingester() {
             .module_names(mnemonic)),
         library.survey(&vehicle())
     );
+}
+
+/// One row of a passport run, as the shell builds it.
+fn reading(family: &str, identifier: &str, value: Option<&str>) -> PassportReading {
+    PassportReading {
+        ecu_family: family.into(),
+        identifier: identifier.into(),
+        parameter: identifier.into(),
+        state: ModuleReadState::Succeeded,
+        value: value.map(str::to_string),
+        route_id: "hs-can".into(),
+        route_validation: "SOURCE_BACKED".into(),
+        raw_response_hex: None,
+        negative_response: None,
+        note: None,
+        reason: None,
+        catalogue: None,
+    }
+}
+
+#[test]
+fn a_part_number_is_set_against_jlrs_catalogue_and_never_judged() {
+    // The claim literal is the ingest's.
+    let library = library();
+    let context = vehicle_context(&vehicle());
+
+    let known = library.catalogue_assemblies(&context, "SYNTHMOD");
+    assert_eq!(
+        known
+            .iter()
+            .map(|entry| entry.assembly.as_str())
+            .collect::<Vec<_>>(),
+        ["8X23-18C808-CE", "8X23-18C808-DA"]
+    );
+    let carried = &known[0];
+    assert_eq!(carried.as_delivered.as_deref(), Some("F113"));
+    assert_eq!(carried.dated.as_deref(), Some("Oct-17-2022 22:16:38"));
+    assert_eq!(
+        carried.parts,
+        vec![
+            (
+                "F191".to_string(),
+                "6H52-14C524-CB".to_string(),
+                "Hardware".to_string()
+            ),
+            (
+                "F188".to_string(),
+                "6H52-14C526-CD".to_string(),
+                "Strategy".to_string()
+            ),
+            (
+                "F124".to_string(),
+                "8X23-14C527-CE".to_string(),
+                "Calibration".to_string()
+            ),
+        ]
+    );
+    // A module the catalogue does not carry has nothing to compare with.
+    assert!(library
+        .catalogue_assemblies(&context, "LEGACYMOD")
+        .is_empty());
+
+    let mut assemblies = BTreeMap::new();
+    assemblies.insert("SYNTHMOD".to_string(), known);
+    let readings = vec![
+        // The assembly itself, answered without the hyphens a catalogue
+        // writes: the same number (ADR-0033, decision 5).
+        reading("SYNTHMOD", "0xF113", Some("8X2318C808CE")),
+        // The software the catalogue names for it.
+        reading("SYNTHMOD", "0xF188", Some("6H52-14C526-CD")),
+        // A calibration that is not the one the catalogue names.
+        reading("SYNTHMOD", "0xF124", Some("8X23-14C527-AA")),
+        // An identifier the catalogue names no part for.
+        reading("SYNTHMOD", "0xF18C", Some("SERIAL-0001")),
+        // A module the catalogue does not carry at all.
+        reading("OTHERMOD", "0xF188", Some("anything")),
+        // And a silence, which is nothing to compare.
+        reading("SYNTHMOD", "0xF120", None),
+    ];
+    let compared = catalogue_comparisons(&assemblies, &readings);
+    let states: Vec<Option<&str>> = compared
+        .iter()
+        .map(|entry| entry.as_ref().map(|value| value.state.as_str()))
+        .collect();
+    assert_eq!(
+        states,
+        [
+            Some(CATALOGUE_AGREES),
+            Some(CATALOGUE_AGREES),
+            Some(CATALOGUE_DIFFERS),
+            Some(CATALOGUE_NOT_NAMED),
+            None,
+            None,
+        ]
+    );
+    let differs = compared[2].as_ref().unwrap();
+    assert_eq!(differs.expected.as_deref(), Some("8X23-14C527-CE"));
+    assert_eq!(differs.part_type.as_deref(), Some("Calibration"));
+    assert_eq!(differs.assembly.as_deref(), Some("8X23-18C808-CE"));
+    // The catalogue's own date travels with every comparison, so its age is
+    // never hidden.
+    assert_eq!(differs.dated.as_deref(), Some("Oct-17-2022 22:16:38"));
+
+    // A module whose assembly the catalogue does not carry says so, rather
+    // than comparing against an assembly it never reported.
+    let mut wrong_unit = BTreeMap::new();
+    wrong_unit.insert(
+        "SYNTHMOD".to_string(),
+        library.catalogue_assemblies(&context, "SYNTHMOD"),
+    );
+    let replaced = vec![
+        reading("SYNTHMOD", "0xF113", Some("9Z99-00A000-ZZ")),
+        reading("SYNTHMOD", "0xF188", Some("6H52-14C526-CD")),
+    ];
+    for entry in catalogue_comparisons(&wrong_unit, &replaced) {
+        let entry = entry.expect("the catalogue carries the module");
+        assert_eq!(entry.state, CATALOGUE_NO_ASSEMBLY);
+        assert!(entry.expected.is_none());
+    }
+
+    // Nothing anywhere in this feature reads as a verdict.
+    let words = [
+        "outdated",
+        "out of date",
+        "update",
+        "flash",
+        "programme this",
+    ];
+    for entry in compared.into_iter().flatten() {
+        let text = format!("{entry:?}").to_ascii_lowercase();
+        for word in words {
+            assert!(!text.contains(word), "{word} in {text}");
+        }
+    }
+}
+
+#[test]
+fn the_catalogue_claim_name_matches_the_ingester() {
+    assert_eq!(
+        catalogue_claim_name(),
+        sdd_ingest::IVS_ASSEMBLY_CLAIM,
+        "the session reads the claim the ingest writes"
+    );
+}
+
+/// The claim the session looks for, read back out of a record the ingest
+/// wrote, so the two literals cannot drift apart unnoticed.
+fn catalogue_claim_name() -> String {
+    let library = library();
+    let context = vehicle_context(&vehicle());
+    assert!(!library
+        .catalogue_assemblies(&context, "SYNTHMOD")
+        .is_empty());
+    let store = library.store();
+    let result = store.query(&knowledge::KnowledgeQuery::default().include_indeterminate(true));
+    result
+        .records
+        .iter()
+        .find_map(
+            |entry| match (&entry.record.entity.kind, &entry.record.key) {
+                (knowledge::EntityKind::ModuleAssembly, knowledge::ClaimKey::Custom { name }) => {
+                    Some(name.clone())
+                }
+                _ => None,
+            },
+        )
+        .expect("a lineage record exists")
 }
 
 #[test]

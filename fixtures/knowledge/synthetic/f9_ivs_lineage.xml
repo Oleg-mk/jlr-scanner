@@ -1,0 +1,138 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  SYNTHETIC F9 FIXTURE. Not JLR evidence and not promotable to evidence.
+
+  Reproduces only the element shape of an SDD IVS part-lineage document
+  (COMMON_JLR_SMPACK_XML/IVS). Values exercise parsing branches:
+
+    * an assembly declared twice, once per node, whose parts are gathered;
+    * a supporting software part with no identifier, and one whose
+      identifier is SDD's own `SECX` rather than four hex digits: neither
+      can be compared with anything a module answers, so neither is
+      recorded;
+    * a lineage with no parts at all;
+    * a second module, so a lookup has to pick the right one.
+
+  The programming attributes of a lineage block are present and ignored on
+  purpose: ADR-0033 records numbers, never instructions.
+-->
+<ShowVehicleServiceActions>
+  <ApplicationArea>
+    <Sender>
+      <LogicalId>IVS</LogicalId>
+      <Component>IDS</Component>
+      <Environment>Production</Environment>
+      <Task>Concern</Task>
+      <Language>eng</Language>
+    </Sender>
+    <CreationDateTime>Oct-17-2022 22:16:38</CreationDateTime>
+    <BODId>2007_SYNTHA_f9-fixture.xml</BODId>
+    <UserArea>
+      <BODRevision>Service 1.26.2</BODRevision>
+      <TaskRevision>IVS 3.1</TaskRevision>
+      <ValidationStatus>Yes</ValidationStatus>
+    </UserArea>
+  </ApplicationArea>
+  <DataArea>
+    <Verb>Show</Verb>
+    <Noun>VehicleServiceActions</Noun>
+    <VehicleServiceActions>
+      <VehicleServiceActionHeader>
+        <VehicleProgram>
+          <ProgramCode>SYNTHA</ProgramCode>
+          <VehicleName>Synthetic vehicle</VehicleName>
+          <ModelYear>2007</ModelYear>
+        </VehicleProgram>
+      </VehicleServiceActionHeader>
+      <VehicleServiceActionDetail>
+        <PartLineage>
+          <ECUAcronym>SYNTHMOD</ECUAcronym>
+          <AssyPN>8X23-18C808-CE</AssyPN>
+          <PartLineageId>8X2318C808CE 00001</PartLineageId>
+          <AsDeliveredPID>F113</AsDeliveredPID>
+          <CertificationRequired>Y</CertificationRequired>
+          <ProgInSvc>Y</ProgInSvc>
+          <ConfigurationMethod>ANY</ConfigurationMethod>
+          <PartIsDiscontinued>ACTIVE</PartIsDiscontinued>
+          <SOTAEnabled>No</SOTAEnabled>
+          <HardwareComponentPart>
+            <HardwareType>6H52-14C524-CB</HardwareType>
+            <PartLineageId>6H5214C524CB 00002</PartLineageId>
+            <FilePNPid>F191</FilePNPid>
+            <PartIsDiscontinued>ACTIVE</PartIsDiscontinued>
+          </HardwareComponentPart>
+          <Node>
+            <NodeAddr>86</NodeAddr>
+            <CPUType>Main</CPUType>
+            <Protocol>HS-CAN</Protocol>
+            <SoftwareComponentPart>
+              <PartType>Strategy</PartType>
+              <FilePN>6H52-14C526-CD</FilePN>
+              <PartLineageId>6H5214C526CD 00004</PartLineageId>
+              <FilePNPid>F188</FilePNPid>
+              <SOTAEnabled>No</SOTAEnabled>
+              <SupportingSoftwarePart>
+                <PartType>Secondary Bootloader</PartType>
+                <FilePN>6H52-14C528-CB</FilePN>
+                <PartLineageId>6H5214C528CB 00002</PartLineageId>
+              </SupportingSoftwarePart>
+            </SoftwareComponentPart>
+          </Node>
+        </PartLineage>
+        <PartLineage>
+          <ECUAcronym>SYNTHMOD</ECUAcronym>
+          <AssyPN>8X23-18C808-CE</AssyPN>
+          <AsDeliveredPID>F113</AsDeliveredPID>
+          <Node>
+            <NodeAddr>87</NodeAddr>
+            <CPUType>Secondary</CPUType>
+            <SoftwareComponentPart>
+              <PartType>Calibration</PartType>
+              <FilePN>8X23-14C527-CE</FilePN>
+              <FilePNPid>F124</FilePNPid>
+            </SoftwareComponentPart>
+            <SoftwareComponentPart>
+              <PartType>Signal Configuration</PartType>
+              <FilePN>8X23-14C529-AA</FilePN>
+              <FilePNPid>SECX</FilePNPid>
+            </SoftwareComponentPart>
+          </Node>
+        </PartLineage>
+        <PartLineage>
+          <ECUAcronym>SYNTHMOD</ECUAcronym>
+          <AssyPN>8X23-18C808-DA</AssyPN>
+          <AsDeliveredPID>F112</AsDeliveredPID>
+          <Node>
+            <NodeAddr>86</NodeAddr>
+            <SoftwareComponentPart>
+              <PartType>Strategy</PartType>
+              <FilePN>9X23-14C526-AB</FilePN>
+              <FilePNPid>F188</FilePNPid>
+            </SoftwareComponentPart>
+          </Node>
+        </PartLineage>
+        <PartLineage>
+          <ECUAcronym>OTHERMOD</ECUAcronym>
+          <AssyPN>8X23-19C200-AA</AssyPN>
+          <AsDeliveredPID>F112</AsDeliveredPID>
+          <Node>
+            <NodeAddr>90</NodeAddr>
+            <SoftwareComponentPart>
+              <PartType>Signal Configuration</PartType>
+              <FilePN>8X23-14C528-AA</FilePN>
+              <FilePNPid>F120</FilePNPid>
+            </SoftwareComponentPart>
+          </Node>
+        </PartLineage>
+        <PartLineage>
+          <ECUAcronym>EMPTYMOD</ECUAcronym>
+          <AssyPN>8X23-19C999-AA</AssyPN>
+          <AsDeliveredPID>F112</AsDeliveredPID>
+          <Node>
+            <NodeAddr>91</NodeAddr>
+          </Node>
+        </PartLineage>
+      </VehicleServiceActionDetail>
+    </VehicleServiceActions>
+  </DataArea>
+</ShowVehicleServiceActions>

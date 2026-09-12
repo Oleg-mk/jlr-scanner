@@ -25,10 +25,10 @@ pub use issue::ISSUE_STAMP_FILE;
 pub use knowledge::VehicleContext;
 
 use app_contracts::{
-    LibraryIssue, LibraryIssueIntegrity, LibrarySnapshot, LibraryState, ManifestFailure,
-    MarkerEntry, ModuleApplicability, ModuleSurveyEntry, ProgrammeEntry, ReadableIdentifierSummary,
-    RouteStatus, RouteSummary, SelfTestSummary, VehicleCatalogueSnapshot, VehicleContextInput,
-    VehicleSurveySnapshot, VinDecodeSnapshot,
+    CatalogueComparison, LibraryIssue, LibraryIssueIntegrity, LibrarySnapshot, LibraryState,
+    ManifestFailure, MarkerEntry, ModuleApplicability, ModuleSurveyEntry, PassportReading,
+    ProgrammeEntry, ReadableIdentifierSummary, RouteStatus, RouteSummary, SelfTestSummary,
+    VehicleCatalogueSnapshot, VehicleContextInput, VehicleSurveySnapshot, VinDecodeSnapshot,
 };
 use diagnostic_environment::{
     DiagnosticEnvironmentPlan, DiagnosticEnvironmentResolution, DiagnosticEnvironmentResolver,
@@ -56,6 +56,17 @@ pub const SDD_YEAR_BREAKPOINT_DIMENSION: &str = "sdd_year_breakpoint";
 /// catalogue's `sdd_year_breakpoint` — one vocabulary written down twice —
 /// and a test asserts the literal agrees with the ingest.
 pub const SDD_MODEL_YEAR_DIMENSION: &str = "sdd_model_year";
+
+/// Claim the IVS ingest writes for one assembly's part lineage
+/// (ADR-0033). The literal is the adapter's; a test asserts they agree.
+const IVS_ASSEMBLY_CLAIM: &str = "sdd_ivs_assembly";
+
+/// The four things this product can say about a number a module reported,
+/// set against JLR's catalogue (ADR-0033). None of them is a verdict.
+pub const CATALOGUE_AGREES: &str = "AGREES";
+pub const CATALOGUE_DIFFERS: &str = "DIFFERS";
+pub const CATALOGUE_NOT_NAMED: &str = "NOT_NAMED";
+pub const CATALOGUE_NO_ASSEMBLY: &str = "NO_ASSEMBLY";
 
 /// Claims the ODST ingest writes for the self tests a module declares
 /// (ADR-0032). The literals are the adapter's; a test asserts they agree.
@@ -129,6 +140,22 @@ pub fn vehicle_context(input: &VehicleContextInput) -> VehicleContext {
         other,
         ..VehicleContext::default()
     }
+}
+
+/// One assembly JLR's IVS catalogue names for a module on this car, and
+/// the parts it says belong inside it (ADR-0033). Knowledge about numbers:
+/// nothing here is an instruction to change one.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct CatalogueAssembly {
+    /// The assembly part number, as the catalogue writes it.
+    pub assembly: String,
+    /// The identifier the catalogue says that assembly answers on, such as
+    /// `F112` or `F113`.
+    pub as_delivered: Option<String>,
+    /// The date the catalogue itself carries.
+    pub dated: Option<String>,
+    /// `(identifier, part number, part type)`, in the catalogue's order.
+    pub parts: Vec<(String, String, String)>,
 }
 
 /// One battery parameter a module can be asked for (ADR-0030).
@@ -653,6 +680,52 @@ impl KnowledgeLibrary {
                 .unwrap_or_else(|| format!("0x{:04X}", identifier.identifier));
             found.push((identifier.identifier, name));
         }
+        found
+    }
+
+    /// What JLR's own catalogue names for this module on this car
+    /// (ADR-0033): every assembly it carries, with the parts inside it.
+    /// Read once when a passport run is planned, because the comparison is
+    /// made as the answers arrive.
+    pub fn catalogue_assemblies(
+        &self,
+        context: &VehicleContext,
+        ecu_family: &str,
+    ) -> Vec<CatalogueAssembly> {
+        // The module is part of what chooses a lineage, so it is part of the
+        // context the record is resolved against — as the fault-code help
+        // does with a screen.
+        let mut context = context.clone();
+        context.ecu_family = Some(ecu_family.to_string());
+        let result = self
+            .store
+            .query(&KnowledgeQuery::for_vehicle(context).include_indeterminate(true));
+        let mut found: Vec<CatalogueAssembly> = Vec::new();
+        for entry in &result.records {
+            if entry.applicability_resolution == ApplicabilityResolution::NotApplicable
+                || entry.record.entity.kind != EntityKind::ModuleAssembly
+            {
+                continue;
+            }
+            let ClaimKey::Custom { name } = &entry.record.key else {
+                continue;
+            };
+            if name != IVS_ASSEMBLY_CLAIM {
+                continue;
+            }
+            let KnowledgeValue::Text { value } = &entry.record.value else {
+                continue;
+            };
+            if let Some(assembly) = parse_assembly(value) {
+                if !found
+                    .iter()
+                    .any(|known| known.assembly == assembly.assembly)
+                {
+                    found.push(assembly);
+                }
+            }
+        }
+        found.sort_by(|left, right| left.assembly.cmp(&right.assembly));
         found
     }
 
@@ -1409,6 +1482,174 @@ fn year_markers(applicability: &knowledge::Applicability) -> Vec<String> {
         Some(DimensionConstraint::OneOf { values }) => values.clone(),
         _ => Vec::new(),
     }
+}
+
+/// One lineage record read back into an assembly (ADR-0033). The lists are
+/// split before they are unescaped, so a part number carrying a separator
+/// survives the round trip.
+fn parse_assembly(text: &str) -> Option<CatalogueAssembly> {
+    let mut fields: BTreeMap<&str, &str> = BTreeMap::new();
+    for part in text.split(';') {
+        if let Some((key, value)) = part.split_once('=') {
+            fields.insert(key.trim(), value.trim());
+        }
+    }
+    let assembly = unescape(fields.get("assembly")?);
+    if assembly.is_empty() {
+        return None;
+    }
+    let list = |key: &str| -> Vec<String> {
+        fields
+            .get(key)
+            .map(|value| value.split('|').map(unescape).collect())
+            .unwrap_or_default()
+    };
+    let pids = list("pids");
+    let parts = list("parts");
+    let types = list("types");
+    let optional = |key: &str| {
+        fields
+            .get(key)
+            .map(|value| unescape(value))
+            .filter(|value| !value.is_empty())
+    };
+    Some(CatalogueAssembly {
+        assembly,
+        as_delivered: optional("as_delivered"),
+        dated: optional("dated"),
+        parts: pids
+            .into_iter()
+            .zip(parts)
+            .zip(types)
+            .map(|((pid, part), kind)| (pid, part, kind))
+            .collect(),
+    })
+}
+
+/// What the catalogue says about each number a passport run read
+/// (ADR-0033), one answer per reading and in the same order. `None` where
+/// the catalogue carries nothing for that module, or the module answered
+/// nothing to compare.
+///
+/// The state is never a verdict. A difference has ordinary causes — a
+/// replaced unit, another market, a dealer update, a catalogue that stopped
+/// in 2022 — and this product ranks none of them.
+pub fn catalogue_comparisons(
+    assemblies: &BTreeMap<String, Vec<CatalogueAssembly>>,
+    readings: &[PassportReading],
+) -> Vec<Option<CatalogueComparison>> {
+    // Which assembly each module turned out to be carrying: the first one
+    // the catalogue names that the module itself reported.
+    let mut carried: BTreeMap<&str, (&CatalogueAssembly, String)> = BTreeMap::new();
+    for (family, known) in assemblies {
+        let values: Vec<(&str, &str)> = readings
+            .iter()
+            .filter(|reading| &reading.ecu_family == family)
+            .filter_map(|reading| {
+                reading
+                    .value
+                    .as_deref()
+                    .map(|value| (identifier_name(&reading.identifier), value))
+            })
+            .collect();
+        let named = |assembly: &CatalogueAssembly, only: Option<&str>| {
+            values.iter().find_map(|(pid, value)| {
+                let wanted = only.is_none() || only == Some(*pid);
+                (wanted && knowledge::part_number::same(value, &assembly.assembly))
+                    .then(|| (*pid).to_string())
+            })
+        };
+        let found = known
+            .iter()
+            // The identifier the catalogue says the assembly answers on
+            // first, then any identifier that carried the same number.
+            .find_map(|assembly| {
+                named(assembly, assembly.as_delivered.as_deref()).map(|pid| (assembly, pid))
+            })
+            .or_else(|| {
+                known
+                    .iter()
+                    .find_map(|assembly| named(assembly, None).map(|pid| (assembly, pid)))
+            });
+        if let Some((assembly, pid)) = found {
+            carried.insert(family.as_str(), (assembly, pid));
+        }
+    }
+
+    readings
+        .iter()
+        .map(|reading| {
+            let known = assemblies.get(&reading.ecu_family)?;
+            if known.is_empty() {
+                return None;
+            }
+            let value = reading.value.as_deref()?;
+            let pid = identifier_name(&reading.identifier);
+            let Some((assembly, carrier)) = carried.get(reading.ecu_family.as_str()) else {
+                return Some(CatalogueComparison {
+                    state: CATALOGUE_NO_ASSEMBLY.into(),
+                    expected: None,
+                    part_type: None,
+                    assembly: None,
+                    dated: known.first().and_then(|entry| entry.dated.clone()),
+                });
+            };
+            let dated = assembly.dated.clone();
+            if pid == *carrier {
+                // The number that identified the assembly agrees with the
+                // catalogue by construction; saying so is worth a row.
+                return Some(CatalogueComparison {
+                    state: CATALOGUE_AGREES.into(),
+                    expected: Some(assembly.assembly.clone()),
+                    part_type: Some("Assembly".into()),
+                    assembly: Some(assembly.assembly.clone()),
+                    dated,
+                });
+            }
+            match assembly
+                .parts
+                .iter()
+                .find(|(known_pid, _, _)| known_pid == pid)
+            {
+                Some((_, expected, kind)) => Some(CatalogueComparison {
+                    state: if knowledge::part_number::same(value, expected) {
+                        CATALOGUE_AGREES.into()
+                    } else {
+                        CATALOGUE_DIFFERS.into()
+                    },
+                    expected: Some(expected.clone()),
+                    part_type: Some(kind.clone()),
+                    assembly: Some(assembly.assembly.clone()),
+                    dated,
+                }),
+                None => Some(CatalogueComparison {
+                    state: CATALOGUE_NOT_NAMED.into(),
+                    expected: None,
+                    part_type: None,
+                    assembly: Some(assembly.assembly.clone()),
+                    dated,
+                }),
+            }
+        })
+        .collect()
+}
+
+/// `0xF188` as the catalogue writes it: `F188`.
+fn identifier_name(identifier: &str) -> &str {
+    identifier
+        .trim()
+        .strip_prefix("0x")
+        .or_else(|| identifier.trim().strip_prefix("0X"))
+        .unwrap_or(identifier.trim())
+}
+
+/// The escaping of `ADR-0028`, undone.
+fn unescape(value: &str) -> String {
+    value
+        .replace("%3D", "=")
+        .replace("%7C", "|")
+        .replace("%3B", ";")
+        .replace("%25", "%")
 }
 
 /// The escaped `key=value;…` text of `ADR-0028`, read back.

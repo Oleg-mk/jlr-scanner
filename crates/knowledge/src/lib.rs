@@ -14,6 +14,8 @@ mod ingestion;
 /// whether it is packed or not (ADR-0023).
 pub mod manifest_file;
 mod model;
+/// How two JLR part numbers are compared (ADR-0033).
+pub mod part_number;
 mod source;
 mod store;
 
