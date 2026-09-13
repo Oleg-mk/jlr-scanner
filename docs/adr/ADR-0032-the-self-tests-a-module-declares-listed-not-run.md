@@ -1,7 +1,11 @@
 # ADR-0032: The self-tests a module declares — listed, not run
 
 - Status: Accepted, 2026-09-12 (the owner took the next row from the
-  capability matrix: "Перелік самотестів і процедур, які модуль уміє")
+  capability matrix: "Перелік самотестів і процедур, які модуль уміє").
+  Amended 2026-09-13 by `ADR-0034`: the words a test is described in are
+  SDD's own — English, and Russian once the ODST Russian pack is ingested —
+  and `description_texts` is keyed by SDD's language code, not the
+  interface's; the wording table this decision leaned on left the product.
 - Decision: the product **lists** every on-demand self test SDD declares for
   a module on this car — its identifier, SDD's own name for it, how long it
   takes and how long the tester waits, and the description SDD writes for
