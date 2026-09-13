@@ -4039,15 +4039,6 @@ table.live-read-identifiers label {
   background: rgb(24 34 49 / 2%);
 }
 
-/* While the look is being worked on: the two marks that say the browser
-   preview is not a car are hidden, so the sheet can be judged whole. They
-   are hidden, not removed — the moment this block goes, both are back, and
-   neither has ever been shown by the application itself. This block must
-   not be in a release build. */
-.app-shell .demo-banner,
-.app-shell .demo-badge {
-  display: none;
-}
 
 
 /* A screen sliding past the end of its column was being sliced square, the
