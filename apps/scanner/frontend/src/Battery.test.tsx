@@ -173,6 +173,9 @@ describe("battery", () => {
           routeValidation: "SYNTHETIC",
           readUnixMs: taken,
         })}
+        running={false}
+        adapterReady
+        surveyed
         bench
       />,
     );
