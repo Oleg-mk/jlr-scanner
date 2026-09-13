@@ -133,6 +133,9 @@ export function CapturePanel({
             }
           />
         </label>
+      </div>
+
+      <div className="capture-actions">
         <button
           className="button button--primary"
           type="button"

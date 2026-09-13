@@ -131,9 +131,7 @@ describe("interface language", () => {
     );
     expect(await screen.findByRole("heading", { name: "Vehicle network" })).toBeVisible();
 
-    fireEvent.change(screen.getByRole("combobox", { name: "Language" }), {
-      target: { value: "uk" },
-    });
+    fireEvent.click(screen.getByRole("button", { name: "Українська" }));
     expect(screen.getByRole("heading", { name: "Мережа автомобіля" })).toBeVisible();
     expect(screen.getByRole("button", { name: "Зберегти звіт сесії" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Оглянути модулі" })).toBeInTheDocument();
@@ -160,18 +158,14 @@ describe("interface language", () => {
     fireEvent.click(screen.getByRole("button", { name: "Survey modules" }));
     expect(await screen.findByText("Powertrain control module")).toBeVisible();
 
-    fireEvent.change(screen.getByRole("combobox", { name: "Language" }), {
-      target: { value: "ru" },
-    });
+    fireEvent.click(screen.getByRole("button", { name: "Русский" }));
     expect(screen.getByRole("heading", { name: "Сеть автомобиля" })).toBeVisible();
     expect(screen.getByRole("button", { name: "Сохранить отчёт сеанса" })).toBeInTheDocument();
     expect(screen.getByText("Блок управления силовым агрегатом")).toBeVisible();
     expect(screen.queryByText("Powertrain control module")).not.toBeInTheDocument();
 
     // Ukrainian has no SDD text: the module keeps its English name.
-    fireEvent.change(screen.getByRole("combobox", { name: "Язык" }), {
-      target: { value: "uk" },
-    });
+    fireEvent.click(screen.getByRole("button", { name: "Українська" }));
     expect(screen.getByText("Powertrain control module")).toBeVisible();
     expect(screen.getByRole("heading", { name: "Мережа автомобіля" })).toBeVisible();
   });

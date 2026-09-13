@@ -96,7 +96,7 @@ export function BatteryCard({
         </div>
         <div className="battery-card__reading">
           <strong>{charge === null ? "—" : `${charge}%`}</strong>
-          <span>{taken ?? t("not read yet")}</span>
+          {taken === null ? null : <span>{taken}</span>}
         </div>
       </div>
 
@@ -120,11 +120,11 @@ export function BatteryCard({
         </p>
       ) : null}
 
-      <p className="battery-card__note">
-        {synthetic
-          ? t("Bench values: nothing here was measured on a car.")
-          : t("The rest of the battery is in its own panel; nothing here is a verdict.")}
-      </p>
+      {synthetic ? (
+        <p className="battery-card__note">
+          {t("Bench values: nothing here was measured on a car.")}
+        </p>
+      ) : null}
     </section>
   );
 }

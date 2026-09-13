@@ -77,18 +77,26 @@ export function SessionPanel({ steps, onJump, vehicle, battery }: SessionPanelPr
   useLanguage();
   const next = steps.find((step) => step.state === "next");
   return (
-    <nav className="session-panel flow-rail" aria-labelledby="session-title">
+    // Three layers, and each one has a job (2026-09-13). The column stands
+    // still. The screen in it stands still too, so the cut around it keeps
+    // its corners however far the session is scrolled. Only the third layer
+    // moves — and it reaches past the screen's right edge on purpose, so its
+    // bar comes down on the narrow screen cut beside it rather than across
+    // the session itself.
+    <nav className="flow-rail" aria-labelledby="session-title">
+      <div className="session-panel">
+      <div className="rail-scroll">
       <div className="section-heading">
         <div>
           <p className="eyebrow">{t("One session, one report")}</p>
           <h2 id="session-title">{t("Session")}</h2>
         </div>
       </div>
-      <p className="operation-copy">
-        {next
-          ? t("Next: {title} — {hint}", { title: next.title.toLowerCase(), hint: next.hint })
-          : t("Everything recorded. Save the report and send it with the tester programme.")}
-      </p>
+      {next ? null : (
+        <p className="operation-copy">
+          {t("Everything recorded. Save the report and send it with the tester programme.")}
+        </p>
+      )}
       <ol className="session-steps">
         {steps.map((step, index) => (
           <li key={step.id} className={`session-step session-step--${step.state}`}>
@@ -138,6 +146,8 @@ export function SessionPanel({ steps, onJump, vehicle, battery }: SessionPanelPr
         ) : (
           <span className="rail-vehicle-detail">{t("Not chosen yet")}</span>
         )}
+      </div>
+      </div>
       </div>
     </nav>
   );

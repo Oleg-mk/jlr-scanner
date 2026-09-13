@@ -18,10 +18,11 @@ export type Language = "en" | "ru" | "uk";
 
 export const LANGUAGE_STORAGE_KEY = "prowlone.language";
 
-export const languages: Array<{ id: Language; label: string }> = [
-  { id: "en", label: "English" },
-  { id: "ru", label: "Русский" },
-  { id: "uk", label: "Українська" },
+/** The name in full, and the two letters cut into the plate beside it. */
+export const languages: Array<{ id: Language; label: string; short: string }> = [
+  { id: "en", label: "English", short: "EN" },
+  { id: "ru", label: "Русский", short: "RU" },
+  { id: "uk", label: "Українська", short: "UA" },
 ];
 
 /**
@@ -105,6 +106,13 @@ export function dataText(
 }
 
 const uk: Record<string, string> = {
+  // The line cut into the foot of the plate (2026-09-13)
+  "© 2026 Oleg-mk · AGPL-3.0 · written with Claude (Anthropic)":
+    "© 2026 Oleg-mk · AGPL-3.0 · написано з Claude (Anthropic)",
+  "macOS and Windows, native on Apple silicon, Intel and x86 — connect it and read; the adapter needs no driver of its own.":
+    "macOS і Windows, нативно на Apple silicon, Intel і x86 — під'єднайте і читайте; адаптеру не потрібен власний драйвер.",
+  "Independent software. Jaguar, Land Rover, Range Rover and SDD are trademarks of Jaguar Land Rover Limited; this application is not affiliated with or endorsed by it.":
+    "Незалежне програмне забезпечення. Jaguar, Land Rover, Range Rover і SDD — торгові марки Jaguar Land Rover Limited; цей застосунок не пов'язаний з нею і нею не схвалений.",
   // The language of SDD's own text (ADR-0034)
   "Text language": "Мова тексту",
   "English": "Англійська",
@@ -149,7 +157,6 @@ const uk: Record<string, string> = {
   "One file with the survey, every capture and every read of this session. Send it, with a few lines about the car and the adapter, through the channel you received the build from.":
     "Один файл з оглядом, усіма захопленнями та читаннями цієї сесії. Надішліть його з кількома рядками про авто та адаптер тим каналом, яким отримали збірку.",
   Session: "Сесія",
-  "Next: {title} — {hint}": "Далі: {title} — {hint}",
   "Everything recorded. Save the report and send it with the tester programme.":
     "Усе записано. Збережіть звіт і надішліть його за програмою тестування.",
   Done: "Виконано",
@@ -523,12 +530,10 @@ const uk: Record<string, string> = {
   "Every battery parameter the loaded data names for this car, module by module: how full it is, what it is doing now, what it leaks while parked, how it has aged, and what the car remembers about it. The card in the session column carries the level and the button that reads it. Read-only; nothing is written anywhere.": "Кожен параметр акумулятора, який завантажені дані називають для цього авто, модуль за модулем: наскільки він заряджений, що робить зараз, скільки втрачає на стоянці, як постарів і що пам'ятає про нього авто. Картка в колонці сеансу тримає рівень і кнопку читання. Лише читання; нікуди нічого не записується.",
   "{asked} of {planned} reads, {answered} answered": "{asked} з {planned} читань, відповіли {answered}",
   "Show the {count} rows that answered nothing": "Показати {count} рядків, які нічого не відповіли",
-  "The rest of the battery is in its own panel; nothing here is a verdict.": "Решта акумулятора — в окремій панелі; тут немає жодної оцінки.",
   "Read the battery": "Прочитати акумулятор",
   "Read again": "Прочитати ще раз",
   "read just now": "щойно зчитано",
   "read {minutes} min ago": "зчитано {minutes} хв тому",
-  "not read yet": "ще не зчитано",
   "State of charge: not read": "Рівень заряду: не зчитано",
   "State of charge: {percent}%": "Рівень заряду: {percent}%",
   "Charge": "Заряд",
@@ -1192,6 +1197,13 @@ const uk: Record<string, string> = {
 };
 
 const ru: Record<string, string> = {
+  // The line cut into the foot of the plate (2026-09-13)
+  "© 2026 Oleg-mk · AGPL-3.0 · written with Claude (Anthropic)":
+    "© 2026 Oleg-mk · AGPL-3.0 · написано с Claude (Anthropic)",
+  "macOS and Windows, native on Apple silicon, Intel and x86 — connect it and read; the adapter needs no driver of its own.":
+    "macOS и Windows, нативно на Apple silicon, Intel и x86 — подключите и читайте; адаптеру не нужен собственный драйвер.",
+  "Independent software. Jaguar, Land Rover, Range Rover and SDD are trademarks of Jaguar Land Rover Limited; this application is not affiliated with or endorsed by it.":
+    "Независимое программное обеспечение. Jaguar, Land Rover, Range Rover и SDD — торговые марки Jaguar Land Rover Limited; это приложение с ней не связано и ею не одобрено.",
   // The language of SDD's own text (ADR-0034)
   "Text language": "Язык текста",
   "English": "Английский",
@@ -1236,7 +1248,6 @@ const ru: Record<string, string> = {
   "One file with the survey, every capture and every read of this session. Send it, with a few lines about the car and the adapter, through the channel you received the build from.":
     "Один файл с обзором, всеми захватами и чтениями этого сеанса. Отправьте его с несколькими строками об авто и адаптере тем каналом, которым получили сборку.",
   Session: "Сеанс",
-  "Next: {title} — {hint}": "Далее: {title} — {hint}",
   "Everything recorded. Save the report and send it with the tester programme.":
     "Всё записано. Сохраните отчёт и отправьте его по программе тестирования.",
   Done: "Выполнено",
@@ -1611,12 +1622,10 @@ const ru: Record<string, string> = {
   "Every battery parameter the loaded data names for this car, module by module: how full it is, what it is doing now, what it leaks while parked, how it has aged, and what the car remembers about it. The card in the session column carries the level and the button that reads it. Read-only; nothing is written anywhere.": "Каждый параметр аккумулятора, который загруженные данные называют для этого автомобиля, модуль за модулем: насколько он заряжен, что делает сейчас, сколько теряет на стоянке, как постарел и что помнит о нём автомобиль. Карточка в колонке сеанса хранит уровень и кнопку чтения. Только чтение; никуда ничего не записывается.",
   "{asked} of {planned} reads, {answered} answered": "{asked} из {planned} чтений, ответили {answered}",
   "Show the {count} rows that answered nothing": "Показать {count} строк, которые ничего не ответили",
-  "The rest of the battery is in its own panel; nothing here is a verdict.": "Остальное об аккумуляторе — в отдельной панели; здесь нет никакой оценки.",
   "Read the battery": "Прочитать аккумулятор",
   "Read again": "Прочитать ещё раз",
   "read just now": "только что считано",
   "read {minutes} min ago": "считано {minutes} мин назад",
-  "not read yet": "ещё не считано",
   "State of charge: not read": "Уровень заряда: не считан",
   "State of charge: {percent}%": "Уровень заряда: {percent}%",
   "Charge": "Заряд",

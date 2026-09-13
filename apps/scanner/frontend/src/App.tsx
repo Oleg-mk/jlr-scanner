@@ -287,6 +287,15 @@ export function App({
     bench,
   });
   const demoPreview = browserDemoEnabled();
+  // The name in the corner is the instrument's own lamp (2026-09-13). Before
+  // there is a car on the other end of the lead it beats — Jaguar's own
+  // rhythm, one, a short pause, two, then the longer rest. Once the adapter
+  // is verified and the car is described, the beating stops and it settles
+  // to a quiet green: reading, and only reading. The third state is red and
+  // steady, for the day something is sent rather than asked; nothing sets it
+  // yet, because nothing in stage 1 can.
+  const lamp: "waiting" | "live" | "sending" =
+    adapterReady && library.vehicle.vehicleProgram.trim() !== "" ? "live" : "waiting";
   // The card is offered when there is something to read it with and a car
   // to read it from; the reason is said rather than the button hidden.
   const batteryDisabledReason = !adapterReady
@@ -349,7 +358,7 @@ export function App({
       <header className="app-header">
         <div className="brand">
           <div className="brand-name">
-            <h1>ProwlOne</h1>
+            <h1 data-lamp={lamp}>ProwlOne</h1>
             <p className="brand-tagline">{t("Multi-platform vehicle diagnostics")}</p>
           </div>
           {demoPreview ? <span className="demo-badge">{t("Simulator UI preview")}</span> : null}
@@ -364,20 +373,30 @@ export function App({
           >
             {t("New session")}
           </button>
-          <label className="language-switch">
-            <span>{t("Language")}</span>
-            <select
-              name="language"
-              value={language}
-              onChange={(event) => chooseLanguage(event.target.value as Language)}
-            >
-              {languages.map((entry) => (
-                <option key={entry.id} value={entry.id}>
-                  {entry.label}
-                </option>
-              ))}
-            </select>
-          </label>
+          {/* Three marks milled into one plate, and a disc of glass that
+              slides to the one in use — the operating system's own list has
+              no place on an instrument (2026-09-13). */}
+          <div
+            className="language-switch"
+            role="group"
+            aria-label={t("Language")}
+            data-language={language}
+          >
+            <span className="language-switch__puck" aria-hidden="true" />
+            {languages.map((entry) => (
+              <button
+                key={entry.id}
+                type="button"
+                className="language-switch__mark"
+                aria-pressed={language === entry.id}
+                aria-label={entry.label}
+                title={entry.label}
+                onClick={() => chooseLanguage(entry.id)}
+              >
+                {entry.short}
+              </button>
+            ))}
+          </div>
         </div>
       </header>
       {bench ? (
@@ -650,6 +669,7 @@ export function App({
         </div>
       ) : null}
       <footer className="app-footer">
+        <div className="app-footer__row">
         <span>
           {bench
             ? t("Bench: virtual vehicle from the library; every value is synthetic.")
@@ -665,6 +685,19 @@ export function App({
         <span className="app-build" title={t("Build: quote it when you report")}>
           {`${__APP_VERSION__} · ${__BUILD_SHA__}`}
         </span>
+        </div>
+        {/* Cut into the foot of the plate, as such a line is on any
+            instrument: who made it, under what licence, and whose marks are
+            named on it (2026-09-13). */}
+        <div className="app-footer__row app-footer__legal">
+          <span>{t("© 2026 Oleg-mk · AGPL-3.0 · written with Claude (Anthropic)")}</span>
+          <span>{t("macOS and Windows, native on Apple silicon, Intel and x86 — connect it and read; the adapter needs no driver of its own.")}</span>
+          <span>
+            {t(
+              "Independent software. Jaguar, Land Rover, Range Rover and SDD are trademarks of Jaguar Land Rover Limited; this application is not affiliated with or endorsed by it.",
+            )}
+          </span>
+        </div>
       </footer>
     </div>
     </LanguageContext.Provider>

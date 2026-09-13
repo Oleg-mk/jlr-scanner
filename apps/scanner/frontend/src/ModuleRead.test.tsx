@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 import { App } from "./App";
 import { LANGUAGE_STORAGE_KEY, setCurrentLanguage } from "./i18n";
@@ -323,9 +323,7 @@ describe("module read", () => {
     expect(screen.getByText("Synthetic screen text, second line.")).toBeVisible();
 
     // The interface's own language picker, the way a reader changes it.
-    fireEvent.change(screen.getByRole("combobox", { name: "Language" }), {
-      target: { value: "uk" },
-    });
+    fireEvent.click(screen.getByRole("button", { name: "Українська" }));
     // SDD's own Russian for a Ukrainian interface (ADR-0034): the pack's
     // text, not ours; the heading is the interface's.
     expect(
@@ -334,10 +332,15 @@ describe("module read", () => {
     expect(
       screen.getByRole("heading", { name: "Самотести, які оголошує цей модуль" }),
     ).toBeVisible();
-    // And English one switch away; Ukrainian is not on offer.
+    // And English one switch away; Ukrainian is not on offer for SDD's own
+    // text — the only Ukrainian mark on screen is the interface's own, which
+    // lives on the plate in the header.
     fireEvent.click(screen.getAllByRole("button", { name: "Англійська" })[0]);
     expect(await screen.findByText("Synthetic screen text, second line.")).toBeVisible();
-    expect(screen.queryByRole("button", { name: "Українська" })).toBeNull();
+    const textLanguage = screen.getAllByRole("group", { name: "Мова тексту" })[0];
+    expect(
+      within(textLanguage).queryByRole("button", { name: "Українська" }),
+    ).toBeNull();
   });
 
   it("requires an identifier for an identifier read", async () => {

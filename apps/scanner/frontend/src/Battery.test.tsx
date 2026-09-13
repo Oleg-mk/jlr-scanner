@@ -152,9 +152,9 @@ describe("battery", () => {
     // The card is the face only: the groups are the panel's.
     expect(screen.queryByRole("heading", { name: "Parked drain" })).toBeNull();
     expect(screen.queryByText("23")).toBeNull();
-    // Not one word of judgement over any reading. The caveat below the card
-    // is the one place the word "good" may appear, and only to say that the
-    // application does not use it.
+    // Not one word of judgement over any reading, and nothing under the card
+    // pointing at the panel that holds the rest: the rail carries readings,
+    // not signposts.
     const card = screen.getByLabelText(/State of charge/).closest("section");
     const readings = Array.from(
       card?.querySelectorAll(
@@ -166,8 +166,7 @@ describe("battery", () => {
     expect(readings).not.toMatch(
       /good|bad|poor|healthy|weak|replace|failing|warning|critical/i,
     );
-    const caveat = card?.querySelector(".battery-card__note")?.textContent ?? "";
-    expect(caveat).toMatch(/nothing here is a verdict/);
+    expect(card?.querySelector(".battery-card__note")).toBeNull();
   });
 
   it("says when the reading was taken and that a bench value is a bench value", () => {
