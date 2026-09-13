@@ -48,7 +48,7 @@ Written 2026-09-12 at the owner's request: what a person gets from SDD at its fu
 | Function | SDD 169 | ProwlOne now (stage 1) | Roadmap (stages 2–3) | Ceiling | Source |
 | --- | --- | --- | --- | --- | --- |
 | DTC read from one module (UDS 0x19) | **yes** | **built** | **—** | **built** | uds 0x19 02; F10 |
-| Code and failure-type descriptions | **yes** — 93,521 descriptions, 257 failure types | **built** | **—** | **built** | rdsDtcHelp*.xml; dtcFaultTypes.xml |
+| Code and failure-type descriptions | **yes** — 93,521 descriptions, 257 failure types | **built** — SDD's own text, English or Russian (ADR-0034); our own wording for the standard's codes in three languages (ADR-0025) | **—** | **built** | rdsDtcHelp*.xml; dtcDescriptions.xml (EN, RU); dtcFaultTypes.xml |
 | DTC status byte | **yes** | **built** — status mask | **—** | **built** | uds dtc.rs |
 | Occurrence counters, extended data (0x19 06) | **not found in the data** | **no** | **—** | **possible** | — |
 | Freeze frame, legislated OBD (mode 02) | **not found in the data** | **built** | **—** | **built** | obd-j1979 modes |

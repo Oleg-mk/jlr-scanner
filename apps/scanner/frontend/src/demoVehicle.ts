@@ -242,6 +242,7 @@ function dtc(
     descriptionScope: "module",
     failureTypeText: failureType.eng,
     failureTypeTexts: failureType,
+    descriptionDataTexts: {},
     descriptionTexts,
     help: [],
     helpTexts: {},

@@ -42,8 +42,8 @@ pub use dtc::{
     MODULE_DATA_NAME_DIMENSION,
 };
 pub use dtc_index::{
-    DtcDescriptionAdapter, DtcFaultTypeAdapter, DTC_DESCRIPTION_PARSER_ID,
-    DTC_FAULT_TYPE_PARSER_ID, FAILURE_TYPE_CLAIM,
+    DtcDescriptionAdapter, DtcFaultTypeAdapter, DTC_DESCRIPTION_CLAIM_PREFIX,
+    DTC_DESCRIPTION_PARSER_ID, DTC_FAULT_TYPE_PARSER_ID, FAILURE_TYPE_CLAIM,
 };
 pub use ivs::{IvsLineageAdapter, IVS_ASSEMBLY_CLAIM, IVS_PARSER_ID};
 pub use model_year::{

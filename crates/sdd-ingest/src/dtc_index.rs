@@ -1,3 +1,4 @@
+use crate::dtc::iso_code_for;
 use crate::{evidence_class_for, preferred_segment, require_attribute, validation_state_for};
 use knowledge::{
     Applicability, ClaimKey, DimensionConstraint, EntityKind, EvidenceId, EvidenceRecord,
@@ -8,10 +9,16 @@ use std::collections::BTreeMap;
 
 pub const DTC_DESCRIPTION_PARSER_ID: &str = "sdd-dtc-descriptions";
 pub const DTC_FAULT_TYPE_PARSER_ID: &str = "sdd-dtc-fault-types";
-const INDEX_PARSER_VERSION: &str = "1.0.0";
+const INDEX_PARSER_VERSION: &str = "1.1.0";
 
 /// Claim key under which an SDD failure type byte description is recorded.
 pub const FAILURE_TYPE_CLAIM: &str = "sdd_failure_type";
+
+/// The code's description from a pack in another language (`ADR-0034`,
+/// amended): `sdd_dtc_description.rus`, the language last as
+/// `sdd_failure_type.rus` has it. The English description stays the alias
+/// claim it always was, so a library issued before this reads unchanged.
+pub const DTC_DESCRIPTION_CLAIM_PREFIX: &str = "sdd_dtc_description.";
 
 /// Adapter for the SDD DTC description indexes.
 ///
@@ -28,13 +35,40 @@ pub const FAILURE_TYPE_CLAIM: &str = "sdd_failure_type";
 #[derive(Clone, Debug)]
 pub struct DtcDescriptionAdapter {
     source: SourceRecord,
+    /// `None` for the English index; a language code for the same index
+    /// from another pack, whose entries are written as their own claim
+    /// (`ADR-0034`, amended).
+    language: Option<String>,
 }
 
 impl DtcDescriptionAdapter {
     pub fn new(source: SourceRecord) -> Result<Self, KnowledgeError> {
         source.validate()?;
-        Ok(Self { source })
+        Ok(Self {
+            source,
+            language: None,
+        })
     }
+
+    /// Read this index as the same descriptions in another language. The
+    /// index carries no `<language>` element of its own, so the words are
+    /// checked instead: a Russian index must be mostly Cyrillic and an
+    /// English one mostly not, or a root mounted under the wrong name would
+    /// write one language under the other's claim.
+    pub fn with_language(mut self, language: &str) -> Result<Self, KnowledgeError> {
+        if iso_code_for(language).is_none() {
+            return Err(KnowledgeError::Parse(format!(
+                "no description index is known for language code {language:?}"
+            )));
+        }
+        self.language = Some(language.to_string());
+        Ok(self)
+    }
+}
+
+/// Whether a text carries a Cyrillic letter.
+fn has_cyrillic(text: &str) -> bool {
+    text.chars().any(|c| ('\u{0400}'..='\u{04FF}').contains(&c))
 }
 
 impl IngestionAdapter for DtcDescriptionAdapter {
@@ -56,6 +90,32 @@ impl IngestionAdapter for DtcDescriptionAdapter {
                 root.tag_name().name()
             )));
         }
+
+        // The index has no language element, so the words themselves say
+        // which pack this is: a Russian index is mostly Cyrillic, an English
+        // one is not. Half is the line; the real indexes sit at the ends.
+        let texts: Vec<&str> = root
+            .children()
+            .filter(|node| node.is_element() && node.tag_name().name() == "dtc")
+            .filter_map(|node| node.text().map(str::trim))
+            .filter(|text| !text.is_empty())
+            .collect();
+        let cyrillic = texts.iter().filter(|text| has_cyrillic(text)).count();
+        let reads_as_russian = cyrillic * 2 > texts.len();
+        let read_as_russian = self.language.as_deref() == Some("rus");
+        if !texts.is_empty() && reads_as_russian != read_as_russian {
+            return Err(KnowledgeError::Parse(format!(
+                "the index reads as {}, this pack is read as {}: {cyrillic} of {} entries carry Cyrillic",
+                if reads_as_russian { "Russian" } else { "not Russian" },
+                self.language.as_deref().unwrap_or("English"),
+                texts.len()
+            )));
+        }
+        let suffix = self
+            .language
+            .as_deref()
+            .map(|code| format!(".{code}"))
+            .unwrap_or_default();
 
         let mut evidence = BTreeMap::new();
         let mut records = BTreeMap::new();
@@ -94,9 +154,9 @@ impl IngestionAdapter for DtcDescriptionAdapter {
             let occurrence = occurrences.len();
 
             let record_id = if occurrence == 1 {
-                format!("{}.dtc.{base}", self.source.id.0)
+                format!("{}.dtc.{base}{suffix}", self.source.id.0)
             } else {
-                format!("{}.dtc.{base}.{occurrence}", self.source.id.0)
+                format!("{}.dtc.{base}.{occurrence}{suffix}", self.source.id.0)
             };
             let evidence_id = format!("{}.ev.{record_id}", self.source.id.0);
 
@@ -141,7 +201,14 @@ impl IngestionAdapter for DtcDescriptionAdapter {
                 KnowledgeRecord {
                     id: record_id,
                     entity,
-                    key: ClaimKey::Alias,
+                    // English is the alias it always was; another language is
+                    // its own claim, named for the language.
+                    key: match &self.language {
+                        None => ClaimKey::Alias,
+                        Some(code) => ClaimKey::Custom {
+                            name: format!("{DTC_DESCRIPTION_CLAIM_PREFIX}{code}"),
+                        },
+                    },
                     value: KnowledgeValue::Text {
                         value: text.to_string(),
                     },

@@ -39,6 +39,10 @@ struct Corpus {
     /// only, the selections come from the English ones.
     dtc_help_rus: Vec<Found>,
     dtc_index: Vec<Found>,
+    /// The two description indexes from the Russian pack (`ADR-0034`,
+    /// amended); the fault types already come in every language from the
+    /// text database.
+    dtc_index_rus: Vec<Found>,
     odst: Vec<Found>,
     /// The same self-test documents from the Russian pack (`ADR-0034`).
     odst_rus: Vec<Found>,
@@ -135,6 +139,11 @@ fn walk(root: &Path, dir: &Path, corpus: &mut Corpus) -> std::io::Result<()> {
                 corpus.dtc_help_rus.push(found);
             } else if parent == "rds-odst-info" {
                 corpus.odst_rus.push(found);
+            } else if matches!(
+                name.as_str(),
+                "dtcDescriptions.xml" | "dtcModuleDescriptions.xml"
+            ) {
+                corpus.dtc_index_rus.push(found);
             }
             continue;
         }
@@ -373,13 +382,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         walk(root, root, &mut corpus)?;
     }
     println!(
-        "found: {} platform, {} converter, {} DID snapshot, {} DTC help, {} DTC help (rus), {} DTC index, {} ODST, {} ODST (rus), {} IVS, {} link monitor, {} VIN decode, {} module text, {} CCF, {} other text items",
+        "found: {} platform, {} converter, {} DID snapshot, {} DTC help, {} DTC help (rus), {} DTC index, {} DTC index (rus), {} ODST, {} ODST (rus), {} IVS, {} link monitor, {} VIN decode, {} module text, {} CCF, {} other text items",
         corpus.platforms.len(),
         corpus.converters.len(),
         corpus.snapshots.len(),
         corpus.dtc_help.len(),
         corpus.dtc_help_rus.len(),
         corpus.dtc_index.len(),
+        corpus.dtc_index_rus.len(),
         corpus.odst.len(),
         corpus.odst_rus.len(),
         corpus.ivs.len(),
@@ -539,6 +549,22 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 &mut rejections,
             )?;
         }
+    }
+    // The same descriptions in Russian, from JLR's own pack (`ADR-0034`,
+    // amended), as their own claim beside the English alias.
+    for found in &corpus.dtc_index_rus {
+        let text = read(found)?;
+        let adapter =
+            DtcDescriptionAdapter::new(source_in(found, &text, Some(DTC_HELP_LANGUAGE_RUSSIAN))?)?
+                .with_language(DTC_HELP_LANGUAGE_RUSSIAN)?;
+        export(
+            &mut store,
+            &mut bundle,
+            &adapter,
+            &text,
+            "dtc-index-rus",
+            &mut rejections,
+        )?;
     }
     summary.push(bundle.finish()?);
 

@@ -267,6 +267,15 @@ both `dtcDescriptions.xml` and `dtcModuleDescriptions.xml`, which share a root
 and differ only in whether an entry names a module. `DtcFaultTypeAdapter` reads
 `dtcFaultTypes.xml`, the failure type byte catalogue.
 
+Since 2026-09-13 (`ADR-0034`, amended) the same two description indexes are
+read from the Russian pack as well: the adapter told the language writes each
+entry as `sdd_dtc_description.rus` beside the English alias, with the same
+module scope, under a source that names the language. The index declares no
+language of its own, so the adapter reads the words — a Russian index is
+mostly Cyrillic, an English one is not — and refuses a root mounted under the
+wrong name. The fault types are not read from the pack; the text database
+already carries them in every language SDD has.
+
 These indexes are **deliberately weaker** than the per-code help documents: they
 carry no model or model-year qualification. An entry without a module stays
 unscoped rather than claiming to hold for every module, and where an index and a

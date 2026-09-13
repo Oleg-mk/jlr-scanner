@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  SYNTHETIC F9 FIXTURE. Not JLR evidence and not promotable to evidence.
+
+  The Russian sibling of f9_dtc_descriptions.xml (ADR-0034, amended): the
+  same codes and modules with the words in invented Russian. The index has
+  no language element of its own, so the adapter reads the words — this one
+  is mostly Cyrillic and must be accepted as Russian, and the English one
+  must be refused as Russian. Exercised on purpose:
+
+    * the generic P0100 and the module-scoped B1250 both have Russian;
+    * B1250's second English wording has no Russian twin, so only the first
+      is joined;
+    * B1251 keeps its empty text and produces no claim, as in English.
+-->
+<dtcDescriptionList>
+<dtc id="P0100"><![CDATA[Синтетическое общее описание]]></dtc>
+<dtc id="B1250" module="SYNTHMOD"><![CDATA[Синтетическая неисправность цепи датчика]]></dtc>
+<dtc id="B1251" module="OTHERMOD"></dtc>
+</dtcDescriptionList>

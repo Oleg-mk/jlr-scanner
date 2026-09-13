@@ -266,6 +266,7 @@ fn fill(
                         description_scope: described.description_scope,
                         failure_type_text: None,
                         failure_type_texts: Default::default(),
+                        description_data_texts: Default::default(),
                         description_texts: described.description_texts,
                         help: described.help,
                         help_texts: described.help_texts,

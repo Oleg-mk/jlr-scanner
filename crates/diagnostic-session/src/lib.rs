@@ -182,11 +182,16 @@ pub struct DtcDescription {
     /// The failure type wording by SDD language code, from the text
     /// database (`eng`, `rus`, …).
     pub failure_type_texts: BTreeMap<String, String>,
-    /// The code's own wording in the interface's languages, by the same
-    /// language codes. SDD holds fault-code descriptions in English only, so
-    /// for the standard codes this is our own text (`dtc_text`); `eng` is
-    /// never here, because English stays `description`.
+    /// Our own wording for the codes the standard defines, by interface
+    /// language code (`dtc_text`, `ADR-0025`); `eng` is never here, because
+    /// English stays `description`. Empty for a manufacturer's code.
     pub description_texts: BTreeMap<String, String>,
+    /// SDD's own description in its other languages, by SDD's language code
+    /// (`rus`), chosen with the same scope as `description` — the module's
+    /// entry when that is what the English is, the generic one otherwise —
+    /// and absent when that language has no entry of that scope
+    /// (`ADR-0034`, amended). Empty for a library issued without the pack.
+    pub description_data_texts: BTreeMap<String, String>,
     /// The help for this code on this car, line by line as the screen shows
     /// it: possible causes, actions required, monitoring conditions — SDD's
     /// own English, unchanged (`ADR-0034`). Empty when the loaded data holds
@@ -214,6 +219,9 @@ struct HelpSelection {
 
 /// A help screen's items: each the mnemonic's name and its text.
 type ScreenItems = Vec<(String, String)>;
+/// A code's descriptions: each the module it is scoped to, when it is, and
+/// its text.
+type ScopedTexts = Vec<(Option<String>, String)>;
 /// Screen name → SDD language code → that screen's items in that language.
 type ScreenItemsByLanguage = BTreeMap<String, BTreeMap<String, ScreenItems>>;
 
@@ -222,7 +230,10 @@ type ScreenItemsByLanguage = BTreeMap<String, BTreeMap<String, ScreenItems>>;
 /// by `FTB-<number>`.
 #[derive(Debug, Default)]
 struct DtcIndex {
-    descriptions: BTreeMap<String, Vec<(Option<String>, String)>>,
+    descriptions: BTreeMap<String, ScopedTexts>,
+    /// `DTC-<code>` → SDD language code → the same descriptions from the
+    /// pack in that language (`ADR-0034`, amended).
+    descriptions_in: BTreeMap<String, BTreeMap<String, ScopedTexts>>,
     failure_types: BTreeMap<String, String>,
     /// `FTB-<n>` → language code → wording, from the text database.
     failure_type_texts: BTreeMap<String, BTreeMap<String, String>>,
@@ -495,6 +506,33 @@ impl KnowledgeLibrary {
             } else if let Some((_, text)) = generic {
                 description.description = Some(text.clone());
                 description.description_scope = Some("generic".into());
+            }
+        }
+        // The same description in each other language the library carries,
+        // with the same scope as the English: a language whose pack has no
+        // entry of that scope for this code says nothing, rather than a
+        // sentence about something else.
+        if let Some(scope) = description.description_scope.as_deref() {
+            if let Some(in_languages) = self
+                .indexes
+                .dtc_index
+                .descriptions_in
+                .get(&format!("DTC-{code}"))
+            {
+                for (language, entries) in in_languages {
+                    let wanted = if scope == "module" {
+                        Some(module)
+                    } else {
+                        None
+                    };
+                    if let Some((_, text)) =
+                        entries.iter().find(|(entry, _)| entry.as_deref() == wanted)
+                    {
+                        description
+                            .description_data_texts
+                            .insert(language.clone(), text.clone());
+                    }
+                }
             }
         }
         let ftb = format!("FTB-{failure_type}");
@@ -1124,18 +1162,33 @@ fn build_indexes(store: &KnowledgeStore) -> Indexes {
                     continue;
                 };
                 let id = record.entity.id.as_str();
-                if id.starts_with("DTC-") && record.key == ClaimKey::Alias {
+                let description_language = match &record.key {
+                    ClaimKey::Custom { name } => name.strip_prefix("sdd_dtc_description."),
+                    _ => None,
+                };
+                if id.starts_with("DTC-")
+                    && (record.key == ClaimKey::Alias || description_language.is_some())
+                {
                     let module = match &record.applicability.ecu_family {
                         DimensionConstraint::OneOf { values } if values.len() == 1 => {
                             Some(values[0].clone())
                         }
                         _ => None,
                     };
-                    dtc_index
-                        .descriptions
-                        .entry(id.to_string())
-                        .or_default()
-                        .push((module, value.clone()));
+                    match description_language {
+                        None => dtc_index
+                            .descriptions
+                            .entry(id.to_string())
+                            .or_default()
+                            .push((module, value.clone())),
+                        Some(language) => dtc_index
+                            .descriptions_in
+                            .entry(id.to_string())
+                            .or_default()
+                            .entry(language.to_string())
+                            .or_default()
+                            .push((module, value.clone())),
+                    }
                 } else if id.starts_with("DTC-") {
                     // The help layer (ADR-0022 is the live read; this is the
                     // DTC help SDD carries). A car is given a screen by name;

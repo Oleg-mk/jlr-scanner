@@ -193,6 +193,7 @@ class BrowserStandardObdClient implements StandardObdClient {
             descriptionScope: "generic",
             failureTypeText: null,
             failureTypeTexts: {},
+            descriptionDataTexts: {},
             descriptionTexts: {},
             help: ["Possible causes:", "Browser preview: the loaded data would say them here."],
             helpTexts: {},

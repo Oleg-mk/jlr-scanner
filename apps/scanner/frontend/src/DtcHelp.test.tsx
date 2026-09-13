@@ -21,6 +21,7 @@ function code(helpTexts: Record<string, string[]>): DtcSummary {
     descriptionScope: null,
     failureTypeText: null,
     failureTypeTexts: {},
+    descriptionDataTexts: {},
     descriptionTexts: {},
     help: ["Possible causes:", "Ignition, fuel or compression"],
     helpTexts,

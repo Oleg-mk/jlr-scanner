@@ -212,6 +212,7 @@ describe("standard OBD-II", () => {
           descriptionScope: "generic",
           failureTypeText: null,
           failureTypeTexts: {},
+          descriptionDataTexts: {},
           descriptionTexts: { ukr: "Пропуски запалювання в кількох циліндрах" },
           help: ["Possible causes:", "Ignition, fuel or compression"],
           helpTexts: {},

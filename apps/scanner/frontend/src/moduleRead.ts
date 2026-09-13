@@ -27,6 +27,11 @@ export interface DtcSummary {
   /** Our own wording for the code in the interface's languages; English stays in `description`. */
   descriptionTexts: Record<string, string>;
   /**
+   * SDD's own description in its other languages, by SDD's language code
+   * (`rus`), with the same scope as `description` (ADR-0034, amended).
+   */
+  descriptionDataTexts: Record<string, string>;
+  /**
    * What the loaded data says about this code on this car — possible causes,
    * actions required, monitoring conditions — line by line, in its own English.
    */

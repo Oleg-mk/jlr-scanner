@@ -34,6 +34,35 @@ describe("fault-code wording by language", () => {
   it("says nothing rather than inventing when the library has no wording either", () => {
     expect(codeText({}, null, "uk")).toEqual({ shown: null, original: null });
   });
+
+  // SDD's own Russian for a manufacturer's code (ADR-0034, amended): shown
+  // when Russian is the reader's choice for SDD's text and the library has
+  // it, with the English beside; our own wording, where we have it, comes
+  // first; English is English.
+  const sdd = { rus: "Датчик температуры воздуха левого подогревателя - Короткое замыкание на массу" };
+  const sddEnglish = "Left heater air temperature sensor - Short circuit to ground";
+
+  it("shows SDD's Russian description when Russian is chosen and we have no words of our own", () => {
+    expect(codeText({}, sddEnglish, "uk", sdd, "rus")).toEqual({
+      shown: sdd.rus,
+      original: sddEnglish,
+    });
+    expect(codeText({}, sddEnglish, "uk", sdd, "eng")).toEqual({
+      shown: sddEnglish,
+      original: null,
+    });
+    expect(codeText({}, sddEnglish, "uk", {}, "rus")).toEqual({
+      shown: sddEnglish,
+      original: null,
+    });
+  });
+
+  it("puts our own wording before SDD's Russian for a code we have translated", () => {
+    expect(codeText(ours, english, "uk", { rus: "чужое" }, "rus")).toEqual({
+      shown: ours.ukr,
+      original: english,
+    });
+  });
 });
 
 /**

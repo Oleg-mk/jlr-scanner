@@ -516,11 +516,16 @@ pub struct DtcSummary {
     /// language code.
     #[serde(default)]
     pub failure_type_texts: BTreeMap<String, String>,
-    /// The code's own wording in the interface's languages, by the same
-    /// language codes; the English stays in `description`. Empty when the
+    /// Our own wording for the codes the standard defines, by interface
+    /// language code; the English stays in `description`. Empty when the
     /// code has no wording of ours.
     #[serde(default)]
     pub description_texts: BTreeMap<String, String>,
+    /// SDD's own description in its other languages, by SDD's language code
+    /// (`rus`), with the same scope as `description` (`ADR-0034`, amended).
+    /// Empty for a library issued without the Russian pack.
+    #[serde(default)]
+    pub description_data_texts: BTreeMap<String, String>,
     /// The help for this code on this car: possible causes, actions
     /// required, monitoring conditions, line by line as the screen shows it,
     /// in SDD's own English (`ADR-0034`).

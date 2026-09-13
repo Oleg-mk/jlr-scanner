@@ -3,12 +3,12 @@ import type { HelpLanguage } from "./helpLanguage";
 
 /**
  * Interface language. The application's own words come in English, Russian
- * and Ukrainian. The vehicle data's words — SDD's fault-code wording,
- * parameter names, module names — are shown as the loaded library has them:
- * SDD's text database carries twelve languages, Russian among them and
- * Ukrainian not, so module names and failure-type wording follow the
- * interface into Russian and stay English for Ukrainian (see
- * `dataLanguage`); fault-code descriptions exist in English only.
+ * and Ukrainian. The vehicle data's words are shown as the loaded library has
+ * them: SDD's text database carries twelve languages, Russian among them and
+ * Ukrainian not. Module names follow the interface into Russian and stay
+ * English for Ukrainian (see `dataLanguage`); the text SDD wrote about a
+ * code — its description, its failure type, its help — follows the reader's
+ * own choice between English and Russian (ADR-0034, `helpLanguage`).
  *
  * Strings are keyed by their English text, so a missing translation shows
  * the English rather than a key, and tests read the English they assert.
@@ -56,20 +56,41 @@ export function productLanguage(language: Language): "ukr" | "rus" | null {
 }
 
 /**
- * A fault code's wording for the interface language: ours when we have it,
- * otherwise the loaded data's English. The English is returned as well, so
- * the caller can show it beside the translation — a tester quotes the
- * English, and every report carries only that.
+ * A fault code's wording: ours for the interface language when we have it
+ * (the standard's codes, ADR-0025); otherwise SDD's own description in the
+ * language chosen for SDD's text, when the library carries it (ADR-0034,
+ * amended); otherwise the loaded data's English. The English is returned as
+ * well whenever something else is shown, so the caller can put it beside —
+ * a tester quotes the English, and every report carries only that.
  */
 export function codeText(
   texts: Record<string, string> | undefined,
   english: string | null,
   language: Language,
+  sddTexts?: Record<string, string>,
+  helpLanguage?: HelpLanguage,
 ): { shown: string | null; original: string | null } {
   const code = productLanguage(language);
   const ours = code !== null ? texts?.[code] : undefined;
-  if (ours === undefined) return { shown: english, original: null };
-  return { shown: ours, original: english };
+  if (ours !== undefined) return { shown: ours, original: english };
+  const theirs =
+    helpLanguage !== undefined && helpLanguage !== "eng" ? sddTexts?.[helpLanguage] : undefined;
+  if (theirs !== undefined) return { shown: theirs, original: english };
+  return { shown: english, original: null };
+}
+
+/**
+ * SDD's own text in the language chosen for such text (ADR-0034): the
+ * Russian when it is chosen and the library has it, otherwise the English —
+ * for the failure type wording and anything else SDD wrote about a code.
+ */
+export function sddText(
+  texts: Record<string, string> | undefined,
+  fallback: string | null,
+  helpLanguage: HelpLanguage,
+): string | null {
+  if (helpLanguage !== "eng" && texts?.[helpLanguage] !== undefined) return texts[helpLanguage];
+  return texts?.eng ?? fallback;
 }
 
 /** Pick the data text for the interface language, English when SDD has none. */

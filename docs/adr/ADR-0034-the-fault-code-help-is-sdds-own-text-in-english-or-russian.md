@@ -100,6 +100,36 @@ who knew which part they were naming.
 - The library is re-exported with the Russian root and re-issued.
 - `ADR-0026` is superseded. The disagreement it records — whether reworded
   text detaches from its source — is moot: the product now shows the source.
-- Not decided here: SDD's Russian for the code *descriptions*
-  (`dtcDescriptions.xml` in the same Russian pack). It exists and is not
-  ingested by this decision.
+- SDD's Russian for the code *descriptions* — see the amendment below.
+
+## Amendment, 2026-09-13, later the same day: the code descriptions too
+
+The owner's word: «занеси російські описи». The same Russian pack carries
+the two description indexes, `dtcDescriptions.xml` (4,033 entries against
+the English 4,031) and `dtcModuleDescriptions.xml` (1,924 against 1,931),
+the same codes and modules with the words changed.
+
+1. **They enter as their own claim beside the English alias**:
+   `sdd_dtc_description.rus`, the language last, from a source that names
+   the language. The English description stays the alias it always was, so
+   a library issued before this reads unchanged. The fault types are not
+   read from the pack: the text database already gives them in every
+   language SDD has.
+2. **The index has no `<language>` element, so the words are checked
+   instead.** An index read as Russian must be mostly Cyrillic and one read
+   as English mostly not; the real indexes sit at the two ends, and a root
+   mounted under the wrong name is refused.
+3. **The Russian is chosen with the English's scope.** Where the English
+   shown is the module's entry, the Russian shown is the module's entry;
+   where it is the generic one, the generic one — and where the Russian pack
+   has no entry of that scope, nothing is shown in Russian rather than a
+   sentence about something else. It travels as `description_data_texts`,
+   keyed by SDD's language code, apart from `description_texts`, which
+   remains this project's own wording for the standard's codes
+   (`ADR-0025`).
+4. **On screen the code's line follows the same choice as the help.** Our
+   own wording for a standard code comes first where it exists; otherwise
+   SDD's description in the language chosen for SDD's text; otherwise
+   English, with the English kept beside whenever something else is shown.
+   The failure type's wording follows that same choice from this day;
+   module names still follow the interface language, as before.

@@ -1,5 +1,5 @@
 import { useHelpLanguage } from "../helpLanguage";
-import { codeText, dataText, helpLines, parameterNote, t, useLanguage } from "../i18n";
+import { codeText, dataText, helpLines, parameterNote, sddText, t, useLanguage } from "../i18n";
 import { DtcHelp } from "./DtcHelp";
 import { HelpLanguageSwitch } from "./HelpLanguageSwitch";
 import type { ModuleSurveyEntry } from "../library";
@@ -332,7 +332,13 @@ export function ModuleDetails({
               </thead>
               <tbody>
                 {outcome.dtcs.map((dtc) => {
-                  const wording = codeText(dtc.descriptionTexts, dtc.description, language);
+                  const wording = codeText(
+                    dtc.descriptionTexts,
+                    dtc.description,
+                    language,
+                    dtc.descriptionDataTexts,
+                    helpLanguage,
+                  );
                   return (
                   <tr key={`${dtc.code}-${dtc.failureType}`}>
                     <td>
@@ -350,9 +356,9 @@ export function ModuleDetails({
                     </td>
                     <td>
                       <code>{dtc.failureType}</code>
-                      {dataText(dtc.failureTypeTexts, dtc.failureTypeText, language) !== null ? (
+                      {sddText(dtc.failureTypeTexts, dtc.failureTypeText, helpLanguage) !== null ? (
                         <div className="module-validation">
-                          {dataText(dtc.failureTypeTexts, dtc.failureTypeText, language)}
+                          {sddText(dtc.failureTypeTexts, dtc.failureTypeText, helpLanguage)}
                         </div>
                       ) : null}
                     </td>

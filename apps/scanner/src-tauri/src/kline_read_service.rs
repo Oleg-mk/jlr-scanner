@@ -353,6 +353,7 @@ fn dtc_row(
         description_scope: described.description_scope,
         failure_type_text: described.failure_type_text,
         failure_type_texts: described.failure_type_texts,
+        description_data_texts: described.description_data_texts,
         description_texts: described.description_texts,
         help: described.help,
         help_texts: described.help_texts,

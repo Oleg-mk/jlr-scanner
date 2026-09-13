@@ -51,7 +51,8 @@ The knowledge this project derives from SDD traces to one artifact:
 - `COMMON_SDD_DATA_DTC_HELP_LANG_RU`: the same 6,171 documents in Russian,
   opened from the installer by the owner's own scripts on 2026-09-13 (every
   file checked against the cabinet's MD5, the installer's SHA-256 confirmed);
-  read for the text of each help screen only (`ADR-0034`).
+  read for the text of each help screen and, since the same day's
+  amendment, for the two description indexes (`ADR-0034`).
 - `COMMON_SDD_DATA_ODST_LANG_EN`: 93 per-module test definitions.
 - `COMMON_SDD_DATA_ODST_LANG_RU`: the same 93 documents in Russian, opened
   from the installer by the owner's own scripts on 2026-09-13; read for the

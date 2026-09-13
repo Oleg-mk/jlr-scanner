@@ -1,3 +1,4 @@
+import { useHelpLanguage } from "../helpLanguage";
 import { codeText, t, useLanguage } from "../i18n";
 import { DtcHelp } from "./DtcHelp";
 import type {
@@ -160,6 +161,7 @@ export function StandardObdPanel({
   bench = false,
 }: StandardObdPanelProps) {
   const language = useLanguage();
+  const [helpLanguage] = useHelpLanguage(language);
   const disabled = busy || !adapterReady;
   const gathered =
     values.length > 0 || frameValues.length > 0 || monitors.length > 0 || information.length > 0;
@@ -272,7 +274,13 @@ export function StandardObdPanel({
             </thead>
             <tbody>
               {snapshot.dtcs.map((dtc) => {
-                const wording = codeText(dtc.descriptionTexts, dtc.description, language);
+                const wording = codeText(
+                  dtc.descriptionTexts,
+                  dtc.description,
+                  language,
+                  dtc.descriptionDataTexts,
+                  helpLanguage,
+                );
                 return (
                   <tr key={dtc.code}>
                     <td>
