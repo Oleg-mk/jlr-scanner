@@ -2827,6 +2827,25 @@ table.live-read-identifiers label {
   margin: 0.35rem 0 0;
 }
 
+/* English or Russian for the text SDD wrote (ADR-0034): one small switch,
+   the same on every panel that shows such text. */
+.help-language {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0.35rem 0 0.2rem;
+}
+
+.help-language .module-validation {
+  flex-basis: 100%;
+}
+
+.button--small {
+  padding: 0.15rem 0.6rem;
+  font-size: 0.8rem;
+}
+
 /* The mileage survey (ADR-0024): readings side by side, the difference in a
    column of its own so the eye finds it without doing the arithmetic. */
 .mileage-panel {

@@ -360,7 +360,11 @@ Under every fault code there is a fold: **What the data says about this code**.
 It is not our text. It is what SDD writes about that code — possible causes,
 actions required, sometimes the conditions under which the module sets it and
 the manufacturer's own limits ("voltage below 7.5 Volts for at least 200ms").
-In English, because that is the only language the data holds it in.
+In English or in Russian — both are SDD's own, from the two language packs JLR
+ships — with a switch under the fold that every such text shares and that is
+remembered on your machine. There is no Ukrainian version: SDD never wrote one
+and this application does not translate it. A library issued before
+2026-09-13 carries no Russian and says so.
 
 The data writes different text for different model years, so the screen is
 chosen for the car: by module, programme, model year and fault type. **If the

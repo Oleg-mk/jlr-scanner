@@ -76,7 +76,7 @@ Written 2026-09-12 at the owner's request: what a person gets from SDD at its fu
 
 | Function | SDD 169 | ProwlOne now (stage 1) | Roadmap (stages 2–3) | Ceiling | Source |
 | --- | --- | --- | --- | --- | --- |
-| Help screen per code: causes, actions, set conditions | **yes** | **built** — the product's own words, 26,893 lines | **—** | **built** | ADR-0026; COMMON_SDD_DATA_DTC_HELP |
+| Help screen per code: causes, actions, set conditions | **yes** | **built** — SDD's own text, English or Russian, from JLR's two packs; no Ukrainian | **—** | **built** | ADR-0034; COMMON_SDD_DATA_DTC_HELP_LANG_EN, _RU |
 | Help and names in Ukrainian | **no** | **built** | **—** | **built** | ADR-0025/0026 |
 | Symptom-driven tree without a code, pinpoint tests | **yes** — RULES: 56 documents, 78 MB | **no** | **—** — needs its own ADR | **possible** | COMMON_SDD_DATA_RULES |
 | Symptom help pages | **yes** — 15 pages | **no** | **—** | **possible** | COMMON_SDD_DATA_SYMPTOM_HELP |

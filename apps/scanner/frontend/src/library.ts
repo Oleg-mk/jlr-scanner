@@ -112,8 +112,8 @@ export interface SelfTestSummary {
   /** What SDD tells whoever runs it, line by line, for this car. */
   description: string[];
   /**
-   * The same lines in this project's own words, by interface language
-   * (ADR-0026): a line we have no wording for keeps SDD's English.
+   * The same lines in SDD's other languages, by SDD's language code
+   * (ADR-0034); empty until the ODST pack in another language is ingested.
    */
   descriptionTexts: Record<string, string[]>;
   /**

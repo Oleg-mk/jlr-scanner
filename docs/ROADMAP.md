@@ -621,9 +621,16 @@ its English, one name at a time.
 
 Ukrainian becomes a full interface for vehicle data for the first time.
 
-### F18 — the fault-code help is written by this project (decided 2026-09-11, `ADR-0026`; amended 2026-09-12)
+### F18 — the fault-code help is SDD's own text, in English or Russian (`ADR-0034`, 2026-09-13; supersedes `ADR-0026`)
 
-The help a code gets — possible causes, actions required, the conditions the
+**Withdrawn on 2026-09-13.** The owner's decision: no translation of the help,
+by anyone, ever. SDD ships the layer in Russian in the same installer — the
+same 6,171 documents, the same names, only the words changed — and that is
+what a Russian or Ukrainian reader is shown, with English one switch away;
+the 27,493 rows of our own wording left the product with the module that
+read them. What follows is the record of the decision this one replaced.
+
+The help a code got — possible causes, actions required, the conditions the
 module sets it under — was SDD's English in all three interfaces. The owner
 wrote all 26,893 named texts in three languages, in two rounds measured
 against the source each time; two faults were corrected here and logged line
@@ -638,8 +645,9 @@ the newlines inside them; the 2026-09-12 amendment has the ingest name a
 screen's items, so a library exported from that day reaches every line the
 owner wrote. Ukrainian has this layer for the first time in any tool.
 
-What remains is the owner's remaining lines — listed for him in the order of
-their use — and, separately, the review's open items above it.
+What remained — 13,130 sentences — is what could be neither written by hand
+in any reasonable time nor trusted to a machine, which is why the decision
+above replaced this one.
 
 ### F19 — the module passport (decided and built 2026-09-12, `ADR-0027`)
 

@@ -10,7 +10,7 @@ use knowledge::{
 use std::collections::BTreeMap;
 
 pub const DTC_HELP_PARSER_ID: &str = "sdd-dtc-help";
-const DTC_HELP_PARSER_VERSION: &str = "1.0.0";
+const DTC_HELP_PARSER_VERSION: &str = "1.1.0";
 
 /// Custom applicability dimension holding an SDD model-year designation.
 ///
@@ -53,6 +53,25 @@ pub const DTC_HELP_SCREEN_ITEMS_CLAIM_PREFIX: &str = "sdd_help_screen_items.";
 /// character no SDD text carries.
 pub const DTC_HELP_ITEM_SEPARATOR: char = '\u{1F}';
 
+/// SDD's code for the Russian help pack (`ADR-0034`). A pack in a language
+/// other than English contributes the text of each screen and nothing else,
+/// under the English claim's name with the language last —
+/// `sdd_help_screen.<NAME>.rus`, as `sdd_failure_type.rus` already has it.
+/// Screen names carry no dot and no lower-case letter, so the suffix cannot
+/// be mistaken for part of a name.
+pub const DTC_HELP_LANGUAGE_RUSSIAN: &str = "rus";
+
+/// The two-letter code a help document declares in `<language isoCode>` for
+/// the language a pack is said to be in; `None` for a code this adapter has
+/// no pack for.
+fn iso_code_for(language: &str) -> Option<&'static str> {
+    match language {
+        DTC_HELP_LANGUAGE_RUSSIAN => Some("ru"),
+        "eng" => Some("en"),
+        _ => None,
+    }
+}
+
 /// Adapter for a single SDD `rdsDtcHelp0x____.xml` document.
 ///
 /// Each document is self-contained: it carries the fault code, the description
@@ -64,6 +83,10 @@ pub const DTC_HELP_ITEM_SEPARATOR: char = '\u{1F}';
 pub struct DtcHelpAdapter {
     source: SourceRecord,
     timeline: Option<ModelYearTimeline>,
+    /// `None` for the English pack, which carries the descriptions and the
+    /// selections; a language code for a pack that carries only the text of
+    /// the same screens (`ADR-0034`).
+    language: Option<String>,
 }
 
 impl DtcHelpAdapter {
@@ -72,7 +95,29 @@ impl DtcHelpAdapter {
         Ok(Self {
             source,
             timeline: None,
+            language: None,
         })
+    }
+
+    /// Read this pack as the same screens in another language: only the
+    /// screen text claims are written, suffixed with the code, and the
+    /// document must declare that language itself (`ADR-0034`).
+    pub fn with_language(mut self, language: &str) -> Result<Self, KnowledgeError> {
+        if iso_code_for(language).is_none() {
+            return Err(KnowledgeError::Parse(format!(
+                "no help pack is known for language code {language:?}"
+            )));
+        }
+        self.language = Some(language.to_string());
+        Ok(self)
+    }
+
+    /// `.rus` on a claim written from a Russian pack; nothing on the English.
+    fn language_suffix(&self) -> String {
+        self.language
+            .as_deref()
+            .map(|code| format!(".{code}"))
+            .unwrap_or_default()
     }
 
     /// Opt in to deriving calendar year ranges from designations. See `ADR-0011`.
@@ -106,6 +151,25 @@ impl IngestionAdapter for DtcHelpAdapter {
             .ok_or_else(|| KnowledgeError::Parse("<dtcHelp> has no <dtcCode>".into()))?;
         let code_slug = slugify(code, "dtcCode")?;
 
+        // A pack read as Russian must say it is Russian, and the English pack
+        // must say English: the two are the same 6,171 file names, and a
+        // root mounted under the wrong name would otherwise write one
+        // language's text under the other's claim.
+        let expected_iso = self
+            .language
+            .as_deref()
+            .and_then(iso_code_for)
+            .unwrap_or("en");
+        if let Some(declared) =
+            child_element(root, "language").and_then(|node| node.attribute("isoCode"))
+        {
+            if declared != expected_iso {
+                return Err(KnowledgeError::Parse(format!(
+                    "{code}: the document declares language {declared:?}, this pack is read as {expected_iso:?}"
+                )));
+            }
+        }
+
         // Description texts are keyed by id and referenced by the qualifiers.
         let mut descriptions = BTreeMap::new();
         if let Some(list) = child_element(root, "dtcDescriptionList") {
@@ -132,7 +196,11 @@ impl IngestionAdapter for DtcHelpAdapter {
         };
         entity.validate()?;
 
-        if let Some(qualification) = child_element(root, "dtcDescriptionQualification") {
+        // The descriptions and which car gets which are the English pack's to
+        // say; another language's pack has the same structure and adds only
+        // its words (`ADR-0034`).
+        let qualification = child_element(root, "dtcDescriptionQualification");
+        if let (None, Some(qualification)) = (&self.language, qualification) {
             for selection in qualification.children().filter(|node| {
                 node.is_element() && node.tag_name().name() == "dtcDescriptionSelection"
             }) {
@@ -284,6 +352,11 @@ impl IngestionAdapter for DtcHelpAdapter {
                         .collect::<Vec<_>>()
                         .join("\n");
 
+                    used_screens.insert(screen_name.clone(), (text, item_lines));
+                    if self.language.is_some() {
+                        continue;
+                    }
+
                     let mut applicability =
                         applicability_from_qualifier(qualifier, self.timeline.as_ref())?;
                     if let Some(fault_type) = fault_type {
@@ -343,19 +416,33 @@ impl IngestionAdapter for DtcHelpAdapter {
                             validation_state: ValidationState::Unverified,
                         },
                     );
-                    used_screens.insert(screen_name.clone(), (text, item_lines));
                 }
             }
         }
 
-        // What each selected screen says, written once whatever selects it.
+        // What each selected screen says, written once whatever selects it —
+        // and, for a pack in another language, the only thing written.
+        let suffix = self.language_suffix();
         for (screen_name, (text, item_lines)) in used_screens {
             let screen_slug = slugify(&screen_name, "helpScreen name")?;
             let record_id = format!(
-                "{}.dtc.{code_slug}.helpscreen.{screen_slug}",
+                "{}.dtc.{code_slug}.helpscreen.{screen_slug}{suffix}",
                 self.source.id.0
             );
-            let evidence_id = format!("{}.ev.{record_id}", self.source.id.0);
+            // The English evidence id repeats the source id inside the record
+            // id, as every F9 adapter's does, and the longest in the corpus is
+            // 119 of the 128 characters an id may have. A language pack's
+            // source id is longer by its code and the record id by the
+            // suffix, which would carry fifteen of them past the limit — so
+            // for a language pack the record id enters without its source
+            // prefix, which the evidence id already begins with.
+            let evidence_id = match &self.language {
+                None => format!("{}.ev.{record_id}", self.source.id.0),
+                Some(_) => format!(
+                    "{}.ev.dtc.{code_slug}.helpscreen.{screen_slug}{suffix}",
+                    self.source.id.0
+                ),
+            };
             evidence.insert(
                 evidence_id.clone(),
                 EvidenceRecord {
@@ -379,7 +466,7 @@ impl IngestionAdapter for DtcHelpAdapter {
                     id: record_id,
                     entity: entity.clone(),
                     key: ClaimKey::Custom {
-                        name: format!("{DTC_HELP_SCREEN_CLAIM_PREFIX}{screen_name}"),
+                        name: format!("{DTC_HELP_SCREEN_CLAIM_PREFIX}{screen_name}{suffix}"),
                     },
                     value: KnowledgeValue::Text { value: text },
                     // A screen's text is the same wherever it is selected; the
@@ -392,7 +479,7 @@ impl IngestionAdapter for DtcHelpAdapter {
             // The same screen as the names of its items, on the same
             // evidence, so a translation keyed by name reaches every line.
             let items_record_id = format!(
-                "{}.dtc.{code_slug}.helpscreenitems.{screen_slug}",
+                "{}.dtc.{code_slug}.helpscreenitems.{screen_slug}{suffix}",
                 self.source.id.0
             );
             records.insert(
@@ -401,7 +488,7 @@ impl IngestionAdapter for DtcHelpAdapter {
                     id: items_record_id,
                     entity: entity.clone(),
                     key: ClaimKey::Custom {
-                        name: format!("{DTC_HELP_SCREEN_ITEMS_CLAIM_PREFIX}{screen_name}"),
+                        name: format!("{DTC_HELP_SCREEN_ITEMS_CLAIM_PREFIX}{screen_name}{suffix}"),
                     },
                     value: KnowledgeValue::Text { value: item_lines },
                     applicability: qualified_applicability(),
@@ -411,7 +498,11 @@ impl IngestionAdapter for DtcHelpAdapter {
             );
         }
 
-        if records.is_empty() {
+        // A document with no selected screen is a third of the corpus: in
+        // English it still carries its descriptions, in another language it
+        // carries nothing this adapter writes, and that is not a fault of the
+        // document — the batch is simply empty.
+        if records.is_empty() && self.language.is_none() {
             return Err(KnowledgeError::Parse(format!(
                 "no qualified descriptions were found for {code}"
             )));

@@ -403,11 +403,10 @@ pub struct SelfTestSummary {
     /// What SDD tells whoever runs it, line by line, for this car. Empty
     /// when the data carries no screen for it.
     pub description: Vec<String>,
-    /// The same lines in this project's own words, by interface language
-    /// (`ADR-0026`'s rule, applied to the self tests): each list is the same
-    /// length and order as `description`. A line this project has no wording
-    /// for keeps SDD's English, and a language with no wording at all is
-    /// absent rather than half filled.
+    /// The same lines in SDD's other languages, by SDD's language code, each
+    /// list the same length and order as `description` (`ADR-0034`). Empty
+    /// until the ODST pack in another language is ingested; the words are
+    /// SDD's own either way.
     #[serde(default)]
     pub description_texts: BTreeMap<String, Vec<String>>,
     /// SDD's own model-year markers for this test, as the data writes them
@@ -524,12 +523,13 @@ pub struct DtcSummary {
     pub description_texts: BTreeMap<String, String>,
     /// The help for this code on this car: possible causes, actions
     /// required, monitoring conditions, line by line as the screen shows it,
-    /// in English and in this project's own words where it has them.
+    /// in SDD's own English (`ADR-0034`).
     #[serde(default)]
     pub help: Vec<String>,
-    /// The same screen in the interface's languages, by SDD's language code,
-    /// each the same length and order as `help`. Empty when none of its lines
-    /// has wording of ours.
+    /// The same screen in SDD's other languages, by SDD's language code
+    /// (`rus`), each the same length and order as `help`; a line the other
+    /// language's screen lacks keeps the English. Empty for a library issued
+    /// without the Russian pack.
     #[serde(default)]
     pub help_texts: BTreeMap<String, Vec<String>>,
     /// Why there is no help, when the reason is worth saying.

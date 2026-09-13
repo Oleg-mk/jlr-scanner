@@ -32,9 +32,9 @@ export interface DtcSummary {
    */
   help: string[];
   /**
-   * The same screen in the interface's languages, by SDD's language code
-   * (ADR-0026). Each list is the same length and order as `help`; a line this
-   * project has no wording for stands in English inside it.
+   * The same screen in SDD's other languages, by SDD's language code — `rus`
+   * from the Russian pack (ADR-0034). Each list is the same length and order
+   * as `help`; a line the other pack lacks stands in English inside it.
    */
   helpTexts: Record<string, string[]>;
   /** Why there is no help, when the reason is worth saying. */

@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  SYNTHETIC F9 FIXTURE. Not JLR evidence and not promotable to evidence.
+
+  The Russian sibling of f9_dtc_help.xml (ADR-0034): the same code, the same
+  selections, the same screens and the same mnemonic names, with the human
+  text in invented Russian — the shape of SDD's language packs, which share
+  everything but the words. Two things are exercised on purpose:
+
+    * the document declares isoCode="ru", which the adapter requires when it
+      is told to read a pack as Russian;
+    * SYNTH_ACTION_1 has no Russian text here, so the line it fills on the
+      MY06 screen must keep its English when the two are joined by name.
+-->
+<dtcHelp>
+<dtcCode>0x0000</dtcCode>
+<language isoCode="ru">Russian</language>
+<dtcDescriptionQualification>
+<dtcDescriptionSelection dtcDescriptionId="1001" helpScreenDataNameId="9001" faultType="17" faultTypeHelpScreenDataNameId="9002">
+<dtcQualifier module="SYNTHMOD" moduleDataName="SYNTHMOD_SYSTEM_A" dtcType="BASE" model="SYNTHA" year="MY06"/>
+<dtcQualifier module="SYNTHMOD" moduleDataName="SYNTHMOD_SYSTEM_A" dtcType="BASE" model="SYNTHA" year="MY07"/>
+</dtcDescriptionSelection>
+<dtcDescriptionSelection dtcDescriptionId="1002" helpScreenDataNameId="9001">
+<dtcQualifier module="OTHERMOD" moduleDataName="OTHERMOD_SYSTEM_A" dtcType="BASE" model="SYNTHB" year="BASE"/>
+</dtcDescriptionSelection>
+</dtcDescriptionQualification>
+<dtcDescriptionList>
+<dtcDescription id="1001">Синтетичний сброс сторожевого таймера</dtcDescription>
+<dtcDescription id="1002">Синтетичное короткое замыкание датчика на массу</dtcDescription>
+</dtcDescriptionList>
+<helpScreenQualification>
+<helpScreenDataName id="9001" name="SYNTH_DEFAULT_HLP">
+<helpScreenSelection helpScreenId="9101" helpScreenName="SYNTH_DEFAULT_HLP_001">
+<helpScreenQualifier model="SYNTHA" year="MY06"/>
+</helpScreenSelection>
+</helpScreenDataName>
+<helpScreenDataName id="9002" name="FLT_TYPE_17_SYNTH_DEFAULT_HLP">
+<helpScreenSelection helpScreenId="9102" helpScreenName="FLT_TYPE_17_SYNTH_DEFAULT_HLP_001">
+<helpScreenQualifier model="SYNTHA" year="MY06"/>
+</helpScreenSelection>
+<helpScreenSelection helpScreenId="9103" helpScreenName="FLT_TYPE_17_SYNTH_DEFAULT_HLP_002">
+<helpScreenQualifier model="SYNTHA" year="MY07"/>
+</helpScreenSelection>
+</helpScreenDataName>
+</helpScreenQualification>
+<helpScreenList>
+<helpScreen id="9101" name="SYNTH_DEFAULT_HLP_001"/>
+<helpScreen id="9102" name="FLT_TYPE_17_SYNTH_DEFAULT_HLP_001">
+<helpScreenItem mnemonicName="J_I_POSSIBLE_CAUSES"/>
+<helpScreenItem mnemonicName="SYNTH_CAUSE_1"/>
+<helpScreenItem mnemonicName="J_I_ACTIONS_REQUIRED"/>
+<helpScreenItem mnemonicName="SYNTH_ACTION_1"/>
+</helpScreen>
+<helpScreen id="9103" name="FLT_TYPE_17_SYNTH_DEFAULT_HLP_002">
+<helpScreenItem mnemonicName="J_I_POSSIBLE_CAUSES"/>
+<helpScreenItem mnemonicName="SYNTH_CAUSE_2"/>
+<helpScreenItem mnemonicName="MNEMONIC_THE_TABLE_DOES_NOT_DEFINE"/>
+<helpScreenItem mnemonicName="empty$I"/>
+</helpScreen>
+</helpScreenList>
+<helpScreenMnemonicList>
+<mnemonic name="J_H_NO_HELP_AVAIL"><![CDATA[Справка пока недоступна]]></mnemonic>
+<mnemonic name="J_I_POSSIBLE_CAUSES"><![CDATA[Возможные причины:]]></mnemonic>
+<mnemonic name="J_I_ACTIONS_REQUIRED"><![CDATA[Необходимые действия:]]></mnemonic>
+<mnemonic name="SYNTH_CAUSE_1"><![CDATA[Обрыв синтетической цепи датчика, сопротивление выше 2,30 Ом при температуре от -40°C до +85°C]]></mnemonic>
+<mnemonic name="SYNTH_CAUSE_2"><![CDATA[Синтетическая цепь датчика – короткое замыкание на массу]]></mnemonic>
+<mnemonic name="empty$I"></mnemonic>
+</helpScreenMnemonicList>
+</dtcHelp>

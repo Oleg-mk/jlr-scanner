@@ -1,7 +1,13 @@
 # ADR-0026: The fault-code help is written by this project
 
-Status: accepted, 2026-09-11. The owner's decision, after a disagreement this
-document records rather than hides.
+Status: **superseded by `ADR-0034`, 2026-09-13.** Accepted 2026-09-11 as the
+owner's decision, after a disagreement this document records rather than
+hides; withdrawn by the owner two days later, when the remaining 13,130
+sentences could be neither written by hand nor trusted to a machine, and
+JLR's own Russian for the whole layer was found in the same installer. The
+help is now SDD's text, in English or Russian, from the issued library; the
+table this document describes left the product. Kept as the record of what
+was tried and why.
 
 ## Context
 

@@ -1,5 +1,7 @@
+import { useHelpLanguage } from "../helpLanguage";
 import { codeText, dataText, helpLines, parameterNote, t, useLanguage } from "../i18n";
 import { DtcHelp } from "./DtcHelp";
+import { HelpLanguageSwitch } from "./HelpLanguageSwitch";
 import type { ModuleSurveyEntry } from "../library";
 import type { ModuleReadKind, ModuleReadSnapshot } from "../moduleRead";
 import { moduleReasons, moduleRoute, nodeStatus, routeText } from "../networkMap";
@@ -55,6 +57,7 @@ export function ModuleDetails({
   bench = false,
 }: ModuleDetailsProps) {
   const language = useLanguage();
+  const [helpLanguage] = useHelpLanguage(language);
   if (module === null) {
     return (
       <section className="module-details" aria-labelledby="module-details-title">
@@ -197,6 +200,7 @@ export function ModuleDetails({
                   "The year markers are SDD's own and this session does not check them, so a test listed here can belong to another year of the same programme.",
                 )}
               </p>
+              <HelpLanguageSwitch />
               <ul className="self-test-list">
                 {module.selfTests.map((test) => (
                   <li key={test.testId}>
@@ -213,7 +217,7 @@ export function ModuleDetails({
                         {` · ${test.safetyClass}`}
                       </span>
                     </div>
-                    {helpLines(test.descriptionTexts, test.description, language).map(
+                    {helpLines(test.descriptionTexts, test.description, helpLanguage).map(
                       (line, index) => (
                         <p className="self-test-line" key={`${test.testId}-${index}`}>
                           {line}

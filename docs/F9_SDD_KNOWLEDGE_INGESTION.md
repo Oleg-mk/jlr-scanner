@@ -228,9 +228,11 @@ what that screen says. A blank item and an item whose mnemonic has no text
 are left out; a screen no test points at is not recorded at all. The slice
 grew from 1,153 records to 4,085 over the same 93 documents: 1,153 test
 descriptions, 1,257 screen bindings, 522 screen records over 462 distinct
-screens, 238,504 characters. The texts enter in SDD's English; the pack
-holds English and Chinese only, so Ukrainian and Russian wording is this
-project's own and comes later. Nothing became executable: every record still
+screens, 238,504 characters. The texts enter in SDD's English. The
+payload first extracted held English and Chinese; the installer also carries
+the ODST pack in Russian, not yet opened, and since `ADR-0034` this project
+writes no wording of its own for SDD's text — a Russian description waits on
+that pack, and there is no Ukrainian one. Nothing became executable: every record still
 carries `ServiceRoutine`.
 
 Each test becomes a `DiagnosticCapability` named from its help-screen data name,
@@ -818,6 +820,18 @@ which the parser already does.
 - `sdd_help_screen.<name>` — what that screen says, its mnemonics resolved
   in order and joined by newlines, unqualified because the text is the text.
   About 37,300 records.
+- `sdd_help_screen_items.<name>` — the same screen as its items, one line
+  per item: the mnemonic's name, U+001F, its text flattened to one line
+  (2026-09-12), so a line can be joined to the same line in another language.
+- `sdd_help_screen.<name>.rus` and `sdd_help_screen_items.<name>.rus` — the
+  same screen from JLR's Russian pack (`ADR-0034`, 2026-09-13), the language
+  last as `sdd_failure_type.rus` has it. The Russian pack has the English
+  pack's structure — the same 6,171 documents, names, screens and selections
+  — so its adapter, told the language, writes the two text claims and nothing
+  else, under a source of its own (`sdd-169-rdsdtchelp0x0000-rus`), and
+  refuses a document whose `<language isoCode>` is not `ru`. A screen name
+  carries no dot and no lower-case letter, so the suffix cannot be mistaken
+  for part of a name.
 
 Resolving at ingest instead would write the same screen out once per car
 that selects it: 44.3 MB of duplicated text against about 15 MB, for no

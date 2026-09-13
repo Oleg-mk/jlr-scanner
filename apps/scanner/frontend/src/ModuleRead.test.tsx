@@ -2,6 +2,7 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 import { App } from "./App";
 import { LANGUAGE_STORAGE_KEY, setCurrentLanguage } from "./i18n";
+import { resetHelpLanguage } from "./helpLanguage";
 import { createEmptySnapshot, type AdapterClient, type AdapterSnapshot } from "./adapter";
 import {
   createDiagnosticSnapshot,
@@ -114,9 +115,9 @@ const surveyed: ModuleSurveyEntry[] = [
           "Synthetic screen text, second line.",
         ],
         descriptionTexts: {
-          ukr: [
-            "Синтетичний текст екрана, перший рядок.",
-            "Синтетичний текст екрана, другий рядок.",
+          rus: [
+            "Синтетический текст экрана, первая строка.",
+            "Синтетический текст экрана, вторая строка.",
           ],
         },
         modelYears: ["MY10"],
@@ -310,7 +311,8 @@ describe("module read", () => {
     ).toBeNull();
   });
 
-  it("says a self test's words in the interface's language where we have them", async () => {
+  it("says a self test in SDD's own words, Russian to a Ukrainian reader unless told otherwise", async () => {
+    resetHelpLanguage();
     renderApp(new ControlledModuleReadClient());
     await screen.findByRole("button", { name: "Read" });
     fireEvent.change(screen.getByLabelText("Programme"), { target: { value: "L405" } });
@@ -323,14 +325,18 @@ describe("module read", () => {
     fireEvent.change(screen.getByRole("combobox", { name: "Language" }), {
       target: { value: "uk" },
     });
-    // Our own words for the lines we have wording for; SDD's English stays
-    // where we have none (ADR-0026).
+    // SDD's own Russian for a Ukrainian interface (ADR-0034): the pack's
+    // text, not ours; the heading is the interface's.
     expect(
-      await screen.findByText("Синтетичний текст екрана, другий рядок."),
+      await screen.findByText("Синтетический текст экрана, вторая строка."),
     ).toBeVisible();
     expect(
       screen.getByRole("heading", { name: "Самотести, які оголошує цей модуль" }),
     ).toBeVisible();
+    // And English one switch away; Ukrainian is not on offer.
+    fireEvent.click(screen.getAllByRole("button", { name: "Англійська" })[0]);
+    expect(await screen.findByText("Synthetic screen text, second line.")).toBeVisible();
+    expect(screen.queryByRole("button", { name: "Українська" })).toBeNull();
   });
 
   it("requires an identifier for an identifier read", async () => {

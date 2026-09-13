@@ -13,7 +13,6 @@
 pub mod ccf;
 pub mod decode;
 pub mod dtc_text;
-pub mod help_text;
 pub mod issue;
 pub mod mileage;
 pub mod parameter_text;
@@ -188,16 +187,16 @@ pub struct DtcDescription {
     /// never here, because English stays `description`.
     pub description_texts: BTreeMap<String, String>,
     /// The help for this code on this car, line by line as the screen shows
-    /// it: possible causes, actions required, monitoring conditions. In
-    /// English, and in this project's own words where it has them
-    /// (`ADR-0026`). Empty when the loaded data holds none, or when it holds
-    /// several and the vehicle is not described closely enough to choose
-    /// between them.
+    /// it: possible causes, actions required, monitoring conditions — SDD's
+    /// own English, unchanged (`ADR-0034`). Empty when the loaded data holds
+    /// none, or when it holds several and the vehicle is not described
+    /// closely enough to choose between them.
     pub help: Vec<String>,
-    /// The same screen in the interface's languages, by SDD's language code,
-    /// each list the same length and order as `help`. A line this project has
-    /// no wording for stands in English inside them. Empty when no line on
-    /// the screen has any.
+    /// The same screen in SDD's other languages, by SDD's language code
+    /// (`rus`), each list the same length and order as `help`: a line is
+    /// joined to its English by the mnemonic's name, and a name the other
+    /// language's screen lacks keeps the English on that line. Empty for a
+    /// library issued without the Russian pack.
     pub help_texts: BTreeMap<String, Vec<String>>,
     /// Why there is no help, when the reason is worth saying.
     pub help_note: Option<String>,
@@ -211,6 +210,11 @@ struct HelpSelection {
     fault_type: Option<String>,
     screen: String,
 }
+
+/// A help screen's items: each the mnemonic's name and its text.
+type ScreenItems = Vec<(String, String)>;
+/// Screen name → SDD language code → that screen's items in that language.
+type ScreenItemsByLanguage = BTreeMap<String, BTreeMap<String, ScreenItems>>;
 
 /// Fault-code wording indexed at load: descriptions by `DTC-<code>` entity,
 /// each with the module it is scoped to when it is, and failure-type wording
@@ -228,7 +232,21 @@ struct DtcIndex {
     /// `DTC-<code>` → screen name → the screen's items, each the mnemonic's
     /// name and its text on one line. Present in libraries exported since
     /// 2026-09-12; absent before, when `help_screens` alone is used.
-    help_screen_items: BTreeMap<String, BTreeMap<String, Vec<(String, String)>>>,
+    help_screen_items: BTreeMap<String, BTreeMap<String, ScreenItems>>,
+    /// `DTC-<code>` → screen name → SDD language code → the same screen's
+    /// items in that language, from the pack SDD ships in it (`ADR-0034`;
+    /// libraries exported since 2026-09-13). Joined to the English by name.
+    help_screen_items_in: BTreeMap<String, ScreenItemsByLanguage>,
+}
+
+/// Split a screen claim's remainder into the screen's name and the language
+/// the text is in: `FLT_TYPE_17_X_001` is English, `FLT_TYPE_17_X_001.rus`
+/// is Russian. A screen name carries no dot, so the last dot is the split.
+fn screen_and_language(remainder: &str) -> (&str, Option<&str>) {
+    match remainder.rsplit_once('.') {
+        Some((screen, language)) if !language.is_empty() => (screen, Some(language)),
+        _ => (remainder, None),
+    }
 }
 
 /// Everything indexed in one pass over the store after a load.
@@ -555,11 +573,12 @@ impl KnowledgeLibrary {
             );
             return description;
         }
-        // The library says which lines this car is given; the words are this
-        // project's own (`ADR-0026`), and a line it has no wording for keeps
-        // the library's English. A library that names the screen's items
-        // is read by name, the unit a translation is keyed by; an older one
-        // is read by the text of each line.
+        // The library says which lines this car is given, and the words are
+        // SDD's own (`ADR-0034`): English from the screen, and the same
+        // screen in each other language the library carries, joined line to
+        // line by the mnemonic's name. A library that names the screen's
+        // items is read by name; an older one is read by the text of each
+        // line and has no other language.
         if let Some(items) = self
             .indexes
             .dtc_index
@@ -567,9 +586,33 @@ impl KnowledgeLibrary {
             .get(&entity)
             .and_then(|screens| screens.get(*screen))
         {
-            let (shown, texts) = help_text::screen_by_names(items);
-            description.help = shown;
-            description.help_texts = texts;
+            description.help = items.iter().map(|(_, text)| text.clone()).collect();
+            if let Some(in_languages) = self
+                .indexes
+                .dtc_index
+                .help_screen_items_in
+                .get(&entity)
+                .and_then(|screens| screens.get(*screen))
+            {
+                for (language, theirs) in in_languages {
+                    let by_name: BTreeMap<&str, &str> = theirs
+                        .iter()
+                        .map(|(name, text)| (name.as_str(), text.as_str()))
+                        .collect();
+                    // A name the other language's screen lacks keeps the
+                    // English on that line: the lists stay the same length.
+                    let lines = items
+                        .iter()
+                        .map(|(name, english)| {
+                            by_name
+                                .get(name.as_str())
+                                .map(|text| text.to_string())
+                                .unwrap_or_else(|| english.clone())
+                        })
+                        .collect();
+                    description.help_texts.insert(language.clone(), lines);
+                }
+            }
         } else if let Some(lines) = self
             .indexes
             .dtc_index
@@ -577,9 +620,7 @@ impl KnowledgeLibrary {
             .get(&entity)
             .and_then(|screens| screens.get(*screen))
         {
-            let (shown, texts) = help_text::screen(lines);
-            description.help = shown;
-            description.help_texts = texts;
+            description.help = lines.clone();
         }
         description
     }
@@ -1119,29 +1160,50 @@ fn build_indexes(store: &KnowledgeStore) -> Indexes {
                                     fault_type,
                                     screen: value.clone(),
                                 });
-                        } else if let Some(screen) = name.strip_prefix("sdd_help_screen_items.") {
+                        } else if let Some(remainder) = name.strip_prefix("sdd_help_screen_items.")
+                        {
                             // One line per item: the name, U+001F, the text.
-                            dtc_index
-                                .help_screen_items
-                                .entry(id.to_string())
-                                .or_default()
-                                .entry(screen.to_string())
-                                .or_insert_with(|| {
-                                    value
-                                        .lines()
-                                        .filter_map(|line| {
-                                            let (name, text) = line.split_once('\u{1F}')?;
-                                            Some((name.to_string(), text.to_string()))
-                                        })
-                                        .collect()
-                                });
-                        } else if let Some(screen) = name.strip_prefix("sdd_help_screen.") {
-                            dtc_index
-                                .help_screens
-                                .entry(id.to_string())
-                                .or_default()
-                                .entry(screen.to_string())
-                                .or_insert_with(|| value.lines().map(str::to_string).collect());
+                            let items = || {
+                                value
+                                    .lines()
+                                    .filter_map(|line| {
+                                        let (name, text) = line.split_once('\u{1F}')?;
+                                        Some((name.to_string(), text.to_string()))
+                                    })
+                                    .collect::<Vec<_>>()
+                            };
+                            match screen_and_language(remainder) {
+                                (screen, None) => {
+                                    dtc_index
+                                        .help_screen_items
+                                        .entry(id.to_string())
+                                        .or_default()
+                                        .entry(screen.to_string())
+                                        .or_insert_with(items);
+                                }
+                                (screen, Some(language)) => {
+                                    dtc_index
+                                        .help_screen_items_in
+                                        .entry(id.to_string())
+                                        .or_default()
+                                        .entry(screen.to_string())
+                                        .or_default()
+                                        .entry(language.to_string())
+                                        .or_insert_with(items);
+                                }
+                            }
+                        } else if let Some(remainder) = name.strip_prefix("sdd_help_screen.") {
+                            // The other languages' text is read from their
+                            // items, which carry the names the lines are
+                            // joined by; the plain text claim is English's.
+                            if let (screen, None) = screen_and_language(remainder) {
+                                dtc_index
+                                    .help_screens
+                                    .entry(id.to_string())
+                                    .or_default()
+                                    .entry(screen.to_string())
+                                    .or_insert_with(|| value.lines().map(str::to_string).collect());
+                            }
                         }
                     }
                 } else if id.starts_with("FTB-") {
@@ -1436,9 +1498,11 @@ fn self_tests_for(
             .and_then(|screen| screens.get(screen))
             .map(|text| text.lines().map(str::to_string).collect())
             .unwrap_or_default();
-        // The words a person reads are this project's own where it has them,
-        // and SDD's English line by line where it does not (`ADR-0026`).
-        let (description, description_texts) = help_text::screen(&lines);
+        // The words a person reads are SDD's own (`ADR-0034`): its English,
+        // and nothing else until the ODST pack in another language is opened
+        // and ingested the way the fault-code help's was.
+        let description = lines;
+        let description_texts = BTreeMap::new();
         let summary = SelfTestSummary {
             test_id: fields.get("test").cloned().unwrap_or_default(),
             name: fields.get("name").cloned().unwrap_or_default(),

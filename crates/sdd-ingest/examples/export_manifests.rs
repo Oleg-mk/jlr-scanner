@@ -23,7 +23,7 @@ use sdd_ingest::{
     is_text_item_id, BatteryFormatting, CanLinkMonitorAdapter, CcfAdapter, ConverterCatalogue,
     DidFormattingAdapter, DtcDescriptionAdapter, DtcFaultTypeAdapter, DtcHelpAdapter,
     IvsLineageAdapter, ModelYearTimeline, ModuleTextAdapter, OdstInfoAdapter, PlatformAdapter,
-    TextLookup, VinDecodeAdapter, YEAR_BREAKPOINT_DIMENSION,
+    TextLookup, VinDecodeAdapter, DTC_HELP_LANGUAGE_RUSSIAN, YEAR_BREAKPOINT_DIMENSION,
 };
 use std::collections::{BTreeMap, BTreeSet};
 use std::io::Write;
@@ -35,6 +35,9 @@ struct Corpus {
     converters: Vec<Found>,
     snapshots: Vec<Found>,
     dtc_help: Vec<Found>,
+    /// The same help documents from the Russian pack (`ADR-0034`): text
+    /// only, the selections come from the English ones.
+    dtc_help_rus: Vec<Found>,
     dtc_index: Vec<Found>,
     odst: Vec<Found>,
     /// JLR's IVS part lineage: which software belongs to which assembly
@@ -57,7 +60,35 @@ struct Found {
     relative: String,
 }
 
+/// The language a corpus root is in, from its name: SDD ships one folder per
+/// language, `COMMON_SDD_DATA_DTC_HELP_LANG_EN`, `..._LANG_RU`. English and
+/// a root that names no language are read as English; Russian is read for
+/// the help text alone (`ADR-0034`); any other language is left where it is.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum RootLanguage {
+    English,
+    Russian,
+    Other,
+}
+
+fn root_language(root: &Path) -> RootLanguage {
+    let name = root
+        .file_name()
+        .and_then(|value| value.to_str())
+        .unwrap_or("");
+    match name.rsplit_once("_LANG_") {
+        None => RootLanguage::English,
+        Some((_, "EN")) => RootLanguage::English,
+        Some((_, "RU")) => RootLanguage::Russian,
+        Some(_) => RootLanguage::Other,
+    }
+}
+
 fn walk(root: &Path, dir: &Path, corpus: &mut Corpus) -> std::io::Result<()> {
+    let language = root_language(root);
+    if language == RootLanguage::Other {
+        return Ok(());
+    }
     let mut entries: Vec<_> = std::fs::read_dir(dir)?
         .filter_map(|entry| entry.ok().map(|entry| entry.path()))
         .collect();
@@ -93,6 +124,16 @@ fn walk(root: &Path, dir: &Path, corpus: &mut Corpus) -> std::io::Result<()> {
                 .replace('\\', "/")
         );
         let found = Found { path, relative };
+        // A Russian root has the same file names as the English one; only
+        // the per-code help documents are taken from it, and the index
+        // files beside them are left, because the English ones carry the
+        // descriptions and the selections.
+        if language == RootLanguage::Russian {
+            if name.starts_with("rdsDtcHelp") {
+                corpus.dtc_help_rus.push(found);
+            }
+            continue;
+        }
         if name.starts_with("PLATFORM_") {
             corpus.platforms.push(found);
         } else if parent == "Converters" {
@@ -142,14 +183,33 @@ fn slug(text: &str) -> String {
 /// The same source identity the F9 examples construct, so records exported
 /// here carry the ids and locators the F9 documents describe.
 fn source(found: &Found, text: &str) -> Result<SourceRecord, KnowledgeError> {
+    source_in(found, text, None)
+}
+
+/// The same, for a file from a pack in another language: the id and the
+/// title name the language, so the Russian `rdsDtcHelp0x0000.xml` is a
+/// source of its own beside the English one and their records cannot
+/// collide.
+fn source_in(
+    found: &Found,
+    text: &str,
+    language: Option<&str>,
+) -> Result<SourceRecord, KnowledgeError> {
     let stem = found
         .path
         .file_stem()
         .and_then(|value| value.to_str())
         .unwrap_or("unknown");
+    let (id, title) = match language {
+        Some(code) => (
+            format!("sdd-169-{}-{code}", slug(stem)),
+            format!("SDD {stem} ({code})"),
+        ),
+        None => (format!("sdd-169-{}", slug(stem)), format!("SDD {stem}")),
+    };
     Ok(SourceRecord {
-        id: SourceId::new(format!("sdd-169-{}", slug(stem)))?,
-        title: format!("SDD {stem}"),
+        id: SourceId::new(id)?,
+        title,
         source_type: SourceType::Documented,
         origin: "Jaguar Land Rover SDD 169.00.001".into(),
         source_locator: found.relative.clone(),
@@ -274,6 +334,11 @@ fn export(
             return Ok(());
         }
     };
+    // A batch with nothing in it — a Russian help document whose screens
+    // no car selects (`ADR-0034`) — is not a rejection and not a manifest.
+    if batch.records.is_empty() {
+        return Ok(());
+    }
     match store.ingest_batch(adapter.parser_id(), adapter.parser_version(), batch.clone()) {
         Ok(_) => bundle.push(&batch),
         Err(error) => {
@@ -304,11 +369,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         walk(root, root, &mut corpus)?;
     }
     println!(
-        "found: {} platform, {} converter, {} DID snapshot, {} DTC help, {} DTC index, {} ODST, {} IVS, {} link monitor, {} VIN decode, {} module text, {} CCF, {} other text items",
+        "found: {} platform, {} converter, {} DID snapshot, {} DTC help, {} DTC help (rus), {} DTC index, {} ODST, {} IVS, {} link monitor, {} VIN decode, {} module text, {} CCF, {} other text items",
         corpus.platforms.len(),
         corpus.converters.len(),
         corpus.snapshots.len(),
         corpus.dtc_help.len(),
+        corpus.dtc_help_rus.len(),
         corpus.dtc_index.len(),
         corpus.odst.len(),
         corpus.ivs.len(),
@@ -481,6 +547,23 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             &adapter,
             &text,
             "dtc-help",
+            &mut rejections,
+        )?;
+    }
+    // The same screens in Russian, from JLR's own pack (`ADR-0034`): the
+    // text of each screen a car can be given, written beside the English.
+    for found in &corpus.dtc_help_rus {
+        let text = read(found)?;
+        let adapter =
+            DtcHelpAdapter::new(source_in(found, &text, Some(DTC_HELP_LANGUAGE_RUSSIAN))?)?
+                .with_timeline(timeline.clone())
+                .with_language(DTC_HELP_LANGUAGE_RUSSIAN)?;
+        export(
+            &mut store,
+            &mut bundle,
+            &adapter,
+            &text,
+            "dtc-help-rus",
             &mut rejections,
         )?;
     }

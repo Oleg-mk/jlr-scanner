@@ -1,4 +1,5 @@
 import { createContext, useContext } from "react";
+import type { HelpLanguage } from "./helpLanguage";
 
 /**
  * Interface language. The application's own words come in English, Russian
@@ -83,6 +84,14 @@ export function dataText(
 }
 
 const uk: Record<string, string> = {
+  // The language of SDD's own text (ADR-0034)
+  "Text language": "Мова тексту",
+  "English": "Англійська",
+  "Russian": "Російська",
+  "SDD's own text, in English or Russian; there is no Ukrainian version.":
+    "Текст SDD як є, англійською або російською; української версії немає.",
+  "This library carries no Russian text for it.":
+    "У цій бібліотеці немає російського тексту для цього.",
   // Header and session
   "Multi-platform vehicle diagnostics": "Кросплатформна діагностика автомобілів",
   "Simulator UI preview": "Попередній перегляд інтерфейсу (симулятор)",
@@ -1162,6 +1171,14 @@ const uk: Record<string, string> = {
 };
 
 const ru: Record<string, string> = {
+  // The language of SDD's own text (ADR-0034)
+  "Text language": "Язык текста",
+  "English": "Английский",
+  "Russian": "Русский",
+  "SDD's own text, in English or Russian; there is no Ukrainian version.":
+    "Текст SDD как есть, на английском или русском; украинской версии нет.",
+  "This library carries no Russian text for it.":
+    "В этой библиотеке нет русского текста для этого.",
   // Header and session
   "Multi-platform vehicle diagnostics": "Кроссплатформенная диагностика автомобилей",
   "Simulator UI preview": "Предпросмотр интерфейса (симулятор)",
@@ -2373,21 +2390,21 @@ export function liveReadReason(reason: string): string {
 }
 
 /**
- * A help screen's lines for the interface language: ours when the shell sent
- * them, otherwise the English it sent (`ADR-0026`). The lists must be the
- * same length — a screen read half in one language and half in another would
- * be worse than one read wholly in English — so a mismatch falls back rather
- * than interleaving.
+ * A screen of SDD's text in the language chosen for such text (`ADR-0034`):
+ * the Russian the shell sent when Russian is chosen and the library has it,
+ * otherwise the English. The lists must be the same length — a screen read
+ * half in one language and half in another would be worse than one read
+ * wholly in English — so a mismatch falls back rather than interleaving.
  */
 export function helpLines(
   texts: Record<string, string[]> | undefined,
   english: string[],
-  language: Language,
+  helpLanguage: HelpLanguage,
 ): string[] {
-  const code = productLanguage(language);
-  const ours = code !== null ? texts?.[code] : undefined;
-  if (ours === undefined || ours.length !== english.length) return english;
-  return ours;
+  if (helpLanguage === "eng") return english;
+  const theirs = texts?.[helpLanguage];
+  if (theirs === undefined || theirs.length !== english.length) return english;
+  return theirs;
 }
 
 export const LanguageContext = createContext<Language>("en");
