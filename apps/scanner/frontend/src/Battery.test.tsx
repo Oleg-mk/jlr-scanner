@@ -145,48 +145,38 @@ describe("battery", () => {
       />,
     );
 
-    expect(screen.getByText("78%")).toBeVisible();
+    // The voltage stands beside the cell; the level is the cell's own fill
+    // and the figure it carries for a reader who cannot see it.
+    const cell = screen.getByLabelText("State of charge: 78%");
     expect(screen.getByText("12.6 V")).toBeVisible();
-    expect(screen.getByText("-1.5 A")).toBeVisible();
-    expect(screen.getByText("21 °C")).toBeVisible();
-    // The card is the face only: the groups are the panel's.
+    expect(cell.querySelector(".battery-key__fill")).toHaveStyle({ width: "78%" });
+    // Everything else the monitor holds is the panel's.
+    expect(screen.queryByText("-1.5 A")).toBeNull();
+    expect(screen.queryByText("21 °C")).toBeNull();
     expect(screen.queryByRole("heading", { name: "Parked drain" })).toBeNull();
     expect(screen.queryByText("23")).toBeNull();
-    // Not one word of judgement over any reading, and nothing under the card
-    // pointing at the panel that holds the rest: the rail carries readings,
-    // not signposts.
-    const card = screen.getByLabelText(/State of charge/).closest("section");
-    const readings = Array.from(
-      card?.querySelectorAll(
-        ".battery-card__tiles, .battery-card__group, .battery-card__reading",
-      ) ?? [],
-    )
-      .map((element) => element.textContent ?? "")
-      .join(" ");
-    expect(readings).not.toMatch(
+    // Not one word of judgement anywhere on the key.
+    expect(cell.parentElement?.textContent ?? "").not.toMatch(
       /good|bad|poor|healthy|weak|replace|failing|warning|critical/i,
     );
-    expect(card?.querySelector(".battery-card__note")).toBeNull();
   });
 
   it("says when the reading was taken and that a bench value is a bench value", () => {
     vi.useFakeTimers();
     const taken = Date.now() - 7 * 60_000;
+    // The key is the cell and nothing else; when a reading was taken, and
+    // that it came off a bench rather than a car, are the panel's to say.
     render(
-      <BatteryCard
+      <BatteryPanel
         snapshot={snapshot({
           readings: [reading({ routeValidation: "SYNTHETIC" })],
           routeValidation: "SYNTHETIC",
           readUnixMs: taken,
         })}
-        busy={false}
-        running={false}
-        onRead={() => undefined}
-        onStop={() => undefined}
-        disabledReason={null}
+        bench
       />,
     );
-    expect(screen.getByText("read 7 min ago")).toBeVisible();
+    expect(screen.getByText(/read 7 min ago/)).toBeVisible();
     expect(
       screen.getByText("Bench values: nothing here was measured on a car."),
     ).toBeVisible();
@@ -230,7 +220,7 @@ describe("battery", () => {
         disabledReason="Connect the adapter first."
       />,
     );
-    const button = screen.getByRole("button", { name: "Read the battery" });
+    const button = screen.getByLabelText("State of charge: not read");
     expect(button).toBeDisabled();
     expect(button).toHaveAttribute("title", "Connect the adapter first.");
   });
@@ -268,8 +258,8 @@ describe("battery", () => {
         disabledReason={null}
       />,
     );
-    expect(screen.getByRole("heading", { name: "Акумулятор" })).toBeVisible();
-    expect(screen.getByRole("button", { name: "Прочитати ще раз" })).toBeVisible();
+    expect(screen.getByText("Прочитати")).toBeVisible();
+    expect(screen.getByLabelText("Рівень заряду: 78%")).toBeVisible();
   });
 
   it("offers every row in the panel, including the ones that answered nothing", () => {

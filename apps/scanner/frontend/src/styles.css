@@ -2956,8 +2956,8 @@ table.live-read-identifiers label {
 
 .app-shell {
   /* The plate, and the way a cut through it is drawn. */
-  --titanium: #2b2f35;
-  --titanium-deep: #1e2126;
+  --titanium: #c3dbc8;
+  --titanium-deep: #bbd5c1;
   --cut-edge: rgb(0 0 0 / 55%);
   --chamfer-light: rgb(255 255 255 / 30%);
   --chamfer-dark: rgb(0 0 0 / 32%);
@@ -2989,13 +2989,13 @@ table.live-read-identifiers label {
 .app-shell .app-header h1,
 .app-shell .app-footer,
 .app-shell .app-build {
-  color: #e8eaec;
+  color: #16301f;
 }
 
 .app-shell .app-header .brand-tagline,
 .app-shell .app-footer,
 .app-shell .app-build {
-  color: rgb(232 234 236 / 62%);
+  color: rgb(22 48 31 / 62%);
 }
 
 /* A step's name is cut into the plate where the light falls on it: dark in
@@ -3031,17 +3031,10 @@ table.live-read-identifiers label {
      one — but not a sharp one either. */
   border-radius: 8px;
   background: var(--screen);
-  /* The plate lies over the screen, not the screen over the plate: nothing
-     is thrown outwards. What there is, is the plate's own thickness falling
-     on the screen inside the opening — deepest under the top edge, a touch
-     down each side, and almost nothing at the foot, where the light gets in. */
-  box-shadow:
-    /* the edge of the glass itself, seen under the chamfer */
-    inset 0 0 0 1px rgb(10 13 16 / 72%),
-    /* the plate's thickness falling on the screen */
-    inset 0 9px 11px -9px rgb(0 0 0 / 30%),
-    inset 6px 0 9px -9px rgb(0 0 0 / 18%),
-    inset -6px 0 9px -9px rgb(0 0 0 / 18%);
+  /* The sheet is thin, so the opening casts nothing into itself: a thick
+     plate throws its own edge across the glass, and this one has no depth
+     to throw. All that is left is the line where the cut meets the screen. */
+  box-shadow: inset 0 0 0 1px rgb(10 13 16 / 58%);
 }
 
 /* The cut edge itself, drawn over the screen's own border, because the
@@ -3066,21 +3059,19 @@ table.live-read-identifiers label {
   content: "";
   position: absolute;
   z-index: 2;
-  inset: -2px;
-  border-radius: 10px;
-  padding: 2px;
+  inset: -1px;
+  border-radius: 9px;
+  padding: 1px;
   /* The chamfer is metal under the same light as the rest of the plate: it is
      drawn in what the light does — shade on the face turned away from it,
      gloss on the face turned into it — and never in a fixed grey, so a window
      low on the sheet, where the light has fallen away, has a dark chamfer too. */
-  background: linear-gradient(
-    180deg,
-    rgb(0 0 0 / 58%) 0%,
-    rgb(0 0 0 / 30%) 24%,
-    rgb(255 255 255 / 5%) 52%,
-    rgb(255 255 255 / 42%) 78%,
-    rgb(255 255 255 / 72%) 100%
-  );
+  /* One edge all the way round. On a dark sheet the upper lip of the cut
+     stood in its own shadow and the lower one caught the light, and the two
+     read as thickness; on a light sheet that shadow is just a dark line
+     across the top of every screen. The cut now carries the lower lip's
+     light the whole way, top and bottom alike. */
+  background: rgb(255 255 255 / 48%);
   -webkit-mask:
     linear-gradient(#000 0 0) content-box,
     linear-gradient(#000 0 0);
@@ -3210,21 +3201,15 @@ table.live-read-identifiers label {
   bottom: 1.25rem;
   width: var(--touch-w);
   border-radius: 6px;
-  background:
-    linear-gradient(
-      180deg,
-      rgb(0 0 0 / 16%) 0%,
-      rgb(0 0 0 / 4%) 4%,
-      rgb(0 0 0 / 0%) 11%,
-      rgb(0 0 0 / 0%) 92%,
-      rgb(0 0 0 / 4%) 100%
-    ),
-    var(--screen);
+  /* The sheet is thin here too: the narrow screen takes no shading from an
+     edge that has no depth, and its cut is the same hairline as the wide
+     ones — a shaded upper lip, a lit lower one, and nothing between. */
+  background: var(--screen);
   box-shadow:
-    inset 0 0 0 1px rgb(10 13 16 / 68%),
+    inset 0 0 0 1px rgb(10 13 16 / 58%),
     0 0 0 1px var(--cut-edge),
-    0 -1px 0 1px rgb(0 0 0 / 45%),
-    0 1px 0 1px rgb(255 255 255 / 34%);
+    0 -1px 0 1px rgb(0 0 0 / 40%),
+    0 1px 0 1px rgb(255 255 255 / 26%);
   pointer-events: none;
 }
 
@@ -3326,14 +3311,14 @@ table.live-read-identifiers label {
 /* ===================================================================== */
 
 .app-shell {
-  --titanium: #2b2f35;
-  --titanium-deep: #1e2126;
+  --titanium: #c3dbc8;
+  --titanium-deep: #bbd5c1;
   --touch-face: var(--screen);
-  --glass: rgb(255 255 255 / 6%);
-  --glass-hover: rgb(255 255 255 / 11%);
-  --hairline: rgb(255 255 255 / 15%);
-  --hairline-strong: rgb(255 255 255 / 28%);
-  --plate-text: #e8ebee;
+  --glass: rgb(22 48 31 / 5%);
+  --glass-hover: rgb(22 48 31 / 9%);
+  --hairline: rgb(22 48 31 / 22%);
+  --hairline-strong: rgb(22 48 31 / 40%);
+  --plate-text: #16301f;
 }
 
 /* The ground of the sample: no grain at all, only light — broad and out of
@@ -3355,20 +3340,20 @@ table.live-read-identifiers label {
     ),
     radial-gradient(
       70% 90% at 78% 12%,
-      rgb(226 234 244 / 16%) 0%,
-      rgb(226 234 244 / 0%) 66%
+      rgb(232 240 235 / 16%) 0%,
+      rgb(232 240 235 / 0%) 66%
     ),
     radial-gradient(
       90% 80% at 12% 38%,
-      rgb(206 218 232 / 9%) 0%,
-      rgb(206 218 232 / 0%) 62%
+      rgb(214 226 218 / 9%) 0%,
+      rgb(214 226 218 / 0%) 62%
     ),
     radial-gradient(
       120% 110% at 46% 118%,
-      rgb(0 0 0 / 40%) 0%,
-      rgb(0 0 0 / 0%) 58%
+      rgb(22 48 31 / 14%) 0%,
+      rgb(22 48 31 / 0%) 58%
     ),
-    linear-gradient(168deg, #3a4048 0%, #2f343b 34%, #262a31 62%, #1a1d22 100%);
+    linear-gradient(168deg, #cbe1d0 0%, #c3dbc8 34%, #bbd5c1 62%, #b1ccb8 100%);
   background-repeat: no-repeat;
   background-attachment: fixed;
 }
@@ -3385,7 +3370,7 @@ table.live-read-identifiers label {
 .app-shell .app-footer,
 .app-shell .app-build,
 .app-shell .flow-section-steps {
-  color: rgb(232 235 238 / 55%);
+  color: rgb(22 48 31 / 58%);
   text-shadow: 0 1px 1px rgb(0 0 0 / 35%);
 }
 
@@ -3537,7 +3522,7 @@ table.live-read-identifiers label {
 /* ===================================================================== */
 
 .app-shell {
-  --milk: 232 240 250;
+  --milk: 24 46 34;
   --milled-face: linear-gradient(
     0deg,
     rgb(var(--milk) / 96%) 0%,
@@ -3562,8 +3547,8 @@ table.live-read-identifiers label {
   color: transparent;
   text-shadow: none;
   filter:
-    drop-shadow(0 -1px 0 rgb(0 0 0 / 55%))
-    drop-shadow(0 1px 3px rgb(var(--milk) / 22%));
+    drop-shadow(0 1px 0 rgb(255 255 255 / 78%))
+    drop-shadow(0 -1px 2px rgb(var(--milk) / 14%));
 }
 
 /* Narrower and lighter: a cut line is thinner than a brush stroke, and the
@@ -3615,7 +3600,7 @@ table.live-read-identifiers label {
 .app-shell .app-header select,
 .app-shell .app-header .status-badge,
 .app-shell .flow-section-heading .status-badge {
-  color: rgb(var(--milk) / 84%);
+  color: rgb(var(--milk) / 76%);
   font-weight: 450;
   letter-spacing: 0.012em;
 }
@@ -3864,7 +3849,7 @@ table.live-read-identifiers label {
 /* ===================================================================== */
 
 .app-shell .app-header h1[data-lamp] {
-  --lamp: 255 59 48;
+  --lamp: 197 27 22;
   background: linear-gradient(
     0deg,
     rgb(var(--lamp) / 100%) 0%,
@@ -3907,37 +3892,37 @@ table.live-read-identifiers label {
 @keyframes lamp-heartbeat {
   /* 0.00 s — the standby glow the cycle starts and ends on */
   0% {
-    opacity: 0.34;
-    filter: drop-shadow(0 -1px 0 rgb(0 0 0 / 55%)) drop-shadow(0 0 3px rgb(var(--lamp) / 10%));
+    opacity: 0.5;
+    filter: drop-shadow(0 1px 0 rgb(255 255 255 / 70%)) drop-shadow(0 0 3px rgb(var(--lamp) / 8%));
     animation-timing-function: cubic-bezier(0.25, 0.9, 0.3, 1);
   }
   /* 0.15 s — the first systolic surge, at full brightness */
   18.07% {
     opacity: 1;
-    filter: drop-shadow(0 -1px 0 rgb(0 0 0 / 55%)) drop-shadow(0 0 14px rgb(var(--lamp) / 68%));
+    filter: drop-shadow(0 1px 0 rgb(255 255 255 / 70%)) drop-shadow(0 0 10px rgb(var(--lamp) / 30%));
     animation-timing-function: cubic-bezier(0.4, 0, 0.5, 1);
   }
   /* 0.30 s — the short fall between the two beats, about half of it */
   36.14% {
-    opacity: 0.52;
-    filter: drop-shadow(0 -1px 0 rgb(0 0 0 / 55%)) drop-shadow(0 0 6px rgb(var(--lamp) / 26%));
+    opacity: 0.68;
+    filter: drop-shadow(0 1px 0 rgb(255 255 255 / 70%)) drop-shadow(0 0 5px rgb(var(--lamp) / 14%));
     animation-timing-function: cubic-bezier(0.3, 0.85, 0.35, 1);
   }
   /* 0.45 s — the second beat, a shade under the first */
   54.22% {
-    opacity: 0.86;
-    filter: drop-shadow(0 -1px 0 rgb(0 0 0 / 55%)) drop-shadow(0 0 11px rgb(var(--lamp) / 54%));
+    opacity: 0.92;
+    filter: drop-shadow(0 1px 0 rgb(255 255 255 / 70%)) drop-shadow(0 0 8px rgb(var(--lamp) / 24%));
     animation-timing-function: cubic-bezier(0.35, 0, 0.5, 1);
   }
   /* 0.65 s — down to the standby glow */
   78.31% {
-    opacity: 0.34;
-    filter: drop-shadow(0 -1px 0 rgb(0 0 0 / 55%)) drop-shadow(0 0 3px rgb(var(--lamp) / 10%));
+    opacity: 0.5;
+    filter: drop-shadow(0 1px 0 rgb(255 255 255 / 70%)) drop-shadow(0 0 3px rgb(var(--lamp) / 8%));
   }
   /* 0.83 s — and held there, which is the rest between beats */
   100% {
-    opacity: 0.34;
-    filter: drop-shadow(0 -1px 0 rgb(0 0 0 / 55%)) drop-shadow(0 0 3px rgb(var(--lamp) / 10%));
+    opacity: 0.5;
+    filter: drop-shadow(0 1px 0 rgb(255 255 255 / 70%)) drop-shadow(0 0 3px rgb(var(--lamp) / 8%));
   }
 }
 
@@ -4054,44 +4039,73 @@ table.live-read-identifiers label {
   background: rgb(24 34 49 / 2%);
 }
 
-/* ===================================================================== */
-/* Each screen is its own matrix, 2026-09-13. Until now a panel was a white */
-/* face lying in a cut; now it is a display module — glass held in a frame,  */
-/* and the frame is what the eye reads as a separate part. Black, glossy,    */
-/* and thin: a frame any wider is a monitor from 2003. Along the foot it is  */
-/* taller, the way every real panel is, because the driver board lives       */
-/* behind that strip. The gloss is not painted on — it is the plate's own    */
-/* light, so the top of the frame takes it straight, the middle goes almost  */
-/* black, and the chin turns a little of it back from below.                 */
-/* Nothing is thrown outwards: the sheet still lies over the screen.         */
-/* ===================================================================== */
-
-.app-shell {
-  --bezel: 5px;
-  /* One moulding for every screen on the sheet, wide or narrow. */
-  --bezel-face: linear-gradient(
-      to top,
-      /* the foot of the chin, where the light coming off the plate is
-         caught and held — this is the part that says glass in plastic */
-      #4e5460 0,
-      #24282f 2px,
-      #14171d 15px,
-      /* the graphite the moulding really is, everywhere the light is not:
-         dark, but never as dark as the seam outside it, or the module
-         would melt into the opening it sits in */
-      #0f1117 55%,
-      /* and the lit top edge of it: one pixel of gloss, no more, or the
-         top of the frame turns into a grey band and reads as the sheet */
-      #0f1117 calc(100% - 2.5px),
-      #262a33 calc(100% - 1px),
-      #9aa0ab 100%
-    );
-  /* 18px and another millimetre and a half. CSS counts a millimetre as
-     96/25.4 px, so that is 5.67 — taken to the whole pixel, because on a
-     fraction the cut edge lands half a device pixel out and a hair of the
-     plate shows between the chin and the chamfer. */
-  --bezel-chin: 24px;
+/* While the look is being worked on: the two marks that say the browser
+   preview is not a car are hidden, so the sheet can be judged whole. They
+   are hidden, not removed — the moment this block goes, both are back, and
+   neither has ever been shown by the application itself. This block must
+   not be in a release build. */
+.app-shell .demo-banner,
+.app-shell .demo-badge {
+  display: none;
 }
+
+
+/* A screen sliding past the end of its column was being sliced square, the
+   way the session's own window was before it got its three layers. The
+   column is a cut in the sheet too, and it is cut like one.
+   `overflow` cannot do it: the clip it applies runs to the border box, which
+   is past the bar and so past the panels, and a corner rounded there falls
+   outside the screens entirely. So the shape is a mask instead, laid exactly
+   on the panels — a rounded rectangle ending where they end, with the bar's
+   own strip left solid beside it so the mark is not masked away with the
+   corner. The gap between the panels and the bar moves inside the bar: it is
+   as wide as the gap and the slot together, and a transparent left border
+   pushes the mark out to the slot. */
+.app-shell .flow-body {
+  --column-bar: calc(var(--touch-gap) + var(--touch-w));
+  --column-r: 9px;
+  padding-right: 0;
+  -webkit-mask:
+    radial-gradient(circle closest-side, #000 99%, #0000) left 0 top 0 / 18px 18px no-repeat,
+    radial-gradient(circle closest-side, #000 99%, #0000) right var(--column-bar) top 0 / 18px 18px
+      no-repeat,
+    radial-gradient(circle closest-side, #000 99%, #0000) left 0 bottom 0 / 18px 18px no-repeat,
+    radial-gradient(circle closest-side, #000 99%, #0000) right var(--column-bar) bottom 0 / 18px
+      18px no-repeat,
+    linear-gradient(#000 0 0) left var(--column-r) top 0 /
+      calc(100% - var(--column-bar) - 18px) 100% no-repeat,
+    linear-gradient(#000 0 0) left 0 top var(--column-r) / calc(100% - var(--column-bar))
+      calc(100% - 18px) no-repeat,
+    linear-gradient(#000 0 0) right 0 top 0 / var(--column-bar) 100% no-repeat;
+  mask:
+    radial-gradient(circle closest-side, #000 99%, #0000) left 0 top 0 / 18px 18px no-repeat,
+    radial-gradient(circle closest-side, #000 99%, #0000) right var(--column-bar) top 0 / 18px 18px
+      no-repeat,
+    radial-gradient(circle closest-side, #000 99%, #0000) left 0 bottom 0 / 18px 18px no-repeat,
+    radial-gradient(circle closest-side, #000 99%, #0000) right var(--column-bar) bottom 0 / 18px
+      18px no-repeat,
+    linear-gradient(#000 0 0) left var(--column-r) top 0 /
+      calc(100% - var(--column-bar) - 18px) 100% no-repeat,
+    linear-gradient(#000 0 0) left 0 top var(--column-r) / calc(100% - var(--column-bar))
+      calc(100% - 18px) no-repeat,
+    linear-gradient(#000 0 0) right 0 top 0 / var(--column-bar) 100% no-repeat;
+}
+
+.app-shell .flow-body::-webkit-scrollbar {
+  width: calc(var(--touch-gap) + var(--touch-w));
+}
+
+.app-shell .flow-body::-webkit-scrollbar-thumb {
+  border-left-width: calc(var(--touch-gap) + 2px);
+}
+
+/* ===================================================================== */
+/* No edging at all, 2026-09-13. The cut kept a line of its own round every  */
+/* screen — the chamfer outside it and a hairline where the glass met the    */
+/* metal. On a light sheet a white screen needs neither: the screen is the   */
+/* lighter thing and its own shape says where it ends. Every one of them     */
+/* goes, on the wide screens, on the session's and on the two touch bars.    */
+/* ===================================================================== */
 
 .app-shell .session-panel,
 .app-shell .adapter-panel,
@@ -4107,25 +4121,9 @@ table.live-read-identifiers label {
 .app-shell .ccf-panel,
 .app-shell .live-read-panel,
 .app-shell .standard-obd-panel {
-  border: var(--bezel) solid transparent;
-  border-bottom-width: var(--bezel-chin);
-  border-radius: 11px;
-  background:
-    linear-gradient(var(--screen), var(--screen)) padding-box,
-    var(--bezel-face) border-box;
-  box-shadow:
-    /* the glass lies a hair below the frame, and the frame's edge shows */
-    inset 0 0 0 1px rgb(0 0 0 / 88%),
-    /* and casts the thinnest shadow of itself on to the glass */
-    inset 0 7px 8px -8px rgb(0 0 0 / 26%),
-    inset 5px 0 8px -9px rgb(0 0 0 / 16%),
-    inset -5px 0 8px -9px rgb(0 0 0 / 16%);
+  box-shadow: none;
 }
 
-/* The frame is bound to the cut: its outer edge is the edge of the opening,
-   from the inside. The chamfer closes straight on to it, with nothing
-   between — so the module fills the hole in the sheet rather than floating
-   in it. */
 .app-shell .session-panel::after,
 .app-shell .adapter-panel::after,
 .app-shell .library-panel::after,
@@ -4140,58 +4138,174 @@ table.live-read-identifiers label {
 .app-shell .ccf-panel::after,
 .app-shell .live-read-panel::after,
 .app-shell .standard-obd-panel::after {
-  /* An absolutely positioned ring is laid out against its parent's PADDING
-     box, so the moment the screen grew a frame the cut edge came away with
-     it — sitting a frame's thickness inside the opening, and at the foot,
-     where the frame is tallest, showing as a light line across the chin.
-     The offsets step back out over the frame, each side by its own
-     thickness, and the ring lands on the edge of the cut again. */
-  top: calc(-1 * (var(--bezel) + 2px));
-  right: calc(-1 * (var(--bezel) + 2px));
-  bottom: calc(-1 * (var(--bezel-chin) + 2px));
-  left: calc(-1 * (var(--bezel) + 2px));
-  border-radius: 13px;
+  display: none;
 }
-
-/* A printed report is paper, not a display. */
-@media print {
-  .app-shell .report-panel {
-    border: 0;
-    box-shadow: none;
-    background: #fff;
-  }
-}
-
-/* The two narrow screens get the same moulding, 2026-09-13 — but a touch bar
-   is nine pixels wide, so all it can carry is a pixel of frame on each edge.
-   The chin is the exception: it is the full 24, the same as every other
-   screen on the sheet, so the feet of all of them stand on one line. The
-   scroll track is pulled up clear of it, because a lit mark running down on
-   to the moulding is a mark off its own screen. */
 
 .app-shell main.flow::before,
 .app-shell main.flow::after {
-  border: 1px solid transparent;
-  border-bottom-width: var(--bezel-chin);
-  /* the slot keeps the corner it had: a pixel of frame inside it leaves the
-     white face reading the same as before */
-  border-radius: 6px;
-  background:
-    linear-gradient(
-        180deg,
-        rgb(0 0 0 / 16%) 0%,
-        rgb(0 0 0 / 4%) 4%,
-        rgb(0 0 0 / 0%) 11%,
-        rgb(0 0 0 / 0%) 92%,
-        rgb(0 0 0 / 4%) 100%
-      )
-      padding-box,
-    linear-gradient(var(--touch-face), var(--touch-face)) padding-box,
-    var(--bezel-face) border-box;
+  box-shadow: none;
 }
 
-.app-shell .flow-body::-webkit-scrollbar-track,
-.app-shell .rail-scroll::-webkit-scrollbar-track {
-  margin-bottom: calc(var(--bezel-chin) + 4px);
-  background: transparent;
+/* The outline round a control on the sheet, 2026-09-13. A dark line drawn on
+   a light sheet reads as ink; the thinnest white one reads as an edge
+   catching the light, which is what it is. So the capsules keep their shape
+   and lose the ink: one hairline of white, and nothing pressed into them. */
+.app-shell .app-header button,
+.app-shell .app-header select,
+.app-shell .app-header .status-badge,
+.app-shell .flow-section-heading .status-badge {
+  border-color: rgb(255 255 255 / 90%);
+  box-shadow: none;
+}
+
+.app-shell .app-header button:hover:not(:disabled),
+.app-shell .app-header select:hover {
+  border-color: #fff;
+  box-shadow: none;
+}
+
+.app-shell .app-header .button--primary {
+  border-color: #fff;
+  box-shadow: none;
+}
+
+/* The language switch is one of those capsules too, and so is the glass disc
+   riding in it: one white hairline each, nothing pressed in. */
+.app-shell .language-switch {
+  border-color: rgb(255 255 255 / 90%);
+  box-shadow: none;
+}
+
+.app-shell .language-switch__puck {
+  background: rgb(255 255 255 / 34%);
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 90%);
+}
+
+/* ===================================================================== */
+/* The battery as one key, 2026-09-13. It used to be a card down in the     */
+/* session column with a gauge, a button and three tiles. Now it is the     */
+/* cell itself, up on the plate beside the other keys: press it to read,    */
+/* it fills to the state of charge as the answer comes, and the voltage     */
+/* stands to its left once there is one. The word stays where it is, over   */
+/* the fill — the key has to say what it does whether it is full or empty.  */
+/* ===================================================================== */
+
+.app-shell .battery-key {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-right: 6px;
+}
+
+.app-shell .battery-key__volts {
+  font-size: 0.82rem;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.01em;
+  color: var(--plate-text);
+  white-space: nowrap;
+}
+
+/* The cell. Its corner is the corner of a cell, not of a capsule. */
+.app-shell .battery-key__cell {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  height: var(--control-h);
+  min-width: 7.4rem;
+  padding: 0 0.85rem;
+  border: 1px solid rgb(255 255 255 / 90%);
+  border-radius: 6px;
+  background: rgb(255 255 255 / 18%);
+  color: var(--plate-text);
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  cursor: pointer;
+}
+
+.app-shell .battery-key__cell:hover:not(:disabled) {
+  background: rgb(255 255 255 / 30%);
+}
+
+.app-shell .battery-key__cell:disabled {
+  cursor: not-allowed;
+  color: rgb(var(--milk) / 52%);
+  border-color: rgb(255 255 255 / 62%);
+}
+
+/* The terminal, sitting outside the cell the way a terminal does. */
+.app-shell .battery-key::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  right: -6px;
+  width: 5px;
+  height: 38%;
+  transform: translateY(-50%);
+  border-radius: 0 3px 3px 0;
+  background: rgb(255 255 255 / 90%);
+}
+
+/* How full it is. It says how much, never whether that is good. */
+.app-shell .battery-key__fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background: rgb(255 255 255 / 52%);
+  transition: width 320ms ease;
+}
+
+.app-shell .battery-key__word {
+  position: relative;
+  z-index: 1;
+}
+
+/* The emblem belongs to the foot of the window, 2026-09-13: it is what the
+   session column stands on, not something that follows the last step. The
+   layer that moves is a column, and the vehicle block takes whatever space
+   is left above it — so on a short list it sits at the bottom of the screen
+   and on a long one it simply follows the steps and scrolls with them. */
+.app-shell .rail-scroll {
+  display: flex;
+  flex-direction: column;
+}
+
+.app-shell .rail-vehicle {
+  margin-top: auto;
+}
+
+/* What makes it read as a cell, 2026-09-13: the corner of a box rather than
+   of a capsule, and the two poles marked. A terminal on the right is not
+   enough on its own — a rounded rectangle with a nub is a battery only to
+   someone already expecting one. */
+.app-shell .battery-key__cell {
+  min-width: 8.4rem;
+  border-radius: 3px;
+  padding: 0 1.5rem;
+}
+
+.app-shell .battery-key::after {
+  height: 44%;
+  border-radius: 0 2px 2px 0;
+}
+
+.app-shell .battery-key__pole {
+  position: absolute;
+  z-index: 1;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 0.9rem;
+  line-height: 1;
+  opacity: 0.72;
+}
+
+.app-shell .battery-key__pole--minus {
+  left: 0.55rem;
+}
+
+.app-shell .battery-key__pole--plus {
+  right: 0.5rem;
 }

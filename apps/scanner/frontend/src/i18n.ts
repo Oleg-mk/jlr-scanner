@@ -527,7 +527,7 @@ const uk: Record<string, string> = {
   // The battery (ADR-0030)
   "Battery": "Акумулятор",
   "What the battery monitor holds": "Що тримає монітор акумулятора",
-  "Every battery parameter the loaded data names for this car, module by module: how full it is, what it is doing now, what it leaks while parked, how it has aged, and what the car remembers about it. The card in the session column carries the level and the button that reads it. Read-only; nothing is written anywhere.": "Кожен параметр акумулятора, який завантажені дані називають для цього авто, модуль за модулем: наскільки він заряджений, що робить зараз, скільки втрачає на стоянці, як постарів і що пам'ятає про нього авто. Картка в колонці сеансу тримає рівень і кнопку читання. Лише читання; нікуди нічого не записується.",
+  "Every battery parameter the loaded data names for this car, module by module: how full it is, what it is doing now, what it leaks while parked, how it has aged, and what the car remembers about it. The cell on the plate carries the level and starts the read. Read-only; nothing is written anywhere.": "Кожен параметр акумулятора, який завантажені дані називають для цього авто, модуль за модулем: наскільки він заряджений, що робить зараз, скільки втрачає на стоянці, як постарів і що пам'ятає про нього авто. Комірка на листі тримає рівень і запускає зчитування. Лише читання; нікуди нічого не записується.",
   "{asked} of {planned} reads, {answered} answered": "{asked} з {planned} читань, відповіли {answered}",
   "Show the {count} rows that answered nothing": "Показати {count} рядків, які нічого не відповіли",
   "Read the battery": "Прочитати акумулятор",
@@ -1619,7 +1619,7 @@ const ru: Record<string, string> = {
   // The battery (ADR-0030)
   "Battery": "Аккумулятор",
   "What the battery monitor holds": "Что хранит монитор аккумулятора",
-  "Every battery parameter the loaded data names for this car, module by module: how full it is, what it is doing now, what it leaks while parked, how it has aged, and what the car remembers about it. The card in the session column carries the level and the button that reads it. Read-only; nothing is written anywhere.": "Каждый параметр аккумулятора, который загруженные данные называют для этого автомобиля, модуль за модулем: насколько он заряжен, что делает сейчас, сколько теряет на стоянке, как постарел и что помнит о нём автомобиль. Карточка в колонке сеанса хранит уровень и кнопку чтения. Только чтение; никуда ничего не записывается.",
+  "Every battery parameter the loaded data names for this car, module by module: how full it is, what it is doing now, what it leaks while parked, how it has aged, and what the car remembers about it. The cell on the plate carries the level and starts the read. Read-only; nothing is written anywhere.": "Каждый параметр аккумулятора, который загруженные данные называют для этого автомобиля, модуль за модулем: насколько он заряжен, что делает сейчас, сколько теряет на стоянке, как постарел и что помнит о нём автомобиль. Ячейка на листе хранит уровень и запускает считывание. Только чтение; никуда ничего не записывается.",
   "{asked} of {planned} reads, {answered} answered": "{asked} из {planned} чтений, ответили {answered}",
   "Show the {count} rows that answered nothing": "Показать {count} строк, которые ничего не ответили",
   "Read the battery": "Прочитать аккумулятор",

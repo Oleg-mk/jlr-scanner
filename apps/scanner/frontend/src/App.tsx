@@ -364,6 +364,14 @@ export function App({
           {demoPreview ? <span className="demo-badge">{t("Simulator UI preview")}</span> : null}
         </div>
         <div className="header-status">
+          <BatteryCard
+            snapshot={battery.snapshot}
+            busy={battery.busy}
+            running={battery.running}
+            onRead={() => void battery.start()}
+            onStop={() => void battery.stop()}
+            disabledReason={batteryDisabledReason}
+          />
           {adapterPill}
           {libraryPill}
           <button
@@ -415,16 +423,6 @@ export function App({
           steps={steps}
           onJump={(stepId) => jumpTo(sectionOf(stepId).id)}
           vehicle={railVehicle}
-          battery={
-            <BatteryCard
-              snapshot={battery.snapshot}
-              busy={battery.busy}
-              running={battery.running}
-              onRead={() => void battery.start()}
-              onStop={() => void battery.stop()}
-              disabledReason={batteryDisabledReason}
-            />
-          }
         />
         <div className="flow-body">
           {sections.map((section) => {

@@ -77,7 +77,7 @@ export function BatteryPanel({
       </div>
       <p className="operation-copy">
         {t(
-          "Every battery parameter the loaded data names for this car, module by module: how full it is, what it is doing now, what it leaks while parked, how it has aged, and what the car remembers about it. The card in the session column carries the level and the button that reads it. Read-only; nothing is written anywhere.",
+          "Every battery parameter the loaded data names for this car, module by module: how full it is, what it is doing now, what it leaks while parked, how it has aged, and what the car remembers about it. The cell on the plate carries the level and starts the read. Read-only; nothing is written anywhere.",
         )}
       </p>
 
