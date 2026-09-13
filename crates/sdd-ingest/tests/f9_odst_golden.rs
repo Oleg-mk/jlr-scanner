@@ -213,6 +213,23 @@ fn a_test_carries_its_timings_and_the_words_sdd_writes_for_whoever_runs_it() {
         value,
         "The synthetic module runs its own check and logs what it finds.\nMake sure the ignition is switched on."
     );
+    // The same screen as its items, by name, so another language's pack
+    // can be joined to it line for line (ADR-0034).
+    let items = store
+        .get_record("f9-odst.odst.SYNTHMOD.screenitems.DR_ODST_14_SYNTHMOD_HLP_000")
+        .expect("the screen's items are named");
+    assert_eq!(
+        items.key,
+        ClaimKey::Custom {
+            name: "sdd_odst_screen_items.DR_ODST_14_SYNTHMOD_HLP_000".into()
+        }
+    );
+    assert_eq!(
+        items.value,
+        KnowledgeValue::Text {
+            value: "J_I_SYNTH_ODST_DESC\u{1F}The synthetic module runs its own check and logs what it finds.\nJ_A_ENS_IGN_ON\u{1F}Make sure the ignition is switched on.".into()
+        }
+    );
     // A screen no test points at is not recorded at all.
     assert!(store
         .get_record("f9-odst.odst.SYNTHMOD.screen.DR_ODST_UNUSED_HLP_000")
@@ -242,8 +259,9 @@ fn classification_follows_the_source_type_and_ingestion_is_idempotent() {
     let second = store.ingest(&adapter, FIXTURE).unwrap();
     assert_eq!(first, second);
     // Four qualified capabilities, four descriptions beside them, the
-    // screen a car is given and the screen's own text (ADR-0032).
-    assert_eq!(first.record_ids.len(), 10);
+    // screen a car is given, the screen's own text (ADR-0032) and the same
+    // screen as its named items (ADR-0034).
+    assert_eq!(first.record_ids.len(), 11);
     assert_eq!(
         store
             .get_record("f9-odst.odst.SYNTHMOD.14.0")

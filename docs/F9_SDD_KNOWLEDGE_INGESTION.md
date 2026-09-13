@@ -228,11 +228,14 @@ what that screen says. A blank item and an item whose mnemonic has no text
 are left out; a screen no test points at is not recorded at all. The slice
 grew from 1,153 records to 4,085 over the same 93 documents: 1,153 test
 descriptions, 1,257 screen bindings, 522 screen records over 462 distinct
-screens, 238,504 characters. The texts enter in SDD's English. The
-payload first extracted held English and Chinese; the installer also carries
-the ODST pack in Russian, not yet opened, and since `ADR-0034` this project
-writes no wording of its own for SDD's text — a Russian description waits on
-that pack, and there is no Ukrainian one. Nothing became executable: every record still
+screens, 238,504 characters. The texts enter in SDD's English and,
+since 2026-09-13, in SDD's Russian: the installer's `COMMON_SDD_DATA_ODST_LANG_RU`
+is the same 93 documents with the words changed, and the adapter told the
+language writes `sdd_odst_screen.<name>.rus` and `sdd_odst_screen_items.<name>.rus`
+beside the English (`ADR-0034`); the items claim — the mnemonic's name, U+001F,
+its text, one per line — is written for English too from that day, so a line
+is joined to its twin by name. This project writes no wording of its own for
+SDD's text, and there is no Ukrainian pack. Nothing became executable: every record still
 carries `ServiceRoutine`.
 
 Each test becomes a `DiagnosticCapability` named from its help-screen data name,

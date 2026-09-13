@@ -72,6 +72,7 @@ pub const CATALOGUE_NO_ASSEMBLY: &str = "NO_ASSEMBLY";
 const ODST_TEST_CLAIM: &str = "sdd_odst_test";
 const ODST_HELP_CLAIM_PREFIX: &str = "sdd_odst_help.";
 const ODST_SCREEN_CLAIM_PREFIX: &str = "sdd_odst_screen.";
+const ODST_SCREEN_ITEMS_CLAIM_PREFIX: &str = "sdd_odst_screen_items.";
 
 /// Manifests that ship with the application: the documented adapter route
 /// bindings (ADR-0013), the X250 CCP connector route, the relayed-route
@@ -1453,10 +1454,23 @@ fn self_tests_for(
         .filter(|entry| entry.applicability_resolution != ApplicabilityResolution::NotApplicable)
         .collect();
 
-    // The screens this car is given, by test entity, and what each
-    // screen says, by name.
+    // The screens this car is given, by test entity; what each screen says,
+    // by name, in English; and the same screens' items in each other
+    // language the library carries, joined to the English by the
+    // mnemonic's name (`ADR-0034`).
     let mut given: BTreeMap<String, Vec<String>> = BTreeMap::new();
     let mut screens: BTreeMap<String, String> = BTreeMap::new();
+    let mut items: BTreeMap<String, ScreenItems> = BTreeMap::new();
+    let mut items_in: ScreenItemsByLanguage = BTreeMap::new();
+    let parse_items = |value: &str| -> ScreenItems {
+        value
+            .lines()
+            .filter_map(|line| {
+                let (name, text) = line.split_once('\u{1F}')?;
+                Some((name.to_string(), text.to_string()))
+            })
+            .collect()
+    };
     for entry in &applicable {
         let ClaimKey::Custom { name } = &entry.record.key else {
             continue;
@@ -1469,8 +1483,24 @@ fn self_tests_for(
                 .entry(entry.record.entity.id.clone())
                 .or_default()
                 .push(screen.to_string());
-        } else if let Some(screen) = name.strip_prefix(ODST_SCREEN_CLAIM_PREFIX) {
-            screens.insert(screen.to_string(), value.clone());
+        } else if let Some(remainder) = name.strip_prefix(ODST_SCREEN_ITEMS_CLAIM_PREFIX) {
+            match screen_and_language(remainder) {
+                (screen, None) => {
+                    items.insert(screen.to_string(), parse_items(value));
+                }
+                (screen, Some(language)) => {
+                    items_in
+                        .entry(screen.to_string())
+                        .or_default()
+                        .insert(language.to_string(), parse_items(value));
+                }
+            }
+        } else if let Some(remainder) = name.strip_prefix(ODST_SCREEN_CLAIM_PREFIX) {
+            // The other languages are read from their items, which carry
+            // the names the lines are joined by; the text claim is English's.
+            if let (screen, None) = screen_and_language(remainder) {
+                screens.insert(screen.to_string(), value.clone());
+            }
         }
     }
 
@@ -1492,17 +1522,42 @@ fn self_tests_for(
             continue;
         };
         let fields = parse_fields(value);
-        let lines: Vec<String> = given
+        let screen = given
             .get(&entry.record.entity.id)
-            .and_then(|names| names.first())
-            .and_then(|screen| screens.get(screen))
-            .map(|text| text.lines().map(str::to_string).collect())
-            .unwrap_or_default();
-        // The words a person reads are SDD's own (`ADR-0034`): its English,
-        // and nothing else until the ODST pack in another language is opened
-        // and ingested the way the fault-code help's was.
-        let description = lines;
-        let description_texts = BTreeMap::new();
+            .and_then(|names| names.first());
+        // The words a person reads are SDD's own (`ADR-0034`): its English
+        // from the screen, and the same screen in each other language the
+        // library carries, line for line by name — a name the other pack
+        // lacks keeps its English, so the lists stay the screen's length.
+        let mut description_texts: BTreeMap<String, Vec<String>> = BTreeMap::new();
+        let description: Vec<String> = match screen.and_then(|screen| items.get(screen)) {
+            Some(english) => {
+                if let Some(in_languages) = screen.and_then(|screen| items_in.get(screen)) {
+                    for (language, theirs) in in_languages {
+                        let by_name: BTreeMap<&str, &str> = theirs
+                            .iter()
+                            .map(|(name, text)| (name.as_str(), text.as_str()))
+                            .collect();
+                        let lines = english
+                            .iter()
+                            .map(|(name, line)| {
+                                by_name
+                                    .get(name.as_str())
+                                    .map(|text| text.to_string())
+                                    .unwrap_or_else(|| line.clone())
+                            })
+                            .collect();
+                        description_texts.insert(language.clone(), lines);
+                    }
+                }
+                english.iter().map(|(_, line)| line.clone()).collect()
+            }
+            // A library issued before the items were written: the text alone.
+            None => screen
+                .and_then(|screen| screens.get(screen))
+                .map(|text| text.lines().map(str::to_string).collect())
+                .unwrap_or_default(),
+        };
         let summary = SelfTestSummary {
             test_id: fields.get("test").cloned().unwrap_or_default(),
             name: fields.get("name").cloned().unwrap_or_default(),

@@ -63,10 +63,12 @@ who knew which part they were naming.
 
 4. **`help_texts.tsv` and the module that read it leave the product.** The
    27,493 rows stay in the repository's history and nowhere else. The
-   ODST descriptions, which used the same table, become SDD's English until
-   the ODST Russian pack (`COMMON_SDD_DATA_ODST_LANG_RU`) is opened the same
-   way — one operation on the owner's side, the same tooling that opened the
-   help.
+   ODST descriptions, which used the same table, follow the same rule: the
+   owner opened the ODST Russian pack (`COMMON_SDD_DATA_ODST_LANG_RU`, the
+   same 93 documents) the same day, and its adapter, told the language,
+   writes `sdd_odst_screen.<NAME>.rus` and `sdd_odst_screen_items.<NAME>.rus`
+   beside the English — the items claim written for English too from this
+   day, so the lines can be joined by name.
 
 5. **The library still decides what a car is shown**, exactly as before:
    which screen a code gets on this model and year, and which lines that
@@ -83,14 +85,15 @@ who knew which part they were naming.
 
 ## Consequences
 
-- `crates/sdd-ingest`: `DtcHelpAdapter::with_language`, the language suffix
-  on the screen claims, a check on the document's own language; the exporter
-  recognises a `_LANG_RU` root and takes only its `rdsDtcHelp*` files, under
-  a source id that names the language.
+- `crates/sdd-ingest`: `DtcHelpAdapter::with_language` and
+  `OdstInfoAdapter::with_language`, the language suffix on the screen claims,
+  a check on the document's own language; the exporter recognises a
+  `_LANG_RU` root and takes only its `rdsDtcHelp*` and `rds-odst-info` files,
+  under a source id that names the language.
 - `crates/diagnostic-session`: `help_text.rs` and `data/help_texts.tsv`
-  removed; `help_texts` on a described code is keyed by SDD's language code
-  and filled from the library; the same field on a self test is empty until
-  the ODST pack is ingested.
+  removed; `help_texts` on a described code and `description_texts` on a
+  self test are keyed by SDD's language code and filled from the library,
+  joined to the English by the mnemonic's name.
 - Frontend: a language switch on the help and self-test panels, English or
   Russian, stored under its own key; `helpLines` takes that choice instead of
   the interface language.
@@ -98,5 +101,5 @@ who knew which part they were naming.
 - `ADR-0026` is superseded. The disagreement it records — whether reworded
   text detaches from its source — is moot: the product now shows the source.
 - Not decided here: SDD's Russian for the code *descriptions*
-  (`dtcDescriptions.xml` in the same Russian pack) and for the ODST pack.
-  Both exist and neither is ingested by this decision.
+  (`dtcDescriptions.xml` in the same Russian pack). It exists and is not
+  ingested by this decision.

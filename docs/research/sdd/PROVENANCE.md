@@ -53,6 +53,9 @@ The knowledge this project derives from SDD traces to one artifact:
   file checked against the cabinet's MD5, the installer's SHA-256 confirmed);
   read for the text of each help screen only (`ADR-0034`).
 - `COMMON_SDD_DATA_ODST_LANG_EN`: 93 per-module test definitions.
+- `COMMON_SDD_DATA_ODST_LANG_RU`: the same 93 documents in Russian, opened
+  from the installer by the owner's own scripts on 2026-09-13; read for the
+  text of each help screen only (`ADR-0034`).
 - `CURRENT_PAG_UTILS_RUNTIME/CANLinkMonitorData.xml`: addressing width per
   programme and year, and the global module-to-identifier map.
 - `PLATFORM_<PROGRAM>_<YEAR>.xml`: 110 platform documents with bus rates,

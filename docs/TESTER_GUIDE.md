@@ -311,7 +311,9 @@ loaded data declares any. These are SDD's on-demand self tests: the pump
 motor test on an ABS, a lamp check, an actuator cycle — things the module
 runs on itself when a technician commands it. Each row gives SDD's own name
 for the test, its identifier, the model-year markers the data qualifies it
-by, how long it takes, and what SDD tells whoever runs it, line by line.
+by, how long it takes, and what SDD tells whoever runs it, line by line — in
+English or in Russian, SDD's own text either way, by the same switch the
+fault-code help has.
 
 **This application does not run them, and this section has no button.** A
 self test is a routine, not a read; routines belong to a later stage with

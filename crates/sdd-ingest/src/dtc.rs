@@ -64,7 +64,7 @@ pub const DTC_HELP_LANGUAGE_RUSSIAN: &str = "rus";
 /// The two-letter code a help document declares in `<language isoCode>` for
 /// the language a pack is said to be in; `None` for a code this adapter has
 /// no pack for.
-fn iso_code_for(language: &str) -> Option<&'static str> {
+pub(crate) fn iso_code_for(language: &str) -> Option<&'static str> {
     match language {
         DTC_HELP_LANGUAGE_RUSSIAN => Some("ru"),
         "eng" => Some("en"),

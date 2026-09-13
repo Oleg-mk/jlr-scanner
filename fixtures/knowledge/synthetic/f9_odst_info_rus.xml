@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  SYNTHETIC F9 FIXTURE. Not JLR evidence and not promotable to evidence.
+
+  The Russian sibling of f9_odst_info.xml (ADR-0034): the same module, the
+  same tests, the same screens and mnemonic names, with the human text in
+  invented Russian — the shape of SDD's language packs, which share
+  everything but the words. Exercised on purpose:
+
+    * the document declares isoCode="ru", which the adapter requires when it
+      is told to read a pack as Russian;
+    * J_A_ENS_IGN_ON has no Russian text here, so the line it fills must keep
+      its English when the two screens are joined by name.
+-->
+<odstInfo moduleType="SYNTHMOD">
+<language isoCode="ru">Russian</language>
+<odstTestQualification>
+<odstTestSelection helpScreenDataNameId="4274" testID="14" timeout="40000" time="40000" flag="4">
+<odstTestQualifier model="SYNTHA" year="MY03"/>
+<odstTestQualifier model="SYNTHB" year="MY04">
+<qual type="TYPE" value="SYNTHENGINE"/>
+<qual type="SUBTYPE" value="SYNTHVARIANT"/>
+</odstTestQualifier>
+<odstTestQualifier model="SYNTHB" year="MY04">
+<qual type="CM_QUAL_ENG_TYPE" value="VAL_ENG_SYNTH"/>
+</odstTestQualifier>
+</odstTestSelection>
+<odstTestSelection testID="99" timeout="5000" time="5000" flag="1">
+<odstTestQualifier model="SYNTHA" year="BASE"/>
+</odstTestSelection>
+</odstTestQualification>
+<helpScreenQualification>
+<helpScreenDataName id="4274" name="DR_ODST_14_SYNTHMOD">
+<helpScreenSelection helpScreenId="5032" helpScreenName="DR_ODST_14_SYNTHMOD_HLP_000">
+<helpScreenQualifier model="SYNTHA" year="MY03"/>
+</helpScreenSelection>
+</helpScreenDataName>
+</helpScreenQualification>
+<helpScreenList>
+<helpScreen id="5032" name="DR_ODST_14_SYNTHMOD_HLP_000">
+<helpScreenItem mnemonicName="J_I_SYNTH_ODST_DESC"/>
+<helpScreenItem mnemonicName="empty$I"/>
+<helpScreenItem mnemonicName="J_A_ENS_IGN_ON"/>
+<helpScreenItem mnemonicName="J_I_SYNTH_NO_TEXT"/>
+</helpScreen>
+<helpScreen id="5033" name="DR_ODST_UNUSED_HLP_000">
+<helpScreenItem mnemonicName="J_A_ENS_IGN_ON"/>
+</helpScreen>
+</helpScreenList>
+<helpScreenMnemonicList>
+<mnemonic name="J_I_SYNTH_ODST_DESC"><![CDATA[Синтетический блок выполняет собственную проверку и записывает результат.]]></mnemonic>
+<mnemonic name="empty$I"><![CDATA[  ]]></mnemonic>
+</helpScreenMnemonicList>
+</odstInfo>

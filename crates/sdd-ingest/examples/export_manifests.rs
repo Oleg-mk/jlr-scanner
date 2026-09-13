@@ -40,6 +40,8 @@ struct Corpus {
     dtc_help_rus: Vec<Found>,
     dtc_index: Vec<Found>,
     odst: Vec<Found>,
+    /// The same self-test documents from the Russian pack (`ADR-0034`).
+    odst_rus: Vec<Found>,
     /// JLR's IVS part lineage: which software belongs to which assembly
     /// (ADR-0033).
     ivs: Vec<Found>,
@@ -131,6 +133,8 @@ fn walk(root: &Path, dir: &Path, corpus: &mut Corpus) -> std::io::Result<()> {
         if language == RootLanguage::Russian {
             if name.starts_with("rdsDtcHelp") {
                 corpus.dtc_help_rus.push(found);
+            } else if parent == "rds-odst-info" {
+                corpus.odst_rus.push(found);
             }
             continue;
         }
@@ -369,7 +373,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         walk(root, root, &mut corpus)?;
     }
     println!(
-        "found: {} platform, {} converter, {} DID snapshot, {} DTC help, {} DTC help (rus), {} DTC index, {} ODST, {} IVS, {} link monitor, {} VIN decode, {} module text, {} CCF, {} other text items",
+        "found: {} platform, {} converter, {} DID snapshot, {} DTC help, {} DTC help (rus), {} DTC index, {} ODST, {} ODST (rus), {} IVS, {} link monitor, {} VIN decode, {} module text, {} CCF, {} other text items",
         corpus.platforms.len(),
         corpus.converters.len(),
         corpus.snapshots.len(),
@@ -377,6 +381,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         corpus.dtc_help_rus.len(),
         corpus.dtc_index.len(),
         corpus.odst.len(),
+        corpus.odst_rus.len(),
         corpus.ivs.len(),
         corpus.link_monitor.len(),
         corpus.vin.len(),
@@ -579,6 +584,21 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             &adapter,
             &text,
             "odst",
+            &mut rejections,
+        )?;
+    }
+    // The same screens in Russian, from JLR's own pack (`ADR-0034`).
+    for found in &corpus.odst_rus {
+        let text = read(found)?;
+        let adapter =
+            OdstInfoAdapter::new(source_in(found, &text, Some(DTC_HELP_LANGUAGE_RUSSIAN))?)?
+                .with_language(DTC_HELP_LANGUAGE_RUSSIAN)?;
+        export(
+            &mut store,
+            &mut bundle,
+            &adapter,
+            &text,
+            "odst-rus",
             &mut rejections,
         )?;
     }

@@ -10,8 +10,10 @@ use knowledge::{
 };
 use std::collections::BTreeMap;
 
+use crate::dtc::{iso_code_for, DTC_HELP_ITEM_SEPARATOR};
+
 pub const ODST_PARSER_ID: &str = "sdd-odst-info";
-const ODST_PARSER_VERSION: &str = "1.0.0";
+const ODST_PARSER_VERSION: &str = "1.1.0";
 
 /// Prefix for custom dimensions holding an SDD `qual` qualifier verbatim.
 pub const QUAL_DIMENSION_PREFIX: &str = "sdd_qual_";
@@ -28,6 +30,11 @@ pub const ODST_HELP_CLAIM_PREFIX: &str = "sdd_odst_help.";
 /// Claim prefix under which one screen's text is recorded, the screen's name
 /// following the dot.
 pub const ODST_SCREEN_CLAIM_PREFIX: &str = "sdd_odst_screen.";
+/// The same screen as the names of its items, one per line — the mnemonic's
+/// name, U+001F, its text — so a line can be joined to the same line in
+/// another language's pack (`ADR-0034`). A pack in another language writes
+/// the two screen claims with its code last, `sdd_odst_screen.<NAME>.rus`.
+pub const ODST_SCREEN_ITEMS_CLAIM_PREFIX: &str = "sdd_odst_screen_items.";
 
 /// Adapter for the SDD `rds-odst-info-<MODULE>.xml` documents.
 ///
@@ -47,12 +54,39 @@ pub const ODST_SCREEN_CLAIM_PREFIX: &str = "sdd_odst_screen.";
 #[derive(Clone, Debug)]
 pub struct OdstInfoAdapter {
     source: SourceRecord,
+    /// `None` for the English pack, which carries the tests, their
+    /// timings and which screen a car is given; a language code for a pack
+    /// that carries only the text of the same screens (`ADR-0034`).
+    language: Option<String>,
 }
 
 impl OdstInfoAdapter {
     pub fn new(source: SourceRecord) -> Result<Self, KnowledgeError> {
         source.validate()?;
-        Ok(Self { source })
+        Ok(Self {
+            source,
+            language: None,
+        })
+    }
+
+    /// Read this pack as the same screens in another language: only the
+    /// screen text claims are written, suffixed with the code, and the
+    /// document must declare that language itself (`ADR-0034`).
+    pub fn with_language(mut self, language: &str) -> Result<Self, KnowledgeError> {
+        if iso_code_for(language).is_none() {
+            return Err(KnowledgeError::Parse(format!(
+                "no self-test pack is known for language code {language:?}"
+            )));
+        }
+        self.language = Some(language.to_string());
+        Ok(self)
+    }
+
+    fn language_suffix(&self) -> String {
+        self.language
+            .as_deref()
+            .map(|code| format!(".{code}"))
+            .unwrap_or_default()
     }
 }
 
@@ -77,6 +111,24 @@ impl IngestionAdapter for OdstInfoAdapter {
         }
         let module = require_attribute(root, "moduleType")?;
         let module_slug = preferred_segment(module, "moduleType")?;
+
+        // The Russian pack has the English pack's file names, so a root
+        // mounted under the wrong name would write one language's text under
+        // the other's claim: the document must say which it is.
+        let expected_iso = self
+            .language
+            .as_deref()
+            .and_then(iso_code_for)
+            .unwrap_or("en");
+        if let Some(declared) =
+            child_element(root, "language").and_then(|node| node.attribute("isoCode"))
+        {
+            if declared != expected_iso {
+                return Err(KnowledgeError::Parse(format!(
+                    "{module}: the document declares language {declared:?}, this pack is read as {expected_iso:?}"
+                )));
+            }
+        }
 
         // The document carries its own screens and its own string table, so
         // a test's prose needs no other pack (ADR-0032).
@@ -149,6 +201,11 @@ impl IngestionAdapter for OdstInfoAdapter {
                     })
                     .enumerate()
                 {
+                    // The tests and their qualifiers are the English pack's
+                    // to say; another language adds only its words.
+                    if self.language.is_some() {
+                        continue;
+                    }
                     let applicability = applicability_from_qualifier(qualifier, module)?;
                     let record_id = format!(
                         "{}.odst.{module_slug}.{test_slug}.{index}",
@@ -223,7 +280,7 @@ impl IngestionAdapter for OdstInfoAdapter {
         // Which screen a car is given for a test, and what each screen
         // says: two claims, so one screen serving dozens of cars is written
         // once (ADR-0032, decision 2).
-        let mut used_screens: BTreeMap<String, String> = BTreeMap::new();
+        let mut used_screens: BTreeMap<String, (String, String)> = BTreeMap::new();
         if let Some(qualification) = child_element(root, "helpScreenQualification") {
             for data_name in qualification
                 .children()
@@ -251,10 +308,16 @@ impl IngestionAdapter for OdstInfoAdapter {
                     let Some(screen) = selection.attribute("helpScreenName").map(str::trim) else {
                         continue;
                     };
-                    let Some(text) = screens.get(screen) else {
+                    let Some((text, item_lines)) = screens.get(screen) else {
                         continue;
                     };
                     if text.trim().is_empty() {
+                        continue;
+                    }
+                    used_screens.insert(screen.to_string(), (text.clone(), item_lines.clone()));
+                    // Which car is given which screen is the English pack's
+                    // to say as well.
+                    if self.language.is_some() {
                         continue;
                     }
                     for (position, qualifier) in selection
@@ -306,14 +369,27 @@ impl IngestionAdapter for OdstInfoAdapter {
                             },
                         );
                     }
-                    used_screens.insert(screen.to_string(), text.clone());
                 }
             }
         }
 
-        for (screen, text) in used_screens {
-            let record_id = format!("{}.odst.{module_slug}.screen.{screen}", self.source.id.0);
-            let evidence_id = format!("{}.ev.{record_id}", self.source.id.0);
+        // What each used screen says — and, for a pack in another language,
+        // the only thing written. The record id carries the language last;
+        // the evidence id of a language pack does not repeat the source id,
+        // which is longer by the code, so it stays within the id limit.
+        let suffix = self.language_suffix();
+        for (screen, (text, item_lines)) in used_screens {
+            let record_id = format!(
+                "{}.odst.{module_slug}.screen.{screen}{suffix}",
+                self.source.id.0
+            );
+            let evidence_id = match &self.language {
+                None => format!("{}.ev.{record_id}", self.source.id.0),
+                Some(_) => format!(
+                    "{}.ev.odst.{module_slug}.screen.{screen}{suffix}",
+                    self.source.id.0
+                ),
+            };
             evidence.insert(
                 evidence_id.clone(),
                 EvidenceRecord {
@@ -340,9 +416,33 @@ impl IngestionAdapter for OdstInfoAdapter {
                         id: module.to_string(),
                     },
                     key: ClaimKey::Custom {
-                        name: format!("{ODST_SCREEN_CLAIM_PREFIX}{screen}"),
+                        name: format!("{ODST_SCREEN_CLAIM_PREFIX}{screen}{suffix}"),
                     },
                     value: KnowledgeValue::Text { value: text },
+                    applicability: Applicability::default(),
+                    evidence_ids: vec![EvidenceId::new(evidence_id.clone())?],
+                    validation_state: ValidationState::Unverified,
+                },
+            );
+            // The same screen as the names of its items, on the same
+            // evidence, so a line is joined to its twin in another language
+            // by name (`ADR-0034`).
+            let items_record_id = format!(
+                "{}.odst.{module_slug}.screenitems.{screen}{suffix}",
+                self.source.id.0
+            );
+            records.insert(
+                items_record_id.clone(),
+                KnowledgeRecord {
+                    id: items_record_id,
+                    entity: KnowledgeEntity {
+                        kind: EntityKind::EcuFamily,
+                        id: module.to_string(),
+                    },
+                    key: ClaimKey::Custom {
+                        name: format!("{ODST_SCREEN_ITEMS_CLAIM_PREFIX}{screen}{suffix}"),
+                    },
+                    value: KnowledgeValue::Text { value: item_lines },
                     applicability: Applicability::default(),
                     evidence_ids: vec![EvidenceId::new(evidence_id)?],
                     validation_state: ValidationState::Unverified,
@@ -350,7 +450,9 @@ impl IngestionAdapter for OdstInfoAdapter {
             );
         }
 
-        if records.is_empty() {
+        // A module whose screens no test points at has nothing for a pack in
+        // another language to add: an empty batch, not a fault.
+        if records.is_empty() && self.language.is_none() {
             return Err(KnowledgeError::Parse(format!(
                 "no qualified self tests were found for {module}"
             )));
@@ -472,13 +574,15 @@ fn mnemonic_texts(root: roxmltree::Node<'_, '_>) -> BTreeMap<String, String> {
     texts
 }
 
-/// Each screen as the lines it is made of, in the order SDD lists them. An
-/// item the string table has no text for is left out rather than shown as
-/// its mnemonic; a screen of nothing but such items yields no text at all.
+/// Each screen as the lines it is made of, in the order SDD lists them —
+/// once as the text and once as the items, the mnemonic's name, U+001F, its
+/// text, one per line. An item the string table has no text for is left out
+/// rather than shown as its mnemonic; a screen of nothing but such items
+/// yields no text at all.
 fn help_screens(
     root: roxmltree::Node<'_, '_>,
     mnemonics: &BTreeMap<String, String>,
-) -> BTreeMap<String, String> {
+) -> BTreeMap<String, (String, String)> {
     let mut screens = BTreeMap::new();
     let Some(list) = child_element(root, "helpScreenList") else {
         return screens;
@@ -490,18 +594,31 @@ fn help_screens(
         let Some(name) = screen.attribute("name").map(str::trim) else {
             continue;
         };
-        let lines: Vec<&str> = screen
+        let items: Vec<(&str, &str)> = screen
             .children()
             .filter(|node| node.is_element() && node.tag_name().name() == "helpScreenItem")
             .filter_map(|item| item.attribute("mnemonicName"))
-            .filter_map(|mnemonic| mnemonics.get(mnemonic))
-            .map(String::as_str)
-            .filter(|line| !line.trim().is_empty())
+            .filter_map(|mnemonic| {
+                mnemonics
+                    .get(mnemonic)
+                    .map(|text| (mnemonic, text.as_str()))
+            })
+            .filter(|(_, line)| !line.trim().is_empty())
             .collect();
-        if lines.is_empty() {
+        if items.is_empty() {
             continue;
         }
-        screens.insert(name.to_string(), lines.join("\n"));
+        let text = items
+            .iter()
+            .map(|(_, line)| *line)
+            .collect::<Vec<_>>()
+            .join("\n");
+        let item_lines = items
+            .iter()
+            .map(|(mnemonic, line)| format!("{mnemonic}{DTC_HELP_ITEM_SEPARATOR}{line}"))
+            .collect::<Vec<_>>()
+            .join("\n");
+        screens.insert(name.to_string(), (text, item_lines));
     }
     screens
 }
