@@ -16,7 +16,7 @@ use mongoose_jlr::{
 use std::sync::{Mutex, MutexGuard};
 use std::time::Duration;
 use transport_serial::{
-    matching_devices, SerialDevice, SerialTransport, SystemSerialDeviceEnumerator,
+    matching_devices, vendor_devices, SerialDevice, SerialTransport, SystemSerialDeviceEnumerator,
     MONGOOSE_JLR_USB_PID, MONGOOSE_JLR_USB_VID,
 };
 use uds_execution::PreparedUdsTransaction;
@@ -48,6 +48,11 @@ pub trait AdapterBackend {
     type Connection;
 
     fn discover(&self) -> Result<Vec<AdapterSummary>, BackendFailure>;
+    /// Devices of the adapter's own vendor that `discover` did not return.
+    /// The default is none: only the system backend enumerates hardware.
+    fn other_vendor_devices(&self) -> Result<Vec<AdapterSummary>, BackendFailure> {
+        Ok(Vec::new())
+    }
     fn connect(
         &self,
         adapter: &AdapterSummary,
@@ -185,6 +190,16 @@ impl AdapterBackend for SystemAdapterBackend {
         Ok(devices.into_iter().map(summary_from_device).collect())
     }
 
+    fn other_vendor_devices(&self) -> Result<Vec<AdapterSummary>, BackendFailure> {
+        let devices = vendor_devices(&SystemSerialDeviceEnumerator, MONGOOSE_JLR_USB_VID)
+            .map_err(|error| BackendFailure::Discovery(error.to_string()))?;
+        Ok(devices
+            .into_iter()
+            .filter(|device| device.usb_pid != MONGOOSE_JLR_USB_PID)
+            .map(summary_from_device)
+            .collect())
+    }
+
     fn connect(
         &self,
         adapter: &AdapterSummary,
@@ -261,6 +276,8 @@ pub struct AdapterService<B: AdapterBackend> {
     connection: Option<B::Connection>,
     /// The scenario the bench was connected on, while it is the bench.
     bench_scenario: Option<u32>,
+    /// Same-vendor devices seen while no adapter of ours was found.
+    other_vendor_devices: Vec<AdapterSummary>,
 }
 
 impl<B: AdapterBackend> AdapterService<B> {
@@ -275,6 +292,7 @@ impl<B: AdapterBackend> AdapterService<B> {
             error: None,
             connection: None,
             bench_scenario: None,
+            other_vendor_devices: Vec::new(),
         }
     }
 
@@ -291,6 +309,7 @@ impl<B: AdapterBackend> AdapterService<B> {
                 && self.connection.is_none(),
             error: self.error.clone(),
             vehicle_message: VEHICLE_MESSAGE.to_owned(),
+            other_vendor_devices: self.other_vendor_devices.clone(),
             // Only while the bench is what is connected: a number left from an
             // earlier bench must not travel with a real adapter.
             bench_scenario: self.is_bench().then_some(self.bench_scenario).flatten(),
@@ -309,6 +328,17 @@ impl<B: AdapterBackend> AdapterService<B> {
                 self.set_error(error);
                 return self.snapshot();
             }
+        };
+
+        // Nothing this application can open. Before saying so, ask what else
+        // of this vendor is on the machine: an adapter of the right family
+        // under the wrong product is the difference between "there is nothing
+        // here" and "what you have is not the one". Failing to enumerate them
+        // is not a failure to discover, and is passed over in silence.
+        self.other_vendor_devices = if discovered.is_empty() {
+            self.backend.other_vendor_devices().unwrap_or_default()
+        } else {
+            Vec::new()
         };
 
         if self.connection.is_some() {
@@ -790,10 +820,12 @@ mod tests {
     use super::*;
     use std::collections::VecDeque;
     use std::sync::Arc;
+    use transport_serial::MONGOOSE_JLR_LEGACY_USB_PID;
 
     #[derive(Default)]
     struct FakeState {
         discoveries: VecDeque<Result<Vec<AdapterSummary>, BackendFailure>>,
+        other_vendor_devices: Vec<AdapterSummary>,
         connect_result: Option<Result<BoardInfoEvidence, BackendFailure>>,
         disconnect_result: Option<Result<(), BackendFailure>>,
         disconnects: usize,
@@ -813,6 +845,10 @@ mod tests {
         fn set_connect_result(&self, result: Result<BoardInfoEvidence, BackendFailure>) {
             self.0.lock().unwrap().connect_result = Some(result);
         }
+
+        fn set_other_vendor_devices(&self, devices: Vec<AdapterSummary>) {
+            self.0.lock().unwrap().other_vendor_devices = devices;
+        }
     }
 
     impl AdapterBackend for FakeBackend {
@@ -825,6 +861,10 @@ mod tests {
                 .discoveries
                 .pop_front()
                 .unwrap_or_else(|| Ok(Vec::new()))
+        }
+
+        fn other_vendor_devices(&self) -> Result<Vec<AdapterSummary>, BackendFailure> {
+            Ok(self.0.lock().unwrap().other_vendor_devices.clone())
         }
 
         fn connect(
@@ -863,6 +903,53 @@ mod tests {
             response_command: "0x8109".to_owned(),
             raw_response_hex: "AA BB".to_owned(),
         }
+    }
+
+    /// A device of the adapter's own vendor under a different product — the
+    /// older Mongoose JLR where a MongoosePro was expected — is named rather
+    /// than passed over, so that the person holding it is told what they have.
+    #[test]
+    fn a_same_vendor_device_is_named_when_no_adapter_of_ours_is_found() {
+        let backend = FakeBackend::with_discoveries(vec![Ok(Vec::new())]);
+        backend.set_other_vendor_devices(vec![AdapterSummary {
+            name: "Mongoose JLR".to_owned(),
+            port: "COM7".to_owned(),
+            usb_vid: MONGOOSE_JLR_USB_VID,
+            usb_pid: MONGOOSE_JLR_LEGACY_USB_PID,
+            serial_number: None,
+            driver: None,
+        }]);
+        let mut service = AdapterService::new(backend);
+
+        let snapshot = service.discover();
+
+        assert_eq!(snapshot.state, AdapterState::NoAdapter);
+        assert_eq!(snapshot.adapters, Vec::new());
+        let named = &snapshot.other_vendor_devices;
+        assert_eq!(named.len(), 1, "{named:?}");
+        assert_eq!(named[0].port, "COM7");
+        assert_eq!(named[0].usb_pid, MONGOOSE_JLR_LEGACY_USB_PID);
+    }
+
+    /// It is only ever a consolation for finding nothing: the moment an
+    /// adapter this application can open is present, nothing else is named.
+    #[test]
+    fn nothing_is_named_once_an_adapter_of_ours_is_there() {
+        let backend = FakeBackend::with_discoveries(vec![Ok(vec![adapter("COM3")])]);
+        backend.set_other_vendor_devices(vec![AdapterSummary {
+            name: "Mongoose JLR".to_owned(),
+            port: "COM7".to_owned(),
+            usb_vid: MONGOOSE_JLR_USB_VID,
+            usb_pid: MONGOOSE_JLR_LEGACY_USB_PID,
+            serial_number: None,
+            driver: None,
+        }]);
+        let mut service = AdapterService::new(backend);
+
+        let snapshot = service.discover();
+
+        assert_eq!(snapshot.adapters.len(), 1);
+        assert!(snapshot.other_vendor_devices.is_empty());
     }
 
     #[test]

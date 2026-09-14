@@ -78,6 +78,11 @@ function BenchOffer({ onConnectBench }: { onConnectBench: (scenario: number) => 
   );
 }
 
+/** Four hex digits, the way a USB identifier is written. */
+function hex4(value: number): string {
+  return value.toString(16).toUpperCase().padStart(4, "0");
+}
+
 export function AdapterPanel({
   snapshot,
   selectedPort,
@@ -106,6 +111,18 @@ export function AdapterPanel({
         <div className="adapter-empty">
           <h3>{t("Adapter not detected")}</h3>
           <p>{t("Connect MongoosePro JLR by USB.")}</p>
+          {(snapshot.otherVendorDevices ?? []).map((device) => (
+            <p className="adapter-other-device" key={device.port}>
+              {t(
+                "A device of the same maker is on {port}: USB {vid}:{pid}. That is not the MongoosePro JLR this application speaks to.",
+                {
+                  port: device.port,
+                  vid: hex4(device.usbVid),
+                  pid: hex4(device.usbPid),
+                },
+              )}
+            </p>
+          ))}
           <button className="button button--primary" type="button" onClick={onDetect}>
             {t("Detect adapter")}
           </button>

@@ -325,6 +325,8 @@ const uk: Record<string, string> = {
   Adapter: "Адаптер",
   "Adapter not detected": "Адаптер не виявлено",
   "Connect MongoosePro JLR by USB.": "Підключіть MongoosePro JLR через USB.",
+  "A device of the same maker is on {port}: USB {vid}:{pid}. That is not the MongoosePro JLR this application speaks to.":
+    "Пристрій того самого виробника на {port}: USB {vid}:{pid}. Це не MongoosePro JLR, з яким працює застосунок.",
   "Detect adapter": "Знайти адаптер",
   Disconnect: "Відʼєднати",
   Connected: "Підключено",
@@ -1416,6 +1418,8 @@ const ru: Record<string, string> = {
   Adapter: "Адаптер",
   "Adapter not detected": "Адаптер не обнаружен",
   "Connect MongoosePro JLR by USB.": "Подключите MongoosePro JLR по USB.",
+  "A device of the same maker is on {port}: USB {vid}:{pid}. That is not the MongoosePro JLR this application speaks to.":
+    "Устройство того же производителя на {port}: USB {vid}:{pid}. Это не MongoosePro JLR, с которым работает приложение.",
   "Detect adapter": "Найти адаптер",
   Disconnect: "Отключить",
   Connected: "Подключено",

@@ -123,6 +123,11 @@ pub struct AdapterSnapshot {
     pub selection_required: bool,
     pub error: Option<UserFacingError>,
     pub vehicle_message: String,
+    /// Serial devices of the adapter's own vendor that are not the adapter
+    /// this application speaks to. Reported so that a person is told what is
+    /// plugged in rather than told nothing; never opened, never connected.
+    #[serde(default)]
+    pub other_vendor_devices: Vec<AdapterSummary>,
     /// The bench scenario the session is connected on (ADR-0020): `0` is the
     /// healthy vehicle, any other number a picture of faults that number
     /// always paints. Absent unless the bench is what is connected.

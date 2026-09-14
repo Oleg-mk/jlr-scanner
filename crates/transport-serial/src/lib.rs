@@ -12,6 +12,10 @@ use transport_api::{ByteTransport, TransportError};
 
 pub const MONGOOSE_JLR_USB_VID: u16 = 0x18E1;
 pub const MONGOOSE_JLR_USB_PID: u16 = 0x0104;
+/// The older Mongoose JLR, which is not the MongoosePro this application
+/// speaks to. It is named so that a person who plugs one in is told what
+/// they have rather than told nothing; it is never opened.
+pub const MONGOOSE_JLR_LEGACY_USB_PID: u16 = 0x0022;
 pub const MONGOOSE_JLR_BAUD_RATE: u32 = 115_200;
 pub const DEFAULT_READ_TIMEOUT: Duration = Duration::from_millis(250);
 
@@ -110,6 +114,22 @@ pub fn discover_unique<E: SerialDeviceEnumerator>(
         [device] => Ok(device.clone()),
         _ => Err(DiscoveryError::AmbiguousDevices(matches)),
     }
+}
+
+/// Every serial device of one vendor, whatever its product is. Discovery
+/// itself stays exact — only `MONGOOSE_JLR_USB_PID` is ever opened — but a
+/// device of the same vendor under a different product is worth naming: on
+/// the other end of it is a person holding hardware that looks right and an
+/// application that says nothing.
+pub fn vendor_devices<E: SerialDeviceEnumerator>(
+    enumerator: &E,
+    vid: u16,
+) -> Result<Vec<SerialDevice>, DiscoveryError> {
+    Ok(enumerator
+        .enumerate()?
+        .into_iter()
+        .filter(|device| device.usb_vid == vid)
+        .collect())
 }
 
 pub fn discover_mongoose_jlr() -> Result<SerialDevice, DiscoveryError> {

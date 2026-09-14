@@ -73,6 +73,13 @@ export interface AdapterSnapshot {
   error: UserFacingError | null;
   vehicleMessage: string;
   /**
+   * Serial devices of the adapter's own vendor that are not the adapter this
+   * application speaks to — an older Mongoose JLR, say, where a MongoosePro
+   * was expected. Named so the person is told what is plugged in rather than
+   * told nothing; never opened.
+   */
+  otherVendorDevices?: AdapterSummary[];
+  /**
    * The bench scenario in force (ADR-0020): 0 is the healthy vehicle, any
    * other number a picture of faults that number always repeats. Null unless
    * the bench is what is connected.
@@ -99,6 +106,7 @@ export const createEmptySnapshot = (): AdapterSnapshot => ({
   selectionRequired: false,
   error: null,
   vehicleMessage: "No vehicle connected",
+  otherVendorDevices: [],
   benchScenario: null,
 });
 
