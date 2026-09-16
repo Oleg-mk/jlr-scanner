@@ -11,13 +11,15 @@ import { createLibrarySnapshot } from "./library";
  * now counts the seconds out loud, which is the cheapest possible proof that
  * something is still happening.
  */
-function panel(busy: boolean) {
+function panel(busy: boolean, restoring = false) {
   return render(
     <LibraryPanel
       snapshot={{ ...createLibrarySnapshot(), message: "Built-in data only." }}
       directory="C:\\library"
       busy={busy}
+      restoring={restoring}
       onDirectoryChange={() => {}}
+      onChooseDirectory={() => {}}
       onLoad={() => {}}
     />,
   );
@@ -32,6 +34,22 @@ describe("while the library loads", () => {
     expect(status.textContent).toMatch(/tens of seconds on an old one/);
     // The button says so too, and refuses a second load.
     expect(screen.getByRole("button", { name: "Working…" })).toBeDisabled();
+  });
+
+  /**
+   * The folder remembered from last time is read on start, and on a large
+   * copy that takes tens of seconds. Until 2026-09-16 it disabled both
+   * buttons for all of that time, so the owner could not put a newer library
+   * in place of the older one it was busy reading. A restore now shows the
+   * same count of seconds and takes nothing away.
+   */
+  it("keeps the choice open while the remembered folder is read on start", () => {
+    panel(false, true);
+    const status = screen.getByRole("status");
+    expect(status.textContent).toMatch(/Reading the folder remembered from last time…\s*0/);
+    expect(status.textContent).toMatch(/the newer one wins/);
+    expect(screen.getByRole("button", { name: "Choose folder…" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Load library" })).toBeEnabled();
   });
 
   it("shows the library's own message once the reading is over", () => {

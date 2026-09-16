@@ -93,6 +93,12 @@ interface LibraryPanelProps {
   snapshot: LibrarySnapshot;
   directory: string;
   busy: boolean;
+  /**
+   * The folder remembered from last time is being read on start. It shows the
+   * same count of seconds as any other reading, but it takes nothing away:
+   * another folder can be chosen and loaded over it while it runs.
+   */
+  restoring?: boolean;
   onDirectoryChange: (directory: string) => void;
   /** Present when the shell can open a native folder dialog. */
   onChooseDirectory?: () => void;
@@ -116,6 +122,7 @@ export function LibraryPanel({
   snapshot,
   directory,
   busy,
+  restoring = false,
   onDirectoryChange,
   onChooseDirectory,
   onLoad,
@@ -124,9 +131,10 @@ export function LibraryPanel({
   // Seconds since the load began. A disabled button is not enough on a slow
   // machine: the owner's 2016 Mac read a 177 MB library with nothing moving
   // on screen, and he took it for a hang (2026-09-10).
+  const reading = busy || restoring;
   const [elapsed, setElapsed] = useState(0);
   useEffect(() => {
-    if (!busy) {
+    if (!reading) {
       setElapsed(0);
       return;
     }
@@ -137,7 +145,7 @@ export function LibraryPanel({
       1000,
     );
     return () => window.clearInterval(timer);
-  }, [busy]);
+  }, [reading]);
   return (
     <section className="library-panel" aria-labelledby="library-title">
       <div className="section-heading section-heading--action">
@@ -171,6 +179,7 @@ export function LibraryPanel({
             type="button"
             onClick={onChooseDirectory}
             disabled={busy}
+            title={restoring ? t("Another folder can be chosen while this one is read.") : undefined}
           >
             {t("Choose folder…")}
           </button>
@@ -185,14 +194,19 @@ export function LibraryPanel({
         </button>
       </div>
 
-      {busy ? (
+      {reading ? (
         <p className="library-status" role="status">
-          {t("Reading the library…")} {elapsed}&nbsp;{t("sec")}
+          {restoring ? t("Reading the folder remembered from last time…") : t("Reading the library…")}{" "}
+          {elapsed}&nbsp;{t("sec")}
           <br />
           <span className="button-hint">
-            {t(
-              "A large library takes seconds on a fast machine and tens of seconds on an old one. Nothing is wrong; wait for the count to stop.",
-            )}
+            {restoring
+              ? t(
+                  "Another folder can be chosen and loaded right now; the newer one wins and this reading is dropped.",
+                )
+              : t(
+                  "A large library takes seconds on a fast machine and tens of seconds on an old one. Nothing is wrong; wait for the count to stop.",
+                )}
           </span>
         </p>
       ) : (

@@ -410,6 +410,11 @@ const uk: Record<string, string> = {
   "Connection": "З'єднання",
   "Choose folder…": "Обрати папку…",
   "Reading the library…": "Читаю бібліотеку…",
+  "Reading the folder remembered from last time…": "Читаю теку, запам'ятану з минулого разу…",
+  "Another folder can be chosen and loaded right now; the newer one wins and this reading is dropped.":
+    "Можна просто зараз обрати іншу теку і завантажити її: переможе новіша, а це читання буде відкинуто.",
+  "Another folder can be chosen while this one is read.":
+    "Поки читається ця тека, можна обрати іншу.",
   sec: "с",
   "A large library takes seconds on a fast machine and tens of seconds on an old one. Nothing is wrong; wait for the count to stop.":
     "Велика бібліотека читається кілька секунд на швидкій машині і десятки — на старій. Нічого не зависло: зачекайте, поки лічильник зупиниться.",
@@ -1515,6 +1520,11 @@ const ru: Record<string, string> = {
   "Connection": "Подключение",
   "Choose folder…": "Выбрать папку…",
   "Reading the library…": "Читаю библиотеку…",
+  "Reading the folder remembered from last time…": "Читаю папку, запомненную с прошлого раза…",
+  "Another folder can be chosen and loaded right now; the newer one wins and this reading is dropped.":
+    "Можно прямо сейчас выбрать другую папку и загрузить её: победит более новая, а это чтение будет отброшено.",
+  "Another folder can be chosen while this one is read.":
+    "Пока читается эта папка, можно выбрать другую.",
   sec: "с",
   "A large library takes seconds on a fast machine and tens of seconds on an old one. Nothing is wrong; wait for the count to stop.":
     "Большая библиотека читается несколько секунд на быстрой машине и десятки — на старой. Ничего не зависло: подождите, пока счётчик не остановится.",

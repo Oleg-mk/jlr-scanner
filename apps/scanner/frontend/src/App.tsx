@@ -466,6 +466,7 @@ export function App({
                       snapshot={library.library}
                       directory={library.directory}
                       busy={library.busy}
+                      restoring={library.restoring}
                       onDirectoryChange={library.setDirectory}
                       onChooseDirectory={
                         hasTauriRuntime() ? () => void library.chooseDirectory() : undefined
