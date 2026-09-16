@@ -4322,3 +4322,12 @@ table.live-read-identifiers label {
   align-items: baseline;
   gap: 0.5rem;
 }
+
+/* A list inside a bordered box lines up with the box's own heading. The
+   rows carried the panel's tight indent, which is right when the panel's
+   padding is what holds them off the edge and wrong here, where the border
+   is a finger's width away and the summary above them sits at 1rem. */
+.technical-details .detail-list > div {
+  padding-right: 1rem;
+  padding-left: 1rem;
+}
