@@ -63,5 +63,26 @@
 				<RESTART_WHILE_RUNNING>yes</RESTART_WHILE_RUNNING>
 			</ROUTINE>
 		</ROUTINE_IDENTIFIERS>
+		<!-- A second section of each kind. Seven documents in SDD 169 carry
+		     one, and reading only the first dropped what stood here. -->
+		<DATA_IDENTIFIERS>
+			<DID ID="did_0500">
+				<NAME>Synthetic value in a second section</NAME>
+				<NUMBER>0x0500</NUMBER>
+				<BYTE_SIZE>1</BYTE_SIZE>
+				<DID_TYPE>single_value</DID_TYPE>
+				<ACCESS_PARAMETERS>
+					<WRITEABLE SERVICE_REFS="service_2E" SESSION_REFS="session_03"/>
+				</ACCESS_PARAMETERS>
+			</DID>
+		</DATA_IDENTIFIERS>
+		<ROUTINE_IDENTIFIERS>
+			<ROUTINE ID="routine_0500" SESSION_REFS="session_03">
+				<NAME>Synthetic routine in a second section</NAME>
+				<NUMBER>0x0500</NUMBER>
+				<MAX_ROUTINE_RUN_TIME/>
+				<RESTART_WHILE_RUNNING>no</RESTART_WHILE_RUNNING>
+			</ROUTINE>
+		</ROUTINE_IDENTIFIERS>
 	</ECU_DATA>
 </MDX>

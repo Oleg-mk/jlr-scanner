@@ -257,12 +257,28 @@ impl IngestionAdapter for ModuleAccessAdapter {
 
         let mut evidence = BTreeMap::new();
         let mut records = BTreeMap::new();
-        let data = child_element(root, "ECU_DATA")
-            .ok_or_else(|| KnowledgeError::Parse("<MDX> has no <ECU_DATA>".into()))?;
+        // Every section, not the first of each. Seven documents in the
+        // corpus carry a second `<DATA_IDENTIFIERS>` or a second
+        // `<ROUTINE_IDENTIFIERS>`, and reading only the first dropped what
+        // stood in the others without saying so.
+        let sections = |name: &'static str| {
+            root.children()
+                .filter(|node| node.is_element() && node.tag_name().name() == "ECU_DATA")
+                .flat_map(move |data| {
+                    data.children()
+                        .filter(move |node| node.is_element() && node.tag_name().name() == name)
+                })
+        };
+        if !root
+            .children()
+            .any(|node| node.tag_name().name() == "ECU_DATA")
+        {
+            return Err(KnowledgeError::Parse("<MDX> has no <ECU_DATA>".into()));
+        }
 
         // The identifiers a module declares it will take, not the ones it
         // will give: the readable half is already in the library.
-        if let Some(identifiers) = child_element(data, "DATA_IDENTIFIERS") {
+        for identifiers in sections("DATA_IDENTIFIERS") {
             for did in identifiers
                 .children()
                 .filter(|node| node.is_element() && node.tag_name().name() == "DID")
@@ -327,7 +343,7 @@ impl IngestionAdapter for ModuleAccessAdapter {
         // The routines it declares it can run. A routine carries no security
         // reference anywhere in this corpus: the session is the only gate SDD
         // names beside one, and it is recorded as SDD names it.
-        if let Some(routines) = child_element(data, "ROUTINE_IDENTIFIERS") {
+        for routines in sections("ROUTINE_IDENTIFIERS") {
             for routine in routines
                 .children()
                 .filter(|node| node.is_element() && node.tag_name().name() == "ROUTINE")

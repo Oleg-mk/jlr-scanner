@@ -137,7 +137,27 @@ fn the_readable_half_is_left_to_the_catalogues_that_already_hold_it() {
     assert!(store.get_record("f9-mdx.synthmod.ct.0100").is_none());
     // An entry with no number cannot be addressed, so it is passed over
     // rather than recorded with a hole in it.
-    assert_eq!(store.record_count(), 4);
+    assert_eq!(store.record_count(), 6);
+}
+
+/// Seven documents in SDD 169 carry a second `<DATA_IDENTIFIERS>` or a
+/// second `<ROUTINE_IDENTIFIERS>`. Reading only the first of each dropped
+/// what stood in the others and said nothing about it.
+#[test]
+fn a_second_section_of_either_kind_is_read_as_well_as_the_first() {
+    let mut store = KnowledgeStore::new();
+    store.ingest(&adapter("f9-mdx"), MODULE).unwrap();
+
+    let write = encoding(&store, "f9-mdx.synthmod.wr.0500");
+    assert!(
+        write.contains("name=Synthetic value in a second section"),
+        "{write}"
+    );
+    let routine = encoding(&store, "f9-mdx.synthmod.ro.0500");
+    assert!(
+        routine.contains("name=Synthetic routine in a second section"),
+        "{routine}"
+    );
 }
 
 #[test]

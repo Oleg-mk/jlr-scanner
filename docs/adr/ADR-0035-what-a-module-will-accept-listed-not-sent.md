@@ -34,10 +34,18 @@ Read on 2026-09-16 from `CURRENT_JLR_XCL_XML_DATA_XML/Xml/*/MDX_*.xml` —
 
 | declared | entries | service |
 | --- | --- | --- |
-| `READABLE` | 6,588 | `0x22` ReadDataByIdentifier |
-| `WRITEABLE` | 2,300 | `0x2E` WriteDataByIdentifier |
+| `READABLE` | 8,004 | `0x22` ReadDataByIdentifier |
+| `WRITEABLE` | 2,294 | `0x2E` WriteDataByIdentifier |
 | `CONTROLLABLE` | 124 | `0x2F` InputOutputControlByIdentifier |
-| `ROUTINE` | 8,279 entries, **253 distinct routine numbers** | `0x31` RoutineControl |
+| `ROUTINE` | 8,144 entries, **253 distinct routine numbers** | `0x31` RoutineControl |
+
+A first count of these, taken with regular expressions, reported 6,588
+readable, 2,300 writeable and 8,279 routines. It was wrong on three of the
+four: the pattern for an identifier missed documents whose element shape
+differed, and the pattern for a routine spanned across neighbouring
+elements. The numbers above were taken with a parser and are corrected here
+rather than quietly, because a measurement that hides its own mistake is
+worth less than one that does not.
 
 The shape is one element per access, beside the identifier it belongs to:
 
@@ -65,21 +73,27 @@ and one element per routine, with SDD's own name for it:
 
 Three facts the numbers settle, which were guesses before:
 
-- **The session is the gate, not the exception.** `session_03` — the
-  extended diagnostic session — is named on 7,267 access entries against
-  6,493 for `session_01`. Every writeable and every controllable identifier
-  in the sample sits in `session_03`. Stage 2 therefore begins with
-  `0x10 03` and with keeping that session alive, not with the write itself.
-- **Security stands in front of a minority, not the majority.** Of the 2,300
-  writeable identifiers, **632** name a security level; of the 124
-  controllable, **24**. Two levels are used, `security_level_1` (669) and
-  `security_level_2` (101). So roughly seven writeable identifiers in nine
-  and five controllable in six are not behind JLR's seed and key. The wall
-  is real and it is narrower than assumed.
+- **The session is the gate, and it is not the exception.** Every one of the
+  2,294 writeable and 124 controllable identifiers names `session_03`, the
+  extended diagnostic session; 33 writeable also allow the default session,
+  and nothing is writeable or controllable in the default session alone.
+  Stage 2 therefore begins with `0x10 03` and with keeping that session
+  alive, not with the write itself.
+- **Security stands in front of a minority, not the majority.** Of the 2,294
+  writeable identifiers, **628** name a security level; of the 124
+  controllable, **24**; and 114 readable ones name one too. So about three
+  writeable identifiers in four, and five controllable in six, are not
+  behind JLR's seed and key. The wall is real and it is narrower than
+  assumed.
 - **A third of the routine entries are already known to this project.**
-  Routine `0x0202` appears 1,532 times: it is the on-demand self test that
+  Routine `0x0202` appears 1,528 times: it is the on-demand self test that
   `ADR-0032` already lists and does not run. `0x0404`, VIN Learn, appears
-  1,318 times. The remaining 251 numbers are new knowledge.
+  1,308 times. The remaining 251 numbers are new knowledge.
+- **Seven documents carry a second section.** Two `MDX_PCM.xml` — X152 and
+  X351, both `201600` — hold two `<ROUTINE_IDENTIFIERS>`, and five
+  `MDX_AHCM.xml` hold two `<DATA_IDENTIFIERS>`. The adapter reads every
+  section rather than the first of each; the first export, which read only
+  the first, lost two routines and said nothing about it.
 
 ## What this is not
 
