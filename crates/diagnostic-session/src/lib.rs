@@ -698,7 +698,8 @@ impl KnowledgeLibrary {
     /// tells whoever runs it. This product lists them and runs none: every
     /// one carries `SERVICE_ROUTINE`, which is what keeps it out of stage 1.
     pub fn self_tests(&self, context: &VehicleContext, ecu_family: &str) -> Vec<SelfTestSummary> {
-        self_tests_for(&self.store, context, ecu_family)
+        let screens = self_test_screens(&self.store, context);
+        self_tests_for(&self.store, context, ecu_family, &screens)
     }
 
     /// What one module declares it will accept on this car (`ADR-0035`).
@@ -1361,6 +1362,10 @@ pub fn survey_vehicle(
     let mut families = DiagnosticEnvironmentResolver::enumerate_ecu_families(store, &context);
     families.sort_by(|left, right| left.ecu_family.cmp(&right.ecu_family));
 
+    // The words the self tests are shown with belong to their screens, not
+    // to a module, so they are read once here rather than once per module.
+    let screens = self_test_screens(store, &context);
+
     let mut modules = Vec::new();
     for presence in families {
         let applicability = match presence.resolution {
@@ -1447,7 +1452,7 @@ pub fn survey_vehicle(
                 }
             }
         }
-        entry.self_tests = self_tests_for(store, &context, family);
+        entry.self_tests = self_tests_for(store, &context, family, &screens);
         entry.accepted_operations = accepted_operations_for(store, &context, family);
         entry.readable_identifiers =
             DiagnosticEnvironmentResolver::readable_identifiers(store, &context, family)
@@ -1520,7 +1525,16 @@ fn accepted_operations_for(
 ) -> Vec<AcceptedOperationSummary> {
     let mut context = context.clone();
     context.ecu_family = Some(ecu_family.to_string());
-    let result = store.query(&KnowledgeQuery::for_vehicle(context).include_indeterminate(true));
+    // Named, so the store drops every record that belongs to another module
+    // before it copies one or traces its evidence. Each of these records
+    // names its module, so nothing is lost by asking for one; without it a
+    // survey of seven hundred modules walked half a million records seven
+    // hundred times over, which is what the owner watched it do (2026-09-16).
+    let result = store.query(
+        &KnowledgeQuery::for_vehicle(context)
+            .with_ecu_family(ecu_family)
+            .include_indeterminate(true),
+    );
     let mut found: Vec<AcceptedOperationSummary> = Vec::new();
     for entry in &result.records {
         if entry.applicability_resolution == ApplicabilityResolution::NotApplicable {
@@ -1578,13 +1592,89 @@ fn parse_encoding(encoding: &str) -> BTreeMap<String, String> {
         .collect()
 }
 
+/// The unit separator the exported screen items put between a line's name
+/// and the line itself.
+const SCREEN_ITEM_SEPARATOR: char = '\u{1F}';
+
+/// The words a self test's screens carry. They belong to the screen and not
+/// to a module — SDD writes them once and every module's test points at them
+/// — so they are gathered once for a survey rather than once for each of a
+/// car's hundreds of modules. The query behind them is the expensive kind:
+/// it walks the whole store, because a screen names no module to filter by.
+#[derive(Debug, Default)]
+pub struct SelfTestScreens {
+    /// What each screen says, in English, as one text.
+    screens: BTreeMap<String, String>,
+    /// The same screens by line, each line under the mnemonic's name.
+    items: BTreeMap<String, ScreenItems>,
+    /// And the same lines in each other language the library carries.
+    items_in: ScreenItemsByLanguage,
+}
+
+fn parse_screen_items(value: &str) -> ScreenItems {
+    value
+        .lines()
+        .filter_map(|line| {
+            let (name, text) = line.split_once(SCREEN_ITEM_SEPARATOR)?;
+            Some((name.to_string(), text.to_string()))
+        })
+        .collect()
+}
+
+fn self_test_screens(store: &KnowledgeStore, context: &VehicleContext) -> SelfTestScreens {
+    let result =
+        store.query(&KnowledgeQuery::for_vehicle(context.clone()).include_indeterminate(true));
+    let mut gathered = SelfTestScreens::default();
+    for entry in &result.records {
+        if entry.applicability_resolution == ApplicabilityResolution::NotApplicable {
+            continue;
+        }
+        let ClaimKey::Custom { name } = &entry.record.key else {
+            continue;
+        };
+        let KnowledgeValue::Text { value } = &entry.record.value else {
+            continue;
+        };
+        if let Some(remainder) = name.strip_prefix(ODST_SCREEN_ITEMS_CLAIM_PREFIX) {
+            match screen_and_language(remainder) {
+                (screen, None) => {
+                    gathered
+                        .items
+                        .insert(screen.to_string(), parse_screen_items(value));
+                }
+                (screen, Some(language)) => {
+                    gathered
+                        .items_in
+                        .entry(screen.to_string())
+                        .or_default()
+                        .insert(language.to_string(), parse_screen_items(value));
+                }
+            }
+        } else if let Some(remainder) = name.strip_prefix(ODST_SCREEN_CLAIM_PREFIX) {
+            // The other languages are read from their items, which carry
+            // the names the lines are joined by; the text claim is English's.
+            if let (screen, None) = screen_and_language(remainder) {
+                gathered.screens.insert(screen.to_string(), value.clone());
+            }
+        }
+    }
+    gathered
+}
+
 fn self_tests_for(
     store: &KnowledgeStore,
     context: &VehicleContext,
     ecu_family: &str,
+    gathered: &SelfTestScreens,
 ) -> Vec<SelfTestSummary> {
-    let result =
-        store.query(&KnowledgeQuery::for_vehicle(context.clone()).include_indeterminate(true));
+    // This module's own records only. A test and the screen it is given both
+    // name their module, so the store can drop the rest before it copies a
+    // record or traces its evidence.
+    let result = store.query(
+        &KnowledgeQuery::for_vehicle(context.clone())
+            .with_ecu_family(ecu_family)
+            .include_indeterminate(true),
+    );
     // What the data does not rule out for this car, which is the same rule
     // `describe_dtc_with_help` uses for a help screen and for the same
     // reason: SDD qualifies a test by a model-year marker on a dimension
@@ -1597,53 +1687,24 @@ fn self_tests_for(
         .filter(|entry| entry.applicability_resolution != ApplicabilityResolution::NotApplicable)
         .collect();
 
-    // The screens this car is given, by test entity; what each screen says,
-    // by name, in English; and the same screens' items in each other
-    // language the library carries, joined to the English by the
-    // mnemonic's name (`ADR-0034`).
+    // Which screens this module's tests are given; the words themselves were
+    // gathered once, for every module.
+    let screens = &gathered.screens;
+    let items = &gathered.items;
+    let items_in = &gathered.items_in;
     let mut given: BTreeMap<String, Vec<String>> = BTreeMap::new();
-    let mut screens: BTreeMap<String, String> = BTreeMap::new();
-    let mut items: BTreeMap<String, ScreenItems> = BTreeMap::new();
-    let mut items_in: ScreenItemsByLanguage = BTreeMap::new();
-    let parse_items = |value: &str| -> ScreenItems {
-        value
-            .lines()
-            .filter_map(|line| {
-                let (name, text) = line.split_once('\u{1F}')?;
-                Some((name.to_string(), text.to_string()))
-            })
-            .collect()
-    };
     for entry in &applicable {
         let ClaimKey::Custom { name } = &entry.record.key else {
             continue;
         };
-        let KnowledgeValue::Text { value } = &entry.record.value else {
+        if !matches!(entry.record.value, KnowledgeValue::Text { .. }) {
             continue;
-        };
+        }
         if let Some(screen) = name.strip_prefix(ODST_HELP_CLAIM_PREFIX) {
             given
                 .entry(entry.record.entity.id.clone())
                 .or_default()
                 .push(screen.to_string());
-        } else if let Some(remainder) = name.strip_prefix(ODST_SCREEN_ITEMS_CLAIM_PREFIX) {
-            match screen_and_language(remainder) {
-                (screen, None) => {
-                    items.insert(screen.to_string(), parse_items(value));
-                }
-                (screen, Some(language)) => {
-                    items_in
-                        .entry(screen.to_string())
-                        .or_default()
-                        .insert(language.to_string(), parse_items(value));
-                }
-            }
-        } else if let Some(remainder) = name.strip_prefix(ODST_SCREEN_CLAIM_PREFIX) {
-            // The other languages are read from their items, which carry
-            // the names the lines are joined by; the text claim is English's.
-            if let (screen, None) = screen_and_language(remainder) {
-                screens.insert(screen.to_string(), value.clone());
-            }
         }
     }
 

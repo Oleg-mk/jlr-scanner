@@ -1,4 +1,5 @@
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { StrictMode } from "react";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { App } from "./App";
 import { createEmptySnapshot, type AdapterClient, type AdapterSnapshot } from "./adapter";
@@ -118,6 +119,31 @@ describe("the library folder between launches", () => {
     render(<App client={new NoAdapter()} libraryClient={library} pollIntervalMs={100_000} />);
     await waitFor(() => expect(library.asked).toEqual([FOLDER]));
     expect(await screen.findByDisplayValue(FOLDER)).toBeInTheDocument();
+  });
+
+  /**
+   * React runs an effect twice on purpose in development, and the guard that
+   * stops the restore happening twice was held in state, which is still
+   * false when the second run looks. The library was then read twice: the
+   * second reading queued behind the first in the shell, and the panel
+   * counted seconds long after it had said the library was loaded
+   * (2026-09-16).
+   */
+  it("is read once even where the effect runs twice", async () => {
+    window.localStorage.setItem(KEY, FOLDER);
+    const library = new RecordingLibrary();
+    render(
+      <StrictMode>
+        <App client={new NoAdapter()} libraryClient={library} pollIntervalMs={100_000} />
+      </StrictMode>,
+    );
+    await waitFor(() => expect(library.asked).toEqual([FOLDER]));
+    expect(await screen.findByDisplayValue(FOLDER)).toBeInTheDocument();
+    // And it stays once: a second reading would appear here.
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(library.asked).toEqual([FOLDER]);
   });
 
   it("asks for nothing on a first launch", async () => {

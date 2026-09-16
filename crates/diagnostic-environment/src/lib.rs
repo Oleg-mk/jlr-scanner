@@ -1214,7 +1214,16 @@ impl DiagnosticEnvironmentResolver {
     ) -> Vec<ReadableIdentifier> {
         let mut context = vehicle_context.clone();
         context.ecu_family = Some(ecu_family.to_string());
-        let result = store.query(&KnowledgeQuery::for_vehicle(context).include_indeterminate(true));
+        // The module is named to the store as well as to the context. Every
+        // record this loop keeps names its module anyway — the check below
+        // is unchanged — so naming it in the query only saves the store from
+        // copying and tracing what it would then throw away. A survey asks
+        // this once per module, and a car has hundreds.
+        let result = store.query(
+            &KnowledgeQuery::for_vehicle(context)
+                .with_ecu_family(ecu_family)
+                .include_indeterminate(true),
+        );
 
         let mut found: BTreeMap<u16, ReadableIdentifier> = BTreeMap::new();
         for entry in &result.records {
@@ -1261,8 +1270,13 @@ impl DiagnosticEnvironmentResolver {
 
 /// Buses the family's own applicable claims place it on, deduplicated.
 fn stated_buses(store: &KnowledgeStore, context: &VehicleContext, ecu_family: &str) -> Vec<String> {
-    let result =
-        store.query(&KnowledgeQuery::for_vehicle(context.clone()).include_indeterminate(true));
+    // Only this family's own claims are read below, and the store can drop
+    // the rest before copying them.
+    let result = store.query(
+        &KnowledgeQuery::for_vehicle(context.clone())
+            .with_ecu_family(ecu_family)
+            .include_indeterminate(true),
+    );
     let mut buses = BTreeSet::new();
     for entry in &result.records {
         if entry.applicability_resolution != ApplicabilityResolution::Applicable

@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { t, useLanguage } from "../i18n";
 import type {
   VehicleCatalogueSnapshot,
@@ -11,6 +12,7 @@ interface VehicleCardProps {
   vehicle: VehicleDescription;
   catalogue: VehicleCatalogueSnapshot;
   survey: VehicleSurveySnapshot | null;
+  /** The modules are being read. The library panel has a flag of its own. */
   busy: boolean;
   libraryReady: boolean;
   vin: string;
@@ -44,6 +46,22 @@ export function VehicleCard({
 }: VehicleCardProps) {
   useLanguage();
   const canSurvey = libraryReady && !busy && vehicle.vehicleProgram.trim() !== "";
+  // The seconds, counted where the person is looking: under the button they
+  // pressed, not in the library panel two screens above it.
+  const [elapsed, setElapsed] = useState(0);
+  useEffect(() => {
+    if (!busy) {
+      setElapsed(0);
+      return;
+    }
+    const started = Date.now();
+    setElapsed(0);
+    const timer = window.setInterval(
+      () => setElapsed(Math.round((Date.now() - started) / 1000)),
+      1000,
+    );
+    return () => window.clearInterval(timer);
+  }, [busy]);
   const programme = catalogue.programmes.find((entry) => entry.program === vehicle.vehicleProgram);
   const hasCatalogue = catalogue.programmes.length > 0;
   const marker = programme?.markers.find((entry) => entry.marker === vehicle.yearBreakpoint);
@@ -271,6 +289,17 @@ export function VehicleCard({
       >
         {busy ? t("Working…") : t("Survey modules")}
       </button>
+      {busy ? (
+        <p className="library-status" role="status">
+          {t("Reading the modules…")} {elapsed}&nbsp;{t("sec")}
+          <br />
+          <span className="button-hint">
+            {t(
+              "Every module the data names is read from the library, with what it can be asked and what it will accept. On a full library this takes seconds, and longer on an old machine.",
+            )}
+          </span>
+        </p>
+      ) : null}
       </div>
       {survey !== null ? (
         <ul className="survey-stats" aria-label={t("Survey summary")}>

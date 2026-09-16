@@ -481,7 +481,7 @@ export function App({
                       vehicle={library.vehicle}
                       catalogue={library.catalogue}
                       survey={library.survey}
-                      busy={library.busy}
+                      busy={library.surveying}
                       libraryReady={library.library.state !== "FAILED"}
                       vin={library.vin}
                       vinDecode={library.vinDecode}

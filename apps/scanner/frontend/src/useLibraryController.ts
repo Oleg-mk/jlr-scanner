@@ -78,6 +78,14 @@ export function useLibraryController(client: LibraryClient) {
   const [survey, setSurvey] = useState<VehicleSurveySnapshot | null>(null);
   const [catalogue, setCatalogue] = useState<VehicleCatalogueSnapshot>({ programmes: [] });
   const [busy, setBusy] = useState(false);
+  /**
+   * True while the modules are being surveyed. It is deliberately not
+   * `busy`: the library panel counts seconds off that flag, so a survey used
+   * to make the panel two screens above claim it was reading the library
+   * again, while the button the person had just pressed said nothing
+   * (2026-09-16).
+   */
+  const [surveying, setSurveying] = useState(false);
   const [vin, setVin] = useState("");
   const [vinDecode, setVinDecode] = useState<VinDecodeSnapshot | null>(null);
   const [decodingVin, setDecodingVin] = useState(false);
@@ -87,7 +95,12 @@ export function useLibraryController(client: LibraryClient) {
     void client
       .getLibrary()
       .then((next) => {
-        if (active) setLibrary(next);
+        // What the shell held before anything was asked of it. A reading
+        // started since has the newer answer, so this one is dropped: it
+        // would otherwise say "built-in data only" over a library that is
+        // loading, or "loaded" while the folder chosen since is still being
+        // read.
+        if (active && request.current === 0) setLibrary(next);
       })
       .catch((error: unknown) => {
         if (active) setLibrary(failedLibrary(error));
@@ -143,13 +156,20 @@ export function useLibraryController(client: LibraryClient) {
   // for again. The window stays usable while it reads, and the panel counts
   // the seconds; a folder that has gone, or a copy whose date has passed,
   // says so in the same words it would say them at any other time.
-  const [restored, setRestored] = useState(false);
+  //
+  // The guard is a ref and not state on purpose. React runs this effect
+  // twice on purpose in development, and a guard held in state is still
+  // false the second time, so the library was read twice: the second reading
+  // queued behind the first in the shell, the first one's answer was dropped
+  // as superseded, and the panel counted seconds long after it had said the
+  // library was loaded. A ref is already set when the second run looks.
+  const restored = useRef(false);
   useEffect(() => {
-    if (restored) return;
-    setRestored(true);
+    if (restored.current) return;
+    restored.current = true;
     const remembered = readStoredDirectory().trim();
     if (remembered !== "") void loadFrom(remembered, true);
-  }, [loadFrom, restored]);
+  }, [loadFrom]);
 
   const chooseDirectory = useCallback(async () => {
     const chosen = await pickDirectory();
@@ -157,13 +177,13 @@ export function useLibraryController(client: LibraryClient) {
   }, []);
 
   const runSurvey = useCallback(async () => {
-    setBusy(true);
+    setSurveying(true);
     try {
       setSurvey(await client.surveyVehicle(vehicle));
     } catch (error) {
       setSurvey(failedSurvey(vehicle, error));
     } finally {
-      setBusy(false);
+      setSurveying(false);
     }
   }, [client, vehicle]);
 
@@ -226,6 +246,7 @@ export function useLibraryController(client: LibraryClient) {
     survey,
     busy,
     restoring,
+    surveying,
     load,
     runSurvey,
   };

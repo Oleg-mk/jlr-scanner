@@ -410,6 +410,9 @@ const uk: Record<string, string> = {
   "Connection": "З'єднання",
   "Choose folder…": "Обрати папку…",
   "Reading the library…": "Читаю бібліотеку…",
+  "Reading the modules…": "Читаю модулі…",
+  "Every module the data names is read from the library, with what it can be asked and what it will accept. On a full library this takes seconds, and longer on an old machine.":
+    "Кожен модуль, який називають дані, читається з бібліотеки — разом з тим, що в нього можна спитати і що він прийме. На повній базі це кілька секунд, на старій машині довше.",
   "Reading the folder remembered from last time…": "Читаю теку, запам'ятану з минулого разу…",
   "Another folder can be chosen and loaded right now; the newer one wins and this reading is dropped.":
     "Можна просто зараз обрати іншу теку і завантажити її: переможе новіша, а це читання буде відкинуто.",
@@ -1520,6 +1523,9 @@ const ru: Record<string, string> = {
   "Connection": "Подключение",
   "Choose folder…": "Выбрать папку…",
   "Reading the library…": "Читаю библиотеку…",
+  "Reading the modules…": "Читаю модули…",
+  "Every module the data names is read from the library, with what it can be asked and what it will accept. On a full library this takes seconds, and longer on an old machine.":
+    "Каждый модуль, который называют данные, читается из библиотеки — вместе с тем, что у него можно спросить и что он примет. На полной базе это несколько секунд, на старой машине дольше.",
   "Reading the folder remembered from last time…": "Читаю папку, запомненную с прошлого раза…",
   "Another folder can be chosen and loaded right now; the newer one wins and this reading is dropped.":
     "Можно прямо сейчас выбрать другую папку и загрузить её: победит более новая, а это чтение будет отброшено.",
