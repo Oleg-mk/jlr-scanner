@@ -39,6 +39,16 @@ Read on 2026-09-16 from `CURRENT_JLR_XCL_XML_DATA_XML/Xml/*/MDX_*.xml` —
 | `CONTROLLABLE` | 124 | `0x2F` InputOutputControlByIdentifier |
 | `ROUTINE` | 8,144 entries, **253 distinct routine numbers** | `0x31` RoutineControl |
 
+**Corrected on 2026-09-16, the same day.** The `READABLE` row counts every
+`<READABLE>` element in the 1,790 documents, and they do not all belong to an
+identifier: 6,576 stand under a `<DID>`, which is what `0x22` carries, and the
+other **1,428** stand under a `<MEMORY_AREA>`, which is `0x23`
+ReadMemoryByAddress — a service this product does not use and did not take.
+The three rows this decision is about are unaffected: every writeable and
+controllable element belongs to a `<DID>` and every routine to a `<ROUTINE>`.
+The routine row counts entries; 49 of them repeat a number already declared
+in the same document, so 8,095 routine records are written, not 8,144.
+
 A first count of these, taken with regular expressions, reported 6,588
 readable, 2,300 writeable and 8,279 routines. It was wrong on three of the
 four: the pattern for an identifier missed documents whose element shape

@@ -508,6 +508,27 @@ formatting document describes the bytes of the ones this product can decode.
 Nothing is judged, nothing is written, and no health percentage is computed
 out of parts SDD did not put together.
 
+### F22 — what a module will accept, listed and not sent (2026-09-16, `ADR-0035`)
+
+Built. Until now the product read SDD's module index for one half only: the
+identifiers a module declares readable. The other half is knowledge too —
+every identifier declared **writeable** or **controllable**, and every
+**routine** a module declares it can run, each with the service that would
+carry it, the session it requires, and the security level standing in front
+of it where there is one. Over 1,790 documents that is 2,294 writeable
+identifiers, 124 controllable and 8,144 routine entries over 253 distinct
+numbers; 628 and 24 of them respectively sit behind security, and every
+writeable and controllable one names the extended session. Each row carries
+its safety class — `PERSISTENT_CHANGE`, `VOLATILE_CONTROL`,
+`SERVICE_ROUTINE` — and the module panel lists them under what was read.
+
+Nothing sends any of them, and this entry is not permission to. It is the
+first three of the four desk tasks the owner set on 2026-09-16 — rewrite the
+right side of the reference, write the ADR, draw the operations into classes,
+try them on the bench. **The bench is what remains**: exercising these
+classes against the virtual vehicle of `ADR-0020`, still without a byte
+leaving for a car.
+
 ### F14 — K-line transport for the legacy buses (brought forward 2026-09-12, `ADR-0029`)
 
 ISO 9141 / ISO 14230 over J1962 pins 7 and 8, which the MongoosePro JLR variant
@@ -725,6 +746,14 @@ replaced it. See `ADR-0028`.
 
 Service functions and configuration follow only after an explicit owner decision
 and the ADRs described under "Scope". Not scheduled here yet.
+
+The desk work of stage 2 began on 2026-09-16 by the owner's decision, while no
+tester's report exists: `ADR-0035` and F22 put the catalogue's other half into
+the knowledge base and drew every operation into its safety class, listing them
+and sending none. That is preparation, not authorisation. The scope table above
+is unchanged, and stage 2 still needs its own ADR, its own confirmation in the
+interface, and the architecture guard loosened visibly, in the same commit that
+authorises it.
 
 `CAPABILITY_MATRIX.md` (2026-09-12) lists, row by row, what SDD 169 does at
 its fullest — read from its own scripts and module documents — against what

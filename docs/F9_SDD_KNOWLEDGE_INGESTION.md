@@ -1097,3 +1097,73 @@ and `the_byte_description_joins_the_module_that_serves_the_parameter` in
 charge, a quiescent current, a monitor-reset count and a turbocharger
 parameter that must stay out, and whose module also declares the dedicated
 `BATT` set.
+## 2026-09-16 — the right half of the module index (`ADR-0035`)
+
+The per-module indexes `MDX_<ECU>.xml` have been open since the readable
+identifiers were taken from them. They also declare what a module will
+**accept**: an identifier that can be written, an identifier whose output can
+be controlled, and a routine it can be asked to run. `ModuleAccessAdapter`
+reads those three and writes a namespace for each — `sdd_module_write`,
+`sdd_module_control`, `sdd_module_routine` — with SDD's own name for the
+thing, the service that would carry it (`0x2E`, `0x2F`, `0x31`), the
+diagnostic session it requires, the security level standing in front of it
+where there is one, and, for a routine, the maximum run time and whether it
+may be restarted while running. The readable half is left alone: the DID
+catalogue and the platform documents already hold it.
+
+**Every section, not the first of each.** `<ECU_DATA>` may carry more than
+one `<DATA_IDENTIFIERS>` or `<ROUTINE_IDENTIFIERS>`, and seven documents do —
+`MDX_PCM.xml` under `X152_201600` and `X351_201600`, and five `MDX_AHCM.xml`.
+The first export read the first of each and lost two routines without saying
+so; the adapter now flattens every section, and the fixture carries a second
+section of each kind so the mistake cannot come back unnoticed.
+
+### Real-source run
+
+| | |
+| --- | --- |
+| documents found | 1,841 |
+| …skipped: the directory names no programme-year | 51 |
+| read | 1,790, over 53 programme-years and 102 kinds of module |
+| documents that declare at least one operation | 1,764 — the manifests written |
+| `WRITEABLE` | 2,294, of which 628 name a security level |
+| `CONTROLLABLE` | 124, of which 24 name a security level |
+| `ROUTINE` | 8,144 entries over 253 distinct numbers |
+| declarations in all | 10,562 |
+| …the same number declared twice in one document | 80 — 49 routines, 31 identifiers |
+| records written | **10,482** in `module_access.json.gz` |
+| the library | 517,595 records over 12,157 sources |
+| rejected | 0 |
+
+Every writeable and every controllable identifier names `session_03`, the
+extended diagnostic session; 33 writeable ones also allow the default
+session, and nothing is writeable or controllable in the default session
+alone. Of the 8,095 routine records, 1,528 are `0x0202` — the on-demand
+self test `ADR-0032` already lists and does not run — and 1,308 are
+`0x0404`, VIN Learn; the remaining 251 numbers are knowledge this project
+did not have.
+
+A first count of the same documents, taken with regular expressions, reported
+2,300 writeable and 8,279 routines, and was wrong on three of the four rows
+`ADR-0035` records. Both tables were taken with a parser, and the ADR states
+the correction in its own text rather than quietly.
+
+**What was left where it was.** The documents also declare 8,004 `<READABLE>`
+elements. 6,576 of them stand under a `<DID>` and are the readable half the
+DID catalogue and the platform documents already hold; the other **1,428**
+stand under a `<MEMORY_AREA>`, an area of memory read with `0x23`
+ReadMemoryByAddress. That service is not in this product and this ingest did
+not take those rows; they are counted here so that the next reader of these
+documents knows they are there.
+
+Nothing sends any of this. Each row carries the safety class it would have to
+be granted — `PERSISTENT_CHANGE` for a write, `VOLATILE_CONTROL` for a
+control, `SERVICE_ROUTINE` for a routine — and the guard in
+`scripts/check-architecture.mjs` is untouched.
+
+Golden tests: seven in `f9_mdx_module_access.rs` over a synthetic fixture
+that carries one identifier of each access, a routine of each shape, an entry
+with no number, a second section of each kind, and a document that is not a
+module index; and three in `module_accepted_operations.rs`, which check that
+every kind reaches the session layer with its class, its cost and nothing
+else, and that a module of another name is given nothing.
