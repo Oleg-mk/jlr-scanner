@@ -187,89 +187,6 @@ export function ModuleDetails({
               </label>
             ) : null}
           </div>
-          {module.selfTests.length > 0 ? (
-            <div className="self-tests">
-              <h3>{t("Self tests this module declares")}</h3>
-              <p className="module-validation">
-                {t(
-                  "SDD can command these; this application does not. A self test is a routine, not a read, and routines belong to a later stage with their own safety rules. The list is here because knowing what a module can be asked to do is worth having.",
-                )}
-              </p>
-              <p className="module-validation">
-                {t(
-                  "The year markers are SDD's own and this session does not check them, so a test listed here can belong to another year of the same programme.",
-                )}
-              </p>
-              <HelpLanguageSwitch />
-              <ul className="self-test-list">
-                {module.selfTests.map((test) => (
-                  <li key={test.testId}>
-                    <div className="self-test-head">
-                      <strong>{test.name}</strong>
-                      <span className="module-validation">
-                        {t("test {id}", { id: test.testId })}
-                        {test.modelYears.length === 0
-                          ? ""
-                          : ` · ${test.modelYears.join(", ")}`}
-                        {test.timeMs === null
-                          ? ""
-                          : ` · ${t("{seconds} s", { seconds: Math.round(test.timeMs / 1000) })}`}
-                        {` · ${test.safetyClass}`}
-                      </span>
-                    </div>
-                    {helpLines(test.descriptionTexts, test.description, helpLanguage).map(
-                      (line, index) => (
-                        <p className="self-test-line" key={`${test.testId}-${index}`}>
-                          {line}
-                        </p>
-                      ),
-                    )}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ) : null}
-          {(module.acceptedOperations ?? []).length > 0 ? (
-            <div className="accepted-operations">
-              <h3>{t("What this module will accept")}</h3>
-              <p className="module-validation">
-                {t(
-                  "SDD declares these; this application sends none of them. A value written into a module, an output driven by hand and a routine the module runs are three different kinds of change, and each belongs to a later stage with its own safety rules. The list is here because the cost of an operation is worth knowing long before anyone decides whether to allow it.",
-                )}
-              </p>
-              <ul className="accepted-operation-list">
-                {(module.acceptedOperations ?? []).map((operation) => (
-                  <li key={`${operation.kind}-${operation.identifier}`}>
-                    <div className="accepted-operation-head">
-                      <strong>{operation.name ?? operation.identifier}</strong>
-                      <span className="module-validation">
-                        {[
-                          operation.identifier,
-                          operation.service === null
-                            ? null
-                            : t("service {service}", { service: operation.service }),
-                          operation.sessions.length === 0
-                            ? null
-                            : t("session {sessions}", {
-                                sessions: operation.sessions.join(", "),
-                              }),
-                          operation.security === null
-                            ? null
-                            : t("security {level}", { level: operation.security }),
-                          operation.maxRunTime === null
-                            ? null
-                            : t("up to {seconds} s", { seconds: operation.maxRunTime }),
-                          operation.safetyClass,
-                        ]
-                          .filter((part) => part !== null)
-                          .join(" · ")}
-                      </span>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ) : null}
           <div className="details-actions">
             <button
               className="button button--primary"
@@ -457,6 +374,92 @@ export function ModuleDetails({
           </details>
         </>
       ) : null}
+      {/* Reference, not an action: what the module declares it can be
+          asked to do stands after what was actually read, so the read
+          button keeps its place beside the identifier that feeds it. */}
+          {module.selfTests.length > 0 ? (
+            <div className="self-tests">
+              <h3>{t("Self tests this module declares")}</h3>
+              <p className="module-validation">
+                {t(
+                  "SDD can command these; this application does not. A self test is a routine, not a read, and routines belong to a later stage with their own safety rules. The list is here because knowing what a module can be asked to do is worth having.",
+                )}
+              </p>
+              <p className="module-validation">
+                {t(
+                  "The year markers are SDD's own and this session does not check them, so a test listed here can belong to another year of the same programme.",
+                )}
+              </p>
+              <HelpLanguageSwitch />
+              <ul className="self-test-list">
+                {module.selfTests.map((test) => (
+                  <li key={test.testId}>
+                    <div className="self-test-head">
+                      <strong>{test.name}</strong>
+                      <span className="module-validation">
+                        {t("test {id}", { id: test.testId })}
+                        {test.modelYears.length === 0
+                          ? ""
+                          : ` · ${test.modelYears.join(", ")}`}
+                        {test.timeMs === null
+                          ? ""
+                          : ` · ${t("{seconds} s", { seconds: Math.round(test.timeMs / 1000) })}`}
+                        {` · ${test.safetyClass}`}
+                      </span>
+                    </div>
+                    {helpLines(test.descriptionTexts, test.description, helpLanguage).map(
+                      (line, index) => (
+                        <p className="self-test-line" key={`${test.testId}-${index}`}>
+                          {line}
+                        </p>
+                      ),
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+          {(module.acceptedOperations ?? []).length > 0 ? (
+            <div className="accepted-operations">
+              <h3>{t("What this module will accept")}</h3>
+              <p className="module-validation">
+                {t(
+                  "SDD declares these; this application sends none of them. A value written into a module, an output driven by hand and a routine the module runs are three different kinds of change, and each belongs to a later stage with its own safety rules. The list is here because the cost of an operation is worth knowing long before anyone decides whether to allow it.",
+                )}
+              </p>
+              <ul className="accepted-operation-list">
+                {(module.acceptedOperations ?? []).map((operation) => (
+                  <li key={`${operation.kind}-${operation.identifier}`}>
+                    <div className="accepted-operation-head">
+                      <strong>{operation.name ?? operation.identifier}</strong>
+                      <span className="module-validation">
+                        {[
+                          operation.identifier,
+                          operation.service === null
+                            ? null
+                            : t("service {service}", { service: operation.service }),
+                          operation.sessions.length === 0
+                            ? null
+                            : t("session {sessions}", {
+                                sessions: operation.sessions.join(", "),
+                              }),
+                          operation.security === null
+                            ? null
+                            : t("security {level}", { level: operation.security }),
+                          operation.maxRunTime === null
+                            ? null
+                            : t("up to {seconds} s", { seconds: operation.maxRunTime }),
+                          operation.safetyClass,
+                        ]
+                          .filter((part) => part !== null)
+                          .join(" · ")}
+                      </span>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
     </section>
   );
 }
