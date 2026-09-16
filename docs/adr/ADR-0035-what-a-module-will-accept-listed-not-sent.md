@@ -129,3 +129,41 @@ anything yet.
 with SDD's own words, timings and instructions, and not one run. The class
 of the operation is what keeps listing and doing apart. This decision
 extends the same separation to the rest of the catalogue.
+## Run in on the bench (2026-09-16)
+
+The owner's fourth desk task. The list was walked where it can be walked
+without a car, and the walk was made to prove something.
+
+The bench (`ADR-0020`) now carries a module index of its own, so a bench
+session shows SYNTHMOD's six declarations — one output it lets be driven,
+three routines it runs itself, two identifiers it takes a value for — each
+with its service, its session, the security level standing in front of it,
+its run time and the class it would cost, in the same words the panel uses
+for a real car. A module that declares none is given none.
+
+The run-in proper is the other half. The bench vehicle keeps a tally of every
+service it is asked for, taken at the end of the line, where a car would take
+it. One whole session — survey, identifier reads, fault codes, the module
+passport, the configuration file, the battery, the odometer, live reading,
+standard OBD current data and stored codes, the K-line modules, a capture and
+the report preview, with the writes, controls and routines listed on screen
+throughout — asked the vehicle for exactly four services:
+
+| asked for | what it is |
+| --- | --- |
+| `0x01` | J1979 mode 01, current data |
+| `0x03` | J1979 mode 03, stored codes |
+| `0x19` | ReadDTCInformation |
+| `0x22` | ReadDataByIdentifier |
+
+and for nothing else. None of `0x10` DiagnosticSessionControl, `0x11`
+ECUReset, `0x27` SecurityAccess, `0x2E` WriteDataByIdentifier, `0x2F`
+InputOutputControlByIdentifier, `0x31` RoutineControl, `0x34`/`0x36`/`0x37`
+transfer or `0x3E` TesterPresent reached the vehicle.
+
+That is what `scripts/check-architecture.mjs` says statically, said from the
+other end: the guard says the constructors are not in the live path, and the
+bench says the vehicle was never asked. It now runs on every commit. The
+interface is held to the rule `ADR-0032` set for the self tests — everything
+declared is shown with what it would cost, and nothing on the screen can set
+it going — and a test of the panel says so.

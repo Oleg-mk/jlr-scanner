@@ -30,10 +30,12 @@ use mongoose_jlr::bench::share_bus;
 use mongoose_jlr::VehicleRouteId;
 use sdd_ingest::{
     BatteryFormatting, CcfAdapter, ConverterCatalogue, DidFormattingAdapter, ModelYearTimeline,
-    ModuleTextAdapter, PlatformAdapter, VinDecodeAdapter,
+    ModuleAccessAdapter, ModuleTextAdapter, PlatformAdapter, VinDecodeAdapter,
 };
+use std::collections::BTreeSet;
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
-use transport_api::EmptyBench;
+use transport_api::{BenchBus, BenchRoute, CanFrame, EmptyBench};
 
 const PLATFORM: &str = include_str!("../../../../fixtures/knowledge/synthetic/f9_platform.xml");
 const DIDS: &str = include_str!("../../../../fixtures/knowledge/synthetic/f9_did_formatting.xml");
@@ -44,6 +46,11 @@ const MODULE_TEXT: &str =
     include_str!("../../../../fixtures/knowledge/synthetic/f9_module_text.xml");
 const VIN_DECODE: &str = include_str!("../../../../fixtures/knowledge/synthetic/f9_vin_decode.xml");
 const CCF: &str = include_str!("../../../../fixtures/knowledge/synthetic/f9_ccf_data.xml");
+/// The right half of a module index (`ADR-0035`): what SYNTHMOD declares it
+/// will accept. It is on the bench so that the list can be walked at the
+/// desk, and so that walking it proves what it is meant to prove — that
+/// nothing is sent.
+const MDX: &str = include_str!("../../../../fixtures/knowledge/synthetic/f9_mdx_module.xml");
 
 fn synthetic_source(id: &str, text: &str) -> SourceRecord {
     SourceRecord {
@@ -103,6 +110,11 @@ fn library() -> KnowledgeLibrary {
         .unwrap()
         .parse(VIN_DECODE)
         .unwrap();
+    let access_batch =
+        ModuleAccessAdapter::new(synthetic_source("bench-mdx", MDX), "SYNTHA", "MY10")
+            .unwrap()
+            .parse(MDX)
+            .unwrap();
     let manifests = [
         (
             "platform.json".to_string(),
@@ -110,7 +122,14 @@ fn library() -> KnowledgeLibrary {
         ),
         (
             "bundle.json".to_string(),
-            serde_json::to_string(&vec![did_batch, text_batch, vin_batch, ccf_batch]).unwrap(),
+            serde_json::to_string(&vec![
+                did_batch,
+                text_batch,
+                vin_batch,
+                ccf_batch,
+                access_batch,
+            ])
+            .unwrap(),
         ),
     ];
     KnowledgeLibrary::from_manifests(
@@ -118,6 +137,77 @@ fn library() -> KnowledgeLibrary {
             .iter()
             .map(|(name, text)| (name.as_str(), text.as_str())),
     )
+}
+
+/// Every diagnostic service the application put on the bus during one bench
+/// session, gathered where the vehicle receives it.
+///
+/// The static guard in `scripts/check-architecture.mjs` says the request
+/// constructors for the stage-2 services do not exist in the live path. This
+/// says the same thing from the other end, at run time and with the module's
+/// declared writes, controls and routines loaded: a whole session went by and
+/// the vehicle was never asked for one of them.
+struct WatchingBench {
+    inner: Box<dyn BenchBus>,
+    seen: Arc<Mutex<BTreeSet<u8>>>,
+}
+
+impl WatchingBench {
+    fn wrap(bench: &mongoose_jlr::bench::SharedBenchBus) -> Arc<Mutex<BTreeSet<u8>>> {
+        let seen = Arc::new(Mutex::new(BTreeSet::new()));
+        let mut guard = bench.lock().unwrap();
+        let inner = std::mem::replace(&mut *guard, Box::new(EmptyBench) as Box<dyn BenchBus>);
+        *guard = Box::new(WatchingBench {
+            inner,
+            seen: seen.clone(),
+        });
+        seen
+    }
+}
+
+/// The service byte of a request frame, or `None` when the frame carries no
+/// request: a consecutive frame, a flow control, or a payload too short. The
+/// medium-speed bus of this vehicle is extended-addressed, so its ISO-TP
+/// header starts one byte in; reading the layout of the wrong bus would
+/// invent services that were never sent.
+fn service_of(route: BenchRoute, data: &[u8]) -> Option<u8> {
+    let frame = if route == BenchRoute::MsCan {
+        data.get(1..)?
+    } else {
+        data
+    };
+    match frame.first()? >> 4 {
+        0x0 => frame.get(1).copied(),
+        0x1 => frame.get(2).copied(),
+        _ => None,
+    }
+}
+
+impl BenchBus for WatchingBench {
+    fn on_frame(&mut self, route: BenchRoute, frame: &CanFrame) -> Vec<CanFrame> {
+        if let Some(service) = service_of(route, &frame.data) {
+            self.seen.lock().unwrap().insert(service);
+        }
+        self.inner.on_frame(route, frame)
+    }
+
+    fn tick(&mut self, route: BenchRoute) -> Vec<CanFrame> {
+        self.inner.tick(route)
+    }
+
+    fn on_line_bytes(&mut self, route: BenchRoute, bytes: &[u8]) -> Vec<u8> {
+        // A serial line carries its own framing, not ISO-TP; what is counted
+        // here is the CAN side, where every service of stage 2 would live.
+        self.inner.on_line_bytes(route, bytes)
+    }
+
+    fn has_serial_modules(&self, route: BenchRoute) -> bool {
+        self.inner.has_serial_modules(route)
+    }
+
+    fn describe(&self) -> String {
+        self.inner.describe()
+    }
 }
 
 fn vehicle() -> VehicleContextInput {
@@ -157,6 +247,8 @@ fn the_bench_connects_without_a_port_reads_the_surveyed_vehicle_and_marks_everyt
     let survey = session.survey(&vehicle());
     refresh_bench(&bench, &session, bench_vehicle::SCENARIO_DEFAULT);
     assert!(bench.lock().unwrap().describe().contains("SYNTHA"));
+    // From here the vehicle keeps a tally of what it was asked for.
+    let services = WatchingBench::wrap(&bench);
 
     // One identifier read through the real stack: prepared from the library,
     // executed over the adapter protocol, decoded, then marked.
@@ -165,6 +257,62 @@ fn the_bench_connects_without_a_port_reads_the_surveyed_vehicle_and_marks_everyt
         .iter()
         .find(|module| module.ecu_family == "SYNTHMOD")
         .expect("SYNTHMOD is surveyed");
+    // What this module declares it will accept, on the bench, in the order
+    // and the words the panel shows (`ADR-0035`). Six rows over the two
+    // sections of the index: two identifiers it takes a value for, one output
+    // it lets be driven, three routines it runs itself.
+    let accepted = &synthmod.accepted_operations;
+    let listed: Vec<(&str, &str, &str)> = accepted
+        .iter()
+        .map(|operation| {
+            (
+                operation.kind.as_str(),
+                operation.identifier.as_str(),
+                operation.safety_class.as_str(),
+            )
+        })
+        .collect();
+    assert_eq!(
+        listed,
+        vec![
+            ("CONTROL", "0x0300", "VOLATILE_CONTROL"),
+            ("ROUTINE", "0x0202", "SERVICE_ROUTINE"),
+            ("ROUTINE", "0x0400", "SERVICE_ROUTINE"),
+            ("ROUTINE", "0x0500", "SERVICE_ROUTINE"),
+            ("WRITE", "0x0200", "PERSISTENT_CHANGE"),
+            ("WRITE", "0x0500", "PERSISTENT_CHANGE"),
+        ],
+        "{accepted:?}"
+    );
+    // Every one of them costs the extended session, and none is offered in
+    // the default one: the first thing stage 2 would have to send is 0x10 03.
+    assert!(
+        accepted
+            .iter()
+            .all(|operation| operation.sessions.iter().any(|session| session == "03")),
+        "{accepted:?}"
+    );
+    let control = accepted
+        .iter()
+        .find(|operation| operation.kind == "CONTROL")
+        .expect("the controllable identifier is listed");
+    assert_eq!(control.service.as_deref(), Some("0x2F"));
+    assert_eq!(control.security.as_deref(), Some("level_1"));
+    let clear_adaptions = accepted
+        .iter()
+        .find(|operation| operation.identifier == "0x0400")
+        .expect("the routine is listed");
+    assert_eq!(clear_adaptions.service.as_deref(), Some("0x31"));
+    assert_eq!(clear_adaptions.max_run_time.as_deref(), Some("30"));
+    assert_eq!(clear_adaptions.restart_while_running.as_deref(), Some("no"));
+    // A module that declares none of this is given none of it.
+    let othermod = survey
+        .modules
+        .iter()
+        .find(|module| module.ecu_family == "OTHERMOD")
+        .expect("OTHERMOD is surveyed");
+    assert!(othermod.accepted_operations.is_empty());
+
     let identifier = synthmod
         .readable_identifiers
         .first()
@@ -816,6 +964,37 @@ fn the_bench_connects_without_a_port_reads_the_surveyed_vehicle_and_marks_everyt
     assert!(adapter.is_bench(), "a refusal does not drop the bench");
     adapter.clear_session_error();
     assert!(adapter.snapshot().error.is_none());
+
+    // The run-in itself: a whole session has gone by with the module's
+    // writes, controls and routines listed on screen, and this is every
+    // service the vehicle was actually asked for.
+    let seen = services.lock().unwrap().clone();
+    let asked: Vec<String> = seen
+        .iter()
+        .map(|service| format!("{service:#04X}"))
+        .collect();
+    assert_eq!(
+        asked,
+        vec!["0x01", "0x03", "0x19", "0x22"],
+        "every service the bench vehicle was asked for"
+    );
+    for (service, what) in [
+        (0x10u8, "DiagnosticSessionControl"),
+        (0x11, "ECUReset"),
+        (0x27, "SecurityAccess"),
+        (0x2E, "WriteDataByIdentifier"),
+        (0x2F, "InputOutputControlByIdentifier"),
+        (0x31, "RoutineControl"),
+        (0x34, "RequestDownload"),
+        (0x36, "TransferData"),
+        (0x37, "RequestTransferExit"),
+        (0x3E, "TesterPresent"),
+    ] {
+        assert!(
+            !seen.contains(&service),
+            "{what} ({service:#04X}) reached the vehicle; this stage sends none of it: {seen:02X?}"
+        );
+    }
 
     // Connecting a real adapter drops the bench link first, whatever the
     // enumeration then finds on this machine.

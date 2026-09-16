@@ -142,6 +142,30 @@ const surveyed: ModuleSurveyEntry[] = [
     dtcRead: { status: "REACHABLE", reasons: [] },
     readableIdentifiers: [{ identifier: "0x1945", parameters: ["Synthetic module-scoped value"] }],
     selfTests: [],
+    acceptedOperations: [
+      {
+        kind: "ROUTINE",
+        identifier: "0x0406",
+        name: "Synthetic clear adaption values",
+        service: "0x31",
+        sessions: ["03"],
+        security: "level_1",
+        maxRunTime: "30",
+        restartWhileRunning: "no",
+        safetyClass: "SERVICE_ROUTINE",
+      },
+      {
+        kind: "WRITE",
+        identifier: "0x1259",
+        name: "Synthetic engine input",
+        service: "0x2E",
+        sessions: ["03"],
+        security: null,
+        maxRunTime: null,
+        restartWhileRunning: null,
+        safetyClass: "PERSISTENT_CHANGE",
+      },
+    ],
   },
 ];
 
@@ -310,6 +334,44 @@ describe("module read", () => {
     expect(
       screen.queryByRole("heading", { name: "Self tests this module declares" }),
     ).toBeNull();
+  });
+
+  /**
+   * The other half of the module index (`ADR-0035`). The rule is the one
+   * `ADR-0032` set for the self tests: everything SDD declares is shown, with
+   * what it would cost, and nothing on the screen can set it going.
+   */
+  it("lists what a module will accept and offers no way to send any of it", async () => {
+    renderApp(new ControlledModuleReadClient());
+    await screen.findByRole("button", { name: "Read" });
+    fireEvent.change(screen.getByLabelText("Programme"), { target: { value: "L405" } });
+    fireEvent.click(screen.getByRole("button", { name: "Survey modules" }));
+    fireEvent.click(await screen.findByRole("button", { name: "PCM: Reachable" }));
+    await screen.findByRole("heading", { name: "PCM" });
+
+    expect(screen.getByRole("heading", { name: "What this module will accept" })).toBeVisible();
+    expect(screen.getByText(/sends none of them/)).toBeVisible();
+    // The service, the session, the security level, the run time and the
+    // class it would cost, on one line each.
+    expect(screen.getByText("Synthetic clear adaption values")).toBeVisible();
+    expect(
+      screen.getByText(
+        /0x0406 · service 0x31 · session 03 · security level_1 · up to 30 s · SERVICE_ROUTINE/,
+      ),
+    ).toBeVisible();
+    expect(screen.getByText("Synthetic engine input")).toBeVisible();
+    expect(
+      screen.getByText(/0x1259 · service 0x2E · session 03 · PERSISTENT_CHANGE/),
+    ).toBeVisible();
+    // Nothing in the section is a control.
+    const buttons = screen.getAllByRole("button").map((button) => button.textContent);
+    expect(buttons.some((label) => label?.includes("Synthetic clear adaption values"))).toBe(false);
+    expect(buttons.some((label) => label?.includes("Synthetic engine input"))).toBe(false);
+
+    // A module that declares none shows no section at all.
+    fireEvent.click(screen.getByRole("button", { name: "BCM: Unverified route" }));
+    await screen.findByRole("heading", { name: "BCM" });
+    expect(screen.queryByRole("heading", { name: "What this module will accept" })).toBeNull();
   });
 
   it("says a self test in SDD's own words, Russian to a Ukrainian reader unless told otherwise", async () => {

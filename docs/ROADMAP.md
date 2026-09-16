@@ -522,12 +522,14 @@ writeable and controllable one names the extended session. Each row carries
 its safety class — `PERSISTENT_CHANGE`, `VOLATILE_CONTROL`,
 `SERVICE_ROUTINE` — and the module panel lists them under what was read.
 
-Nothing sends any of them, and this entry is not permission to. It is the
-first three of the four desk tasks the owner set on 2026-09-16 — rewrite the
-right side of the reference, write the ADR, draw the operations into classes,
-try them on the bench. **The bench is what remains**: exercising these
-classes against the virtual vehicle of `ADR-0020`, still without a byte
-leaving for a car.
+Nothing sends any of them, and this entry is not permission to. It closes
+the four desk tasks the owner set on 2026-09-16 — rewrite the right side of
+the reference, write the ADR, draw the operations into classes, try them on
+the bench. The bench carries a module index of its own now, and a whole bench
+session with the declarations on screen asked the vehicle for four services
+only — `0x01`, `0x03`, `0x19`, `0x22` — and for none of the ten that stage 2
+and stage 3 would need. The guard says the constructors are absent; the bench
+says the vehicle was never asked. Both run on every commit.
 
 ### F14 — K-line transport for the legacy buses (brought forward 2026-09-12, `ADR-0029`)
 
