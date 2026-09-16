@@ -229,6 +229,47 @@ export function ModuleDetails({
               </ul>
             </div>
           ) : null}
+          {(module.acceptedOperations ?? []).length > 0 ? (
+            <div className="accepted-operations">
+              <h3>{t("What this module will accept")}</h3>
+              <p className="module-validation">
+                {t(
+                  "SDD declares these; this application sends none of them. A value written into a module, an output driven by hand and a routine the module runs are three different kinds of change, and each belongs to a later stage with its own safety rules. The list is here because the cost of an operation is worth knowing long before anyone decides whether to allow it.",
+                )}
+              </p>
+              <ul className="accepted-operation-list">
+                {(module.acceptedOperations ?? []).map((operation) => (
+                  <li key={`${operation.kind}-${operation.identifier}`}>
+                    <div className="accepted-operation-head">
+                      <strong>{operation.name ?? operation.identifier}</strong>
+                      <span className="module-validation">
+                        {[
+                          operation.identifier,
+                          operation.service === null
+                            ? null
+                            : t("service {service}", { service: operation.service }),
+                          operation.sessions.length === 0
+                            ? null
+                            : t("session {sessions}", {
+                                sessions: operation.sessions.join(", "),
+                              }),
+                          operation.security === null
+                            ? null
+                            : t("security {level}", { level: operation.security }),
+                          operation.maxRunTime === null
+                            ? null
+                            : t("up to {seconds} s", { seconds: operation.maxRunTime }),
+                          operation.safetyClass,
+                        ]
+                          .filter((part) => part !== null)
+                          .join(" · ")}
+                      </span>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
           <div className="details-actions">
             <button
               className="button button--primary"

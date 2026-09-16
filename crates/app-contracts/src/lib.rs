@@ -389,6 +389,43 @@ pub struct ModuleSurveyEntry {
     /// (`ADR-0032`); listed, never run.
     #[serde(default)]
     pub self_tests: Vec<SelfTestSummary>,
+    /// What the data declares this module will accept on this car
+    /// (`ADR-0035`): identifiers it takes a value for, identifiers it lets
+    /// be driven, routines it can run. Listed, never sent.
+    #[serde(default)]
+    pub accepted_operations: Vec<AcceptedOperationSummary>,
+}
+
+/// One operation a module declares it will accept (`ADR-0035`). It is
+/// knowledge, not an offer: this product lists these and sends none of
+/// them. Every field is SDD's own, and the safety class is the one the
+/// operation would carry if a later decision ever allowed it.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AcceptedOperationSummary {
+    /// `WRITE` for a value the module takes, `CONTROL` for an output it
+    /// lets be driven, `ROUTINE` for a procedure it runs itself.
+    pub kind: String,
+    /// The identifier, as SDD writes it: `0x0200`.
+    pub identifier: String,
+    /// SDD's own name for it, where the data carries one.
+    pub name: Option<String>,
+    /// The diagnostic service that would carry it — `0x2E`, `0x2F`, `0x31`.
+    pub service: Option<String>,
+    /// The diagnostic sessions it requires, as bare numbers: `03`.
+    #[serde(default)]
+    pub sessions: Vec<String>,
+    /// The security level standing in front of it, where SDD names one.
+    /// Absent means SDD names none, not that none exists on the car.
+    pub security: Option<String>,
+    /// For a routine: how long SDD says it may run, and whether it may be
+    /// restarted while it is running.
+    pub max_run_time: Option<String>,
+    pub restart_while_running: Option<String>,
+    /// The class this operation would carry: `PERSISTENT_CHANGE` for a
+    /// write, `VOLATILE_CONTROL` for a control, `SERVICE_ROUTINE` for a
+    /// routine. Stage 1 sends none of the three, and the row says so.
+    pub safety_class: String,
 }
 
 /// One on-demand self test a module declares for this car (`ADR-0032`).

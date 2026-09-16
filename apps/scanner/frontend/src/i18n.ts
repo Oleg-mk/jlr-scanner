@@ -482,6 +482,18 @@ const uk: Record<string, string> = {
   "Fault memory": "Памʼять несправностей",
   "Identification": "Ідентифікація",
   "Self tests this module declares": "Самотести, які оголошує цей модуль",
+  "What this module will accept":
+    "Що цей модуль прийме",
+  "SDD declares these; this application sends none of them. A value written into a module, an output driven by hand and a routine the module runs are three different kinds of change, and each belongs to a later stage with its own safety rules. The list is here because the cost of an operation is worth knowing long before anyone decides whether to allow it.":
+    "SDD це оголошує; застосунок не надсилає нічого з цього. Значення, записане в модуль, вихід, яким керують вручну, і процедура, яку модуль виконує сам, — це три різні роди змін, і кожен належить пізнішому етапу з власними правилами безпеки. Список тут тому, що ціну операції варто знати задовго до того, як хтось вирішуватиме, чи її дозволяти.",
+  "service {service}":
+    "сервіс {service}",
+  "session {sessions}":
+    "сесія {sessions}",
+  "security {level}":
+    "безпека {level}",
+  "up to {seconds} s":
+    "до {seconds} с",
   "The year markers are SDD's own and this session does not check them, so a test listed here can belong to another year of the same programme.": "Маркери року — власні позначки SDD, і цей сеанс їх не перевіряє, тож наведений тут тест може належати іншому року тієї самої програми.",
   "SDD can command these; this application does not. A self test is a routine, not a read, and routines belong to a later stage with their own safety rules. The list is here because knowing what a module can be asked to do is worth having.": "SDD може їх запускати; цей застосунок — ні. Самотест — це процедура, а не читання, і процедури належать до пізнішого етапу з власними правилами безпеки. Перелік тут тому, що знати, про що можна попросити модуль, само по собі корисно.",
   "test {id}": "тест {id}",
@@ -1576,6 +1588,18 @@ const ru: Record<string, string> = {
   "Fault memory": "Память неисправностей",
   "Identification": "Идентификация",
   "Self tests this module declares": "Самотесты, которые объявляет этот модуль",
+  "What this module will accept":
+    "Что этот модуль примет",
+  "SDD declares these; this application sends none of them. A value written into a module, an output driven by hand and a routine the module runs are three different kinds of change, and each belongs to a later stage with its own safety rules. The list is here because the cost of an operation is worth knowing long before anyone decides whether to allow it.":
+    "SDD это объявляет; приложение не отправляет ничего из этого. Значение, записанное в модуль, выход, которым управляют вручную, и процедура, которую модуль выполняет сам, — это три разных рода изменений, и каждый принадлежит более позднему этапу со своими правилами безопасности. Список здесь потому, что цену операции стоит знать задолго до того, как кто-то будет решать, разрешать ли её.",
+  "service {service}":
+    "сервис {service}",
+  "session {sessions}":
+    "сессия {sessions}",
+  "security {level}":
+    "безопасность {level}",
+  "up to {seconds} s":
+    "до {seconds} с",
   "The year markers are SDD's own and this session does not check them, so a test listed here can belong to another year of the same programme.": "Маркеры года — собственные обозначения SDD, и этот сеанс их не проверяет, поэтому приведённый здесь тест может относиться к другому году той же программы.",
   "SDD can command these; this application does not. A self test is a routine, not a read, and routines belong to a later stage with their own safety rules. The list is here because knowing what a module can be asked to do is worth having.": "SDD может их запускать; это приложение — нет. Самотест — это процедура, а не чтение, и процедуры относятся к более позднему этапу со своими правилами безопасности. Перечень здесь потому, что знать, о чём можно попросить модуль, само по себе полезно.",
   "test {id}": "тест {id}",

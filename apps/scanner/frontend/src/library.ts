@@ -100,6 +100,31 @@ export interface ModuleSurveyEntry {
    * what keeps it out of stage 1.
    */
   selfTests: SelfTestSummary[];
+  /**
+   * What the data declares this module will accept on this car (ADR-0035):
+   * identifiers it takes a value for, identifiers it lets be driven,
+   * routines it runs itself. Listed, never sent — every row carries the
+   * class the operation would need, and this build grants none of them.
+   */
+  acceptedOperations?: AcceptedOperationSummary[];
+}
+
+export interface AcceptedOperationSummary {
+  /** `WRITE`, `CONTROL` or `ROUTINE`. */
+  kind: string;
+  /** The identifier, as SDD writes it. */
+  identifier: string;
+  name: string | null;
+  /** The service that would carry it: `0x2E`, `0x2F`, `0x31`. */
+  service: string | null;
+  /** The diagnostic sessions it requires, as bare numbers. */
+  sessions: string[];
+  /** The security level in front of it, where SDD names one. */
+  security: string | null;
+  maxRunTime: string | null;
+  restartWhileRunning: string | null;
+  /** `PERSISTENT_CHANGE`, `VOLATILE_CONTROL` or `SERVICE_ROUTINE`. */
+  safetyClass: string;
 }
 
 export interface SelfTestSummary {

@@ -24,10 +24,11 @@ pub use issue::ISSUE_STAMP_FILE;
 pub use knowledge::VehicleContext;
 
 use app_contracts::{
-    CatalogueComparison, LibraryIssue, LibraryIssueIntegrity, LibrarySnapshot, LibraryState,
-    ManifestFailure, MarkerEntry, ModuleApplicability, ModuleSurveyEntry, PassportReading,
-    ProgrammeEntry, ReadableIdentifierSummary, RouteStatus, RouteSummary, SelfTestSummary,
-    VehicleCatalogueSnapshot, VehicleContextInput, VehicleSurveySnapshot, VinDecodeSnapshot,
+    AcceptedOperationSummary, CatalogueComparison, LibraryIssue, LibraryIssueIntegrity,
+    LibrarySnapshot, LibraryState, ManifestFailure, MarkerEntry, ModuleApplicability,
+    ModuleSurveyEntry, PassportReading, ProgrammeEntry, ReadableIdentifierSummary, RouteStatus,
+    RouteSummary, SelfTestSummary, VehicleCatalogueSnapshot, VehicleContextInput,
+    VehicleSurveySnapshot, VinDecodeSnapshot,
 };
 use diagnostic_environment::{
     DiagnosticEnvironmentPlan, DiagnosticEnvironmentResolution, DiagnosticEnvironmentResolver,
@@ -70,6 +71,11 @@ pub const CATALOGUE_NO_ASSEMBLY: &str = "NO_ASSEMBLY";
 /// Claims the ODST ingest writes for the self tests a module declares
 /// (ADR-0032). The literals are the adapter's; a test asserts they agree.
 const ODST_TEST_CLAIM: &str = "sdd_odst_test";
+/// The three namespaces that say what a module will accept (`ADR-0035`).
+/// Reading them is all this product does with them.
+const MODULE_WRITE_NAMESPACE: &str = "sdd_module_write";
+const MODULE_CONTROL_NAMESPACE: &str = "sdd_module_control";
+const MODULE_ROUTINE_NAMESPACE: &str = "sdd_module_routine";
 const ODST_HELP_CLAIM_PREFIX: &str = "sdd_odst_help.";
 const ODST_SCREEN_CLAIM_PREFIX: &str = "sdd_odst_screen.";
 const ODST_SCREEN_ITEMS_CLAIM_PREFIX: &str = "sdd_odst_screen_items.";
@@ -693,6 +699,16 @@ impl KnowledgeLibrary {
     /// one carries `SERVICE_ROUTINE`, which is what keeps it out of stage 1.
     pub fn self_tests(&self, context: &VehicleContext, ecu_family: &str) -> Vec<SelfTestSummary> {
         self_tests_for(&self.store, context, ecu_family)
+    }
+
+    /// What one module declares it will accept on this car (`ADR-0035`).
+    /// Listed, never sent.
+    pub fn accepted_operations(
+        &self,
+        context: &VehicleContext,
+        ecu_family: &str,
+    ) -> Vec<AcceptedOperationSummary> {
+        accepted_operations_for(&self.store, context, ecu_family)
     }
 
     /// The battery parameters the loaded data declares for this module
@@ -1375,6 +1391,7 @@ pub fn survey_vehicle(
             dtc_read: not_applicable(),
             readable_identifiers: Vec::new(),
             self_tests: Vec::new(),
+            accepted_operations: Vec::new(),
         };
 
         if applicability != ModuleApplicability::Applicable {
@@ -1431,6 +1448,7 @@ pub fn survey_vehicle(
             }
         }
         entry.self_tests = self_tests_for(store, &context, family);
+        entry.accepted_operations = accepted_operations_for(store, &context, family);
         entry.readable_identifiers =
             DiagnosticEnvironmentResolver::readable_identifiers(store, &context, family)
                 .into_iter()
@@ -1488,6 +1506,78 @@ fn not_applicable() -> RouteSummary {
 
 /// The self tests a module declares on this car (ADR-0032). A free
 /// function over a store, because the survey is one too.
+/// What one module declares it will accept on this car (`ADR-0035`).
+///
+/// The module is part of what chooses these records, so it is part of the
+/// context they are resolved against. Nothing here is an offer: the rows
+/// carry the service, the session and the security level so that the cost of
+/// an operation can be read long before anyone decides whether to allow one,
+/// and every row carries the class that decision would have to grant.
+fn accepted_operations_for(
+    store: &KnowledgeStore,
+    context: &VehicleContext,
+    ecu_family: &str,
+) -> Vec<AcceptedOperationSummary> {
+    let mut context = context.clone();
+    context.ecu_family = Some(ecu_family.to_string());
+    let result = store.query(&KnowledgeQuery::for_vehicle(context).include_indeterminate(true));
+    let mut found: Vec<AcceptedOperationSummary> = Vec::new();
+    for entry in &result.records {
+        if entry.applicability_resolution == ApplicabilityResolution::NotApplicable {
+            continue;
+        }
+        let ClaimKey::IdentifierDefinition { namespace } = &entry.record.key else {
+            continue;
+        };
+        let (kind, safety_class) = match namespace.as_str() {
+            MODULE_WRITE_NAMESPACE => ("WRITE", "PERSISTENT_CHANGE"),
+            MODULE_CONTROL_NAMESPACE => ("CONTROL", "VOLATILE_CONTROL"),
+            MODULE_ROUTINE_NAMESPACE => ("ROUTINE", "SERVICE_ROUTINE"),
+            _ => continue,
+        };
+        let KnowledgeValue::IdentifierDefinition {
+            identifier,
+            encoding,
+            ..
+        } = &entry.record.value
+        else {
+            continue;
+        };
+        let fields = parse_encoding(encoding.as_deref().unwrap_or_default());
+        let field = |name: &str| fields.get(name).cloned().filter(|text| !text.is_empty());
+        found.push(AcceptedOperationSummary {
+            kind: kind.to_string(),
+            identifier: identifier.clone(),
+            name: field("name"),
+            service: field("service"),
+            sessions: field("session")
+                .map(|value| value.split_whitespace().map(str::to_string).collect())
+                .unwrap_or_default(),
+            security: field("security"),
+            max_run_time: field("max_run_time"),
+            restart_while_running: field("restart_while_running"),
+            safety_class: safety_class.to_string(),
+        });
+    }
+    // One order a person can follow: by what it would cost, then by number.
+    found.sort_by(|left, right| {
+        left.kind
+            .cmp(&right.kind)
+            .then_with(|| left.identifier.cmp(&right.identifier))
+    });
+    found.dedup_by(|left, right| left.kind == right.kind && left.identifier == right.identifier);
+    found
+}
+
+/// `key=value;…` back into its fields, the shape the ingest writes.
+fn parse_encoding(encoding: &str) -> BTreeMap<String, String> {
+    encoding
+        .split(';')
+        .filter_map(|field| field.split_once('='))
+        .map(|(key, value)| (key.trim().to_string(), value.trim().to_string()))
+        .collect()
+}
+
 fn self_tests_for(
     store: &KnowledgeStore,
     context: &VehicleContext,

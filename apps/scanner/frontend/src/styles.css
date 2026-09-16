@@ -4300,3 +4300,25 @@ table.live-read-identifiers label {
 .app-shell .battery-key__pole--plus {
   right: 0.5rem;
 }
+
+/* What a module will accept (ADR-0035): the same shape as the self tests
+   beside it, because it is the same kind of thing — a list of what could be
+   asked for, and a plain statement that this build asks for none of it. */
+.accepted-operations {
+  margin-top: 1.5rem;
+}
+
+.accepted-operation-list {
+  margin: 0.75rem 0 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 0.6rem;
+}
+
+.accepted-operation-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.5rem;
+}

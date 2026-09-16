@@ -1,4 +1,5 @@
 import type {
+  AcceptedOperationSummary,
   ModuleSurveyEntry,
   SelfTestSummary,
   VehicleCatalogueSnapshot,
@@ -138,6 +139,62 @@ const MY14_ROWS: Row[] = [
  * run — in the demo there is nothing to run them on — and they exist here
  * only so the section has something to show.
  */
+/**
+ * What the demonstration modules declare they would accept (ADR-0035).
+ * Invented, like everything else on the bench, and sent by nothing: the
+ * rows exist so the section has something to show.
+ */
+const DEMO_ACCEPTED_OPERATIONS: Record<string, AcceptedOperationSummary[]> = {
+  PCM: [
+    {
+      kind: "ROUTINE",
+      identifier: "0x0406",
+      name: "Synthetic clear adaption values",
+      service: "0x31",
+      sessions: ["03"],
+      security: null,
+      maxRunTime: "30",
+      restartWhileRunning: "no",
+      safetyClass: "SERVICE_ROUTINE",
+    },
+    {
+      kind: "WRITE",
+      identifier: "0x1259",
+      name: "Synthetic engine input",
+      service: "0x2E",
+      sessions: ["03"],
+      security: null,
+      maxRunTime: null,
+      restartWhileRunning: null,
+      safetyClass: "PERSISTENT_CHANGE",
+    },
+    {
+      kind: "CONTROL",
+      identifier: "0x0453",
+      name: "Synthetic pump control",
+      service: "0x2F",
+      sessions: ["03"],
+      security: "level_1",
+      maxRunTime: null,
+      restartWhileRunning: null,
+      safetyClass: "VOLATILE_CONTROL",
+    },
+  ],
+  ABS: [
+    {
+      kind: "ROUTINE",
+      identifier: "0x4024",
+      name: "Synthetic brake bleed",
+      service: "0x31",
+      sessions: ["03"],
+      security: "level_1",
+      maxRunTime: null,
+      restartWhileRunning: "no",
+      safetyClass: "SERVICE_ROUTINE",
+    },
+  ],
+};
+
 const DEMO_SELF_TESTS: Record<string, SelfTestSummary[]> = {
   ABS: [
     {
@@ -191,6 +248,7 @@ function entry([family, requestId, responseId, bus, identifier, parameter]: Row)
     readableIdentifiers:
       identifier && parameter ? [{ identifier, parameters: [parameter] }] : [],
     selfTests: DEMO_SELF_TESTS[family] ?? [],
+    acceptedOperations: DEMO_ACCEPTED_OPERATIONS[family] ?? [],
   };
 }
 
