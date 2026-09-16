@@ -22,8 +22,9 @@ use knowledge::{
 use sdd_ingest::{
     is_text_item_id, BatteryFormatting, CanLinkMonitorAdapter, CcfAdapter, ConverterCatalogue,
     DidFormattingAdapter, DtcDescriptionAdapter, DtcFaultTypeAdapter, DtcHelpAdapter,
-    IvsLineageAdapter, ModelYearTimeline, ModuleTextAdapter, OdstInfoAdapter, PlatformAdapter,
-    TextLookup, VinDecodeAdapter, DTC_HELP_LANGUAGE_RUSSIAN, YEAR_BREAKPOINT_DIMENSION,
+    IvsLineageAdapter, ModelYearTimeline, ModuleAccessAdapter, ModuleTextAdapter, OdstInfoAdapter,
+    PlatformAdapter, TextLookup, VinDecodeAdapter, DTC_HELP_LANGUAGE_RUSSIAN,
+    YEAR_BREAKPOINT_DIMENSION,
 };
 use std::collections::{BTreeMap, BTreeSet};
 use std::io::Write;
@@ -54,6 +55,9 @@ struct Corpus {
     module_text: Vec<Found>,
     /// The car configuration descriptions (ADR-0028).
     ccf: Vec<Found>,
+    /// The per-module indexes: what each module declares it will accept
+    /// (ADR-0035). One file per module per programme-year.
+    mdx: Vec<Found>,
     /// Every item of SDD's text database, for the configuration's titles
     /// and options.
     texts: Vec<Found>,
@@ -170,6 +174,8 @@ fn walk(root: &Path, dir: &Path, corpus: &mut Corpus) -> std::io::Result<()> {
             corpus.vin.push(found);
         } else if name.starts_with("CCF_DATA_") {
             corpus.ccf.push(found);
+        } else if name.starts_with("MDX_") {
+            corpus.mdx.push(found);
         } else if is_text_item_id(name.trim_end_matches(".xml")) {
             corpus.module_text.push(found);
         } else if name.starts_with('@') && parent.starts_with('@') {
@@ -203,6 +209,42 @@ fn source(found: &Found, text: &str) -> Result<SourceRecord, KnowledgeError> {
 /// title name the language, so the Russian `rdsDtcHelp0x0000.xml` is a
 /// source of its own beside the English one and their records cannot
 /// collide.
+/// The source of one module index. Its file name repeats across every
+/// programme-year — `MDX_PCM.xml` sits in fifty-three directories — so the
+/// directory joins the identifier, or the fifty-third would silently replace
+/// the first.
+fn mdx_source(found: &Found, text: &str) -> Result<SourceRecord, KnowledgeError> {
+    let mut source = source(found, text)?;
+    let directory = found
+        .path
+        .parent()
+        .and_then(|path| path.file_name())
+        .and_then(|value| value.to_str())
+        .unwrap_or("unknown");
+    let stem = found
+        .path
+        .file_stem()
+        .and_then(|value| value.to_str())
+        .unwrap_or("unknown");
+    source.id = SourceId::new(format!("sdd-169-{}-{}", slug(directory), slug(stem)))?;
+    source.title = format!("SDD {directory} {stem}");
+    Ok(source)
+}
+
+/// The programme and the model-year marker a module index belongs to, read
+/// from the directory it sits in: `X150_201000` is `X150` at `MY10`. The
+/// document itself names neither, and guessing from its contents is not
+/// possible — so a directory that does not carry the shape is skipped
+/// rather than ingested against the wrong car.
+fn mdx_qualification(found: &Found) -> Option<(String, String)> {
+    let directory = found.path.parent()?.file_name()?.to_str()?;
+    let (program, year) = directory.rsplit_once('_')?;
+    if program.is_empty() || year.len() != 6 || !year.chars().all(|c| c.is_ascii_digit()) {
+        return None;
+    }
+    Some((program.to_string(), format!("MY{}", &year[2..4])))
+}
+
 fn source_in(
     found: &Found,
     text: &str,
@@ -382,8 +424,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         walk(root, root, &mut corpus)?;
     }
     println!(
-        "found: {} platform, {} converter, {} DID snapshot, {} DTC help, {} DTC help (rus), {} DTC index, {} DTC index (rus), {} ODST, {} ODST (rus), {} IVS, {} link monitor, {} VIN decode, {} module text, {} CCF, {} other text items",
+        "found: {} platform, {} module index, {} converter, {} DID snapshot, {} DTC help, {} DTC help (rus), {} DTC index, {} DTC index (rus), {} ODST, {} ODST (rus), {} IVS, {} link monitor, {} VIN decode, {} module text, {} CCF, {} other text items",
         corpus.platforms.len(),
+        corpus.mdx.len(),
         corpus.converters.len(),
         corpus.snapshots.len(),
         corpus.dtc_help.len(),
@@ -501,6 +544,34 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             "platform",
             &mut rejections,
         )?;
+    }
+    summary.push(bundle.finish()?);
+
+    // What each module declares it will accept (ADR-0035): knowledge only,
+    // and nothing in the product sends any of it.
+    let mut bundle = Bundle::create(out, "module_access.json")?;
+    let mut without_qualification = 0usize;
+    for found in &corpus.mdx {
+        let Some((program, marker)) = mdx_qualification(found) else {
+            without_qualification += 1;
+            continue;
+        };
+        let text = read(found)?;
+        let adapter = ModuleAccessAdapter::new(mdx_source(found, &text)?, program, marker)?
+            .with_model_year_timeline(timeline.clone());
+        export(
+            &mut store,
+            &mut bundle,
+            &adapter,
+            &text,
+            "module access",
+            &mut rejections,
+        )?;
+    }
+    if without_qualification > 0 {
+        println!(
+            "  {without_qualification} module indexes sat in a directory that names no programme-year and were skipped"
+        );
     }
     summary.push(bundle.finish()?);
 

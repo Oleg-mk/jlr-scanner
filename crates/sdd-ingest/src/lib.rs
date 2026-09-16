@@ -21,6 +21,7 @@ mod did;
 mod dtc;
 mod dtc_index;
 mod ivs;
+mod mdx;
 mod model_year;
 mod odst;
 mod platform;
@@ -46,6 +47,10 @@ pub use dtc_index::{
     DTC_DESCRIPTION_PARSER_ID, DTC_FAULT_TYPE_PARSER_ID, FAILURE_TYPE_CLAIM,
 };
 pub use ivs::{IvsLineageAdapter, IVS_ASSEMBLY_CLAIM, IVS_PARSER_ID};
+pub use mdx::{
+    ModuleAccessAdapter, MODULE_ACCESS_PARSER_ID, MODULE_CONTROL_NAMESPACE,
+    MODULE_ROUTINE_NAMESPACE, MODULE_WRITE_NAMESPACE,
+};
 pub use model_year::{
     parse_marker, parse_relative_marker, ModelYearPoint, ModelYearTimeline, RelativeMarker,
     BASE_MARKER, FIRST_MODEL_YEAR, LAST_MODEL_YEAR,
