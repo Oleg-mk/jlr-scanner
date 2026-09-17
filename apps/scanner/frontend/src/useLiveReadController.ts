@@ -90,6 +90,26 @@ export function useLiveReadController(
     });
   }, []);
 
+  /**
+   * Put a whole list in at once, keeping what is already chosen and stopping
+   * at the cap. Sixteen parameters one checkbox at a time is not a task for
+   * a person (the owner, 2026-09-16).
+   */
+  const choose = useCallback((entries: LiveReadEntryRequest[]) => {
+    setSet((current) => {
+      const held = new Set(current.map(entryKey));
+      const next = [...current];
+      for (const entry of entries) {
+        if (next.length >= LIVE_READ_MAX_ENTRIES) break;
+        const key = entryKey(entry);
+        if (held.has(key)) continue;
+        held.add(key);
+        next.push(entry);
+      }
+      return next;
+    });
+  }, []);
+
   const clearSet = useCallback(() => setSet([]), []);
 
   const stop = useCallback(async () => {
@@ -158,6 +178,7 @@ export function useLiveReadController(
     busy,
     running: snapshot.state === "RUNNING",
     toggle,
+    choose,
     clearSet,
     start,
     stop,

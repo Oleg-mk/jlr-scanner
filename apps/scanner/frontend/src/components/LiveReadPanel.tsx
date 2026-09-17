@@ -1,4 +1,6 @@
-import { dataText, liveReadReason, parameterNote, t, useLanguage } from "../i18n";
+import { useEffect, useState } from "react";
+import { dataText, decimalText, liveReadReason, parameterNote, t, useLanguage } from "../i18n";
+import { readLimits, writeLimits, type LiveLimits } from "../liveLimits";
 import { parameterName } from "../parameterNames";
 import type { ModuleSurveyEntry } from "../library";
 import {
@@ -8,6 +10,7 @@ import {
   type LiveReadSnapshot,
   type LiveReadValue,
 } from "../liveRead";
+import { LiveTiles } from "./LiveTiles";
 import { StatusBadge } from "./StatusBadge";
 
 interface LiveReadPanelProps {
@@ -19,6 +22,8 @@ interface LiveReadPanelProps {
   busy: boolean;
   adapterReady: boolean;
   onToggle: (entry: LiveReadEntryRequest) => void;
+  /** Put a whole list into the set at once, up to what the set may hold. */
+  onChoose: (entries: LiveReadEntryRequest[]) => void;
   onClearSet: () => void;
   onStart: () => void;
   onStop: () => void;
@@ -53,7 +58,10 @@ function cadence(ms: number): string {
 
 /** The value as the catalogue decodes it: a number and its unit, a named state, or the raw count. */
 function reading(value: LiveReadValue): string {
-  if (value.value !== null) return value.unit !== null ? `${value.value} ${value.unit}` : value.value;
+  if (value.value !== null) {
+    const number = decimalText(value.value);
+    return value.unit !== null ? `${number} ${value.unit}` : number;
+  }
   if (value.state !== null) return value.state;
   if (value.raw !== null) return String(value.raw);
   return "—";
@@ -63,7 +71,7 @@ function span(value: LiveReadValue): string | null {
   if (value.minimum === null || value.maximum === null) return null;
   if (value.minimum === value.maximum) return null;
   const format = (number: number) =>
-    Number.isInteger(number) ? String(number) : number.toFixed(2).replace(/\.?0+$/, "");
+    decimalText(Number.isInteger(number) ? String(number) : number.toFixed(2).replace(/\.?0+$/, ""));
   return `${format(value.minimum)} … ${format(value.maximum)}`;
 }
 
@@ -75,6 +83,7 @@ export function LiveReadPanel({
   busy,
   adapterReady,
   onToggle,
+  onChoose,
   onClearSet,
   onStart,
   onStop,
@@ -86,6 +95,29 @@ export function LiveReadPanel({
   const chosen = new Set(set.map(entryKey));
   const offered = modules.filter((module) => module.readableIdentifiers.length > 0);
   const full = set.length >= LIVE_READ_MAX_ENTRIES;
+  // Which identifiers the chooser offers. Quantities — what the catalogue
+  // reads as a number with a unit — come first, because that is what a
+  // person watches; "everything" hides nothing. A library that marks none
+  // offers everything rather than an empty list.
+  const [onlyQuantities, setOnlyQuantities] = useState(true);
+  const anyQuantities = offered.some((module) =>
+    module.readableIdentifiers.some((identifier) => identifier.quantity === true),
+  );
+  const filtering = onlyQuantities && anyQuantities;
+  const listed = (module: ModuleSurveyEntry) =>
+    module.readableIdentifiers.filter((identifier) => !filtering || identifier.quantity === true);
+  // The person's own warning and alarm limits, kept on this machine.
+  const [limits, setLimits] = useState<Record<string, LiveLimits>>({});
+  useEffect(() => setLimits(readLimits()), []);
+  const changeLimits = (key: string, next: LiveLimits | null) => {
+    setLimits((current) => {
+      const updated = { ...current };
+      if (next === null) delete updated[key];
+      else updated[key] = next;
+      writeLimits(updated);
+      return updated;
+    });
+  };
 
   return (
     <section className="live-read-panel" aria-labelledby="live-read-title">
@@ -102,6 +134,34 @@ export function LiveReadPanel({
         )}
       </p>
 
+      {offered.length > 0 && anyQuantities ? (
+        <div className="live-read-filter">
+          <div className="live-read-filter-choice" role="group" aria-label={t("Which parameters")}>
+            <button
+              className={`button button--quiet${onlyQuantities ? " is-current" : ""}`}
+              type="button"
+              aria-pressed={onlyQuantities}
+              onClick={() => setOnlyQuantities(true)}
+            >
+              {t("Quantities")}
+            </button>
+            <button
+              className={`button button--quiet${onlyQuantities ? "" : " is-current"}`}
+              type="button"
+              aria-pressed={!onlyQuantities}
+              onClick={() => setOnlyQuantities(false)}
+            >
+              {t("Everything")}
+            </button>
+          </div>
+          <span className="button-hint">
+            {onlyQuantities
+              ? t("Those the catalogue reads as a number with a unit.")
+              : t("Everything the module declares, raw counts and texts included.")}
+          </span>
+        </div>
+      ) : null}
+
       {offered.length === 0 ? (
         <p className="button-hint">{t("Survey the vehicle first: the set is chosen from what the data describes.")}</p>
       ) : (
@@ -114,6 +174,24 @@ export function LiveReadPanel({
                   <span className="module-validation"> {dataText(module.names, module.name, language)}</span>
                 ) : null}
               </summary>
+              <div className="live-read-module-actions">
+                <button
+                  className="button button--quiet"
+                  type="button"
+                  disabled={running || full || listed(module).length === 0}
+                  onClick={() =>
+                    onChoose(
+                      listed(module).map((identifier) => ({
+                        ecuFamily: module.ecuFamily,
+                        identifier: identifier.identifier,
+                      })),
+                    )
+                  }
+                >
+                  {t("Choose these")}
+                </button>
+                <span className="button-hint">{t("{count} offered", { count: listed(module).length })}</span>
+              </div>
               <table className="live-read-identifiers">
                 <thead>
                   <tr>
@@ -123,7 +201,7 @@ export function LiveReadPanel({
                   </tr>
                 </thead>
                 <tbody>
-                  {module.readableIdentifiers.map((identifier) => {
+                  {listed(module).map((identifier) => {
                     const entry = {
                       ecuFamily: module.ecuFamily,
                       identifier: identifier.identifier,
@@ -221,6 +299,17 @@ export function LiveReadPanel({
           ) : null}
           {snapshot.stoppedReason !== null ? ` · ${t(snapshot.stoppedReason)}` : null}
         </p>
+      ) : null}
+
+      {snapshot.values.length > 0 ? (
+        <>
+          <LiveTiles values={snapshot.values} limits={limits} onLimits={changeLimits} />
+          <p className="button-hint">
+            {t(
+              "The chosen parameters, at a glance. A tile colours itself only against limits you set; SDD records no normal range, so none is drawn for you.",
+            )}
+          </p>
+        </>
       ) : null}
 
       {snapshot.values.length > 0 ? (

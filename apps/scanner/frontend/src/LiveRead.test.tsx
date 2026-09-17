@@ -98,6 +98,7 @@ function module(ecuFamily: string, identifiers: string[]): ModuleSurveyEntry {
 
 const idleHandlers = {
   onToggle: () => {},
+  onChoose: () => {},
   onClearSet: () => {},
   onStart: () => {},
   onStop: () => {},
@@ -265,7 +266,7 @@ describe("live reading", () => {
       />,
     );
     await waitFor(() => expect(screen.getByText("SYNTHETIC")).toBeInTheDocument());
-    expect(screen.getByText("engine speed")).toBeInTheDocument();
+    expect(screen.getAllByText("engine speed")[0]).toBeInTheDocument();
     expect(screen.getByText("750 rpm")).toBeInTheDocument();
     expect(screen.getByText("742 … 768")).toBeInTheDocument();
     // The cadence the run actually achieves, not one it promises.
@@ -351,7 +352,7 @@ describe("live reading", () => {
     expect(screen.getByText(/зупинив тестувальник/)).toBeInTheDocument();
     // SDD's own name for the parameter is English because SDD holds it in
     // English; inventing a translation would be inventing data.
-    expect(screen.getByText("engine speed")).toBeInTheDocument();
+    expect(screen.getAllByText("engine speed")[0]).toBeInTheDocument();
   });
 
   it("offers the series as a spreadsheet once a run has samples", async () => {

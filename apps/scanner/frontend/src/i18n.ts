@@ -411,6 +411,27 @@ const uk: Record<string, string> = {
   "Choose folder…": "Обрати папку…",
   "Reading the library…": "Читаю бібліотеку…",
   "Reading the modules…": "Читаю модулі…",
+  "the run so far": "прогін дотепер",
+  "seen {low} … {high}": "бачили {low} … {high}",
+  "limits {low} … {high}": "межі {low} … {high}",
+  "our suggestion": "наша підказка",
+  "warn below": "увага нижче",
+  "warn above": "увага вище",
+  "alarm below": "тривога нижче",
+  "alarm above": "тривога вище",
+  "Clear limits": "Прибрати межі",
+  "Your limits, kept on this machine. SDD records no normal range.":
+    "Ваші межі, зберігаються на цій машині. Норми SDD не тримає.",
+  Quantities: "Величини",
+  Everything: "Усе",
+  "Which parameters": "Які параметри",
+  "Those the catalogue reads as a number with a unit.": "Ті, що каталог читає як число з одиницею.",
+  "Everything the module declares, raw counts and texts included.":
+    "Усе, що оголошує модуль, разом із сирими лічильниками й текстами.",
+  "Choose these": "Обрати ці",
+  "{count} offered": "пропонується {count}",
+  "The chosen parameters, at a glance. A tile colours itself only against limits you set; SDD records no normal range, so none is drawn for you.":
+    "Обрані параметри одним поглядом. Плитка фарбується лише за межами, які задали ви; норми SDD не тримає, тому за вас їх ніхто не малює.",
   "Nothing was connected: a session is either on the bench or on a car, and this one already holds records. Start a new session to change over.":
     "Нічого не підключено: сесія буває або на стенді, або на авто, а ця вже має записи. Щоб перейти, почніть нову сесію.",
   "This session already holds records, and the question about starting a new one could not be asked.":
@@ -1530,6 +1551,27 @@ const ru: Record<string, string> = {
   "Choose folder…": "Выбрать папку…",
   "Reading the library…": "Читаю библиотеку…",
   "Reading the modules…": "Читаю модули…",
+  "the run so far": "прогон до сих пор",
+  "seen {low} … {high}": "видели {low} … {high}",
+  "limits {low} … {high}": "пределы {low} … {high}",
+  "our suggestion": "наша подсказка",
+  "warn below": "внимание ниже",
+  "warn above": "внимание выше",
+  "alarm below": "тревога ниже",
+  "alarm above": "тревога выше",
+  "Clear limits": "Убрать пределы",
+  "Your limits, kept on this machine. SDD records no normal range.":
+    "Ваши пределы, хранятся на этой машине. Нормы SDD не хранит.",
+  Quantities: "Величины",
+  Everything: "Всё",
+  "Which parameters": "Какие параметры",
+  "Those the catalogue reads as a number with a unit.": "Те, что каталог читает как число с единицей.",
+  "Everything the module declares, raw counts and texts included.":
+    "Всё, что объявляет модуль, вместе с сырыми счётчиками и текстами.",
+  "Choose these": "Выбрать эти",
+  "{count} offered": "предлагается {count}",
+  "The chosen parameters, at a glance. A tile colours itself only against limits you set; SDD records no normal range, so none is drawn for you.":
+    "Выбранные параметры одним взглядом. Плитка окрашивается только по пределам, которые задали вы; нормы SDD не хранит, поэтому за вас их никто не рисует.",
   "Nothing was connected: a session is either on the bench or on a car, and this one already holds records. Start a new session to change over.":
     "Ничего не подключено: сессия бывает либо на стенде, либо на авто, а эта уже содержит записи. Чтобы перейти, начните новую сессию.",
   "This session already holds records, and the question about starting a new one could not be asked.":
@@ -2371,6 +2413,18 @@ export function currentLanguage(): Language {
 }
 
 /** Translate an English string into the current language, filling `{name}` placeholders. */
+/**
+ * A decoded number as this language writes it. The core hands a value over
+ * as text with a decimal point, because that is how the data writes it;
+ * Russian and Ukrainian write it with a comma. Only a plain number is
+ * touched: an address, a code or a name that merely contains a dot is left
+ * exactly as it is.
+ */
+export function decimalText(value: string): string {
+  if (current === "en") return value;
+  return /^-?\d+\.\d+$/.test(value.trim()) ? value.replace(".", ",") : value;
+}
+
 export function t(text: string, params?: Record<string, string | number>): string {
   const translated = dictionaries[current][text] ?? text;
   if (params === undefined) return translated;

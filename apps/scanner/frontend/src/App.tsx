@@ -615,6 +615,7 @@ export function App({
                     adapterReady={adapterReady}
                     bench={bench}
                     onToggle={liveRead.toggle}
+                    onChoose={liveRead.choose}
                     onClearSet={liveRead.clearSet}
                     onStart={() => void liveRead.start()}
                     onStop={() => void liveRead.stop()}
