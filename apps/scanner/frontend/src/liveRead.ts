@@ -49,6 +49,14 @@ export interface LiveReadValue {
   maximum: number | null;
   samples: number;
   atMs: number;
+  /** The run so far, oldest first, for a line on screen. */
+  series?: LiveReadPoint[];
+}
+
+/** One moment of a run: how far into it, and what was read. */
+export interface LiveReadPoint {
+  atMs: number;
+  value: number;
 }
 
 export interface LiveReadSnapshot {
@@ -198,6 +206,7 @@ class BrowserLiveReadClient implements LiveReadClient {
       maximum: Math.max(wandering, this.snapshot.values[index]?.maximum ?? wandering),
       samples: (this.snapshot.values[index]?.samples ?? 0) + 1,
       atMs,
+      series: [...(this.snapshot.values[index]?.series ?? []).slice(-299), { atMs, value: wandering }],
     };
     const values = [...this.snapshot.values];
     values[index] = value;

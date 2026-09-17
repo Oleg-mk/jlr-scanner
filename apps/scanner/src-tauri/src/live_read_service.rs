@@ -21,9 +21,9 @@ use crate::module_read_service::{ModuleReadService, PreparedModuleRead};
 use crate::read_record::{read_record, ReadIdentity, ReadOutcome};
 use app_contracts::{
     AdapterInfo, DecodedParameterSummary, DiagnosticError, DiagnosticErrorCategory,
-    DiagnosticExecutionStage, LiveReadEntryRequest, LiveReadEntryStatus, LiveReadRequest,
-    LiveReadSnapshot, LiveReadState, LiveReadValue, ModuleReadKind, ModuleReadReport,
-    ModuleReadRequest,
+    DiagnosticExecutionStage, LiveReadEntryRequest, LiveReadEntryStatus, LiveReadPoint,
+    LiveReadRequest, LiveReadSnapshot, LiveReadState, LiveReadValue, ModuleReadKind,
+    ModuleReadReport, ModuleReadRequest,
 };
 use diagnostic_session::decode::decode_parameters;
 use diagnostic_session::KnowledgeLibrary;
@@ -53,6 +53,12 @@ static RUN_COUNTER: AtomicU64 = AtomicU64::new(1);
 
 /// The entry whose turn it is, with the transaction prepared when the run
 /// started. Handed to the caller so the adapter can be locked alone.
+/// How many readings of one parameter a snapshot carries for the screen.
+/// The whole run is in the report and in the spreadsheet; a line on screen
+/// needs only its recent shape, and at the floor of a hundred milliseconds
+/// three hundred points are half a minute of the fastest run there can be.
+pub const LIVE_READ_SERIES_POINTS: usize = 300;
+
 pub struct LiveReadDue {
     pub index: usize,
     pub transaction: PreparedUdsTransaction,
@@ -615,6 +621,14 @@ impl Run {
                     if let Some(number) = number {
                         kept.minimum = Some(kept.minimum.map_or(number, |low| low.min(number)));
                         kept.maximum = Some(kept.maximum.map_or(number, |high| high.max(number)));
+                        kept.series.push(LiveReadPoint {
+                            at_ms,
+                            value: number,
+                        });
+                        if kept.series.len() > LIVE_READ_SERIES_POINTS {
+                            let drop = kept.series.len() - LIVE_READ_SERIES_POINTS;
+                            kept.series.drain(..drop);
+                        }
                     }
                 }
                 None => self.values.push(LiveReadValue {
@@ -630,6 +644,9 @@ impl Run {
                     maximum: number,
                     samples: 1,
                     at_ms,
+                    series: number
+                        .map(|value| vec![LiveReadPoint { at_ms, value }])
+                        .unwrap_or_default(),
                 }),
             }
         }

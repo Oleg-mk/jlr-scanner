@@ -74,6 +74,8 @@ export interface RouteSummary {
 export interface ReadableIdentifierSummary {
   identifier: string;
   parameters: string[];
+  /** The catalogue reads this one as a number with a unit. */
+  quantity?: boolean;
 }
 
 export interface ModuleSurveyEntry {

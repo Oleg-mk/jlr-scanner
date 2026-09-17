@@ -1459,6 +1459,19 @@ pub fn survey_vehicle(
                 .into_iter()
                 .map(|identifier| ReadableIdentifierSummary {
                     identifier: format!("0x{:04X}", identifier.identifier),
+                    // A quantity when the catalogue gives any parameter of
+                    // it a unit and a scaling: what reads as a number rather
+                    // than as a count of something unstated.
+                    quantity: identifier.parameters.iter().any(|parameter| {
+                        parameter
+                            .unit
+                            .as_deref()
+                            .is_some_and(|unit| !unit.is_empty())
+                            && parameter
+                                .encoding
+                                .as_deref()
+                                .is_some_and(|encoding| encoding.contains("scale="))
+                    }),
                     parameters: identifier
                         .parameters
                         .into_iter()

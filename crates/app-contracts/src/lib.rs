@@ -358,6 +358,11 @@ pub struct RouteSummary {
 pub struct ReadableIdentifierSummary {
     pub identifier: String,
     pub parameters: Vec<String>,
+    /// Whether the catalogue reads this identifier as a quantity: a parameter
+    /// with a unit and a scaling. Those are what a person watches first; raw
+    /// counts, texts and blocks are shown too, but under "everything".
+    #[serde(default)]
+    pub quantity: bool,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -939,6 +944,15 @@ pub struct LiveReadEntryStatus {
     pub negative_response: Option<String>,
 }
 
+/// One moment of a run: how far into it, and what the parameter read.
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LiveReadPoint {
+    /// Milliseconds since the run began.
+    pub at_ms: u64,
+    pub value: f64,
+}
+
 /// One parameter as the run has seen it: the latest value the catalogue
 /// decodes, and the smallest and largest of the run (ADR-0022, decision 6).
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -958,6 +972,11 @@ pub struct LiveReadValue {
     pub samples: u32,
     /// Milliseconds since the run began, at the last sample.
     pub at_ms: u64,
+    /// The run so far, oldest first, for a line on screen: the most recent
+    /// readings that were numbers, capped in the service. The whole run
+    /// stays in the report and the spreadsheet.
+    #[serde(default)]
+    pub series: Vec<LiveReadPoint>,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
