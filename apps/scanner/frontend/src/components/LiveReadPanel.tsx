@@ -11,6 +11,7 @@ import {
   type LiveReadValue,
 } from "../liveRead";
 import { chartColour } from "../liveChartColours";
+import { decimalsOf, withDecimals } from "../liveFormat";
 import { withUnit } from "../units";
 import { LiveChart } from "./LiveChart";
 import { LiveTiles } from "./LiveTiles";
@@ -72,8 +73,8 @@ function reading(value: LiveReadValue): string {
 function span(value: LiveReadValue): string | null {
   if (value.minimum === null || value.maximum === null) return null;
   if (value.minimum === value.maximum) return null;
-  const format = (number: number) =>
-    decimalText(Number.isInteger(number) ? String(number) : number.toFixed(2).replace(/\.?0+$/, ""));
+  const decimals = decimalsOf(value.value);
+  const format = (number: number) => withDecimals(number, decimals);
   return `${format(value.minimum)} … ${format(value.maximum)}`;
 }
 

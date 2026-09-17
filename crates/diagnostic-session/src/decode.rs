@@ -270,7 +270,13 @@ fn decode_one(parameter: &ReadableParameter, data: &[u8]) -> DecodedParameter {
         None
     };
     match scaled {
-        Some(value) => decoded.value = Some(format_number(value)),
+        Some(value) => {
+            let decimals = decimals_for(
+                encoding.scale.unwrap_or(1.0),
+                encoding.offset.unwrap_or(0.0),
+            );
+            decoded.value = Some(format_number(value, decimals));
+        }
         None => {
             decoded.value = Some(raw.to_string());
             decoded.note = Some("raw counts; the catalogue records no scaling".into());
@@ -288,13 +294,29 @@ fn unescape_state_name(name: &str) -> String {
         .replace("%25", "%")
 }
 
-fn format_number(value: f64) -> String {
-    if value.fract() == 0.0 && value.abs() < 1e15 {
-        format!("{}", value as i64)
-    } else {
-        let text = format!("{value:.3}");
-        text.trim_end_matches('0').trim_end_matches('.').to_string()
-    }
+/// How many decimals the converter's step and offset call for, three at
+/// most: a step of 0.25 needs two, 0.1 one, 1 none, and a step finer than a
+/// thousandth is shown to the thousandth. A reading is written with exactly
+/// these, so 21.0 and 21.5 at a half-degree step are the same width and the
+/// last digit is the converter's own, never a rounding artefact
+/// (2026-09-17).
+fn decimals_for(scale: f64, offset: f64) -> usize {
+    (0..=3)
+        .find(|decimals| {
+            let factor = 10f64.powi(*decimals as i32);
+            let whole = |number: f64| ((number * factor).round() - number * factor).abs() < 1e-9;
+            whole(scale) && whole(offset)
+        })
+        .unwrap_or(3)
+}
+
+/// The reading as text, with the decimals its converter calls for.
+fn format_number(value: f64, decimals: usize) -> String {
+    let factor = 10f64.powi(decimals as i32);
+    let rounded = (value * factor).round() / factor;
+    // A rounding that lands on zero is zero, not "-0.0".
+    let value = if rounded == 0.0 { 0.0 } else { rounded };
+    format!("{value:.decimals$}")
 }
 
 fn hex(bytes: &[u8]) -> String {
@@ -328,7 +350,7 @@ mod tests {
             &[0x1A, 0xF8],
         );
         assert_eq!(decoded[0].raw, Some(0x1AF8));
-        assert_eq!(decoded[0].value.as_deref(), Some("1726"));
+        assert_eq!(decoded[0].value.as_deref(), Some("1726.00"));
         assert_eq!(decoded[0].unit.as_deref(), Some("rpm"));
         assert_eq!(decoded[0].note, None);
     }
@@ -343,8 +365,8 @@ mod tests {
             )],
             &[0x80],
         );
-        // (128 - 48) * 0.75 = 60
-        assert_eq!(decoded[0].value.as_deref(), Some("60"));
+        // (128 - 48) * 0.75 = 60, written with the two decimals of 0.75
+        assert_eq!(decoded[0].value.as_deref(), Some("60.00"));
         let decoded = decode_parameters(
             &[parameter(
                 "Voltage",
@@ -354,6 +376,47 @@ mod tests {
             &[123],
         );
         assert_eq!(decoded[0].value.as_deref(), Some("12.3"));
+    }
+
+    /// The decimals are the converter's own: 0.25 needs two, 0.5 one, 1
+    /// none; finer than a thousandth is shown to the thousandth; and a
+    /// reading keeps them when it lands on a whole number, so 21.0 and 21.5
+    /// are the same width (2026-09-17).
+    #[test]
+    fn a_reading_carries_its_converter_decimals() {
+        assert_eq!(decimals_for(0.25, 0.0), 2);
+        assert_eq!(decimals_for(0.5, -80.0), 1);
+        assert_eq!(decimals_for(1.0, -40.0), 0);
+        assert_eq!(decimals_for(0.0048828125, 0.0), 3);
+        assert_eq!(decimals_for(0.000030518, 0.0), 3);
+        let half = [parameter(
+            "Ambient",
+            "bytes=0..0;size=1;mask=all;scale=0.5;offset=-80;offset_first=true",
+            Some("degC"),
+        )];
+        assert_eq!(
+            decode_parameters(&half, &[122])[0].value.as_deref(),
+            Some("21.0")
+        );
+        assert_eq!(
+            decode_parameters(&half, &[123])[0].value.as_deref(),
+            Some("21.5")
+        );
+        assert_eq!(
+            decode_parameters(&half, &[160])[0].value.as_deref(),
+            Some("40.0")
+        );
+        let channel = [parameter(
+            "Channel",
+            "bytes=0..1;size=2;mask=0xffff;scale=0.0048828125;offset=0;offset_first=true",
+            Some("V"),
+        )];
+        assert_eq!(
+            decode_parameters(&channel, &[0x02, 0x00])[0]
+                .value
+                .as_deref(),
+            Some("2.500")
+        );
     }
 
     #[test]

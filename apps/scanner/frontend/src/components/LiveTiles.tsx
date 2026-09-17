@@ -9,6 +9,7 @@ import {
   toneFor,
   type LiveLimits,
 } from "../liveLimits";
+import { decimalsOf, withDecimals } from "../liveFormat";
 import type { LiveReadValue } from "../liveRead";
 import { parameterName } from "../parameterNames";
 import { unitLabel } from "../units";
@@ -40,11 +41,6 @@ function shown(value: LiveReadValue): { number: string; unit: string | null } {
   if (value.state !== null) return { number: value.state, unit: null };
   if (value.raw !== null) return { number: String(value.raw), unit: null };
   return { number: "—", unit: null };
-}
-
-function compact(number: number): string {
-  const text = Number.isInteger(number) ? String(number) : number.toFixed(2).replace(/\.?0+$/, "");
-  return decimalText(text);
 }
 
 /** The run so far, scaled to what it has actually seen. */
@@ -113,6 +109,7 @@ export function LiveTiles({ values, limits, onLimits }: LiveTilesProps) {
         const number = numberOf(value);
         const tone = toneFor(number, effective);
         const { number: text, unit } = shown(value);
+        const decimals = decimalsOf(value.value);
         const open = editing === key;
         const draft = own ?? starter ?? EMPTY_LIMITS;
         return (
@@ -135,8 +132,8 @@ export function LiveTiles({ values, limits, onLimits }: LiveTilesProps) {
             <p className="live-tile-seen">
               {value.minimum !== null && value.maximum !== null && value.minimum !== value.maximum
                 ? t("over the run {low} … {high}", {
-                    low: compact(value.minimum),
-                    high: compact(value.maximum),
+                    low: withDecimals(value.minimum, decimals),
+                    high: withDecimals(value.maximum, decimals),
                   })
                 : t("{count} reading(s)", { count: value.samples })}
             </p>
