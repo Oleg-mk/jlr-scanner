@@ -195,3 +195,41 @@ What does not change: the codes are still not a car's, every value is still
 marked synthetic, a bench session is still refused by `report-intake` —
 `bench_scenario` gives that refusal nothing to reconsider — and the picture is
 still illustration, never evidence.
+
+## Amendment, 2026-09-17: a reading the bench makes up is one a car could show
+
+Decision 2 said values are "shaped by the library's converters so units and
+ranges read as on a real screen". The bytes were not: for every identifier
+but the battery's, the bench filled each byte with a number between 0x40 and
+0x8E and let the converter multiply. Through SDD's own converter a 10-bit
+sensor channel in a 16-bit field (PCM 0x1265, 5/1024 V a count) read
+136.8 V, an estimated oil temperature 12 352 °C, a valve-timing position a
+million degrees — numbers no car shows, and the owner saw them on the live
+table (2026-09-17). The battery's own table was off too: 0x402A was written
+as 202 counts under a comment saying 1/16 of a volt, while the library's
+converter is (raw + 120) × 0.05, so the card read 16.1 V.
+
+The bench now writes a reading, not bytes. For every parameter the catalogue
+places in an identifier it takes a number a standing car with the engine
+running could show, in the parameter's own unit — a supply between 12 and
+14.5 V; a sensor channel between 0.5 and 4.5 V, where an analogue-to-digital
+step of 5 V over 8, 10 or 12 bits marks a channel whatever the field width,
+and a field that cannot hold 6.5 V is a channel too; a temperature between
+20 and 95 °C; a percentage between 15 and 85; engine speed between 750 and
+2600 rpm; and so on for every unit the library names — converts it back
+through the parameter's own scale and offset into the parameter's own
+bytes, fitted under what those bytes can hold, and walks it across the
+middle of the band over 64 requests, each parameter at its own phase. A
+named state is one of the first two the catalogue names. A count, or a unit
+the bench does not know, is a few counts. Where two layouts of one
+identifier overlap, the wide one keeps its reading and the narrow one reads
+zero rather than a number no car shows. Only an identifier the catalogue
+places nothing in still draws plain bytes from the seed. The battery table
+is corrected: 132 counts, 12.6 V.
+
+These bands are bench numbers, chosen so the screen can be judged; they are
+not knowledge, not a normal range, and nothing in the application reads
+them. The application shows what a module says — on the bench and on a car
+alike — and states no threshold of its own: a limit is the operator's to
+set. What the bench says is now believable; it is still synthetic, and every
+row still says so.

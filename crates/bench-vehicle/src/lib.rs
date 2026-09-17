@@ -6,6 +6,13 @@
 //! proves the software above it and never a car, which is why every value
 //! it produces reaches the screen labelled so.
 //!
+//! A reading it makes up is a number a car could show - a supply near 13 V,
+//! a sensor channel inside its 0...5 V, a temperature between 20 and 95 C -
+//! in the parameter's own unit, written through the parameter's own converter
+//! into the parameter's own bytes, and wandering with the request count so a
+//! chart has a line to draw (ADR-0020, amendment of 2026-09-17). Only an
+//! identifier the catalogue places nothing in draws plain bytes from the seed.
+//!
 //! What it answers comes from the same base that tells the application what
 //! to ask: a module the library does not mount does not exist here, a bus the
 //! library binds to no pins is silent here, and an identifier the catalogue
@@ -21,8 +28,8 @@
 //! number can be shown the same screen again.
 
 use app_contracts::VehicleContextInput;
-use diagnostic_environment::DiagnosticEnvironmentResolver;
-use diagnostic_session::decode::{is_text, parameters_span};
+use diagnostic_environment::{DiagnosticEnvironmentResolver, ReadableParameter};
+use diagnostic_session::decode::{is_text, parameters_span, parse_encoding, placed_span, Encoding};
 use diagnostic_session::{vehicle_context, KnowledgeLibrary};
 use obd_j1979::bench::{
     current_data_response, cvn_response, dtc_list_response, ecu_name_response,
@@ -111,6 +118,10 @@ struct ModuleResponder {
     extended: bool,
     /// Identifier to the number of data bytes it answers with.
     identifiers: BTreeMap<u16, usize>,
+    /// Identifier to the parameters the catalogue places in it, so a
+    /// reading can be written the way the decoder reads it: a believable
+    /// number in the parameter's own unit, through its own converter.
+    readings: BTreeMap<u16, Vec<ReadableParameter>>,
     /// Identifiers whose payload is a text (ADR-0027): answered with a
     /// part-number-shaped string rather than walking bytes.
     texts: BTreeSet<u16>,
@@ -177,6 +188,10 @@ impl BenchVehicle {
                 .filter(|identifier| is_text(&identifier.parameters))
                 .map(|identifier| identifier.identifier)
                 .collect();
+            let readings: BTreeMap<u16, Vec<ReadableParameter>> = readable
+                .iter()
+                .map(|identifier| (identifier.identifier, identifier.parameters.clone()))
+                .collect();
             let mut identifiers: BTreeMap<u16, usize> = readable
                 .into_iter()
                 .map(|identifier| {
@@ -206,6 +221,7 @@ impl BenchVehicle {
                 response_id: response,
                 extended: request > 0x7FF,
                 identifiers,
+                readings,
                 texts,
                 configuration,
                 faults: choose_faults(library, &entry.ecu_family, scenario),
@@ -269,13 +285,27 @@ impl BenchVehicle {
                             // The value walks with the number of requests
                             // this module has answered, so a live read has
                             // something to draw; the walk is deterministic.
+                            // A reading the catalogue places is a number a
+                            // car could show; only an identifier it places
+                            // nothing in draws plain bytes.
                             module.answered = module.answered.wrapping_add(1);
-                            payload.extend(synthetic_bytes(
-                                &module.family,
-                                identifier,
-                                *length,
-                                module.answered,
-                            ));
+                            let reading = module.readings.get(&identifier).and_then(|parameters| {
+                                synthetic_reading(
+                                    &module.family,
+                                    parameters,
+                                    *length,
+                                    module.answered,
+                                )
+                            });
+                            match reading {
+                                Some(bytes) => payload.extend_from_slice(&bytes),
+                                None => payload.extend(synthetic_bytes(
+                                    &module.family,
+                                    identifier,
+                                    *length,
+                                    module.answered,
+                                )),
+                            }
                         }
                         payload
                     }
@@ -920,8 +950,10 @@ fn synthetic_battery(identifier: u16, length: usize) -> Option<Vec<u8>> {
         0x4029 => 61,
         // -1.5 A into the battery: (raw - 8192) * 0.0625.
         0x4090 | 0x402B => 8192 - 24,
-        // 12.6 V at 1/16 of a volt.
-        0x402A => 202,
+        // 12.6 V: the data reads (raw + 120) x 0.05. Written as 202 counts
+        // under a comment saying 1/16 of a volt, the card read 16.1 V
+        // (2026-09-17).
+        0x402A => 132,
         // 14.4 V at 1/2048 of a volt.
         0x0304 => 29_491,
         // 10.9 V of estimated cold cranking, at 1/16 of a volt.
@@ -959,9 +991,182 @@ fn synthetic_bytes(family: &str, identifier: u16, length: usize, tick: u32) -> V
     bytes
 }
 
+/// A believable reading for every parameter the catalogue places in an
+/// identifier (ADR-0020, amendment of 2026-09-17): a number a standing car
+/// with the engine running could show, in the parameter's own unit, written
+/// back through the parameter's own converter into its own bytes and
+/// wandering across its band with the request count, so a chart has a line
+/// to draw. A named state is one of the first two the catalogue names. None
+/// where the catalogue places nothing; the caller then draws plain bytes.
+fn synthetic_reading(
+    family: &str,
+    parameters: &[ReadableParameter],
+    length: usize,
+    tick: u32,
+) -> Option<Vec<u8>> {
+    let mut placed: Vec<(usize, usize, Encoding, &ReadableParameter)> = parameters
+        .iter()
+        .filter_map(|parameter| {
+            let encoding = parse_encoding(parameter.encoding.as_deref()?);
+            if encoding.text || encoding.ccf.is_some() {
+                return None;
+            }
+            let (from, to) = placed_span(&encoding, length)?;
+            (from <= to && to < length && to - from < 8).then_some((from, to, encoding, parameter))
+        })
+        .collect();
+    if placed.is_empty() {
+        return None;
+    }
+    // Narrow spans first, wide ones last: where two layouts of one
+    // identifier overlap, the wide one keeps its reading and the narrow one
+    // reads its high bytes - zero, rather than a number no car shows.
+    placed.sort_by_key(|(from, to, _, _)| to - from);
+    let mut bytes = vec![0u8; length];
+    for (from, to, encoding, parameter) in placed {
+        let capacity = capacity_of(&encoding, to - from + 1);
+        let raw = if !encoding.states.is_empty() {
+            let pick = (fnv(&parameter.name) as usize) % encoding.states.len().min(2);
+            encoding.states[pick].0.min(capacity)
+        } else if let Some(scale) = encoding
+            .scale
+            .filter(|scale| *scale > 0.0 && !encoding.has_map)
+        {
+            let offset = encoding.offset.unwrap_or(0.0);
+            let top = converted(capacity as f64, scale, offset, encoding.offset_first);
+            match band_for(parameter.unit.as_deref(), scale, top) {
+                Some((low, high)) => {
+                    let value = low + wander(&parameter.name, family, tick, high - low);
+                    let counts = if encoding.offset_first {
+                        value / scale - offset
+                    } else {
+                        (value - offset) / scale
+                    };
+                    // At least one count: a band under one step of a coarse
+                    // converter still reads as something, not as nothing.
+                    counts.round().clamp(1.0, capacity as f64) as u64
+                }
+                None => counts_band(&parameter.name, family, tick, capacity),
+            }
+        } else {
+            counts_band(&parameter.name, family, tick, capacity)
+        };
+        write_number(&mut bytes[from..=to], encoding.mask.unwrap_or(0), raw);
+    }
+    Some(bytes)
+}
+
+/// The largest count the parameter's bytes can hold, as the decoder reads
+/// them: the mask's own span where there is one, the full width otherwise.
+fn capacity_of(encoding: &Encoding, width: usize) -> u64 {
+    let full = if width >= 8 {
+        u64::MAX
+    } else {
+        (1u64 << (8 * width)) - 1
+    };
+    match encoding.mask {
+        Some(mask) if mask != 0 && width == 1 => {
+            let mask = mask & 0xFF;
+            mask >> mask.trailing_zeros()
+        }
+        Some(mask) if mask != 0 => mask.min(full),
+        _ => full,
+    }
+}
+
+/// The converter applied as the decoder applies it.
+fn converted(raw: f64, scale: f64, offset: f64, offset_first: bool) -> f64 {
+    if offset_first {
+        (raw + offset) * scale
+    } else {
+        raw * scale + offset
+    }
+}
+
+/// The step of an analogue-to-digital converter: 5 V over 8, 10 or 12 bits.
+/// It marks a sensor channel whatever the width of the field that carries
+/// it - a 10-bit count in a 16-bit field is still 0...5 V.
+fn is_adc_step(scale: f64) -> bool {
+    [256.0, 1023.0, 1024.0, 4095.0, 4096.0]
+        .iter()
+        .any(|counts| (scale * counts - 5.0).abs() < 1e-6)
+}
+
+/// The band a car could show for a unit the catalogue names, in that unit,
+/// fitted under what the bytes can hold. Bench numbers, not knowledge: a
+/// standing car with the engine running. None for a count or a unit the
+/// bench does not know.
+fn band_for(unit: Option<&str>, scale: f64, top: f64) -> Option<(f64, f64)> {
+    let (low, high): (f64, f64) = match unit? {
+        // A sensor channel inside 0...5 V; a field that cannot hold 6.5 V is
+        // a channel too. Anything else is a supply.
+        "V" if is_adc_step(scale) || top <= 6.5 => (0.5, 4.5),
+        "V" => (12.0, 14.5),
+        "degC" => (20.0, 95.0),
+        "pct" => (15.0, 85.0),
+        "rpm" => (750.0, 2600.0),
+        "kph" => (30.0, 90.0),
+        "A" => (1.0, 12.0),
+        "uA" => (20.0, 300.0),
+        "Nm" => (40.0, 160.0),
+        "deg" => (3.0, 25.0),
+        "deg/s" => (0.5, 6.0),
+        "kg/h" => (15.0, 90.0),
+        "g/s" => (4.0, 25.0),
+        "Pa" => (35_000.0, 100_000.0),
+        "bar" => (0.8, 2.5),
+        "Hz" => (10.0, 60.0),
+        "m" => (5.0, 50.0),
+        "R" => (2.0, 12.0),
+        "m/s^2" => (0.2, 1.5),
+        "W" => (5.0, 80.0),
+        "g" => (5.0, 60.0),
+        "dB" => (20.0, 60.0),
+        "l/h" => (1.0, 9.0),
+        "mm/s" => (2.0, 20.0),
+        "cm^3" => (5.0, 60.0),
+        "L" => (10.0, 60.0),
+        "kg/m^3" => (720.0, 850.0),
+        "km" => (95_000.0, 140_000.0),
+        "s" => (120.0, 900.0),
+        _ => return None,
+    };
+    if top <= 0.0 {
+        return None;
+    }
+    // Fitted under the top of the field: the upper nine tenths of it at
+    // most, and the band's own floor or the lower three tenths.
+    Some(if high > top {
+        (low.min(top * 0.3), top * 0.9)
+    } else {
+        (low, high)
+    })
+}
+
+/// A count a person can read as a count: a few, wandering.
+fn counts_band(name: &str, family: &str, tick: u32, capacity: u64) -> u64 {
+    (3.0 + wander(name, family, tick, 37.0))
+        .round()
+        .clamp(0.0, capacity as f64) as u64
+}
+
+/// Where in its band a reading stands at this request: a triangle across
+/// the middle of the band over 64 requests, each parameter starting at its
+/// own phase so the lines on one chart do not move in step.
+fn wander(name: &str, family: &str, tick: u32, span: f64) -> f64 {
+    let step = tick.wrapping_add(fnv(name)).wrapping_add(fnv(family)) % 64;
+    let triangle = if step < 32 {
+        f64::from(step) / 32.0
+    } else {
+        f64::from(64 - step) / 32.0
+    };
+    span * (0.3 + 0.4 * triangle)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use diagnostic_session::decode::decode_parameters;
 
     #[test]
     fn fault_codes_go_on_the_wire_as_iso_14229_writes_them() {
@@ -1100,6 +1305,165 @@ mod tests {
             synthetic_bytes("PCM", 0x1945, 8, 64),
             "a full period"
         );
+    }
+
+    fn placed(name: &str, encoding: &str, unit: &str) -> ReadableParameter {
+        ReadableParameter {
+            name: name.into(),
+            encoding: Some(encoding.into()),
+            unit: (!unit.is_empty()).then(|| unit.to_string()),
+        }
+    }
+
+    fn number(parameters: &[ReadableParameter], bytes: &[u8]) -> f64 {
+        decode_parameters(parameters, bytes)[0]
+            .value
+            .as_deref()
+            .expect("a value")
+            .parse()
+            .expect("a number")
+    }
+
+    /// ADR-0020, amendment of 2026-09-17: a reading the bench makes up is a
+    /// number a car could show, in the parameter's own unit, through its
+    /// own converter - what the owner saw instead was 136.8 V on a 0...5 V
+    /// channel and 12 352 C of oil.
+    #[test]
+    fn synthetic_readings_stay_inside_what_a_car_shows() {
+        // A 10-bit channel in a 16-bit field, 5/1024 V a count: PCM 0x1265.
+        let channel = [placed(
+            "Air conditioning high pressure sensor voltage",
+            "bytes=0..1;size=2;mask=0xffff;converter=X;scale=0.0048828125;offset=0;offset_first=true",
+            "V",
+        )];
+        for tick in [1, 17, 40, 63] {
+            let bytes = synthetic_reading("PCM", &channel, 2, tick).unwrap();
+            let volts = number(&channel, &bytes);
+            assert!((0.5..=4.5).contains(&volts), "tick {tick}: {volts} V");
+            assert!(decode_parameters(&channel, &bytes)[0].raw.unwrap() <= 1023);
+        }
+        // A supply over four bytes, a millivolt a count.
+        let supply = [placed(
+            "Control module voltage",
+            "bytes=0..3;size=4;mask=all;scale=0.001;offset=0;offset_first=true",
+            "V",
+        )];
+        let volts = number(&supply, &synthetic_reading("PCM", &supply, 4, 5).unwrap());
+        assert!((12.0..=14.5).contains(&volts), "{volts} V");
+        // A lambda-sensor channel that cannot hold 6 V: 0.005 V a count.
+        let lambda = [placed(
+            "Oxygen sensor output voltage",
+            "bytes=0..0;size=1;mask=0xff;scale=0.005;offset=0;offset_first=true",
+            "V",
+        )];
+        let volts = number(&lambda, &synthetic_reading("PCM", &lambda, 1, 5).unwrap());
+        assert!((0.0..=1.275).contains(&volts), "{volts} V");
+        // A temperature with the offset first: (raw - 40) x 1.
+        let heat = [placed(
+            "Engine coolant temperature",
+            "size=1;mask=0xff;scale=1;offset=-40;offset_first=true",
+            "degC",
+        )];
+        let degrees = number(&heat, &synthetic_reading("PCM", &heat, 1, 9).unwrap());
+        assert!((20.0..=95.0).contains(&degrees), "{degrees} degC");
+        // An estimated oil temperature, 0.625 a count over two bytes.
+        let oil = [placed(
+            "Engine oil temperature  -  Estimated",
+            "bytes=0..1;size=2;mask=0xffff;scale=0.625;offset=-64;offset_first=true",
+            "degC",
+        )];
+        let degrees = number(&oil, &synthetic_reading("PCM", &oil, 2, 30).unwrap());
+        assert!((20.0..=95.0).contains(&degrees), "{degrees} degC");
+        // A percentage in one byte, and a percentage with a signed offset.
+        let duty = [placed(
+            "Pump output",
+            "size=1;mask=0xff;scale=1;offset=0;offset_first=true",
+            "pct",
+        )];
+        let percent = number(&duty, &synthetic_reading("TCCM", &duty, 1, 2).unwrap());
+        assert!((15.0..=85.0).contains(&percent), "{percent} pct");
+        let trim = [placed(
+            "Fuel trim",
+            "bytes=0..0;size=1;mask=0xff;scale=0.78125;offset=-128;offset_first=true",
+            "pct",
+        )];
+        let percent = number(&trim, &synthetic_reading("PCM", &trim, 1, 2).unwrap());
+        assert!((15.0..=85.0).contains(&percent), "{percent} pct");
+        // A state is one the catalogue names, never a count outside them.
+        let state = [placed(
+            "Market",
+            "bytes=0..0;size=1;mask=all;scale=1;offset=0;offset_first=true;states=0..0=Off|1..1=On|2..255=Not used",
+            "int",
+        )];
+        let decoded = decode_parameters(&state, &synthetic_reading("BCM", &state, 1, 1).unwrap());
+        assert!(
+            matches!(decoded[0].state.as_deref(), Some("Off") | Some("On")),
+            "{decoded:?}"
+        );
+        // A count: a few.
+        let count = [placed(
+            "Resets",
+            "bytes=0..1;size=2;mask=0xffff;scale=1;offset=0;offset_first=true",
+            "int",
+        )];
+        let counts = number(&count, &synthetic_reading("GWM", &count, 2, 1).unwrap());
+        assert!((3.0..=40.0).contains(&counts), "{counts}");
+    }
+
+    /// A reading moves with the request count and is back after 64; two
+    /// layouts of one identifier that overlap leave the wide one its reading
+    /// and the narrow one zero; where the catalogue places nothing there is
+    /// no reading and the caller draws plain bytes.
+    #[test]
+    fn synthetic_readings_wander_overlap_and_give_way() {
+        let heat = [placed(
+            "Catalyst temperature",
+            "bytes=0..1;size=2;mask=0xffff;scale=0.1;offset=-400;offset_first=true",
+            "degC",
+        )];
+        let at = |tick| number(&heat, &synthetic_reading("PCM", &heat, 2, tick).unwrap());
+        assert_ne!(at(0), at(16));
+        assert_eq!(at(0), at(64), "a full period");
+
+        let both = [
+            placed(
+                "Wide",
+                "bytes=0..3;size=4;mask=all;scale=0.001;offset=0;offset_first=true",
+                "V",
+            ),
+            placed(
+                "Narrow",
+                "bytes=0..1;size=2;mask=0xffff;scale=0.0048828125;offset=0;offset_first=true",
+                "V",
+            ),
+        ];
+        let decoded = decode_parameters(&both, &synthetic_reading("PCM", &both, 4, 3).unwrap());
+        let wide: f64 = decoded[0].value.as_deref().unwrap().parse().unwrap();
+        assert!((12.0..=14.5).contains(&wide), "{wide} V");
+        assert_eq!(
+            decoded[1].raw,
+            Some(0),
+            "the narrow layout reads the high bytes"
+        );
+
+        assert_eq!(
+            synthetic_reading("PCM", &[placed("Part", "text=ascii", "")], 4, 0),
+            None
+        );
+        assert_eq!(synthetic_reading("PCM", &[], 4, 0), None);
+    }
+
+    /// The battery table reads as the library converts it: 0x402A is
+    /// (raw + 120) x 0.05 V, so 132 counts is 12.6 V (2026-09-17).
+    #[test]
+    fn the_bench_battery_voltage_is_twelve_point_six() {
+        let voltage = [placed(
+            "Vehicle battery voltage",
+            "size=1;mask=0xff;converter=CVT_N_VOLT_OFF_6_RES_0PT05;scale=0.05;offset=120;offset_first=true",
+            "V",
+        )];
+        let volts = number(&voltage, &synthetic_battery(0x402A, 1).unwrap());
+        assert!((volts - 12.6).abs() < 1e-9, "{volts} V");
     }
 
     #[test]

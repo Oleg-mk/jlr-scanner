@@ -33,26 +33,29 @@ pub struct DecodedParameter {
     pub note: Option<String>,
 }
 
+/// A parameter's layout as the catalogue records it: where its bytes are,
+/// the mask, the linear converter, the named states. Public so the bench
+/// can write a reading the way this module reads one (ADR-0020).
 #[derive(Debug, Default)]
-struct Encoding {
-    bytes: Option<(usize, usize)>,
+pub struct Encoding {
+    pub bytes: Option<(usize, usize)>,
     /// How many bytes the parameter occupies, where the data says so
     /// without saying where they start. A one-parameter identifier whose
     /// answer is exactly that long has only one reading (ADR-0030).
-    size: Option<usize>,
-    mask: Option<u64>,
-    scale: Option<f64>,
-    offset: Option<f64>,
-    offset_first: bool,
-    has_map: bool,
-    states: Vec<(u64, u64, String)>,
+    pub size: Option<usize>,
+    pub mask: Option<u64>,
+    pub scale: Option<f64>,
+    pub offset: Option<f64>,
+    pub offset_first: bool,
+    pub has_map: bool,
+    pub states: Vec<(u64, u64, String)>,
     /// The whole payload is a text — a part number, a serial, a VIN
     /// (ADR-0027, `text=ascii`).
-    text: bool,
+    pub text: bool,
     /// The payload carries a block of the car configuration file
     /// (ADR-0028, `ccf=<BLOCK>;offset=<n>;length=<n>`): decoded by the
     /// configuration read, not here.
-    ccf: Option<String>,
+    pub ccf: Option<String>,
 }
 
 /// Whether an identifier's parameters say its payload is a text (ADR-0027).
@@ -68,7 +71,8 @@ fn is_padding(byte: u8) -> bool {
     byte == 0x00 || byte == 0xFF || byte == b' '
 }
 
-fn parse_encoding(text: &str) -> Encoding {
+/// The catalogue's encoding descriptor, parsed; unknown keys are ignored.
+pub fn parse_encoding(text: &str) -> Encoding {
     let mut encoding = Encoding::default();
     for part in text.split(';') {
         let Some((key, value)) = part.split_once('=') else {
@@ -115,6 +119,16 @@ fn parse_encoding(text: &str) -> Encoding {
         }
     }
     encoding
+}
+
+/// Where a parameter sits in an answer of the given length: its byte range,
+/// or - where the data gives a size and no range and the answer is exactly
+/// that long - the whole answer (ADR-0030). None when it cannot be placed.
+pub fn placed_span(encoding: &Encoding, length: usize) -> Option<(usize, usize)> {
+    encoding.bytes.or_else(|| match encoding.size {
+        Some(size) if size > 0 && size == length => Some((0, size - 1)),
+        _ => None,
+    })
 }
 
 /// How many data bytes an identifier's parameters span, by the catalogue's
@@ -199,10 +213,7 @@ fn decode_one(parameter: &ReadableParameter, data: &[u8]) -> DecodedParameter {
     // bytes, the parameter is the whole answer. That is a reading, not a
     // guess: there is nowhere else for it to be. An answer of any other
     // length is left unplaced, with the reason.
-    let span = encoding.bytes.or_else(|| match encoding.size {
-        Some(size) if size > 0 && size == data.len() => Some((0, size - 1)),
-        _ => None,
-    });
+    let span = placed_span(&encoding, data.len());
     let Some((from, to)) = span else {
         decoded.note = Some(match encoding.size {
             Some(size) => format!(
