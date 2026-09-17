@@ -278,6 +278,79 @@ describe("live reading", () => {
     expect(screen.getByRole("button", { name: "Stop" })).toBeEnabled();
   });
 
+  /**
+   * F15, the chart: every chosen parameter with readings is one line over the
+   * same stretch of time, and the legend is the key. No dial anywhere.
+   */
+  it("draws one line per parameter with a run, and names them in the legend", () => {
+    const snapshot: LiveReadSnapshot = {
+      ...createLiveReadSnapshot(),
+      state: "RUNNING",
+      rounds: 3,
+      samples: 6,
+      elapsedMs: 900,
+      values: [
+        {
+          ecuFamily: "PCM",
+          identifier: "0xF40C",
+          name: "engine speed",
+          value: "760",
+          unit: "rpm",
+          state: null,
+          note: null,
+          raw: 3040,
+          minimum: 742,
+          maximum: 768,
+          samples: 3,
+          atMs: 800,
+          series: [
+            { atMs: 0, value: 742 },
+            { atMs: 400, value: 768 },
+            { atMs: 800, value: 760 },
+          ],
+        },
+        {
+          ecuFamily: "PCM",
+          identifier: "0xDD02",
+          name: "battery voltage",
+          value: "13.75",
+          unit: "V",
+          state: null,
+          note: null,
+          raw: 55,
+          minimum: 13.5,
+          maximum: 14,
+          samples: 3,
+          atMs: 900,
+          series: [
+            { atMs: 100, value: 13.5 },
+            { atMs: 500, value: 14 },
+            { atMs: 900, value: 13.75 },
+          ],
+        },
+      ],
+    };
+    render(
+      <LiveReadPanel
+        snapshot={snapshot}
+        set={[{ ecuFamily: "PCM", identifier: "0xF40C" }]}
+        modules={[module("PCM", ["0xF40C"])]}
+        running
+        busy={false}
+        adapterReady
+        {...idleHandlers}
+      />,
+    );
+    const chart = screen.getByRole("img", { name: "the run, every chosen parameter over time" });
+    expect(chart.querySelectorAll("polyline")).toHaveLength(2);
+    // The legend names each line with its latest reading and its span.
+    expect(screen.getByRole("button", { name: /engine speed.*760 rpm.*742 … 768/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /battery voltage.*13\.75 V.*13\.5 … 14/ })).toBeInTheDocument();
+    // Tiles stand above it, one per parameter, and there is no dial.
+    expect(screen.getAllByRole("article")).toHaveLength(2);
+    expect(document.querySelector(".gauge")).toBeNull();
+  });
+
   it("says what to do first when nothing is surveyed or no adapter is there", () => {
     render(
       <LiveReadPanel

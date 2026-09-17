@@ -4489,3 +4489,81 @@ table.live-read-identifiers label {
   gap: 0.5rem 0.75rem;
   margin: 0.4rem 0 0.2rem;
 }
+
+/* ---------------------------------------------------------------------
+   Live reading: the chart (F15)
+
+   One plot for the run, every chosen parameter on the same axis of time,
+   each line scaled to its own span. The legend is the key and the switch.
+   --------------------------------------------------------------------- */
+.live-chart {
+  margin: 0.75rem 0 0.5rem;
+}
+
+.live-chart-plot {
+  display: block;
+  width: 100%;
+  height: 11rem;
+  border-radius: var(--radius-card, 12px);
+  background: rgb(255 255 255 / 55%);
+  box-shadow: inset 0 0 0 1px rgb(22 48 31 / 16%);
+}
+
+.live-chart-plot polyline {
+  fill: none;
+  stroke-width: 1.6;
+  vector-effect: non-scaling-stroke;
+}
+
+.live-chart-axis {
+  display: flex;
+  justify-content: space-between;
+  margin: 0.2rem 0.25rem 0;
+  font-size: 0.75rem;
+  color: rgb(22 48 31 / 65%);
+  font-variant-numeric: tabular-nums;
+}
+
+.live-chart-legend {
+  list-style: none;
+  margin: 0.4rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem 0.5rem;
+}
+
+.live-chart-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.2rem 0.55rem;
+  border: 0;
+  border-radius: var(--radius-chip, 6px);
+  background: rgb(255 255 255 / 55%);
+  box-shadow: inset 0 0 0 1px rgb(22 48 31 / 16%);
+  font: inherit;
+  font-size: 0.8rem;
+  color: inherit;
+  cursor: pointer;
+}
+
+.live-chart-legend-item.is-off {
+  opacity: 0.45;
+}
+
+.live-chart-swatch {
+  width: 0.7rem;
+  height: 0.7rem;
+  border-radius: 50%;
+}
+
+.live-chart-legend-reading {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.live-chart-legend-span {
+  color: rgb(22 48 31 / 65%);
+  font-variant-numeric: tabular-nums;
+}

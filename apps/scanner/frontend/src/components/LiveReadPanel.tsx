@@ -10,6 +10,7 @@ import {
   type LiveReadSnapshot,
   type LiveReadValue,
 } from "../liveRead";
+import { LiveChart } from "./LiveChart";
 import { LiveTiles } from "./LiveTiles";
 import { StatusBadge } from "./StatusBadge";
 
@@ -309,6 +310,7 @@ export function LiveReadPanel({
               "The chosen parameters, at a glance. A tile colours itself only against limits you set; SDD records no normal range, so none is drawn for you.",
             )}
           </p>
+          <LiveChart values={snapshot.values} />
         </>
       ) : null}
 
