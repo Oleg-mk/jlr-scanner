@@ -130,7 +130,7 @@ export function LiveTiles({ values, limits, onLimits }: LiveTilesProps) {
             ) : null}
             <p className="live-tile-seen">
               {value.minimum !== null && value.maximum !== null && value.minimum !== value.maximum
-                ? t("seen {low} … {high}", {
+                ? t("over the run {low} … {high}", {
                     low: compact(value.minimum),
                     high: compact(value.maximum),
                   })

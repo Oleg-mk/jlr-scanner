@@ -335,12 +335,36 @@ export function LiveReadPanel({
       ) : null}
 
       {snapshot.values.length > 0 ? (
+        <div className="live-marks-actions">
+          <button
+            className="button button--quiet"
+            type="button"
+            onClick={() => setPlotted(snapshot.values.map(markKey))}
+          >
+            {t("Mark all for the chart")}
+          </button>
+          {pinned.length > 0 || plotted.length > 0 ? (
+            <button
+              className="button button--quiet"
+              type="button"
+              onClick={() => {
+                setPinned([]);
+                setPlotted([]);
+              }}
+            >
+              {t("Clear marks")}
+            </button>
+          ) : null}
+        </div>
+      ) : null}
+
+      {snapshot.values.length > 0 ? (
         <table className="module-table">
           <thead>
             <tr>
               <th scope="col">{t("Parameter")}</th>
               <th scope="col">{t("Value")}</th>
-              <th scope="col">{t("Seen")}</th>
+              <th scope="col">{t("Min … max")}</th>
               <th scope="col">{t("Module")}</th>
               <th scope="col">{t("Show")}</th>
             </tr>
@@ -378,23 +402,28 @@ export function LiveReadPanel({
                   {value.ecuFamily} <code>{value.identifier}</code>
                 </td>
                 <td className="live-marks">
-                  <button
-                    type="button"
-                    className={`button button--quiet live-mark${onTile ? " is-on" : ""}`}
-                    aria-pressed={onTile}
-                    disabled={!onTile && pinned.length >= 8}
-                    onClick={() => setPinned((current) => flip(current, key))}
-                  >
-                    {t("Tile")}
-                  </button>
-                  <button
-                    type="button"
-                    className={`button button--quiet live-mark${onChart >= 0 ? " is-on" : ""}`}
-                    aria-pressed={onChart >= 0}
-                    onClick={() => setPlotted((current) => flip(current, key))}
-                  >
-                    {t("Chart")}
-                  </button>
+                  {/* Two marks milled into one plate, like the language
+                      switch in the header; each is its own lens, because a
+                      row may be a tile and on the chart at once. */}
+                  <div className="mark-switch" role="group" aria-label={t("Show")}>
+                    <button
+                      type="button"
+                      className="mark-switch__mark"
+                      aria-pressed={onTile}
+                      disabled={!onTile && pinned.length >= 8}
+                      onClick={() => setPinned((current) => flip(current, key))}
+                    >
+                      {t("Tile")}
+                    </button>
+                    <button
+                      type="button"
+                      className="mark-switch__mark"
+                      aria-pressed={onChart >= 0}
+                      onClick={() => setPlotted((current) => flip(current, key))}
+                    >
+                      {t("Chart")}
+                    </button>
+                  </div>
                 </td>
               </tr>
               );
