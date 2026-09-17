@@ -54,11 +54,20 @@ function effective(value: LiveReadValue, limits: Record<string, LiveLimits>): Li
   return limits[limitKey(value)] ?? starterFor(value) ?? undefined;
 }
 
-/** The first watched value of a unit whose name says what it is, else the first of that unit at all. */
+/** A parameter that only mentions the quantity - a timeout log, a threshold - is not the quantity. */
+const NOT_THE_READING = /log|timeout|event|threshold|limit|maximum|minimum|request|target|desired/i;
+
+/**
+ * The watched value a dial reads: the parameter named for the quantity
+ * itself first ("Vehicle speed"), then one that carries the name without
+ * being a log or a threshold about it, then any of the unit at all.
+ */
 function gaugeValue(values: LiveReadValue[], unit: string, pattern: RegExp): LiveReadValue | null {
+  const ofUnit = values.filter((value) => value.unit === unit);
   return (
-    values.find((value) => value.unit === unit && pattern.test(value.name)) ??
-    values.find((value) => value.unit === unit) ??
+    ofUnit.find((value) => pattern.test(value.name) && !NOT_THE_READING.test(value.name)) ??
+    ofUnit.find((value) => pattern.test(value.name)) ??
+    ofUnit[0] ??
     null
   );
 }
@@ -188,8 +197,8 @@ function Dial({
 }
 
 export function LiveDashboard({ values, limits }: LiveDashboardProps) {
-  const speed = gaugeValue(values, "kph", /vehicle speed|road speed/i);
-  const engine = gaugeValue(values, "rpm", /engine speed/i);
+  const speed = gaugeValue(values, "kph", /^vehicle speed|^road speed/i);
+  const engine = gaugeValue(values, "rpm", /^engine speed/i);
   const onDials = new Set(
     [speed, engine].filter((value): value is LiveReadValue => value !== null).map(limitKey),
   );

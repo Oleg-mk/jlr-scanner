@@ -400,6 +400,8 @@ describe("live reading", () => {
       samples: 8,
       elapsedMs: 400,
       values: [
+        // A log that mentions the speed is not the speed: the dial passes it by.
+        value("0xD018", "First CAN signal timeout event log  -  Vehicle speed", "0", "kph", 0),
         value("0xF40C", "Engine speed", "812.00", "rpm", 812),
         value("0xF40D", "Vehicle speed", "66", "kph", 66),
         value("0xF405", "Engine coolant temperature", "97.0", "degC", 97),
