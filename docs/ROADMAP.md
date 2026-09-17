@@ -32,6 +32,14 @@ Generic SAE J1979 remains a baseline capability for vehicles with no JLR
 knowledge yet. It is not the product and must not become the centre of a phase
 plan.
 
+## Version numbers, decided 2026-09-17
+
+The owner's rule: the first number is the product, the second is the stage,
+the third counts the builds within it. 1.1.x is stage 1 built and in the
+testers' hands; stage 2, once it is authorised, will be 1.2.x, and stage 3
+1.3.x. 1.0.x were the builds before stage 1 had its face; 1.1.0 is the
+first build after the visual layer of F15 closed the last open row.
+
 ## Scope, decided 2026-09-01
 
 The owner selected staged scope. Later stages are **declared direction, not
