@@ -1,6 +1,6 @@
 # Capability matrix: SDD 169 against ProwlOne
 
-Written 2026-09-12 at the owner's request: what a person gets from SDD at its fullest, what ProwlOne does today in stage 1 (read-only), what the roadmap adds in stages 2 and 3, and what the product could reach if the goal were the most function possible. Rows are not only SDD's functions: some things only ProwlOne does. This is a planning matrix, not a promise; `ROADMAP.md` decides order, `SAFETY_BOUNDARIES.md` decides what never happens.
+Written 2026-09-12 at the owner's request, updated 2026-09-17 when the last row open inside stage 1 closed: what a person gets from SDD at its fullest, what ProwlOne does today in stage 1 (read-only), what the roadmap adds in stages 2 and 3, and what the product could reach if the goal were the most function possible. Rows are not only SDD's functions: some things only ProwlOne does. This is a planning matrix, not a promise; `ROADMAP.md` decides order, `SAFETY_BOUNDARIES.md` decides what never happens.
 
 ## How to read it
 
@@ -21,7 +21,7 @@ Written 2026-09-12 at the owner's request: what a person gets from SDD at its fu
 | `not found in the data` | not found in SDD 169's data; may still exist in its runtime |
 | `—` | not applicable, or already answered by the column before |
 
-**Counts.** 99 rows. SDD does 63 of them. ProwlOne today: 43 built, 1 partly, 1 open inside stage 1 — the graphs and gauges of F15, which wait for the first real reports. The roadmap: 20 in stage 2, 8 in stage 3. The ceiling: 37 already reached, 50 possible, 3 need other hardware, 8 excluded for good, 1 no. 10 rows are things SDD does not do and ProwlOne already does; 8 rows are things SDD does that ProwlOne will never do.
+**Counts.** 99 rows. SDD does 63 of them. ProwlOne today: 44 built, 1 partly, none open inside stage 1 — the graphs and gauges of F15 were built on 2026-09-17. The roadmap: 20 in stage 2, 8 in stage 3. The ceiling: 38 already reached, 49 possible, 3 need other hardware, 8 excluded for good, 1 no. 10 rows are things SDD does not do and ProwlOne already does; 8 rows are things SDD does that ProwlOne will never do.
 
 ## Vehicle, modules, network
 
@@ -67,7 +67,7 @@ Written 2026-09-12 at the owner's request: what a person gets from SDD at its fu
 | Parameter names in Ukrainian and Russian | **partly** — Russian yes, Ukrainian no | **built** — the product's own dictionary | **—** | **built** | ADR-0025 |
 | Repeated reads at a stated cadence (16 pairs, 100 ms floor, 10 min cap) | **yes** — datalogger | **built** | **—** | **built** | ADR-0022 |
 | Several modules in one live set | **likely** | **built** | **—** | **built** | ADR-0022 |
-| Graphs and gauges | **yes** | **stage 1, open** — F15 visual layer; the first real report outranks it | **—** | **possible** | ROADMAP F15 |
+| Graphs and gauges | **yes** | **built** — F15 visual layer (2026-09-17): the table as the one list, tiles, one chart over time, the operator's own limits, an instrument panel after the cluster | **—** | **built** | ROADMAP F15; ADR-0022 amendment 2026-09-17 |
 | Recording to a file, CSV export | **likely** | **built** — every sample in the session bundle; the series exports as CSV, every row saying what it is worth | **—** | **possible** — streamed to a file during the run itself | ADR-0022 §5, amended 2026-09-12 |
 | Legislated live data (mode 01) | **likely** | **built** | **—** | **built** | obd-j1979 |
 | Derived channels, triggers, two-signal compare | **likely** | **no** | **—** | **possible** | — |

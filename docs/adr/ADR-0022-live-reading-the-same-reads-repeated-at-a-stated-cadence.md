@@ -270,3 +270,31 @@ a spreadsheet. Concretely:
 
 No new operation, no new safety class: `LIVE_READ` is unchanged, and
 `SAFETY_BOUNDARIES.md` gains a note, not a row.
+
+## Amendment, 2026-09-17: the visual layer, and whose the limits are
+
+The decision left the visual layer for after the plain table and the first
+real report. The owner did not wait for the report: he researched how
+workshop tools show live data, rejected a first attempt that drew a row of
+gauges, and set the shape himself. Recorded here because it fixes three
+things the operation's screen holds to from now on.
+
+1. **The table is the master view.** Tiles and the one chart are marks on
+   its rows, not lists of their own, so nothing is shown twice. Every marked
+   parameter is drawn over the same axis of time, each to its own span; rows
+   at zero are hidden until asked.
+2. **The limits are the operator's.** The library records no normal or
+   display range for any of its 15,281 parameter records — checked — so the
+   application draws none and states no threshold of its own. A person sets
+   warning and alarm limits on a tile; they are kept on the machine, never in
+   the library or the report; one starter suggestion, the battery's 11.5…15 V,
+   is marked as ours. The same limits colour the instrument panel — the
+   speedometer, the tachometer, and between them what crossed a limit, or the
+   key readings while nothing has — as red and amber arcs.
+3. **A reading is shown as its converter defines it:** with the decimals of
+   the step, and with the unit as a symbol in the interface language; SDD's
+   `int` means «no unit» and shows nothing.
+
+No new operation, no new safety class. What outranks the visual layer is
+unchanged: the first real tester report, because the read path under it has
+never met a vehicle.

@@ -180,6 +180,17 @@ M5 and M6 next — the working unsigned build and the library go to named
 testers, and the first step that needs a car. `CURRENT_STATE.md` has the
 resume notes.
 
+Status on 2026-09-17: every function declared for stage 1 is built — the
+last row the capability matrix held open inside the stage, the visual layer
+of F15, closed that day — and the owner named the state: «з нашого боку
+закрита умовна теорія. зараз чекаємо підтвердження практикою» — the theory
+is closed on our side, what remains is confirmation by practice. The stage
+is not closed: the multi-module read path has never met a car, the
+map-converter scale waits on a tester's read of one quantity through a
+linear and a map identifier, and F14's second slice waits on the adapter
+and the first early Range Rover. M6 closes it, and nothing built at the
+desk can.
+
 **M1 — an application a tester can use without knowing SDD (F11, size L).**
 Today the vehicle is described by typing SDD's programme name and breakpoint
 marker; the module list shows identifiers, not values; fault codes show
@@ -589,6 +600,22 @@ built the same day:* `LiveReadService` and the plain table — the set from
 the library, the floor and the cap enforced in the shell, the samples
 recorded whole, `IMPLEMENTED / FIXTURE_TESTED`. What remains of F15 is the
 visual layer, and the first real tester report still outranks it.
+*Visual layer built 2026-09-17* — the owner's research and his word over a
+first attempt that drew a row of gauges: not dials for everything, but what
+workshop tools do. The table is the one list; a row is marked for a tile or
+for the one chart, where every marked parameter is drawn to its own span
+over the same axis of time; rows at zero are hidden until asked. SDD records
+no normal range for any parameter, so the only limits are the operator's,
+set on a tile and kept on the machine, and nothing colours itself against
+anything else. Over the table, on one button, the instrument panel after the
+car's own cluster: the speedometer, the tachometer, and between them what
+crossed a limit or, while nothing has, the key readings. Units are shown as
+symbols in the interface language (`В`, `км/год`, `об/хв`; SDD's `int` shows
+nothing) and a reading carries the decimals of its converter's step. The
+bench writes a reading a car could show through the parameter's own
+converter (`ADR-0020`, amendment of 2026-09-17). `IMPLEMENTED /
+FIXTURE_TESTED`; `ADR-0022`, amendment of 2026-09-17. Nothing of F15 is
+open. What outranks it is unchanged: the first real tester report.
 
 ### F16 — the odometer, read from every module (decided 2026-09-11, `ADR-0024`)
 
