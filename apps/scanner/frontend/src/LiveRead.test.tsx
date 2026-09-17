@@ -363,6 +363,173 @@ describe("live reading", () => {
   });
 
   /**
+   * The instrument panel (the owner, 2026-09-17): one button turns it on,
+   * it sits under the buttons, the speedometer and the tachometer take the
+   * speed and the engine speed, and the middle shows what has crossed a
+   * limit the person set - or the key readings while nothing has.
+   */
+  it("shows the instrument panel on request, with what crossed a limit in the middle", () => {
+    const value = (
+      identifier: string,
+      name: string,
+      text: string,
+      unit: string,
+      number: number,
+    ) => ({
+      ecuFamily: "PCM",
+      identifier,
+      name,
+      value: text,
+      unit,
+      state: null,
+      note: null,
+      raw: number,
+      minimum: number,
+      maximum: number,
+      samples: 2,
+      atMs: 400,
+      series: [
+        { atMs: 0, value: number },
+        { atMs: 400, value: number },
+      ],
+    });
+    const snapshot: LiveReadSnapshot = {
+      ...createLiveReadSnapshot(),
+      state: "RUNNING",
+      rounds: 2,
+      samples: 8,
+      elapsedMs: 400,
+      values: [
+        value("0xF40C", "Engine speed", "812.00", "rpm", 812),
+        value("0xF40D", "Vehicle speed", "66", "kph", 66),
+        value("0xF405", "Engine coolant temperature", "97.0", "degC", 97),
+        value("0xDD02", "Battery voltage", "13.75", "V", 13.75),
+      ],
+    };
+    // The person's own alarm on the coolant, set on an earlier run.
+    window.localStorage.setItem(
+      "prowlone.liveLimits",
+      JSON.stringify({
+        "PCM|0xF405|Engine coolant temperature": {
+          warnLow: null,
+          warnHigh: 90,
+          alarmLow: null,
+          alarmHigh: 95,
+        },
+      }),
+    );
+    window.localStorage.removeItem("prowlone.liveDashboard");
+    try {
+      render(
+        <LiveReadPanel
+          snapshot={snapshot}
+          set={[{ ecuFamily: "PCM", identifier: "0xF40C" }]}
+          modules={[module("PCM", ["0xF40C"])]}
+          running
+          busy={false}
+          adapterReady
+          {...idleHandlers}
+        />,
+      );
+      // Off until asked.
+      expect(document.querySelector(".live-dash")).toBeNull();
+      const toggle = screen.getByRole("button", { name: "Instrument panel" });
+      expect(toggle).toHaveAttribute("aria-pressed", "false");
+      fireEvent.click(toggle);
+      expect(toggle).toHaveAttribute("aria-pressed", "true");
+      // Under the buttons, before the table.
+      const panel = document.querySelector(".live-dash");
+      expect(panel).not.toBeNull();
+      const actions = document.querySelector(".live-marks-actions");
+      const table = document.querySelector(".module-table");
+      expect(actions!.compareDocumentPosition(panel!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      expect(panel!.compareDocumentPosition(table!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      // The dials read the speed and the engine speed, as whole numbers.
+      expect(screen.getByRole("img", { name: "Vehicle speed: 66 km/h" })).toBeInTheDocument();
+      expect(screen.getByRole("img", { name: "Engine speed: 812 rpm" })).toBeInTheDocument();
+      // The middle: the coolant crossed the person's alarm; the battery, within its limits, is not there.
+      expect(screen.getByText("Out of limits")).toBeInTheDocument();
+      const cells = document.querySelectorAll(".live-dash-cell");
+      expect(cells).toHaveLength(1);
+      expect(cells[0].className).toContain("live-dash-cell--alarm");
+      expect(cells[0].textContent).toContain("Engine coolant temperature");
+      expect(cells[0].textContent).toContain("97.0 °C");
+      // Off again on the same button.
+      fireEvent.click(toggle);
+      expect(document.querySelector(".live-dash")).toBeNull();
+    } finally {
+      window.localStorage.removeItem("prowlone.liveLimits");
+      window.localStorage.removeItem("prowlone.liveDashboard");
+    }
+  });
+
+  it("shows the key readings in the middle while nothing has crossed a limit, and a dial that is not watched says so", () => {
+    const snapshot: LiveReadSnapshot = {
+      ...createLiveReadSnapshot(),
+      state: "RUNNING",
+      rounds: 1,
+      samples: 2,
+      elapsedMs: 200,
+      values: [
+        {
+          ecuFamily: "PCM",
+          identifier: "0xF405",
+          name: "Engine coolant temperature",
+          value: "88.0",
+          unit: "degC",
+          state: null,
+          note: null,
+          raw: 128,
+          minimum: 88,
+          maximum: 88,
+          samples: 1,
+          atMs: 200,
+          series: [{ atMs: 200, value: 88 }],
+        },
+        {
+          ecuFamily: "PCM",
+          identifier: "0xF40C",
+          name: "Engine speed",
+          value: "760.00",
+          unit: "rpm",
+          state: null,
+          note: null,
+          raw: 3040,
+          minimum: 760,
+          maximum: 760,
+          samples: 1,
+          atMs: 200,
+          series: [{ atMs: 200, value: 760 }],
+        },
+      ],
+    };
+    window.localStorage.setItem("prowlone.liveDashboard", "on");
+    try {
+      render(
+        <LiveReadPanel
+          snapshot={snapshot}
+          set={[{ ecuFamily: "PCM", identifier: "0xF40C" }]}
+          modules={[module("PCM", ["0xF40C"])]}
+          running
+          busy={false}
+          adapterReady
+          {...idleHandlers}
+        />,
+      );
+      // Remembered from last time: on without a click.
+      expect(document.querySelector(".live-dash")).not.toBeNull();
+      expect(screen.getByText("Key readings")).toBeInTheDocument();
+      expect(document.querySelectorAll(".live-dash-cell")).toHaveLength(1);
+      expect(screen.getByRole("img", { name: "Engine speed: 760 rpm" })).toBeInTheDocument();
+      // No speed is being read: the speedometer says so instead of guessing.
+      expect(screen.getByRole("img", { name: "Vehicle speed: —" })).toBeInTheDocument();
+      expect(screen.getByText("not watched")).toBeInTheDocument();
+    } finally {
+      window.localStorage.removeItem("prowlone.liveDashboard");
+    }
+  });
+
+  /**
    * A parameter that reads zero and has never moved says nothing during a
    * run, and a module can have dozens. They are hidden by default behind
    * one button that says the opposite of the current state.

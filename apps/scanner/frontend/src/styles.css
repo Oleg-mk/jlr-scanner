@@ -4650,3 +4650,249 @@ table.live-read-identifiers label {
   gap: 0.4rem 0.6rem;
   margin: 0.6rem 0 0.2rem;
 }
+
+/* ---------------------------------------------------------------------
+   Live reading: the instrument panel (F15)
+
+   After the car's own cluster: the speedometer left, the tachometer right,
+   and between them the screen for what matters now - what crossed a limit
+   the person set, or the key readings while nothing has. A dark screen set
+   into the light sheet, as the cluster is set into the dash.
+   --------------------------------------------------------------------- */
+.live-marks-actions .live-dash-toggle {
+  margin-left: auto;
+}
+
+.live-marks-actions .live-dash-toggle[aria-pressed="true"] {
+  background: rgb(255 255 255 / 70%);
+  color: var(--plate-text, #16301f);
+  box-shadow: inset 0 0 0 1px rgb(22 48 31 / 22%);
+}
+
+.live-dash {
+  display: grid;
+  grid-template-columns: minmax(11rem, 1fr) minmax(12rem, 1.25fr) minmax(11rem, 1fr);
+  gap: 0.75rem 1rem;
+  align-items: center;
+  margin: 0.75rem 0 0.5rem;
+  padding: 0.9rem 1rem 0.7rem;
+  border-radius: var(--radius-card, 12px);
+  background: #0b0d10;
+  color: #f2f3f5;
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 8%);
+}
+
+.live-dash-dial {
+  margin: 0;
+  text-align: center;
+}
+
+.live-dash-dial svg {
+  display: block;
+  width: 100%;
+  max-width: 17rem;
+  margin: 0 auto;
+}
+
+.live-dash-face {
+  fill: #11151a;
+  stroke: #2a3138;
+  stroke-width: 1;
+}
+
+.live-dash-rim {
+  fill: none;
+  stroke: rgb(255 255 255 / 22%);
+  stroke-width: 0.8;
+}
+
+.live-dash-track {
+  fill: none;
+  stroke: rgb(255 255 255 / 10%);
+  stroke-width: 3;
+}
+
+.live-dash-progress {
+  fill: none;
+  stroke: #6ee7dc;
+  stroke-width: 3;
+  stroke-linecap: round;
+}
+
+.live-dash-arc {
+  fill: none;
+  stroke-width: 3.5;
+}
+
+.live-dash-arc--warn {
+  stroke: #f0b429;
+}
+
+.live-dash-arc--alarm {
+  stroke: #e5484d;
+}
+
+.live-dash-tick {
+  stroke: rgb(255 255 255 / 55%);
+  stroke-width: 1;
+}
+
+.live-dash-tick--major {
+  stroke: #f2f3f5;
+  stroke-width: 1.8;
+}
+
+.live-dash-numeral {
+  fill: #f2f3f5;
+  font-size: 10px;
+  font-weight: 600;
+  text-anchor: middle;
+  dominant-baseline: central;
+  font-variant-numeric: tabular-nums;
+}
+
+.live-dash-scale {
+  fill: rgb(255 255 255 / 60%);
+  font-size: 8.5px;
+  text-anchor: middle;
+  letter-spacing: 0.04em;
+}
+
+.live-dash-pointer {
+  stroke: #e5484d;
+  stroke-width: 3.2;
+  stroke-linecap: round;
+}
+
+.live-dash-reading {
+  fill: #fff;
+  font-size: 34px;
+  font-weight: 700;
+  text-anchor: middle;
+  dominant-baseline: central;
+  font-variant-numeric: tabular-nums;
+}
+
+.live-dash-unit {
+  fill: rgb(255 255 255 / 70%);
+  font-size: 9px;
+  text-anchor: middle;
+}
+
+.live-dash-dial--warn .live-dash-reading {
+  fill: #f0b429;
+}
+
+.live-dash-dial--alarm .live-dash-reading {
+  fill: #e5484d;
+}
+
+.live-dash-caption {
+  margin-top: 0.15rem;
+  font-size: 0.75rem;
+  color: rgb(255 255 255 / 65%);
+}
+
+.live-dash-centre {
+  align-self: stretch;
+  display: flex;
+  flex-direction: column;
+  padding: 0.5rem 0.75rem;
+  border-left: 1px solid rgb(255 255 255 / 12%);
+  border-right: 1px solid rgb(255 255 255 / 12%);
+}
+
+.live-dash-title {
+  margin: 0 0 0.5rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-align: center;
+  color: rgb(255 255 255 / 80%);
+}
+
+.live-dash-cells {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1px;
+  margin: 0;
+  flex: 1;
+  background: rgb(255 255 255 / 12%);
+}
+
+.live-dash-cell {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 0.2rem;
+  padding: 0.55rem 0.6rem;
+  background: #0b0d10;
+  text-align: center;
+}
+
+.live-dash-cell dt {
+  margin: 0;
+  font-size: 0.7rem;
+  line-height: 1.2;
+  color: rgb(255 255 255 / 65%);
+}
+
+.live-dash-cell dd {
+  margin: 0;
+  font-size: 1.15rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.live-dash-cell--warn dd {
+  color: #f0b429;
+}
+
+.live-dash-cell--alarm dd {
+  color: #e5484d;
+}
+
+.live-dash-empty {
+  margin: auto;
+  font-size: 0.8rem;
+  text-align: center;
+  color: rgb(255 255 255 / 60%);
+}
+
+.live-dash-foot {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  gap: 1rem;
+  padding-top: 0.4rem;
+  border-top: 1px solid rgb(255 255 255 / 12%);
+  font-size: 0.8rem;
+  font-variant-numeric: tabular-nums;
+  color: rgb(255 255 255 / 80%);
+}
+
+.live-dash-foot span:nth-child(2) {
+  text-align: center;
+}
+
+.live-dash-foot span:last-child {
+  text-align: right;
+}
+
+@media (max-width: 720px) {
+  .live-dash {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .live-dash-centre {
+    grid-column: 1 / -1;
+    order: 3;
+    padding-top: 0.6rem;
+    border-left: 0;
+    border-right: 0;
+    border-top: 1px solid rgb(255 255 255 / 12%);
+  }
+
+  .live-dash-foot {
+    order: 4;
+  }
+}

@@ -14,6 +14,7 @@ import { chartColour } from "../liveChartColours";
 import { decimalsOf, withDecimals } from "../liveFormat";
 import { withUnit } from "../units";
 import { LiveChart } from "./LiveChart";
+import { LiveDashboard } from "./LiveDashboard";
 import { LiveTiles } from "./LiveTiles";
 import { StatusBadge } from "./StatusBadge";
 
@@ -78,6 +79,8 @@ function span(value: LiveReadValue): string | null {
   return `${format(value.minimum)} … ${format(value.maximum)}`;
 }
 
+const DASHBOARD_KEY = "prowlone.liveDashboard";
+
 export function LiveReadPanel({
   snapshot,
   set,
@@ -136,6 +139,24 @@ export function LiveReadPanel({
   };
   const shownValues = showAll ? snapshot.values : snapshot.values.filter(informative);
   const hiddenCount = snapshot.values.length - shownValues.length;
+  // The instrument panel, on or off, remembered on this machine.
+  const [dashboard, setDashboard] = useState<boolean>(() => {
+    try {
+      return window.localStorage.getItem(DASHBOARD_KEY) === "on";
+    } catch {
+      return false;
+    }
+  });
+  const toggleDashboard = () =>
+    setDashboard((current) => {
+      const next = !current;
+      try {
+        window.localStorage.setItem(DASHBOARD_KEY, next ? "on" : "off");
+      } catch {
+        // A browser that refuses storage forgets the choice; nothing else.
+      }
+      return next;
+    });
   // The person's own warning and alarm limits, kept on this machine.
   const [limits, setLimits] = useState<Record<string, LiveLimits>>({});
   useEffect(() => setLimits(readLimits()), []);
@@ -331,17 +352,6 @@ export function LiveReadPanel({
         </p>
       ) : null}
 
-      {pinnedValues.length > 0 ? (
-        <>
-          <LiveTiles values={pinnedValues} limits={limits} onLimits={changeLimits} />
-          <p className="button-hint">
-            {t(
-              "A tile colours itself only against limits you set; SDD records no normal range, so none is drawn for you.",
-            )}
-          </p>
-        </>
-      ) : null}
-      {plottedValues.length > 0 ? <LiveChart values={plottedValues} /> : null}
       {snapshot.values.length > 0 && pinnedValues.length === 0 && plottedValues.length === 0 ? (
         <p className="button-hint">
           {t("Mark a row in the table to see it as a tile or on the chart.")}
@@ -380,9 +390,32 @@ export function LiveReadPanel({
               {t("Clear marks")}
             </button>
           ) : null}
+          <button
+            className="button button--quiet live-dash-toggle"
+            type="button"
+            aria-pressed={dashboard}
+            onClick={toggleDashboard}
+          >
+            {t("Instrument panel")}
+          </button>
         </div>
       ) : null}
 
+      {dashboard && snapshot.values.length > 0 ? (
+        <LiveDashboard values={snapshot.values} limits={limits} />
+      ) : null}
+
+      {pinnedValues.length > 0 ? (
+        <>
+          <LiveTiles values={pinnedValues} limits={limits} onLimits={changeLimits} />
+          <p className="button-hint">
+            {t(
+              "A tile colours itself only against limits you set; SDD records no normal range, so none is drawn for you.",
+            )}
+          </p>
+        </>
+      ) : null}
+      {plottedValues.length > 0 ? <LiveChart values={plottedValues} /> : null}
       {snapshot.values.length > 0 ? (
         <table className="module-table">
           <thead>
