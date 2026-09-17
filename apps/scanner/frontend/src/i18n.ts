@@ -412,7 +412,14 @@ const uk: Record<string, string> = {
   "Reading the library…": "Читаю бібліотеку…",
   "Reading the modules…": "Читаю модулі…",
   "the run so far": "прогін дотепер",
-  "the run, every chosen parameter over time": "прогін: кожен обраний параметр у часі",
+  "the run, every marked parameter over time": "прогін: кожен позначений параметр у часі",
+  "A tile colours itself only against limits you set; SDD records no normal range, so none is drawn for you.":
+    "Плитка фарбується лише за межами, які задали ви; норми SDD не тримає, тому за вас їх ніхто не малює.",
+  "Mark a row in the table to see it as a tile or on the chart.":
+    "Позначте рядок у таблиці, щоб побачити його плиткою або на графіку.",
+  Show: "Показати",
+  Tile: "Плитка",
+  Chart: "Графік",
   "seen {low} … {high}": "бачили {low} … {high}",
   "limits {low} … {high}": "межі {low} … {high}",
   "our suggestion": "наша підказка",
@@ -431,8 +438,6 @@ const uk: Record<string, string> = {
     "Усе, що оголошує модуль, разом із сирими лічильниками й текстами.",
   "Choose these": "Обрати ці",
   "{count} offered": "пропонується {count}",
-  "The chosen parameters, at a glance. A tile colours itself only against limits you set; SDD records no normal range, so none is drawn for you.":
-    "Обрані параметри одним поглядом. Плитка фарбується лише за межами, які задали ви; норми SDD не тримає, тому за вас їх ніхто не малює.",
   "Nothing was connected: a session is either on the bench or on a car, and this one already holds records. Start a new session to change over.":
     "Нічого не підключено: сесія буває або на стенді, або на авто, а ця вже має записи. Щоб перейти, почніть нову сесію.",
   "This session already holds records, and the question about starting a new one could not be asked.":
@@ -1553,7 +1558,14 @@ const ru: Record<string, string> = {
   "Reading the library…": "Читаю библиотеку…",
   "Reading the modules…": "Читаю модули…",
   "the run so far": "прогон до сих пор",
-  "the run, every chosen parameter over time": "прогон: каждый выбранный параметр во времени",
+  "the run, every marked parameter over time": "прогон: каждый отмеченный параметр во времени",
+  "A tile colours itself only against limits you set; SDD records no normal range, so none is drawn for you.":
+    "Плитка окрашивается только по пределам, которые задали вы; нормы SDD не хранит, поэтому за вас их никто не рисует.",
+  "Mark a row in the table to see it as a tile or on the chart.":
+    "Отметьте строку в таблице, чтобы увидеть её плиткой или на графике.",
+  Show: "Показать",
+  Tile: "Плитка",
+  Chart: "График",
   "seen {low} … {high}": "видели {low} … {high}",
   "limits {low} … {high}": "пределы {low} … {high}",
   "our suggestion": "наша подсказка",
@@ -1572,8 +1584,6 @@ const ru: Record<string, string> = {
     "Всё, что объявляет модуль, вместе с сырыми счётчиками и текстами.",
   "Choose these": "Выбрать эти",
   "{count} offered": "предлагается {count}",
-  "The chosen parameters, at a glance. A tile colours itself only against limits you set; SDD records no normal range, so none is drawn for you.":
-    "Выбранные параметры одним взглядом. Плитка окрашивается только по пределам, которые задали вы; нормы SDD не хранит, поэтому за вас их никто не рисует.",
   "Nothing was connected: a session is either on the bench or on a car, and this one already holds records. Start a new session to change over.":
     "Ничего не подключено: сессия бывает либо на стенде, либо на авто, а эта уже содержит записи. Чтобы перейти, начните новую сессию.",
   "This session already holds records, and the question about starting a new one could not be asked.":

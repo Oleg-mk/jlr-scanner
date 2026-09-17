@@ -282,7 +282,7 @@ describe("live reading", () => {
    * F15, the chart: every chosen parameter with readings is one line over the
    * same stretch of time, and the legend is the key. No dial anywhere.
    */
-  it("draws one line per parameter with a run, and names them in the legend", () => {
+  it("draws only the rows marked for the chart, and tiles only the rows marked for a tile", () => {
     const snapshot: LiveReadSnapshot = {
       ...createLiveReadSnapshot(),
       state: "RUNNING",
@@ -341,13 +341,24 @@ describe("live reading", () => {
         {...idleHandlers}
       />,
     );
-    const chart = screen.getByRole("img", { name: "the run, every chosen parameter over time" });
-    expect(chart.querySelectorAll("polyline")).toHaveLength(2);
-    // The legend names each line with its latest reading and its span.
-    expect(screen.getByRole("button", { name: /engine speed.*760 rpm.*742 … 768/ })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /battery voltage.*13\.75 V.*13\.5 … 14/ })).toBeInTheDocument();
-    // Tiles stand above it, one per parameter, and there is no dial.
-    expect(screen.getAllByRole("article")).toHaveLength(2);
+    // Nothing marked: the table alone, and a line saying how to get more.
+    expect(screen.queryByRole("img", { name: "the run, every marked parameter over time" })).toBeNull();
+    expect(screen.queryAllByRole("article")).toHaveLength(0);
+    expect(screen.getByText("Mark a row in the table to see it as a tile or on the chart.")).toBeInTheDocument();
+
+    // Mark engine speed for the chart and battery voltage for a tile.
+    const chartMarks = screen.getAllByRole("button", { name: "Chart" });
+    const tileMarks = screen.getAllByRole("button", { name: "Tile" });
+    fireEvent.click(chartMarks[0]);
+    fireEvent.click(tileMarks[1]);
+    const chart = screen.getByRole("img", { name: "the run, every marked parameter over time" });
+    expect(chart.querySelectorAll("polyline")).toHaveLength(1);
+    expect(screen.getAllByRole("article")).toHaveLength(1);
+    expect(screen.getByRole("article", { name: "battery voltage" })).toBeInTheDocument();
+    // The chart has no legend of its own; the table row carries the colour.
+    expect(document.querySelector(".live-chart-legend")).toBeNull();
+    expect(document.querySelectorAll(".module-table .live-chart-swatch")).toHaveLength(1);
+    // And there is no dial anywhere.
     expect(document.querySelector(".gauge")).toBeNull();
   });
 

@@ -10,6 +10,7 @@ import {
   type LiveReadSnapshot,
   type LiveReadValue,
 } from "../liveRead";
+import { chartColour } from "../liveChartColours";
 import { LiveChart } from "./LiveChart";
 import { LiveTiles } from "./LiveTiles";
 import { StatusBadge } from "./StatusBadge";
@@ -107,6 +108,20 @@ export function LiveReadPanel({
   const filtering = onlyQuantities && anyQuantities;
   const listed = (module: ModuleSurveyEntry) =>
     module.readableIdentifiers.filter((identifier) => !filtering || identifier.quantity === true);
+  // What the person marked in the table: which rows become tiles, which
+  // rows go on the chart. The table is the one list; these are picks from
+  // it, so nothing is shown twice.
+  const [pinned, setPinned] = useState<string[]>([]);
+  const [plotted, setPlotted] = useState<string[]>([]);
+  const markKey = (value: LiveReadValue) => `${value.ecuFamily}|${value.identifier}|${value.name}`;
+  const flip = (list: string[], key: string) =>
+    list.includes(key) ? list.filter((held) => held !== key) : [...list, key];
+  const pinnedValues = pinned
+    .map((key) => snapshot.values.find((value) => markKey(value) === key))
+    .filter((value): value is LiveReadValue => value !== undefined);
+  const plottedValues = plotted
+    .map((key) => snapshot.values.find((value) => markKey(value) === key))
+    .filter((value): value is LiveReadValue => value !== undefined);
   // The person's own warning and alarm limits, kept on this machine.
   const [limits, setLimits] = useState<Record<string, LiveLimits>>({});
   useEffect(() => setLimits(readLimits()), []);
@@ -302,16 +317,21 @@ export function LiveReadPanel({
         </p>
       ) : null}
 
-      {snapshot.values.length > 0 ? (
+      {pinnedValues.length > 0 ? (
         <>
-          <LiveTiles values={snapshot.values} limits={limits} onLimits={changeLimits} />
+          <LiveTiles values={pinnedValues} limits={limits} onLimits={changeLimits} />
           <p className="button-hint">
             {t(
-              "The chosen parameters, at a glance. A tile colours itself only against limits you set; SDD records no normal range, so none is drawn for you.",
+              "A tile colours itself only against limits you set; SDD records no normal range, so none is drawn for you.",
             )}
           </p>
-          <LiveChart values={snapshot.values} />
         </>
+      ) : null}
+      {plottedValues.length > 0 ? <LiveChart values={plottedValues} /> : null}
+      {snapshot.values.length > 0 && pinnedValues.length === 0 && plottedValues.length === 0 ? (
+        <p className="button-hint">
+          {t("Mark a row in the table to see it as a tile or on the chart.")}
+        </p>
       ) : null}
 
       {snapshot.values.length > 0 ? (
@@ -322,12 +342,24 @@ export function LiveReadPanel({
               <th scope="col">{t("Value")}</th>
               <th scope="col">{t("Seen")}</th>
               <th scope="col">{t("Module")}</th>
+              <th scope="col">{t("Show")}</th>
             </tr>
           </thead>
           <tbody>
-            {snapshot.values.map((value) => (
+            {snapshot.values.map((value) => {
+              const key = markKey(value);
+              const onChart = plotted.indexOf(key);
+              const onTile = pinned.includes(key);
+              return (
               <tr key={`${value.ecuFamily}-${value.identifier}-${value.name}`}>
                 <td>
+                  {onChart >= 0 ? (
+                    <span
+                      className="live-chart-swatch"
+                      style={{ background: chartColour(onChart) }}
+                      aria-hidden="true"
+                    />
+                  ) : null}
                   {parameterName(value.name)}
                   {value.note !== null ? (
                     <div className="module-validation">{parameterNote(value.note)}</div>
@@ -345,8 +377,28 @@ export function LiveReadPanel({
                 <td>
                   {value.ecuFamily} <code>{value.identifier}</code>
                 </td>
+                <td className="live-marks">
+                  <button
+                    type="button"
+                    className={`button button--quiet live-mark${onTile ? " is-on" : ""}`}
+                    aria-pressed={onTile}
+                    disabled={!onTile && pinned.length >= 8}
+                    onClick={() => setPinned((current) => flip(current, key))}
+                  >
+                    {t("Tile")}
+                  </button>
+                  <button
+                    type="button"
+                    className={`button button--quiet live-mark${onChart >= 0 ? " is-on" : ""}`}
+                    aria-pressed={onChart >= 0}
+                    onClick={() => setPlotted((current) => flip(current, key))}
+                  >
+                    {t("Chart")}
+                  </button>
+                </td>
               </tr>
-            ))}
+              );
+            })}
           </tbody>
         </table>
       ) : null}
