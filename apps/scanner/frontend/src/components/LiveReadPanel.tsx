@@ -11,6 +11,7 @@ import {
   type LiveReadValue,
 } from "../liveRead";
 import { chartColour } from "../liveChartColours";
+import { withUnit } from "../units";
 import { LiveChart } from "./LiveChart";
 import { LiveTiles } from "./LiveTiles";
 import { StatusBadge } from "./StatusBadge";
@@ -61,8 +62,7 @@ function cadence(ms: number): string {
 /** The value as the catalogue decodes it: a number and its unit, a named state, or the raw count. */
 function reading(value: LiveReadValue): string {
   if (value.value !== null) {
-    const number = decimalText(value.value);
-    return value.unit !== null ? `${number} ${value.unit}` : number;
+    return withUnit(decimalText(value.value), value.unit);
   }
   if (value.state !== null) return value.state;
   if (value.raw !== null) return String(value.raw);

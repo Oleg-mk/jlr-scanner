@@ -6,6 +6,7 @@ import type { ModuleSurveyEntry } from "../library";
 import type { ModuleReadKind, ModuleReadSnapshot } from "../moduleRead";
 import { moduleReasons, moduleRoute, nodeStatus, routeText } from "../networkMap";
 import { parameterName } from "../parameterNames";
+import { withUnit } from "../units";
 import { StatusBadge } from "./StatusBadge";
 
 interface ModuleDetailsProps {
@@ -259,16 +260,12 @@ export function ModuleDetails({
                         <>
                           <strong>{parameter.state}</strong>
                           <div className="module-validation">
-                            {parameter.value ?? "—"}
-                            {parameter.unit !== null ? ` ${parameter.unit}` : ""}
+                            {parameter.value === null ? "—" : withUnit(parameter.value, parameter.unit)}
                           </div>
                         </>
                       ) : (
                         <strong>
-                          {parameter.value ?? "—"}
-                          {parameter.unit !== null && parameter.value !== null
-                            ? ` ${parameter.unit}`
-                            : ""}
+                          {parameter.value === null ? "—" : withUnit(parameter.value, parameter.unit)}
                         </strong>
                       )}
                     </td>

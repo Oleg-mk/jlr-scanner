@@ -11,6 +11,7 @@ import {
 } from "../liveLimits";
 import type { LiveReadValue } from "../liveRead";
 import { parameterName } from "../parameterNames";
+import { unitLabel } from "../units";
 
 /**
  * The chosen parameters as tiles: the name, the reading large with its unit,
@@ -32,7 +33,10 @@ interface LiveTilesProps {
 
 /** A number as the language writes it, with the unit beside it. */
 function shown(value: LiveReadValue): { number: string; unit: string | null } {
-  if (value.value !== null) return { number: decimalText(value.value), unit: value.unit };
+  if (value.value !== null) {
+    const unit = unitLabel(value.unit);
+    return { number: decimalText(value.value), unit: unit === "" ? null : unit };
+  }
   if (value.state !== null) return { number: value.state, unit: null };
   if (value.raw !== null) return { number: String(value.raw), unit: null };
   return { number: "—", unit: null };

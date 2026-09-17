@@ -1,6 +1,7 @@
 import { parameterNote, t, useLanguage } from "../i18n";
 import { parameterName } from "../parameterNames";
 import type { MileageReading, MileageSurveySnapshot } from "../mileage";
+import { withUnit } from "../units";
 import { StatusBadge } from "./StatusBadge";
 
 interface MileagePanelProps {
@@ -31,7 +32,7 @@ function grouped(value: number): string {
 
 /** What one module answered, or what it did instead. */
 function reading(row: MileageReading): string {
-  if (row.value !== null) return row.unit !== null ? `${row.value} ${row.unit}` : row.value;
+  if (row.value !== null) return withUnit(row.value, row.unit);
   if (row.raw !== null) return String(row.raw);
   return "—";
 }

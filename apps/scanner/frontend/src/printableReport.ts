@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { hasTauriRuntime, saveTextFile } from "./files";
+import { withUnit } from "./units";
 
 /**
  * The readable report (ADR-0031): the session bundle turned into a document
@@ -332,11 +333,7 @@ export function buildReport(
       title: t("Mileage"),
       worth: worthOf(run.route_validation),
       columns: [t("Module"), t("Parameter"), t("Value")],
-      rows: rows.map((row) => [
-        text(row.ecuFamily),
-        text(row.parameter),
-        `${text(row.value)}${row.unit ? ` ${row.unit}` : ""}`,
-      ]),
+      rows: rows.map((row) => [text(row.ecuFamily), text(row.parameter), withUnit(text(row.value), row.unit)]),
       note: t("Every module that keeps a distance, as it keeps it. No verdict is drawn from a difference."),
     });
   }
@@ -349,11 +346,7 @@ export function buildReport(
       title: t("Battery"),
       worth: worthOf(run.route_validation),
       columns: [t("Module"), t("Parameter"), t("Value")],
-      rows: rows.map((row) => [
-        text(row.ecuFamily),
-        text(row.parameter),
-        `${text(row.value)}${row.unit ? ` ${row.unit}` : ""}`,
-      ]),
+      rows: rows.map((row) => [text(row.ecuFamily), text(row.parameter), withUnit(text(row.value), row.unit)]),
       note: t(
         "What the modules hold, as they hold it. This application states no threshold of its own and says nothing about whether the battery is good.",
       ),

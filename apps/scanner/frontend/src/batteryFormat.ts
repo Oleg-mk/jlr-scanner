@@ -1,5 +1,8 @@
 import type { BatteryReading } from "./battery";
 import { t } from "./i18n";
+import { withUnit } from "./units";
+
+export { unitLabel } from "./units";
 
 /**
  * How a battery reading is worded (ADR-0030): the unit the data states in
@@ -7,28 +10,10 @@ import { t } from "./i18n";
  * is. Shared by the card on the session rail and the panel that holds
  * every row.
  */
-const UNIT_SYMBOL: Record<string, string> = {
-  pct: "%",
-  degC: "°C",
-  degF: "°F",
-  V: "V",
-  A: "A",
-  mA: "mA",
-  Ah: "A·h",
-  // The data states `int` where a number carries no unit at all.
-  int: "",
-};
-
-export function unitLabel(unit: string | null): string {
-  if (unit === null) return "";
-  return UNIT_SYMBOL[unit] ?? unit;
-}
-
 /** The value with its unit, or an em dash where the module said nothing. */
 export function valueText(reading: BatteryReading): string {
   if (reading.value === null) return "—";
-  const unit = unitLabel(reading.unit);
-  return unit === "" ? reading.value : `${reading.value} ${unit}`;
+  return withUnit(reading.value, reading.unit);
 }
 
 /**

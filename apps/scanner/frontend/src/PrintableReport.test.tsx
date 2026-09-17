@@ -104,7 +104,7 @@ describe("the readable report", () => {
     expect(screen.getByText(/the adapter has not opened a K-line yet/)).toBeVisible();
     // The reads.
     expect(screen.getByText("P0300, P0301")).toBeVisible();
-    expect(screen.getByText("78 pct")).toBeVisible();
+    expect(screen.getByText("78 %")).toBeVisible();
     // What the values are worth, said in the document and not only on screen.
     expect(screen.getAllByText("SOURCE_BACKED").length).toBeGreaterThan(0);
     expect(
