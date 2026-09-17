@@ -122,6 +122,19 @@ export function LiveReadPanel({
   const plottedValues = plotted
     .map((key) => snapshot.values.find((value) => markKey(value) === key))
     .filter((value): value is LiveReadValue => value !== undefined);
+  // Rows that say something. A parameter that reads zero and has never
+  // moved carries no information during a run, and a module can have dozens
+  // of them; the table shows the informative rows by default and everything
+  // on request (the owner, 2026-09-17).
+  const [showAll, setShowAll] = useState(false);
+  const informative = (value: LiveReadValue) => {
+    const number = value.value !== null ? Number(value.value) : value.raw;
+    if (number !== null && Number.isFinite(number) && number !== 0) return true;
+    if (value.minimum !== null && value.maximum !== null && value.minimum !== value.maximum) return true;
+    return value.state !== null && value.raw !== 0;
+  };
+  const shownValues = showAll ? snapshot.values : snapshot.values.filter(informative);
+  const hiddenCount = snapshot.values.length - shownValues.length;
   // The person's own warning and alarm limits, kept on this machine.
   const [limits, setLimits] = useState<Record<string, LiveLimits>>({});
   useEffect(() => setLimits(readLimits()), []);
@@ -339,7 +352,18 @@ export function LiveReadPanel({
           <button
             className="button button--quiet"
             type="button"
-            onClick={() => setPlotted(snapshot.values.map(markKey))}
+            aria-pressed={showAll}
+            onClick={() => setShowAll((current) => !current)}
+          >
+            {showAll ? t("Only informative") : t("Show all")}
+          </button>
+          {!showAll && hiddenCount > 0 ? (
+            <span className="button-hint">{t("{count} rows at zero hidden", { count: hiddenCount })}</span>
+          ) : null}
+          <button
+            className="button button--quiet"
+            type="button"
+            onClick={() => setPlotted(shownValues.map(markKey))}
           >
             {t("Mark all for the chart")}
           </button>
@@ -370,7 +394,7 @@ export function LiveReadPanel({
             </tr>
           </thead>
           <tbody>
-            {snapshot.values.map((value) => {
+            {shownValues.map((value) => {
               const key = markKey(value);
               const onChart = plotted.indexOf(key);
               const onTile = pinned.includes(key);

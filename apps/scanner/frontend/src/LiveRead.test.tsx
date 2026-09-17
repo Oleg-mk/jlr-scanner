@@ -362,6 +362,69 @@ describe("live reading", () => {
     expect(document.querySelector(".gauge")).toBeNull();
   });
 
+  /**
+   * A parameter that reads zero and has never moved says nothing during a
+   * run, and a module can have dozens. They are hidden by default behind
+   * one button that says the opposite of the current state.
+   */
+  it("hides rows at zero until asked, and the button says which way it goes", () => {
+    const snapshot: LiveReadSnapshot = {
+      ...createLiveReadSnapshot(),
+      state: "RUNNING",
+      rounds: 2,
+      samples: 4,
+      elapsedMs: 600,
+      values: [
+        {
+          ecuFamily: "PCM",
+          identifier: "0xF40C",
+          name: "engine speed",
+          value: "760",
+          unit: "rpm",
+          state: null,
+          note: null,
+          raw: 3040,
+          minimum: 742,
+          maximum: 768,
+          samples: 2,
+          atMs: 500,
+        },
+        {
+          ecuFamily: "PCM",
+          identifier: "0xD901",
+          name: "brake switch 1",
+          value: "0",
+          unit: "int",
+          state: null,
+          note: null,
+          raw: 0,
+          minimum: 0,
+          maximum: 0,
+          samples: 2,
+          atMs: 600,
+        },
+      ],
+    };
+    render(
+      <LiveReadPanel
+        snapshot={snapshot}
+        set={[{ ecuFamily: "PCM", identifier: "0xF40C" }]}
+        modules={[module("PCM", ["0xF40C"])]}
+        running
+        busy={false}
+        adapterReady
+        {...idleHandlers}
+      />,
+    );
+    expect(screen.getAllByText("engine speed").length).toBeGreaterThan(0);
+    expect(screen.queryByText("brake switch 1")).toBeNull();
+    expect(screen.getByText("1 rows at zero hidden")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Show all" }));
+    expect(screen.getByText("brake switch 1")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Only informative" })).toBeInTheDocument();
+  });
+
   it("says what to do first when nothing is surveyed or no adapter is there", () => {
     render(
       <LiveReadPanel
