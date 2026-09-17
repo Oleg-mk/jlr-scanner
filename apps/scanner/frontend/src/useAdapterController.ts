@@ -4,6 +4,7 @@ import {
   type AdapterClient,
   type AdapterSnapshot,
 } from "./adapter";
+import { t } from "./i18n";
 
 const DEFAULT_POLL_INTERVAL_MS = 1_500;
 
@@ -14,7 +15,26 @@ function frontendFailure(snapshot: AdapterSnapshot, error: unknown): AdapterSnap
     boardCommunication: "FAILED",
     error: {
       code: "DISCOVERY_FAILED",
-      message: "Unable to update adapter state",
+      message: t("The adapter state could not be updated."),
+      technicalDetails: error instanceof Error ? error.message : String(error),
+    },
+  };
+}
+
+/**
+ * The bench call itself failed - the window was restarting, or the shell
+ * answered with an error. It is named as the bench's failure: the adapter
+ * panel must not answer a bench click with advice about a USB cable, which
+ * is what it did (the owner, 2026-09-17).
+ */
+function benchFailure(snapshot: AdapterSnapshot, error: unknown): AdapterSnapshot {
+  return {
+    ...snapshot,
+    state: "ERROR",
+    boardCommunication: "FAILED",
+    error: {
+      code: "BENCH_FAILED",
+      message: t("The bench could not be connected."),
       technicalDetails: error instanceof Error ? error.message : String(error),
     },
   };
@@ -115,7 +135,7 @@ export function useAdapterController(
     try {
       setSnapshot(await client.connectBench(scenario));
     } catch (error) {
-      setSnapshot((current) => frontendFailure(current, error));
+      setSnapshot((current) => benchFailure(current, error));
     } finally {
       actionInFlight.current = false;
     }

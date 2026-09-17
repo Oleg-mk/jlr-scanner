@@ -216,7 +216,9 @@ export function AdapterPanel({
           hint={
             error.code === "SESSION_MODE_MISMATCH"
               ? null
-              : t("Check the USB connection and try again.")
+              : error.code === "BENCH_FAILED"
+                ? t("Try the bench again; it needs no adapter.")
+                : t("Check the USB connection and try again.")
           }
         />
       ) : null}

@@ -120,6 +120,24 @@ describe("the bench (ADR-0020)", () => {
     expect(screen.getByText("Adapter not detected")).toBeInTheDocument();
   });
 
+  it("names a failed bench call as the bench's failure, and offers the bench again", async () => {
+    // The window was restarting, or the shell answered with an error: the
+    // panel used to answer with advice about a USB cable (2026-09-17).
+    const client = new BenchAdapterClient();
+    client.connectBench = () => Promise.reject(new Error("the window was restarting"));
+    render(<App client={client} pollIntervalMs={100_000} />);
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Connect the bench (virtual vehicle)" }),
+    );
+    expect((await screen.findAllByText("The bench could not be connected.")).length).toBeGreaterThan(0);
+    expect(screen.getByText("Try the bench again; it needs no adapter.")).toBeInTheDocument();
+    expect(screen.queryByText("Check the USB connection and try again.")).toBeNull();
+    expect(screen.getByText("the window was restarting")).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Connect the bench (virtual vehicle)" }),
+    ).toBeInTheDocument();
+  });
+
   it("connects on the scenario the tester chose, and 0 says the vehicle is healthy", async () => {
     const client = new BenchAdapterClient();
     render(<App client={client} pollIntervalMs={100_000} />);

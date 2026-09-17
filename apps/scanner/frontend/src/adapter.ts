@@ -22,7 +22,9 @@ export type AdapterErrorCode =
   | "BOARD_COMMUNICATION_FAILED"
   | "DISCOVERY_FAILED"
   | "DISCONNECT_FAILED"
-  | "SESSION_MODE_MISMATCH";
+  | "SESSION_MODE_MISMATCH"
+  // The interface's own: the call to connect the bench failed before the shell answered.
+  | "BENCH_FAILED";
 
 export interface AdapterSummary {
   name: string;
