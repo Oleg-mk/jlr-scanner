@@ -411,6 +411,12 @@ const uk: Record<string, string> = {
   "Choose folder…": "Обрати папку…",
   "Reading the library…": "Читаю бібліотеку…",
   "Reading the modules…": "Читаю модулі…",
+  "Nothing was connected: a session is either on the bench or on a car, and this one already holds records. Start a new session to change over.":
+    "Нічого не підключено: сесія буває або на стенді, або на авто, а ця вже має записи. Щоб перейти, почніть нову сесію.",
+  "This session already holds records, and the question about starting a new one could not be asked.":
+    "Ця сесія вже має записи, а запитати про початок нової не вдалося.",
+  "The bench could not be connected.": "Стенд не вдалося підключити.",
+  "The adapter could not be connected.": "Адаптер не вдалося підключити.",
   "Every module the data names is read from the library, with what it can be asked and what it will accept. On a full library this takes seconds, and longer on an old machine.":
     "Кожен модуль, який називають дані, читається з бібліотеки — разом з тим, що в нього можна спитати і що він прийме. На повній базі це кілька секунд, на старій машині довше.",
   "Reading the folder remembered from last time…": "Читаю теку, запам'ятану з минулого разу…",
@@ -1524,6 +1530,12 @@ const ru: Record<string, string> = {
   "Choose folder…": "Выбрать папку…",
   "Reading the library…": "Читаю библиотеку…",
   "Reading the modules…": "Читаю модули…",
+  "Nothing was connected: a session is either on the bench or on a car, and this one already holds records. Start a new session to change over.":
+    "Ничего не подключено: сессия бывает либо на стенде, либо на авто, а эта уже содержит записи. Чтобы перейти, начните новую сессию.",
+  "This session already holds records, and the question about starting a new one could not be asked.":
+    "Эта сессия уже содержит записи, а спросить о начале новой не удалось.",
+  "The bench could not be connected.": "Стенд не удалось подключить.",
+  "The adapter could not be connected.": "Адаптер не удалось подключить.",
   "Every module the data names is read from the library, with what it can be asked and what it will accept. On a full library this takes seconds, and longer on an old machine.":
     "Каждый модуль, который называют данные, читается из библиотеки — вместе с тем, что у него можно спросить и что он примет. На полной базе это несколько секунд, на старой машине дольше.",
   "Reading the folder remembered from last time…": "Читаю папку, запомненную с прошлого раза…",

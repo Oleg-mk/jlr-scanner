@@ -27,7 +27,23 @@ export function useAdapterController(
   const [snapshot, setSnapshot] = useState<AdapterSnapshot>(createEmptySnapshot);
   const [selectedPort, setSelectedPort] = useState<string | null>(null);
   const snapshotRef = useRef(snapshot);
-  const inFlightRef = useRef(false);
+  /**
+   * The background poll and what the person asks for used to share one
+   * "busy" flag, so a click that landed while the poll was out was dropped
+   * where nobody could see it: no action, no error, the panel simply as it
+   * was. On Windows, where enumerating the ports is not instant, that was
+   * most clicks — the owner could not connect the bench at all (2026-09-16).
+   *
+   * They are now two. A poll stands aside for a person; a person never
+   * stands aside for a poll.
+   */
+  const pollInFlight = useRef(false);
+  const actionInFlight = useRef(false);
+  /**
+   * Which answer is the current one. A poll that was already out when the
+   * person acted must not paint its older picture over the newer one.
+   */
+  const answer = useRef(0);
 
   useEffect(() => {
     snapshotRef.current = snapshot;
@@ -37,14 +53,19 @@ export function useAdapterController(
   }, [snapshot]);
 
   const refresh = useCallback(async () => {
-    if (inFlightRef.current) return;
-    inFlightRef.current = true;
+    if (pollInFlight.current || actionInFlight.current) return;
+    pollInFlight.current = true;
+    const ticket = answer.current;
     try {
-      setSnapshot(await client.discover());
+      const next = await client.discover();
+      // Nothing the person did overtook this poll while it was out.
+      if (ticket === answer.current) setSnapshot(next);
     } catch (error) {
-      setSnapshot((current) => frontendFailure(current, error));
+      if (ticket === answer.current) {
+        setSnapshot((current) => frontendFailure(current, error));
+      }
     } finally {
-      inFlightRef.current = false;
+      pollInFlight.current = false;
     }
   }, [client]);
 
@@ -63,8 +84,9 @@ export function useAdapterController(
   }, [pollIntervalMs, refresh]);
 
   const connect = useCallback(async () => {
-    if (inFlightRef.current) return;
-    inFlightRef.current = true;
+    if (actionInFlight.current) return;
+    actionInFlight.current = true;
+    answer.current += 1;
     setSnapshot((current) => ({
       ...current,
       state: "CONNECTING",
@@ -76,13 +98,14 @@ export function useAdapterController(
     } catch (error) {
       setSnapshot((current) => frontendFailure(current, error));
     } finally {
-      inFlightRef.current = false;
+      actionInFlight.current = false;
     }
   }, [client, selectedPort]);
 
   const connectBench = useCallback(async (scenario: number) => {
-    if (inFlightRef.current) return;
-    inFlightRef.current = true;
+    if (actionInFlight.current) return;
+    actionInFlight.current = true;
+    answer.current += 1;
     setSnapshot((current) => ({
       ...current,
       state: "CONNECTING",
@@ -94,21 +117,40 @@ export function useAdapterController(
     } catch (error) {
       setSnapshot((current) => frontendFailure(current, error));
     } finally {
-      inFlightRef.current = false;
+      actionInFlight.current = false;
     }
   }, [client]);
 
   const disconnect = useCallback(async () => {
-    if (inFlightRef.current) return;
-    inFlightRef.current = true;
+    if (actionInFlight.current) return;
+    actionInFlight.current = true;
+    answer.current += 1;
     try {
       setSnapshot(await client.disconnect());
     } catch (error) {
       setSnapshot((current) => frontendFailure(current, error));
     } finally {
-      inFlightRef.current = false;
+      actionInFlight.current = false;
     }
   }, [client]);
+
+  /**
+   * Say on the panel that something the person asked for did not happen.
+   * A click that vanishes without a word is worse than one that fails: the
+   * owner pressed "connect the bench" and got silence, and nothing on screen
+   * or in the shell said why (2026-09-16).
+   */
+  const reportRefusal = useCallback((message: string, details: string | null) => {
+    answer.current += 1;
+    setSnapshot((current) => ({
+      ...current,
+      error: {
+        code: "DISCOVERY_FAILED",
+        message,
+        technicalDetails: details,
+      },
+    }));
+  }, []);
 
   return {
     snapshot,
@@ -118,5 +160,6 @@ export function useAdapterController(
     connect,
     connectBench,
     disconnect,
+    reportRefusal,
   };
 }

@@ -1,6 +1,7 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, renderHook, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { App } from "./App";
+import { useAdapterController } from "./useAdapterController";
 import {
   createBenchSnapshot,
   createEmptySnapshot,
@@ -12,6 +13,42 @@ import {
   type SessionReportClient,
   type SessionReportSnapshot,
 } from "./sessionReport";
+
+/**
+ * A machine where looking for adapters takes as long as it likes. Windows is
+ * such a machine: enumerating the ports is not instant, and the panel looks
+ * for them every second and a half.
+ */
+class SlowDiscoveryClient implements AdapterClient {
+  private answerPoll: ((snapshot: AdapterSnapshot) => void) | null = null;
+  bench = false;
+
+  getState(): Promise<AdapterSnapshot> {
+    return Promise.resolve(this.bench ? createBenchSnapshot(1) : createEmptySnapshot());
+  }
+  discover(): Promise<AdapterSnapshot> {
+    return new Promise((resolve) => {
+      this.answerPoll = resolve;
+    });
+  }
+  connect(): Promise<AdapterSnapshot> {
+    this.bench = false;
+    return this.getState();
+  }
+  connectBench(): Promise<AdapterSnapshot> {
+    this.bench = true;
+    return this.getState();
+  }
+  disconnect(): Promise<AdapterSnapshot> {
+    this.bench = false;
+    return this.getState();
+  }
+  /** Let the poll that is out answer at last, with what it found then. */
+  finishPoll() {
+    this.answerPoll?.(createEmptySnapshot());
+    this.answerPoll = null;
+  }
+}
 
 /** No adapter on any port; the bench connects on request and stays connected. */
 class BenchAdapterClient implements AdapterClient {
@@ -179,5 +216,36 @@ describe("the bench (ADR-0020)", () => {
     fireEvent.click(screen.getByRole("button", { name: "Connect the bench (virtual vehicle)" }));
     await waitFor(() => expect(restart).toHaveBeenCalledTimes(1));
     expect(client.benchRequests).toBe(1);
+  });
+});
+
+/**
+ * The panel looks for adapters every second and a half, and until
+ * 2026-09-16 that poll and the buttons shared one "busy" flag: a click that
+ * landed while the poll was out was dropped in silence — no action, no
+ * error, the panel exactly as it was. The owner could not connect the bench
+ * at all, and there was nothing on screen to say why.
+ */
+describe("a click while the machine is being searched", () => {
+  it("connects the bench anyway, and the late answer does not paint over it", async () => {
+    const client = new SlowDiscoveryClient();
+    const { result } = renderHook(() => useAdapterController(client, 100_000));
+    // The poll that runs on mount is out and has not answered.
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(result.current.snapshot.state).not.toBe("CONNECTED");
+
+    await act(async () => {
+      await result.current.connectBench(1);
+    });
+    expect(result.current.snapshot.state).toBe("CONNECTED");
+
+    // The poll answers at last, with the picture from before the click.
+    await act(async () => {
+      client.finishPoll();
+      await Promise.resolve();
+    });
+    expect(result.current.snapshot.state).toBe("CONNECTED");
   });
 });

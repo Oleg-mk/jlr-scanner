@@ -214,15 +214,33 @@ export function App({
   const switchMode = useCallback(
     async (wanted: "bench" | "real", connect: () => Promise<void>) => {
       if (sessionHasRecords && sessionMode !== wanted) {
-        const confirmed = await startNewSession({
-          title: t("Start a new session?"),
-          message: t(
-            "A session is either on the bench or on a car, never both. The report, the survey and the reads of this session are dropped unless saved.",
-          ),
-          confirmLabel: t("Start"),
-          cancelLabel: t("Cancel"),
-        });
-        if (!confirmed) return;
+        let confirmed = false;
+        try {
+          confirmed = await startNewSession({
+            title: t("Start a new session?"),
+            message: t(
+              "A session is either on the bench or on a car, never both. The report, the survey and the reads of this session are dropped unless saved.",
+            ),
+            confirmLabel: t("Start"),
+            cancelLabel: t("Cancel"),
+          });
+        } catch (error) {
+          // The shell could not ask. Saying so beats doing nothing.
+          controller.reportRefusal(
+            t("This session already holds records, and the question about starting a new one could not be asked."),
+            error instanceof Error ? error.message : String(error),
+          );
+          return;
+        }
+        if (!confirmed) {
+          controller.reportRefusal(
+            t(
+              "Nothing was connected: a session is either on the bench or on a car, and this one already holds records. Start a new session to change over.",
+            ),
+            null,
+          );
+          return;
+        }
         await connect();
         if (onNewSession) onNewSession();
         else window.location.reload();
@@ -230,7 +248,7 @@ export function App({
       }
       await connect();
     },
-    [onNewSession, sessionHasRecords, sessionMode],
+    [controller, onNewSession, sessionHasRecords, sessionMode],
   );
   const connectAdapter = useCallback(() => switchMode("real", connectReal), [connectReal, switchMode]);
   const connectBench = useCallback(
@@ -458,8 +476,22 @@ export function App({
                       selectedPort={controller.selectedPort}
                       onSelectPort={controller.setSelectedPort}
                       onDetect={() => void controller.refresh()}
-                      onConnect={() => void connectAdapter()}
-                      onConnectBench={(scenario) => void connectBench(scenario)}
+                      onConnect={() => {
+                        void connectAdapter().catch((error: unknown) => {
+                          controller.reportRefusal(
+                            t("The adapter could not be connected."),
+                            error instanceof Error ? error.message : String(error),
+                          );
+                        });
+                      }}
+                      onConnectBench={(scenario) => {
+                        void connectBench(scenario).catch((error: unknown) => {
+                          controller.reportRefusal(
+                            t("The bench could not be connected."),
+                            error instanceof Error ? error.message : String(error),
+                          );
+                        });
+                      }}
                       onDisconnect={() => void controller.disconnect()}
                     />
                     <LibraryPanel
