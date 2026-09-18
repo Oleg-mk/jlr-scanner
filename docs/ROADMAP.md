@@ -48,14 +48,18 @@ current work**, and none may be started early.
 | Stage | Contents | Status |
 | --- | --- | --- |
 | 1 | Full read-only diagnostics: all modules on all buses, DTC read, live data, ECU and software identification, CCF read | **CURRENT SCOPE** |
-| 2 | Service functions: service-interval reset, adaptations, actuator tests, DTC clear | future direction |
+| 2 | Service functions: service-interval reset, adaptations, actuator tests, DTC clear | **AUTHORISED 2026-09-18** — `ADR-0036`: four steps, one operation class at a time, versions 1.2.x, installers to the owner alone |
 | 3 | Configuration and programming: CCF write, module configuration | future direction |
 
 Stage 1 keeps `SAFETY_BOUNDARIES.md` and `ADR-0005` unchanged. Every operation
 stays `READ_ONLY`; everything else stays unavailable.
 
 Stage 2 introduces the first write operations and requires new safety classes, a
-new ADR, and explicit in-application confirmation per operation.
+new ADR, and explicit in-application confirmation per operation. `ADR-0036`
+(2026-09-18) is that ADR: a service mode switched on per session behind a
+consent, one confirmation per operation, the extended session opened and
+left, every operation recorded, and the guard loosened one service at a
+time in the commit that adds the operation.
 
 Stage 3 collides with `ADR-0005`, which prohibits firmware programming. Reaching
 it would require an ADR that explicitly supersedes `ADR-0005`, taken as a
@@ -787,10 +791,12 @@ and the ADRs described under "Scope". Not scheduled here yet.
 The desk work of stage 2 began on 2026-09-16 by the owner's decision, while no
 tester's report exists: `ADR-0035` and F22 put the catalogue's other half into
 the knowledge base and drew every operation into its safety class, listing them
-and sending none. That is preparation, not authorisation. The scope table above
-is unchanged, and stage 2 still needs its own ADR, its own confirmation in the
-interface, and the architecture guard loosened visibly, in the same commit that
-authorises it.
+and sending none. That was preparation, not authorisation. The authorisation
+came on 2026-09-18 with `ADR-0036`: stage 2 proceeds in four steps — clear
+the codes, run a routine, drive an actuator, change an adaptation — each with
+its own confirmation in the interface and the architecture guard loosened
+visibly, in the same commit that adds the operation. Stage 3 stays declared
+direction only.
 
 `CAPABILITY_MATRIX.md` (2026-09-12) lists, row by row, what SDD 169 does at
 its fullest — read from its own scripts and module documents — against what
@@ -805,7 +811,10 @@ ECU firmware flashing, VBF programming, bootloader or recovery flashing, key,
 immobilizer, or security programming, arbitrary EEPROM writes, any public
 arbitrary CAN transmit API, and use of X250 diagnostic connector pins 12/13.
 
-Stage 2 and stage 3 are declared future direction. Neither is authorisation. Any
-move into them requires its own ADR — and for firmware programming, an ADR that
-explicitly supersedes `ADR-0005`. Silent scope expansion is the specific failure
-mode these documents exist to prevent.
+Stage 2 is authorised by `ADR-0036` (2026-09-18) and proceeds one operation
+class at a time, each visible in the guard and in `SAFETY_BOUNDARIES.md`;
+what stands behind JLR's security level stays unavailable inside it. Stage 3
+is declared future direction, not authorisation: any move into it requires its
+own ADR — and for firmware programming, an ADR that explicitly supersedes
+`ADR-0005`. Silent scope expansion is the specific failure mode these
+documents exist to prevent.
