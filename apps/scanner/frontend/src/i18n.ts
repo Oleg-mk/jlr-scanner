@@ -438,8 +438,6 @@ const uk: Record<string, string> = {
   "The car stands still, the ignition is on and the engine is off unless a procedure says otherwise.":
     "Авто стоїть, запалювання увімкнене, двигун вимкнений, якщо процедура не каже інакше.",
   "What follows is your decision for the car in front of you.": "Далі це ваше рішення для авто перед вами.",
-  "SERVICE MODE · operations that change what a module holds are on · each one asks again":
-    "СЕРВІСНИЙ РЕЖИМ · операції, що змінюють вміст модуля, увімкнені · кожна перепитає окремо",
   "Clear the fault codes": "Стерти коди несправностей",
   "Clearing…": "Стираю…",
   "Clear the fault codes of {module}": "Стерти коди несправностей {module}",
@@ -1642,8 +1640,6 @@ const ru: Record<string, string> = {
   "The car stands still, the ignition is on and the engine is off unless a procedure says otherwise.":
     "Автомобиль стоит, зажигание включено, двигатель выключен, если процедура не говорит иначе.",
   "What follows is your decision for the car in front of you.": "Дальше это ваше решение для автомобиля перед вами.",
-  "SERVICE MODE · operations that change what a module holds are on · each one asks again":
-    "СЕРВИСНЫЙ РЕЖИМ · операции, меняющие содержимое модуля, включены · каждая переспросит отдельно",
   "Clear the fault codes": "Стереть коды неисправностей",
   "Clearing…": "Стираю…",
   "Clear the fault codes of {module}": "Стереть коды неисправностей {module}",

@@ -250,7 +250,6 @@ describe("the service mode (ADR-0036)", () => {
     renderApp(service, session, new TwoCodesClient());
     const toggle = await screen.findByRole("button", { name: "Service mode" });
     expect(toggle).toHaveAttribute("aria-pressed", "false");
-    expect(screen.queryByText(/SERVICE MODE/)).toBeNull();
 
     // The consent stands before the switch; declining leaves everything off.
     fireEvent.click(toggle);
@@ -261,15 +260,19 @@ describe("the service mode (ADR-0036)", () => {
     expect(screen.queryByRole("dialog")).toBeNull();
     expect(service.on).toBe(false);
 
-    // Accepting turns it on: the shell is told, the bands appear, the lamp is red.
+    // Accepting turns it on: the shell is told, the switch itself goes red
+    // (pressed), the lamp is red; no band anywhere (the owner, 2026-09-18).
     fireEvent.click(toggle);
     fireEvent.click(screen.getByRole("button", { name: "Turn the service mode on" }));
     await waitFor(() => expect(service.on).toBe(true));
-    await waitFor(() => expect(screen.getAllByText(/SERVICE MODE/)).toHaveLength(2));
-    expect(screen.getByRole("button", { name: "Service mode" })).toHaveAttribute(
-      "aria-pressed",
-      "true",
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "Service mode" })).toHaveAttribute(
+        "aria-pressed",
+        "true",
+      ),
     );
+    expect(screen.getByRole("button", { name: "Service mode" }).className).toContain("button--service");
+    expect(screen.queryByText(/SERVICE MODE/)).toBeNull();
     expect(screen.getByRole("heading", { name: "ProwlOne" })).toHaveAttribute(
       "data-lamp",
       "sending",
@@ -278,7 +281,12 @@ describe("the service mode (ADR-0036)", () => {
     // The same button turns it off again, without a question.
     fireEvent.click(screen.getByRole("button", { name: "Service mode" }));
     await waitFor(() => expect(service.on).toBe(false));
-    await waitFor(() => expect(screen.queryByText(/SERVICE MODE/)).toBeNull());
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "Service mode" })).toHaveAttribute(
+        "aria-pressed",
+        "false",
+      ),
+    );
   });
 
   it("offers the clear only in the mode and only after the codes were read, asks once, and shows the answer", async () => {

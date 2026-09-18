@@ -561,9 +561,11 @@ first operation of this product that changes what a module holds, and the
 mechanics every later operation of stage 2 reuses:
 
 - **the service mode** — a switch for the session behind one consent, off
-  on every start and every new session, a band in the header and the footer
-  while it is on, the lamp in the corner red; the shell keeps its state and
-  offers nothing of stage 2 while it is off;
+  on every start and every new session; while it is on the switch itself is
+  red and so is the lamp in the corner (the bands the decision described were
+  withdrawn the same day on the owner's word: two red bands made the screen
+  absurd); the shell keeps its state and offers nothing of stage 2 while it
+  is off;
 - **the clear** — `0x14` for every group over UDS, DS2 `0x05` and KWP2000
   `0x14` on a serial line; offered under a module's fault codes only once
   they were read in this session, after one question that names the module,

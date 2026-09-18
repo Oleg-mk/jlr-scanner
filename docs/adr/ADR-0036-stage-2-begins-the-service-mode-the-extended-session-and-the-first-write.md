@@ -301,6 +301,12 @@ and what the code does met in these places:
 7. **Beside the step:** a Windows checkout gave the shell scripts carriage
    returns and the Linux container refused them; `.gitattributes` now pins
    `*.sh` to LF.
+8. **The bands (decision 2) are withdrawn.** Built as decided, seen on the
+   owner's screen, and refused the same day: «дві червоні полоси зверху і
+   знизу роблять абсурд». The state of the mode is said by the switch
+   itself, red while the mode is on, and by the lamp in the corner, red
+   with it. Nothing else about decision 2 changes: one consent, off on every
+   start and every new session, never remembered.
 
 The version turns 1.2.0 with the owner's word, and the installer goes to him
 alone (decision 8).

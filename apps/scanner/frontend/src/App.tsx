@@ -417,7 +417,8 @@ export function App({
             {t("New session")}
           </button>
           {/* The service mode (ADR-0036): one switch for the session, behind
-              one consent; while it is on the bands below say so. */}
+              one consent; while it is on the switch itself is red, and so is
+              the lamp - no bands (the owner, 2026-09-18). */}
           <button
             className={`button ${service.on ? "button--service" : "button--secondary"}`}
             type="button"
@@ -460,11 +461,6 @@ export function App({
         <div className="bench-band" role="status">
           {t("BENCH · virtual vehicle · synthetic data")} · {t("Scenario")}{" "}
           {controller.snapshot.benchScenario ?? BENCH_SCENARIO_DEFAULT}
-        </div>
-      ) : null}
-      {service.on ? (
-        <div className="mode-band" role="status">
-          {t("SERVICE MODE · operations that change what a module holds are on · each one asks again")}
         </div>
       ) : null}
       {service.consentOpen ? (
@@ -767,11 +763,6 @@ export function App({
         <div className="bench-band">
           {t("BENCH · virtual vehicle · synthetic data")} · {t("Scenario")}{" "}
           {controller.snapshot.benchScenario ?? BENCH_SCENARIO_DEFAULT}
-        </div>
-      ) : null}
-      {service.on ? (
-        <div className="mode-band">
-          {t("SERVICE MODE · operations that change what a module holds are on · each one asks again")}
         </div>
       ) : null}
       <footer className="app-footer">

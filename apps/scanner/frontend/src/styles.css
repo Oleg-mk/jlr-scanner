@@ -4905,21 +4905,10 @@ table.live-read-identifiers label {
 /* ---------------------------------------------------------------------
    The service mode and its operations (ADR-0036)
 
-   A band the colour of caution while the mode is on, one question in a
-   dialog before an operation, and the operation's own control in amber:
-   never the primary blue of a read, never the default.
+   The switch red while the mode is on, one question in a dialog before an
+   operation, and the operation's own control in amber: never the primary
+   blue of a read, never the default.
    --------------------------------------------------------------------- */
-.mode-band {
-  padding: 0.45rem var(--content-pad);
-  background: #a66b00;
-  color: #fff;
-  font-size: 0.82rem;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-align: center;
-  text-transform: uppercase;
-}
-
 .button--service {
   border-color: #a66b00;
   background: #fff7e6;
@@ -4930,8 +4919,11 @@ table.live-read-identifiers label {
   background: #ffefcf;
 }
 
+/* The switch itself says the mode is on: red, like the lamp (the owner,
+   2026-09-18: no bands). */
 .button--service[aria-pressed="true"] {
-  background: #a66b00;
+  border-color: var(--negative, #b3261e);
+  background: var(--negative, #b3261e);
   color: #fff;
 }
 
