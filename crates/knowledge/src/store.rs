@@ -1,7 +1,7 @@
 use crate::{
-    ApplicabilityResolution, EntityKind, EvidenceId, EvidenceRecord, IngestionBatch,
-    KnowledgeError, KnowledgeRecord, KnowledgeValue, RegistrationOutcome, SourceRecord,
-    SourceRegistry, SourceType, ValidationState, VehicleContext,
+    ApplicabilityResolution, DimensionConstraint, EntityKind, EvidenceId, EvidenceRecord,
+    IngestionBatch, KnowledgeEntity, KnowledgeError, KnowledgeRecord, KnowledgeValue,
+    RegistrationOutcome, SourceRecord, SourceRegistry, SourceType, ValidationState, VehicleContext,
 };
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -10,6 +10,25 @@ pub struct KnowledgeStore {
     sources: SourceRegistry,
     evidence: BTreeMap<EvidenceId, EvidenceRecord>,
     records: BTreeMap<String, KnowledgeRecord>,
+    /*
+     * Which records name a module, and which name a diagnostic
+     * implementation. Without these a query walked every record in the
+     * store, and a store holding the whole corpus is over half a million of
+     * them. The bench asks once per module and a car has dozens, so
+     * building one virtual vehicle read the library dozens of times over:
+     * on the owner's own library and machine that was 65 seconds for one
+     * car, and he named the feeling exactly - the loading goes from the
+     * very beginning, every time (2026-09-18).
+     *
+     * A record is listed under a name when it carries that name the only
+     * two ways a query can match one: as the entity it is about, or in the
+     * one_of list of its applicability. Nothing else matches, so nothing
+     * else is indexed, and the filter itself is still run over what the
+     * index returns - the index narrows the walk and never decides it.
+     */
+    by_ecu_family: BTreeMap<String, BTreeSet<String>>,
+    by_diagnostic_implementation: BTreeMap<String, BTreeSet<String>>,
+    by_entity: BTreeMap<KnowledgeEntity, BTreeSet<String>>,
 }
 
 impl KnowledgeStore {
@@ -59,6 +78,7 @@ impl KnowledgeStore {
                 id: record.id,
             }),
             None => {
+                self.index_record(&record);
                 self.records.insert(record.id.clone(), record);
                 Ok(RegistrationOutcome::Inserted)
             }
@@ -146,49 +166,145 @@ impl KnowledgeStore {
             self.evidence.insert(evidence.id.clone(), evidence);
         }
         for record in batch.records {
+            self.index_record(&record);
             self.records.insert(record.id.clone(), record);
         }
         Ok(())
     }
 
+    /// List a record under every name a query can find it by.
+    ///
+    /// Written to allocate a key only when the name is new. A store holding
+    /// the whole corpus is indexed half a million times over as it loads, so
+    /// a `String` made and thrown away on every one of them is a minute of
+    /// the person's time rather than a tidier line.
+    fn index_record(&mut self, record: &KnowledgeRecord) {
+        let id = &record.id;
+        let list = |index: &mut BTreeMap<String, BTreeSet<String>>, name: &str| {
+            if let Some(listed) = index.get_mut(name) {
+                listed.insert(id.clone());
+            } else {
+                index.insert(name.to_owned(), BTreeSet::from([id.clone()]));
+            }
+        };
+        if let Some(listed) = self.by_entity.get_mut(&record.entity) {
+            listed.insert(id.clone());
+        } else {
+            self.by_entity
+                .insert(record.entity.clone(), BTreeSet::from([id.clone()]));
+        }
+        if record.entity.kind == EntityKind::EcuFamily {
+            list(&mut self.by_ecu_family, &record.entity.id);
+        }
+        if let DimensionConstraint::OneOf { values } = &record.applicability.ecu_family {
+            for value in values {
+                list(&mut self.by_ecu_family, value);
+            }
+        }
+        if record.entity.kind == EntityKind::DiagnosticImplementation {
+            list(&mut self.by_diagnostic_implementation, &record.entity.id);
+        }
+        if let DimensionConstraint::OneOf { values } =
+            &record.applicability.diagnostic_implementation
+        {
+            for value in values {
+                list(&mut self.by_diagnostic_implementation, value);
+            }
+        }
+    }
+
+    /// The records a query could possibly match, in the order a walk of the
+    /// whole store would meet them, or `None` when the query names nothing
+    /// to narrow by and the walk is the whole store.
+    fn candidates(&self, query: &KnowledgeQuery) -> Option<Vec<&String>> {
+        let by_family = query
+            .ecu_family
+            .as_ref()
+            .map(|name| self.by_ecu_family.get(name));
+        let by_implementation = query
+            .diagnostic_implementation
+            .as_ref()
+            .map(|name| self.by_diagnostic_implementation.get(name));
+        let narrowed: Vec<&String> = match (by_family, by_implementation) {
+            // Nothing to narrow by: the walk is the whole store.
+            (None, None) => return None,
+            // A name nothing was ever listed under matches nothing, which is
+            // what the walk concluded after reading everything.
+            (Some(None), _) | (_, Some(None)) => Vec::new(),
+            (Some(Some(family)), None) => family.iter().collect(),
+            (None, Some(Some(implementation))) => implementation.iter().collect(),
+            (Some(Some(family)), Some(Some(implementation))) => {
+                family.intersection(implementation).collect()
+            }
+        };
+        // A record about the named entity answers the query whatever else it
+        // names, so it joins the candidates rather than being narrowed away.
+        let Some(entity) = query.or_entity.as_ref().and_then(|e| self.by_entity.get(e)) else {
+            return Some(narrowed);
+        };
+        let joined: BTreeSet<&String> = narrowed.into_iter().chain(entity.iter()).collect();
+        Some(joined.into_iter().collect())
+    }
+
     pub fn query(&self, query: &KnowledgeQuery) -> KnowledgeQueryResult {
         let mut resolved = Vec::new();
-        for record in self.records.values() {
-            if !matches_entity_filters(record, query) {
-                continue;
-            }
-            let resolution = query
-                .vehicle_context
-                .as_ref()
-                .map_or(ApplicabilityResolution::InsufficientContext, |context| {
-                    record.applicability.resolve(context)
-                });
-            match resolution {
-                ApplicabilityResolution::NotApplicable => continue,
-                ApplicabilityResolution::InsufficientContext
-                | ApplicabilityResolution::InsufficientEvidence
-                    if !query.include_indeterminate =>
-                {
-                    continue
+        match self.candidates(query) {
+            Some(candidates) => {
+                for id in candidates {
+                    if let Some(record) = self.records.get(id) {
+                        self.resolve_into(record, query, &mut resolved);
+                    }
                 }
-                _ => {}
             }
-            let evidence = record
-                .evidence_ids
-                .iter()
-                .filter_map(|id| self.trace_evidence(id))
-                .collect();
-            resolved.push(ResolvedKnowledge {
-                record: record.clone(),
-                applicability_resolution: resolution,
-                evidence,
-            });
+            None => {
+                for record in self.records.values() {
+                    self.resolve_into(record, query, &mut resolved);
+                }
+            }
         }
         let conflicts = detect_conflicts(&resolved);
         KnowledgeQueryResult {
             records: resolved,
             conflicts,
         }
+    }
+
+    /// One record measured against one query, and kept if it answers it.
+    fn resolve_into(
+        &self,
+        record: &KnowledgeRecord,
+        query: &KnowledgeQuery,
+        resolved: &mut Vec<ResolvedKnowledge>,
+    ) {
+        if !matches_entity_filters(record, query) {
+            return;
+        }
+        let resolution = query
+            .vehicle_context
+            .as_ref()
+            .map_or(ApplicabilityResolution::InsufficientContext, |context| {
+                record.applicability.resolve(context)
+            });
+        match resolution {
+            ApplicabilityResolution::NotApplicable => return,
+            ApplicabilityResolution::InsufficientContext
+            | ApplicabilityResolution::InsufficientEvidence
+                if !query.include_indeterminate =>
+            {
+                return
+            }
+            _ => {}
+        }
+        let evidence = record
+            .evidence_ids
+            .iter()
+            .filter_map(|id| self.trace_evidence(id))
+            .collect();
+        resolved.push(ResolvedKnowledge {
+            record: record.clone(),
+            applicability_resolution: resolution,
+            evidence,
+        });
     }
 
     pub fn trace_back(&self, record_id: &str) -> Result<Vec<EvidenceTrace>, KnowledgeError> {
@@ -267,6 +383,12 @@ pub struct KnowledgeQuery {
     pub vehicle_context: Option<VehicleContext>,
     pub ecu_family: Option<String>,
     pub diagnostic_implementation: Option<String>,
+    /// A record about this entity answers the query whatever module or
+    /// implementation it names, the way a caller that asks about a module
+    /// and the bus it sits on wants both. Without it such a caller had to
+    /// ask for everything and sort it out itself, which meant reading the
+    /// whole store once per module (2026-09-18).
+    pub or_entity: Option<KnowledgeEntity>,
     pub include_indeterminate: bool,
 }
 
@@ -290,6 +412,12 @@ impl KnowledgeQuery {
 
     pub fn with_diagnostic_implementation(mut self, implementation: impl Into<String>) -> Self {
         self.diagnostic_implementation = Some(implementation.into());
+        self
+    }
+
+    /// Also answer with the records about this entity, whatever else they name.
+    pub fn with_entity(mut self, entity: KnowledgeEntity) -> Self {
+        self.or_entity = Some(entity);
         self
     }
 }
@@ -322,6 +450,14 @@ pub struct KnowledgeQueryResult {
 }
 
 fn matches_entity_filters(record: &KnowledgeRecord, query: &KnowledgeQuery) -> bool {
+    // A record about the named entity is wanted whatever else it names.
+    if query
+        .or_entity
+        .as_ref()
+        .is_some_and(|entity| &record.entity == entity)
+    {
+        return true;
+    }
     if let Some(expected) = &query.ecu_family {
         let entity_match =
             record.entity.kind == EntityKind::EcuFamily && record.entity.id == *expected;
@@ -438,6 +574,224 @@ mod tests {
             evidence_ids: vec![EvidenceId::new(evidence_id).unwrap()],
             validation_state: ValidationState::SourceBacked,
         }
+    }
+
+    /// A record that names a module in a way no query can match, so that the
+    /// index has something it must leave out and the walk has something it
+    /// must reject.
+    fn record_for(
+        id: &str,
+        evidence_id: &str,
+        kind: EntityKind,
+        entity_id: &str,
+        family: DimensionConstraint,
+        implementation: DimensionConstraint,
+    ) -> KnowledgeRecord {
+        KnowledgeRecord {
+            id: id.into(),
+            entity: KnowledgeEntity {
+                kind,
+                id: entity_id.into(),
+            },
+            key: ClaimKey::UsesProtocolFamily,
+            value: KnowledgeValue::ProtocolFamily { name: "UDS".into() },
+            applicability: Applicability {
+                vehicle_program: DimensionConstraint::one_of(vec!["PROGRAM-A".into()]).unwrap(),
+                model_year: YearConstraint::Any,
+                architecture_generation: DimensionConstraint::Any,
+                ecu_family: family,
+                powertrain: DimensionConstraint::Any,
+                variant: DimensionConstraint::Any,
+                market: DimensionConstraint::Any,
+                diagnostic_implementation: implementation,
+                other: BTreeMap::new(),
+            },
+            evidence_ids: vec![EvidenceId::new(evidence_id).unwrap()],
+            validation_state: ValidationState::SourceBacked,
+        }
+    }
+
+    /// The index narrows the walk; it must never decide it.
+    ///
+    /// A query naming a module used to read every record in the store, and a
+    /// store holding the whole corpus is over half a million of them. What
+    /// the index must guarantee is that narrowing changes the speed and
+    /// nothing else: for every name, what comes back is exactly what the
+    /// filter would have kept from a walk of everything.
+    #[test]
+    fn narrowing_by_name_returns_exactly_what_a_walk_of_everything_would() {
+        let mut store = KnowledgeStore::new();
+        store.register_source(documented_source("s-a")).unwrap();
+        for id in ["e-1", "e-2", "e-3", "e-4", "e-5", "e-6"] {
+            store.add_evidence(evidence(id, "s-a")).unwrap();
+        }
+        let one_of = |value: &str| DimensionConstraint::one_of(vec![value.to_owned()]).unwrap();
+        // Named in the applicability; named as the entity; named as neither;
+        // unconstrained, which names nothing and so matches no name at all.
+        store
+            .add_record(record_for(
+                "r-1",
+                "e-1",
+                EntityKind::DiagnosticImplementation,
+                "IMPL-A",
+                one_of("ECU-A"),
+                one_of("IMPL-A"),
+            ))
+            .unwrap();
+        store
+            .add_record(record_for(
+                "r-2",
+                "e-2",
+                EntityKind::EcuFamily,
+                "ECU-A",
+                DimensionConstraint::Any,
+                DimensionConstraint::Any,
+            ))
+            .unwrap();
+        store
+            .add_record(record_for(
+                "r-3",
+                "e-3",
+                EntityKind::DiagnosticImplementation,
+                "IMPL-B",
+                one_of("ECU-B"),
+                one_of("IMPL-B"),
+            ))
+            .unwrap();
+        store
+            .add_record(record_for(
+                "r-4",
+                "e-4",
+                EntityKind::DiagnosticImplementation,
+                "IMPL-A",
+                DimensionConstraint::Any,
+                DimensionConstraint::Any,
+            ))
+            .unwrap();
+        store
+            .add_record(record_for(
+                "r-5",
+                "e-5",
+                EntityKind::DiagnosticImplementation,
+                "IMPL-A",
+                DimensionConstraint::Unknown,
+                one_of("IMPL-A"),
+            ))
+            .unwrap();
+        store
+            .add_record(record_for(
+                "r-6",
+                "e-6",
+                EntityKind::EcuFamily,
+                "ECU-A",
+                one_of("ECU-B"),
+                one_of("IMPL-B"),
+            ))
+            .unwrap();
+
+        let context = VehicleContext {
+            vehicle_program: Some("PROGRAM-A".into()),
+            model_year: Some(2012),
+            architecture_generation: None,
+            ecu_family: None,
+            powertrain: None,
+            variant: None,
+            market: None,
+            diagnostic_implementation: None,
+            other: BTreeMap::new(),
+        };
+        let everything =
+            store.query(&KnowledgeQuery::for_vehicle(context.clone()).include_indeterminate(true));
+
+        for query in [
+            KnowledgeQuery::for_vehicle(context.clone())
+                .with_ecu_family("ECU-A")
+                .include_indeterminate(true),
+            KnowledgeQuery::for_vehicle(context.clone())
+                .with_ecu_family("ECU-B")
+                .include_indeterminate(true),
+            KnowledgeQuery::for_vehicle(context.clone())
+                .with_diagnostic_implementation("IMPL-A")
+                .include_indeterminate(true),
+            KnowledgeQuery::for_vehicle(context.clone())
+                .with_ecu_family("ECU-A")
+                .with_diagnostic_implementation("IMPL-A")
+                .include_indeterminate(true),
+            // A name nothing was ever listed under: the walk reads every
+            // record and keeps none, and so must the index.
+            KnowledgeQuery::for_vehicle(context.clone())
+                .with_ecu_family("ECU-NOWHERE")
+                .include_indeterminate(true),
+            // A module and an entity together: what is about that entity
+            // joins what names that module, rather than being narrowed away.
+            // This is what a caller asking about a module and the bus it
+            // sits on needs, and getting it wrong would quietly lose the
+            // record that says where the module is reached.
+            KnowledgeQuery::for_vehicle(context.clone())
+                .with_ecu_family("ECU-A")
+                .with_entity(KnowledgeEntity {
+                    kind: EntityKind::DiagnosticImplementation,
+                    id: "IMPL-B".into(),
+                })
+                .include_indeterminate(true),
+            KnowledgeQuery::for_vehicle(context.clone())
+                .with_ecu_family("ECU-NOWHERE")
+                .with_entity(KnowledgeEntity {
+                    kind: EntityKind::EcuFamily,
+                    id: "ECU-A".into(),
+                })
+                .include_indeterminate(true),
+        ] {
+            let walked: Vec<_> = everything
+                .records
+                .iter()
+                .filter(|resolved| matches_entity_filters(&resolved.record, &query))
+                .cloned()
+                .collect();
+            let narrowed = store.query(&query);
+            let ids = |records: &[ResolvedKnowledge]| {
+                records
+                    .iter()
+                    .map(|resolved| resolved.record.id.clone())
+                    .collect::<Vec<_>>()
+            };
+            assert_eq!(
+                ids(&narrowed.records),
+                ids(&walked),
+                "narrowed by {:?} / {:?}",
+                query.ecu_family,
+                query.diagnostic_implementation
+            );
+            assert_eq!(narrowed.records, walked);
+        }
+
+        // The entity case above is only worth running if it unites two
+        // different sets: one record found by the module, one by the entity.
+        let united = store.query(
+            &KnowledgeQuery::for_vehicle(context.clone())
+                .with_ecu_family("ECU-A")
+                .with_entity(KnowledgeEntity {
+                    kind: EntityKind::DiagnosticImplementation,
+                    id: "IMPL-B".into(),
+                })
+                .include_indeterminate(true),
+        );
+        let united: Vec<_> = united
+            .records
+            .iter()
+            .map(|resolved| resolved.record.id.as_str())
+            .collect();
+        assert!(united.contains(&"r-1"), "found by its module: {united:?}");
+        assert!(united.contains(&"r-3"), "found by its entity: {united:?}");
+
+        // The whole point: a name is answered without reading the store.
+        assert!(store
+            .candidates(
+                &KnowledgeQuery::for_vehicle(context)
+                    .with_ecu_family("ECU-A")
+                    .include_indeterminate(true)
+            )
+            .is_some_and(|candidates| candidates.len() < store.record_count()));
     }
 
     #[test]

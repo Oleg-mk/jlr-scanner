@@ -12,10 +12,10 @@ use super::live_read_service::{LiveReadService, LIVE_READ_TIMEOUT};
 use super::mileage_service::{MileageService, MILEAGE_READ_TIMEOUT};
 use super::module_read_service::{map_live_error, ModuleReadService, PreparedModuleRead};
 use super::passport_service::{PassportService, PASSPORT_READ_TIMEOUT};
-use super::refresh_bench;
 use super::session_report_service::{SessionReportService, SESSION_MODE_BENCH, SESSION_MODE_REAL};
 use super::session_service::SessionService;
 use super::standard_obd_service::{StandardObdService, STANDARD_OBD_TIMEOUT};
+use super::{refresh_bench, BenchBuild};
 use app_contracts::{
     AdapterErrorCode, AdapterInfo, AdapterState, BatteryReadState, CcfReadState,
     LiveReadEntryRequest, LiveReadRequest, LiveReadState, MileageKind, MileageSurveyState,
@@ -223,6 +223,183 @@ fn vehicle() -> VehicleContextInput {
     }
 }
 
+/// The bench is built from the library, and that build is the expensive part
+/// of it: one pass over the library per surveyed module. It used to run again
+/// on every connection of the bench, over a vehicle the survey had already
+/// built, so switching the bench off and on after a survey stood for minutes
+/// (the owner, 2026-09-18). It now runs when what it is built from changes,
+/// and not otherwise.
+#[test]
+fn the_bench_is_built_when_what_it_is_built_from_changes_and_not_otherwise() {
+    let bench = share_bus(Box::new(EmptyBench));
+    let built = BenchBuild(Mutex::new(None));
+    let mut session = SessionService::with_library(library());
+    let scenario = bench_vehicle::SCENARIO_DEFAULT;
+
+    // Nothing described yet: the empty bench, and asking twice changes nothing.
+    assert!(!refresh_bench(&bench, &built, &session, scenario));
+
+    // The survey describes a vehicle: the bench is built for it.
+    session.survey(&vehicle());
+    assert!(refresh_bench(&bench, &built, &session, scenario));
+    assert!(bench.lock().unwrap().describe().contains("SYNTHA"));
+
+    // Connecting the bench over the same vehicle and the same scenario asks
+    // for the bench already standing. This is the minutes the owner waited.
+    assert!(!refresh_bench(&bench, &built, &session, scenario));
+    assert!(!refresh_bench(&bench, &built, &session, scenario));
+    assert!(bench.lock().unwrap().describe().contains("SYNTHA"));
+
+    // Another scenario is another set of faults: built again, and the new
+    // number is what the next connection is measured against.
+    assert!(refresh_bench(&bench, &built, &session, scenario + 1));
+    assert!(!refresh_bench(&bench, &built, &session, scenario + 1));
+    assert!(refresh_bench(&bench, &built, &session, scenario));
+
+    // A new session describes nothing: the vehicle leaves the bench rather
+    // than answering for a session that never surveyed it.
+    session.clear_session();
+    assert!(refresh_bench(&bench, &built, &session, scenario));
+    assert!(!bench.lock().unwrap().describe().contains("SYNTHA"));
+}
+
+/// Connecting the bench while the survey is running is answered at once.
+///
+/// The bench is built from what the survey finds, so it needs the session
+/// the survey is holding. Waiting for it held the adapter service too, and
+/// the adapter service is what every poll of the connection card takes: the
+/// card stood on its empty state, offering to look for hardware, for the
+/// length of the survey (the owner, 2026-09-18). The wait is now a refusal
+/// with a reason, and the adapter is left alone.
+#[test]
+fn the_bench_refuses_at_once_while_the_session_is_busy_rather_than_waiting_for_it() {
+    let bench = share_bus(Box::new(EmptyBench));
+    let mut adapter = AdapterService::new(SystemAdapterBackend::new(bench.clone()));
+    let session = Mutex::new(SessionService::with_library(library()));
+
+    // The survey has the session. Nothing else may build a bench from it.
+    let held = session.lock().unwrap();
+    let busy = matches!(session.try_lock(), Err(std::sync::TryLockError::WouldBlock));
+    assert!(
+        busy,
+        "the session is held, as it is for the length of a survey"
+    );
+
+    let refused = adapter.refuse_bench_while_busy();
+    let error = refused.error.expect("a refusal says why");
+    assert_eq!(error.code, AdapterErrorCode::SessionBusy);
+    assert!(error.technical_details.is_some());
+    // Refusing is not a failure of the connection: whatever was connected
+    // stays, and the adapter is not put into an error state.
+    assert_ne!(refused.state, AdapterState::Error);
+
+    // The survey ends; the bench can be built and connected as usual.
+    drop(held);
+    let mut session = session.lock().unwrap();
+    session.survey(&vehicle());
+    let built = BenchBuild(Mutex::new(None));
+    assert!(refresh_bench(
+        &bench,
+        &built,
+        &session,
+        bench_vehicle::SCENARIO_DEFAULT
+    ));
+    drop(session);
+    let connected = adapter.connect_bench(bench_vehicle::SCENARIO_DEFAULT);
+    assert_eq!(connected.state, AdapterState::Connected);
+    assert!(bench.lock().unwrap().describe().contains("SYNTHA"));
+}
+
+/// A stopwatch on the real library, for the question "where do the seconds
+/// go". Ignored by default and pointed at a library folder with
+/// `PROWLONE_LIBRARY`; it reads and measures, and writes nothing.
+#[test]
+#[ignore]
+fn measure_where_the_seconds_go() {
+    let Ok(directory) = std::env::var("PROWLONE_LIBRARY") else {
+        panic!("set PROWLONE_LIBRARY to a library folder");
+    };
+    let context = VehicleContextInput {
+        vehicle_program: std::env::var("PROWLONE_PROGRAM").unwrap_or_else(|_| "X250".into()),
+        model_year: Some(2008),
+        powertrain: Some(std::env::var("PROWLONE_ENGINE").unwrap_or_else(|_| "V6NA".into())),
+        variant: None,
+        market: None,
+        year_breakpoint: Some(std::env::var("PROWLONE_MARKER").unwrap_or_else(|_| "MY08".into())),
+    };
+
+    let mut session = SessionService::new();
+    let started = std::time::Instant::now();
+    let snapshot = session.load_directory(&directory);
+    println!(
+        "load_directory: {:?} -> {:?}",
+        started.elapsed(),
+        snapshot.state
+    );
+
+    let started = std::time::Instant::now();
+    let survey = session.survey(&context);
+    let survey_took = started.elapsed();
+    println!(
+        "survey: {survey_took:?} for {} modules",
+        survey.modules.len()
+    );
+
+    let bench = share_bus(Box::new(EmptyBench));
+    let built = BenchBuild(Mutex::new(None));
+    let started = std::time::Instant::now();
+    assert!(refresh_bench(&bench, &built, &session, 1));
+    println!("bench build (first): {:?}", started.elapsed());
+
+    let started = std::time::Instant::now();
+    assert!(!refresh_bench(&bench, &built, &session, 1));
+    println!("bench build (again, same vehicle): {:?}", started.elapsed());
+
+    let started = std::time::Instant::now();
+    assert!(refresh_bench(&bench, &built, &session, 2));
+    println!("bench build (another scenario): {:?}", started.elapsed());
+
+    // Where inside one module's resolution the time goes.
+    let library = session.library();
+    let store = library.store();
+    println!("records in the store: {}", store.record_count());
+    let family = survey.modules[0].ecu_family.clone();
+    let mut knowledge_context = knowledge::VehicleContext {
+        vehicle_program: Some(context.vehicle_program.clone()),
+        model_year: context.model_year,
+        architecture_generation: None,
+        ecu_family: None,
+        powertrain: context.powertrain.clone(),
+        variant: None,
+        market: None,
+        diagnostic_implementation: None,
+        other: std::collections::BTreeMap::new(),
+    };
+    knowledge_context.ecu_family = Some(family.clone());
+
+    let started = std::time::Instant::now();
+    let narrowed = store.query(
+        &knowledge::KnowledgeQuery::for_vehicle(knowledge_context.clone())
+            .with_ecu_family(&family)
+            .include_indeterminate(true),
+    );
+    println!(
+        "one query named {family}: {:?} -> {} records kept",
+        started.elapsed(),
+        narrowed.records.len()
+    );
+
+    let started = std::time::Instant::now();
+    let wide = store.query(
+        &knowledge::KnowledgeQuery::for_vehicle(knowledge_context).include_indeterminate(true),
+    );
+    println!(
+        "one query naming no module: {:?} -> {} records kept",
+        started.elapsed(),
+        wide.records.len()
+    );
+}
+
 #[test]
 fn the_bench_connects_without_a_port_reads_the_surveyed_vehicle_and_marks_everything_synthetic() {
     let bench = share_bus(Box::new(EmptyBench));
@@ -247,7 +424,12 @@ fn the_bench_connects_without_a_port_reads_the_surveyed_vehicle_and_marks_everyt
     // The session describes SYNTHA; the bench follows the session.
     let mut session = SessionService::with_library(library());
     let survey = session.survey(&vehicle());
-    refresh_bench(&bench, &session, bench_vehicle::SCENARIO_DEFAULT);
+    let _ = refresh_bench(
+        &bench,
+        &BenchBuild(Mutex::new(None)),
+        &session,
+        bench_vehicle::SCENARIO_DEFAULT,
+    );
     assert!(bench.lock().unwrap().describe().contains("SYNTHA"));
     // From here the vehicle keeps a tally of what it was asked for.
     let services = WatchingBench::wrap(&bench);
@@ -1198,7 +1380,12 @@ fn cadence_on_the_bench() {
 
     let mut session = SessionService::with_library(library);
     let survey = session.survey(&context);
-    refresh_bench(&bench, &session, bench_vehicle::SCENARIO_DEFAULT);
+    let _ = refresh_bench(
+        &bench,
+        &BenchBuild(Mutex::new(None)),
+        &session,
+        bench_vehicle::SCENARIO_DEFAULT,
+    );
     println!(
         "vehicle: {} {} — {} modules surveyed, {} reachable; bench: {}",
         context.vehicle_program,

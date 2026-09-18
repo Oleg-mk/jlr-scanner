@@ -47,7 +47,7 @@ use session_report_service::{SESSION_MODE_BENCH, SESSION_MODE_REAL};
 use session_service::SessionService;
 use standard_obd_service::{StandardObdService, STANDARD_OBD_TIMEOUT};
 use std::collections::BTreeMap;
-use std::sync::{Mutex, MutexGuard};
+use std::sync::{Mutex, MutexGuard, TryLockError};
 use std::time::Duration;
 use tauri::State;
 use transport_api::{BenchBus, EmptyBench};
@@ -120,6 +120,18 @@ type SharedBench = SharedBenchBus;
 /// vehicle and has to keep painting the picture the tester asked for.
 struct BenchScenario(Mutex<u32>);
 
+/// What the bench now in memory was built from: the vehicle the session had
+/// described and the scenario in force, or `None` for the empty bench.
+///
+/// Building a virtual vehicle reads the whole library once per module of the
+/// survey, which on a full car is minutes rather than seconds. It was being
+/// done again on every connection of the bench, over a vehicle the survey had
+/// already built — so switching the bench off and on after a survey stood for
+/// minutes with nothing on screen but the adapter card (the owner,
+/// 2026-09-18). The build is now done when what it is built from changes, and
+/// not otherwise.
+struct BenchBuild(Mutex<Option<(VehicleContextInput, u32)>>);
+
 fn bench_scenario(state: &State<'_, BenchScenario>) -> u32 {
     *state
         .inner()
@@ -129,19 +141,39 @@ fn bench_scenario(state: &State<'_, BenchScenario>) -> u32 {
 }
 
 /// Put the vehicle the session last described on the bench, or nothing.
-fn refresh_bench(bench: &SharedBench, session: &SessionService, scenario: u32) {
-    let vehicle: Box<dyn BenchBus> = match session.last_context() {
-        Some(context) => Box::new(BenchVehicle::from_library(
+///
+/// Answers whether it built anything, which is what the test of the skip
+/// reads: the cost of a build is time, and time is not visible in a snapshot.
+fn refresh_bench(
+    bench: &SharedBench,
+    built: &BenchBuild,
+    session: &SessionService,
+    scenario: u32,
+) -> bool {
+    let wanted = session.last_context().map(|context| (context, scenario));
+    let mut built = built
+        .0
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    // The bench already standing is the bench being asked for: rebuilding it
+    // would read the library again for the same answers.
+    if *built == wanted {
+        return false;
+    }
+    let vehicle: Box<dyn BenchBus> = match wanted.as_ref() {
+        Some((context, scenario)) => Box::new(BenchVehicle::from_library(
             session.library(),
-            &context,
+            context,
             None,
-            scenario,
+            *scenario,
         )),
         None => Box::new(EmptyBench),
     };
     *bench
         .lock()
         .unwrap_or_else(std::sync::PoisonError::into_inner) = vehicle;
+    *built = wanted;
+    true
 }
 
 fn lock_dtc_clear<'a>(
@@ -227,6 +259,7 @@ fn connect_bench_now(
     session_state: State<'_, SharedSessionService>,
     report_state: State<'_, SharedSessionReportService>,
     bench: State<'_, SharedBench>,
+    build_state: State<'_, BenchBuild>,
     scenario_state: State<'_, BenchScenario>,
     scenario: Option<u32>,
 ) -> AdapterSnapshot {
@@ -235,12 +268,28 @@ fn connect_bench_now(
         return service.refuse_session_switch(SESSION_MODE_BENCH);
     }
     let scenario = scenario.unwrap_or(bench_vehicle::SCENARIO_DEFAULT);
+    /*
+     * The bench answers for the vehicle the session describes, so building
+     * it needs the session — and the module survey holds the session for as
+     * long as it runs. Waiting for it here held the adapter service with it,
+     * which is the lock every poll of the panel takes, so the whole
+     * connection card stood on its empty state for the length of the survey
+     * (the owner, 2026-09-18: "це миттєво перетворюється на хвилини коли
+     * модулі оглядаються"). A survey in flight is now answered at once, with
+     * the reason, and the adapter is let go.
+     */
+    let session = match session_state.inner().try_lock() {
+        Ok(session) => session,
+        Err(TryLockError::Poisoned(poisoned)) => poisoned.into_inner(),
+        Err(TryLockError::WouldBlock) => return service.refuse_bench_while_busy(),
+    };
     *scenario_state
         .inner()
         .0
         .lock()
         .unwrap_or_else(std::sync::PoisonError::into_inner) = scenario;
-    refresh_bench(&bench, &lock_session(&session_state), scenario);
+    let _ = refresh_bench(&bench, &build_state, &session, scenario);
+    drop(session);
     let snapshot = service.connect_bench(scenario);
     if snapshot.state == AdapterState::Connected {
         let mut report = lock_session_report(&report_state);
@@ -337,13 +386,19 @@ async fn get_data_library(
 fn load_data_library_now(
     state: State<'_, SharedSessionService>,
     bench: State<'_, SharedBench>,
+    build_state: State<'_, BenchBuild>,
     scenario_state: State<'_, BenchScenario>,
     directory: String,
 ) -> LibrarySnapshot {
     let mut session = lock_session(&state);
     let snapshot = session.load_directory(&directory);
     // A new library means no surveyed vehicle: the bench empties with it.
-    refresh_bench(&bench, &session, bench_scenario(&scenario_state));
+    let _ = refresh_bench(
+        &bench,
+        &build_state,
+        &session,
+        bench_scenario(&scenario_state),
+    );
     snapshot
 }
 
@@ -365,13 +420,19 @@ async fn decode_vin(
 fn survey_vehicle_now(
     state: State<'_, SharedSessionService>,
     bench: State<'_, SharedBench>,
+    build_state: State<'_, BenchBuild>,
     scenario_state: State<'_, BenchScenario>,
     context: VehicleContextInput,
 ) -> VehicleSurveySnapshot {
     let mut session = lock_session(&state);
     let survey = session.survey(&context);
     // The bench follows the session: it answers for the vehicle just described.
-    refresh_bench(&bench, &session, bench_scenario(&scenario_state));
+    let _ = refresh_bench(
+        &bench,
+        &build_state,
+        &session,
+        bench_scenario(&scenario_state),
+    );
     survey
 }
 
@@ -849,6 +910,7 @@ async fn connect_bench(
     session_state: State<'_, SharedSessionService>,
     report_state: State<'_, SharedSessionReportService>,
     bench: State<'_, SharedBench>,
+    build_state: State<'_, BenchBuild>,
     scenario_state: State<'_, BenchScenario>,
     scenario: Option<u32>,
 ) -> Result<AdapterSnapshot, String> {
@@ -857,6 +919,7 @@ async fn connect_bench(
         session_state,
         report_state,
         bench,
+        build_state,
         scenario_state,
         scenario,
     ))
@@ -886,12 +949,14 @@ async fn read_calibration_identification(
 async fn load_data_library(
     state: State<'_, SharedSessionService>,
     bench: State<'_, SharedBench>,
+    build_state: State<'_, BenchBuild>,
     scenario_state: State<'_, BenchScenario>,
     directory: String,
 ) -> Result<LibrarySnapshot, String> {
     Ok(load_data_library_now(
         state,
         bench,
+        build_state,
         scenario_state,
         directory,
     ))
@@ -901,10 +966,17 @@ async fn load_data_library(
 async fn survey_vehicle(
     state: State<'_, SharedSessionService>,
     bench: State<'_, SharedBench>,
+    build_state: State<'_, BenchBuild>,
     scenario_state: State<'_, BenchScenario>,
     context: VehicleContextInput,
 ) -> Result<VehicleSurveySnapshot, String> {
-    Ok(survey_vehicle_now(state, bench, scenario_state, context))
+    Ok(survey_vehicle_now(
+        state,
+        bench,
+        build_state,
+        scenario_state,
+        context,
+    ))
 }
 
 #[tauri::command]
@@ -1933,6 +2005,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .manage(bench.clone())
         .manage(BenchScenario(Mutex::new(bench_vehicle::SCENARIO_DEFAULT)))
+        .manage(BenchBuild(Mutex::new(None)))
         .manage(shared_service(bench))
         .manage(Mutex::new(DiagnosticService::new()))
         .manage(Mutex::new(SessionService::new()))

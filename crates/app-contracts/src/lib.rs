@@ -55,6 +55,11 @@ pub enum AdapterErrorCode {
     /// The session already holds records of the other kind (bench or real);
     /// start a new session before switching (ADR-0020).
     SessionModeMismatch,
+    /// The session is busy with the work the bench would be built from - the
+    /// module survey - so the bench cannot be built now. Answered at once
+    /// rather than waited out: waiting held the adapter with it, and the
+    /// panel stood empty for the length of the survey (2026-09-18).
+    SessionBusy,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]

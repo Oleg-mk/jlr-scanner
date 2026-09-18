@@ -43,6 +43,8 @@ pub enum BackendFailure {
     Disconnect(String),
     /// The session holds records of the other kind; a new session comes first.
     SessionMode(String),
+    /// The session is busy with the survey the bench is built from.
+    SessionBusy(String),
 }
 
 pub trait AdapterBackend {
@@ -555,6 +557,18 @@ impl<B: AdapterBackend> AdapterService<B> {
         self.snapshot()
     }
 
+    /// Refuse a bench connection while the session is busy with the survey
+    /// the bench would be built from. Answered at once and with a reason:
+    /// waiting for that survey held the adapter service with it, so the
+    /// panel showed nothing but its empty state for as long as the survey
+    /// ran (the owner, 2026-09-18).
+    pub fn refuse_bench_while_busy(&mut self) -> AdapterSnapshot {
+        self.error = Some(user_error(BackendFailure::SessionBusy(
+            "the module survey is still running; it is what the bench answers for".to_owned(),
+        )));
+        self.snapshot()
+    }
+
     /// Forget a refused switch once a new session has made it moot.
     pub fn clear_session_error(&mut self) {
         if self
@@ -847,6 +861,12 @@ fn user_error(failure: BackendFailure) -> UserFacingError {
         BackendFailure::SessionMode(details) => UserFacingError {
             code: AdapterErrorCode::SessionModeMismatch,
             message: "Start a new session before switching between the bench and an adapter"
+                .to_owned(),
+            technical_details: Some(details),
+        },
+        BackendFailure::SessionBusy(details) => UserFacingError {
+            code: AdapterErrorCode::SessionBusy,
+            message: "The modules are being surveyed; the bench is built from what that finds"
                 .to_owned(),
             technical_details: Some(details),
         },

@@ -350,9 +350,30 @@ impl DiagnosticEnvironmentResolver {
             effective_target.diagnostic_implementation =
                 query.vehicle_context.diagnostic_implementation.clone();
         }
-        let result = store.query(
-            &KnowledgeQuery::for_vehicle(query.vehicle_context.clone()).include_indeterminate(true),
-        );
+        /*
+         * Ask the store for what this target could be related to rather than
+         * for everything. `record_is_related` below is unchanged and still
+         * decides: what is named here is exactly the three ways it says yes -
+         * the module, the implementation, and the entity - so the store
+         * returns the same records and copies far fewer on the way.
+         *
+         * A resolution used to read the whole store, and a survey resolves
+         * two or three capabilities per module: on the owner's own library,
+         * half a million records read some eighty times over for one car
+         * (2026-09-18).
+         */
+        let mut narrowed =
+            KnowledgeQuery::for_vehicle(query.vehicle_context.clone()).include_indeterminate(true);
+        if let Some(family) = &effective_target.ecu_family {
+            narrowed = narrowed.with_ecu_family(family.as_str());
+        }
+        if let Some(implementation) = &effective_target.diagnostic_implementation {
+            narrowed = narrowed.with_diagnostic_implementation(implementation.as_str());
+        }
+        if let Some(entity) = &effective_target.knowledge_entity {
+            narrowed = narrowed.with_entity(entity.clone());
+        }
+        let result = store.query(&narrowed);
         let related: Vec<_> = result
             .records
             .into_iter()
