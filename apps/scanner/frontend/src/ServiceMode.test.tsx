@@ -302,7 +302,9 @@ describe("the service mode (ADR-0036)", () => {
     fireEvent.click(await screen.findByRole("button", { name: "PCM: Reachable" }));
     await screen.findByRole("heading", { name: "PCM" });
     fireEvent.click(screen.getByRole("button", { name: "Read" }));
-    expect(await screen.findByText("P0300")).toBeVisible();
+    // The code is on screen twice now, on purpose: in the list of what the
+    // check found and in the module's own panel (2026-09-18).
+    expect((await screen.findAllByText("P0300")).length).toBeGreaterThan(0);
     expect(screen.queryByRole("button", { name: "Clear the fault codes" })).toBeNull();
 
     // The mode goes on: the clear appears under the codes.

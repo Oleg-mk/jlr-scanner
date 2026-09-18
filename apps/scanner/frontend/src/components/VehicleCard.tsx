@@ -66,32 +66,52 @@ export function VehicleCard({
   const hasCatalogue = catalogue.programmes.length > 0;
   const marker = programme?.markers.find((entry) => entry.marker === vehicle.yearBreakpoint);
 
+  /*
+   * The programme is chosen first and everything under it depends on it, so
+   * it keeps the top line of the right-hand half with the button that acts on
+   * the whole form beside it — the shape the VIN row on the left already has
+   * (the owner, 2026-09-18: "зроби праву половину аналогічну лівій").
+   */
+  const programmeField = hasCatalogue ? (
+    <label className="field">
+      <span>{t("Programme")}</span>
+      <select
+        name="vehicleProgram"
+        value={vehicle.vehicleProgram}
+        onChange={(event) =>
+          onVehicleChange({
+            ...vehicle,
+            vehicleProgram: event.target.value,
+            yearBreakpoint: null,
+            modelYear: null,
+            powertrain: null,
+            variant: null,
+          })
+        }
+      >
+        <option value="">{t("Choose a programme")}</option>
+        {catalogue.programmes.map((entry) => (
+          <option key={entry.program} value={entry.program}>
+            {entry.program}
+          </option>
+        ))}
+      </select>
+    </label>
+  ) : (
+    <label className="field">
+      <span>{t("Programme")}</span>
+      <input
+        type="text"
+        name="vehicleProgram"
+        value={vehicle.vehicleProgram}
+        placeholder="X250"
+        onChange={(event) => onVehicleChange({ ...vehicle, vehicleProgram: event.target.value })}
+      />
+    </label>
+  );
+
   const fields = hasCatalogue ? (
     <>
-      <label className="field">
-        <span>{t("Programme")}</span>
-        <select
-          name="vehicleProgram"
-          value={vehicle.vehicleProgram}
-          onChange={(event) =>
-            onVehicleChange({
-              ...vehicle,
-              vehicleProgram: event.target.value,
-              yearBreakpoint: null,
-              modelYear: null,
-              powertrain: null,
-              variant: null,
-            })
-          }
-        >
-          <option value="">{t("Choose a programme")}</option>
-          {catalogue.programmes.map((entry) => (
-            <option key={entry.program} value={entry.program}>
-              {entry.program}
-            </option>
-          ))}
-        </select>
-      </label>
       <label className="field">
         <span>{t("Model years")}</span>
         <select
@@ -156,16 +176,6 @@ export function VehicleCard({
     </>
   ) : (
     <>
-      <label className="field">
-        <span>{t("Programme")}</span>
-        <input
-          type="text"
-          name="vehicleProgram"
-          value={vehicle.vehicleProgram}
-          placeholder="X250"
-          onChange={(event) => onVehicleChange({ ...vehicle, vehicleProgram: event.target.value })}
-        />
-      </label>
       <label className="field">
         <span>{t("Model year")}</span>
         <input
@@ -280,7 +290,7 @@ export function VehicleCard({
       ) : null}
       </div>
       <div className="vehicle-column vehicle-column--describe">
-      <div className="field-stack">{fields}</div>
+      {programmeField}
       <button
         className="button button--primary"
         type="button"
@@ -289,6 +299,7 @@ export function VehicleCard({
       >
         {busy ? t("Working…") : t("Survey modules")}
       </button>
+      <div className="field-stack">{fields}</div>
       {busy ? (
         <p className="library-status" role="status">
           {t("Reading the modules…")} {elapsed}&nbsp;{t("sec")}

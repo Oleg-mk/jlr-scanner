@@ -80,6 +80,38 @@ class BenchAdapterClient implements AdapterClient {
   }
 }
 
+/**
+ * A bench that takes its time. Building the virtual vehicle reads the
+ * library once per surveyed module, so on a full car it is not instant, and
+ * what the person sees while it happens is the whole of this test.
+ */
+class HeldBenchClient implements AdapterClient {
+  private release: (() => void) | null = null;
+
+  getState(): Promise<AdapterSnapshot> {
+    return Promise.resolve(createEmptySnapshot());
+  }
+  discover() {
+    return this.getState();
+  }
+  connect() {
+    return this.getState();
+  }
+  connectBench(): Promise<AdapterSnapshot> {
+    return new Promise((resolve) => {
+      this.release = () => resolve(createBenchSnapshot(1));
+    });
+  }
+  disconnect() {
+    return this.getState();
+  }
+  /** Let the bench finish building at last. */
+  finish() {
+    this.release?.();
+    this.release = null;
+  }
+}
+
 class FixedReportClient implements SessionReportClient {
   constructor(private readonly state: SessionReportSnapshot) {}
   getState() {
@@ -109,7 +141,10 @@ describe("the bench (ADR-0020)", () => {
     // what the screen shows depends on it.
     expect(client.scenario).toBe(1);
     expect(screen.queryByText(/BENCH ·/)).toBeNull();
-    expect(screen.getByText("Bench: virtual vehicle")).toBeInTheDocument();
+    // One word and a colour: a badge names the thing and the dot carries the
+    // state, so that the header keeps the same geometry in every language
+    // (2026-09-18).
+    expect(screen.getAllByText("Bench").length).toBeGreaterThan(0);
     expect(screen.getByLabelText("Scenario 1")).toHaveTextContent("1");
     expect(screen.getByText("Virtual vehicle (bench)")).toBeInTheDocument();
     expect(
@@ -119,6 +154,55 @@ describe("the bench (ADR-0020)", () => {
     fireEvent.click(screen.getByRole("button", { name: "Disconnect" }));
     await waitFor(() => expect(container.querySelector(".app-shell--bench")).toBeNull());
     expect(screen.getByText("Adapter not detected")).toBeInTheDocument();
+  });
+
+  it("says what it is connecting and counts the seconds while it does", async () => {
+    /*
+     * The card used to fall through to the empty state while a connection
+     * was being made: a button reading "detect adapter" and nothing else,
+     * for as long as the build took. The owner sat in front of it for
+     * minutes and took the application for hung (2026-09-18). It now names
+     * what is being connected and counts the seconds, as the library load
+     * and the module survey already do.
+     */
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      const client = new HeldBenchClient();
+      const { container } = render(<App client={client} pollIntervalMs={100_000} />);
+      fireEvent.click(
+        await screen.findByRole("button", { name: "Connect the bench (virtual vehicle)" }),
+      );
+
+      await waitFor(() =>
+        expect(container.querySelector(".adapter-panel .library-status")).not.toBeNull(),
+      );
+      const status = container.querySelector(".adapter-panel .library-status");
+      expect(status?.textContent).toMatch(/Connecting the bench…\s*\d+\s*sec/);
+      // The button that does nothing new is not what a person waits in front of.
+      expect(screen.queryByRole("button", { name: "Detect adapter" })).toBeNull();
+      // And the badge in the header says the same rather than "no adapter".
+      // The badge in the header names the state in as few words as it can,
+      // so that the row keeps one geometry in every language (2026-09-18);
+      // which of the two is being connected is on the card.
+      expect(container.querySelector(".app-header .status-badge")?.textContent).toMatch(
+        /Connecting…/,
+      );
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(3_000);
+      });
+      const moved = container.querySelector(".adapter-panel .library-status");
+      expect(moved?.textContent).toMatch(/Connecting the bench…\s*[1-9]\d*\s*sec/);
+
+      // Built at last: the ordinary bench panel, and no counter left running.
+      await act(async () => {
+        client.finish();
+      });
+      await waitFor(() => expect(screen.getByText("Virtual vehicle (bench)")).toBeInTheDocument());
+      expect(container.querySelector(".adapter-panel .library-status")).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("names a failed bench call as the bench's failure, and offers the bench again", async () => {

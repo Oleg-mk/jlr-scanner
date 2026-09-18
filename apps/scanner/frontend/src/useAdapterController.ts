@@ -40,12 +40,21 @@ function benchFailure(snapshot: AdapterSnapshot, error: unknown): AdapterSnapsho
   };
 }
 
+/**
+ * What the person asked for and is waiting on. The panel says which of the
+ * two is happening: waiting in front of a button labelled "detect adapter"
+ * while the bench is in fact being built tells nobody anything (the owner,
+ * 2026-09-18).
+ */
+export type AdapterPending = "adapter" | "bench" | null;
+
 export function useAdapterController(
   client: AdapterClient,
   pollIntervalMs = DEFAULT_POLL_INTERVAL_MS,
 ) {
   const [snapshot, setSnapshot] = useState<AdapterSnapshot>(createEmptySnapshot);
   const [selectedPort, setSelectedPort] = useState<string | null>(null);
+  const [pending, setPending] = useState<AdapterPending>(null);
   const snapshotRef = useRef(snapshot);
   /**
    * The background poll and what the person asks for used to share one
@@ -106,6 +115,7 @@ export function useAdapterController(
   const connect = useCallback(async () => {
     if (actionInFlight.current) return;
     actionInFlight.current = true;
+    setPending("adapter");
     answer.current += 1;
     setSnapshot((current) => ({
       ...current,
@@ -119,12 +129,14 @@ export function useAdapterController(
       setSnapshot((current) => frontendFailure(current, error));
     } finally {
       actionInFlight.current = false;
+      setPending(null);
     }
   }, [client, selectedPort]);
 
   const connectBench = useCallback(async (scenario: number) => {
     if (actionInFlight.current) return;
     actionInFlight.current = true;
+    setPending("bench");
     answer.current += 1;
     setSnapshot((current) => ({
       ...current,
@@ -138,6 +150,7 @@ export function useAdapterController(
       setSnapshot((current) => benchFailure(current, error));
     } finally {
       actionInFlight.current = false;
+      setPending(null);
     }
   }, [client]);
 
@@ -174,6 +187,7 @@ export function useAdapterController(
 
   return {
     snapshot,
+    pending,
     selectedPort,
     setSelectedPort,
     refresh,

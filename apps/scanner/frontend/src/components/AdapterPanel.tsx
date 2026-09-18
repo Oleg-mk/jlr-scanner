@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { t, useLanguage } from "../i18n";
 import {
   BENCH_SCENARIO_DEFAULT,
@@ -6,6 +6,7 @@ import {
   type AdapterSnapshot,
   type UserFacingError,
 } from "../adapter";
+import type { AdapterPending } from "../useAdapterController";
 import { StatusBadge } from "./StatusBadge";
 
 interface AdapterPanelProps {
@@ -17,6 +18,15 @@ interface AdapterPanelProps {
   onDisconnect: () => void;
   /** The bench (ADR-0020): a virtual vehicle from the library, no adapter and no car. */
   onConnectBench: (scenario: number) => void;
+  /** Which of the two the person is waiting on, while they are waiting. */
+  pending?: AdapterPending;
+  /**
+   * The modules are being surveyed. The bench is built from what that survey
+   * finds, so it cannot be connected until the survey is done; the button
+   * says so rather than standing there and taking minutes (the owner,
+   * 2026-09-18).
+   */
+  surveying?: boolean;
 }
 
 function hexId(value: number) {
@@ -38,7 +48,13 @@ function ErrorBanner({ error, hint }: { error: UserFacingError; hint: string | n
   );
 }
 
-function BenchOffer({ onConnectBench }: { onConnectBench: (scenario: number) => void }) {
+function BenchOffer({
+  onConnectBench,
+  surveying,
+}: {
+  onConnectBench: (scenario: number) => void;
+  surveying: boolean;
+}) {
   const [scenario, setScenario] = useState(String(BENCH_SCENARIO_DEFAULT));
   const chosen = Number.parseInt(scenario, 10);
   const valid = Number.isInteger(chosen) && chosen >= 0 && chosen <= 999;
@@ -48,7 +64,7 @@ function BenchOffer({ onConnectBench }: { onConnectBench: (scenario: number) => 
         <button
           className="button button--quiet"
           type="button"
-          disabled={!valid}
+          disabled={!valid || surveying}
           onClick={() => onConnectBench(chosen)}
         >
           {t("Connect the bench (virtual vehicle)")}
@@ -64,6 +80,13 @@ function BenchOffer({ onConnectBench }: { onConnectBench: (scenario: number) => 
           />
         </label>
       </div>
+      {surveying ? (
+        <p className="button-hint">
+          {t(
+            "The modules are being surveyed. The bench answers for what that survey finds, so it waits for it to end.",
+          )}
+        </p>
+      ) : null}
       <p className="button-hint">
         {t(
           "No adapter and no car needed: a virtual vehicle built from the library answers instead. Every value is synthetic.",
@@ -91,8 +114,31 @@ export function AdapterPanel({
   onConnect,
   onDisconnect,
   onConnectBench,
+  pending = null,
+  surveying = false,
 }: AdapterPanelProps) {
   useLanguage();
+  const connecting = snapshot.state === "CONNECTING";
+  /*
+   * The seconds, counted under the thing the person is waiting on, the way
+   * the library load and the module survey already count them. A message
+   * that does not move reads as a hang however honest its words are (the
+   * owner, 2026-09-18).
+   */
+  const [elapsed, setElapsed] = useState(0);
+  useEffect(() => {
+    if (!connecting) {
+      setElapsed(0);
+      return;
+    }
+    const started = Date.now();
+    setElapsed(0);
+    const timer = window.setInterval(
+      () => setElapsed(Math.round((Date.now() - started) / 1000)),
+      1000,
+    );
+    return () => window.clearInterval(timer);
+  }, [connecting]);
   const detected =
     snapshot.adapters.find((adapter) => adapter.port === selectedPort) ??
     snapshot.adapters[0] ??
@@ -107,7 +153,16 @@ export function AdapterPanel({
             <h2 id="adapter-title">{t("Adapter")}</h2>
           </div>
         </div>
-        {snapshot.error !== null ? <ErrorBanner error={snapshot.error} hint={null} /> : null}
+        {snapshot.error !== null ? (
+          <ErrorBanner
+            error={snapshot.error}
+            hint={
+              snapshot.error.code === "SESSION_BUSY"
+                ? t("Wait for the survey to end, then connect the bench again.")
+                : null
+            }
+          />
+        ) : null}
         <div className="adapter-empty">
           <h3>{t("Adapter not detected")}</h3>
           <p>{t("Connect MongoosePro JLR by USB.")}</p>
@@ -127,7 +182,7 @@ export function AdapterPanel({
             {t("Detect adapter")}
           </button>
         </div>
-        <BenchOffer onConnectBench={onConnectBench} />
+        <BenchOffer onConnectBench={onConnectBench} surveying={surveying} />
       </section>
     );
   }
@@ -199,8 +254,45 @@ export function AdapterPanel({
     );
   }
 
-  const connecting = snapshot.state === "CONNECTING";
   const error = snapshot.error;
+
+  /*
+   * While a connection is being made the card says so, and says which one.
+   * It used to fall through to the empty state and show a button reading
+   * "detect adapter" — so building the bench, which on a surveyed car is not
+   * instant, looked like an application waiting to be told to look for
+   * hardware. The owner sat in front of that button for minutes
+   * (2026-09-18).
+   */
+  if (connecting) {
+    const bench = pending === "bench";
+    return (
+      <section className="adapter-panel" aria-labelledby="adapter-title">
+        <div className="section-heading">
+          <div>
+            <p className="eyebrow">{t("Connection")}</p>
+            <h2 id="adapter-title">{t("Adapter")}</h2>
+          </div>
+        </div>
+        <div className="adapter-title-row">
+          <h3>{bench ? t("Virtual vehicle (bench)") : (detected?.name ?? t("Adapter"))}</h3>
+          <StatusBadge tone="pending">{t("Connecting")}</StatusBadge>
+        </div>
+        <p className="library-status" role="status">
+          {bench ? t("Connecting the bench…") : t("Connecting the adapter…")} {elapsed}
+          &nbsp;{t("sec")}
+          <br />
+          <span className="button-hint">
+            {bench
+              ? t(
+                  "The virtual vehicle is being built from the library for the vehicle this session describes. Nothing is sent anywhere.",
+                )
+              : t("Opening the port and asking the board what it is.")}
+          </span>
+        </p>
+      </section>
+    );
+  }
 
   return (
     <section className="adapter-panel" aria-labelledby="adapter-title">
@@ -216,9 +308,11 @@ export function AdapterPanel({
           hint={
             error.code === "SESSION_MODE_MISMATCH"
               ? null
-              : error.code === "BENCH_FAILED"
-                ? t("Try the bench again; it needs no adapter.")
-                : t("Check the USB connection and try again.")
+              : error.code === "SESSION_BUSY"
+                ? t("Wait for the survey to end, then connect the bench again.")
+                : error.code === "BENCH_FAILED"
+                  ? t("Try the bench again; it needs no adapter.")
+                  : t("Check the USB connection and try again.")
           }
         />
       ) : null}
@@ -226,9 +320,7 @@ export function AdapterPanel({
         <>
           <div className="adapter-title-row">
             <h3>{t("{name} detected", { name: detected.name })}</h3>
-            <StatusBadge tone={connecting ? "pending" : "neutral"}>
-              {connecting ? t("Connecting") : detected.port}
-            </StatusBadge>
+            <StatusBadge tone="neutral">{detected.port}</StatusBadge>
           </div>
           {snapshot.selectionRequired ? (
             <label className="adapter-select">
@@ -256,9 +348,9 @@ export function AdapterPanel({
               className="button button--primary"
               type="button"
               onClick={onConnect}
-              disabled={connecting || (snapshot.selectionRequired && selectedPort === null)}
+              disabled={snapshot.selectionRequired && selectedPort === null}
             >
-              {connecting ? t("Connecting…") : t("Connect")}
+              {t("Connect")}
             </button>
             <button className="button button--quiet" type="button" onClick={onDetect}>
               {t("Detect again")}
@@ -270,7 +362,7 @@ export function AdapterPanel({
           {t("Detect adapter")}
         </button>
       )}
-      {connecting ? null : <BenchOffer onConnectBench={onConnectBench} />}
+      <BenchOffer onConnectBench={onConnectBench} surveying={surveying} />
     </section>
   );
 }

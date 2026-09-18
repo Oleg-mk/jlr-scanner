@@ -103,7 +103,7 @@ summary:focus-visible {
 .app-header h1 {
   margin: 0;
   font-size: clamp(1.65rem, 2.5vw, 2.15rem);
-  font-weight: 550;
+  font-weight: 500;
   letter-spacing: -0.025em;
   line-height: 1.1;
 }
@@ -159,7 +159,7 @@ summary:focus-visible {
 .error-banner h3 {
   margin: 0;
   font-size: clamp(1.5rem, 2.6vw, 2rem);
-  font-weight: 520;
+  font-weight: 500;
   letter-spacing: -0.025em;
   line-height: 1.15;
 }
@@ -193,7 +193,7 @@ summary:focus-visible {
   border-radius: 4px;
   padding: 0.25rem 0.7rem;
   font-size: 0.875rem;
-  font-weight: 650;
+  font-weight: 600;
   line-height: 1.2;
   white-space: nowrap;
 }
@@ -266,7 +266,7 @@ summary:focus-visible {
   margin: 1rem 0;
   color: #000000;
   font-size: 0.9rem;
-  font-weight: 650;
+  font-weight: 600;
 }
 
 .adapter-select select {
@@ -295,7 +295,7 @@ summary:focus-visible {
   border-radius: var(--radius);
   padding: 0.65rem 1.15rem;
   font-size: 0.95rem;
-  font-weight: 680;
+  font-weight: 600;
   line-height: 1.2;
   cursor: pointer;
   transition:
@@ -377,7 +377,7 @@ summary:focus-visible {
   color: var(--pending);
   padding: 0.28rem 0.65rem;
   font-size: 0.72rem;
-  font-weight: 720;
+  font-weight: 700;
 }
 
 .demo-banner {
@@ -386,7 +386,7 @@ summary:focus-visible {
   color: #684a0b;
   padding: 0.65rem var(--content-pad);
   font-size: 0.82rem;
-  font-weight: 620;
+  font-weight: 600;
 }
 
 .profile-card {
@@ -401,7 +401,7 @@ summary:focus-visible {
   margin: 0 0 0.45rem;
   color: var(--accent);
   font-size: 0.72rem;
-  font-weight: 760;
+  font-weight: 700;
   letter-spacing: 0.095em;
   line-height: 1.3;
   text-transform: uppercase;
@@ -410,7 +410,7 @@ summary:focus-visible {
 .profile-card h3 {
   margin: 0 0 1.15rem;
   font-size: clamp(1.35rem, 2.3vw, 1.8rem);
-  font-weight: 560;
+  font-weight: 500;
   letter-spacing: -0.02em;
 }
 
@@ -433,7 +433,7 @@ summary:focus-visible {
 .diagnostic-panel .section-heading h2 {
   color: var(--text);
   font-size: clamp(1.3rem, 2.2vw, 1.7rem);
-  font-weight: 580;
+  font-weight: 500;
   letter-spacing: -0.02em;
 }
 
@@ -472,7 +472,7 @@ summary:focus-visible {
   overflow-wrap: anywhere;
   font-family: ui-monospace, "SF Mono", "Cascadia Mono", Consolas, monospace;
   font-size: 1.05rem;
-  font-weight: 620;
+  font-weight: 600;
 }
 
 .diagnostic-actions,
@@ -499,9 +499,8 @@ summary:focus-visible {
   border: 2px solid #77818d;
   border-radius: 50%;
   color: #000000;
-  font-size: 1.35rem;
+  font-size: 1.5rem;
   font-weight: 700;
-  font-family: Georgia, serif;
 }
 
 .vehicle-empty p {
@@ -559,13 +558,16 @@ summary:focus-visible {
   border-radius: var(--radius);
 }
 
+/* One face, one weight, and the emphasis in the size alone: a heading at
+   680 against the 600 of every other heading read as a different typeface
+   (the owner, 2026-09-18). */
 .technical-details summary {
   min-height: 46px;
   padding: 0.75rem 1rem;
   color: #000000;
   cursor: pointer;
-  font-size: 0.92rem;
-  font-weight: 680;
+  font-size: 0.95rem;
+  font-weight: 600;
 }
 
 .technical-details__grid {
@@ -586,7 +588,7 @@ summary:focus-visible {
 .technical-details__grid dt {
   color: var(--muted);
   font-size: 0.78rem;
-  font-weight: 650;
+  font-weight: 600;
 }
 
 .technical-details__grid dd {
@@ -1421,7 +1423,7 @@ summary:focus-visible {
 }
 
 .vin-row input {
-  font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+  font-family: ui-monospace, "SF Mono", "Cascadia Mono", Consolas, monospace;
   letter-spacing: 0.06em;
   text-transform: uppercase;
 }
@@ -1726,7 +1728,7 @@ html {
 .diagnostic-panel .section-heading h2 {
   color: var(--text);
   font-size: 1.05rem;
-  font-weight: 650;
+  font-weight: 600;
   letter-spacing: -0.01em;
   line-height: 1.3;
 }
@@ -1827,7 +1829,7 @@ html {
 
 .flow-section-heading h2 {
   font-size: 1.15rem;
-  font-weight: 650;
+  font-weight: 600;
   letter-spacing: -0.01em;
 }
 
@@ -1881,6 +1883,63 @@ html {
 
 .vehicle-column > .button {
   margin-top: 0.25rem;
+}
+
+/* The right-hand half is built like the left: the field that comes first on
+   the top line, the button that acts on the whole form beside it, and the
+   rest of the fields under it in the same column — so every field ends on
+   one line and the button is not left at the foot of the card (the owner,
+   2026-09-18). The fields no longer run the full width of the half: their
+   longest content is a programme code and a pair of years. */
+.vehicle-column--describe {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  column-gap: 0.5rem;
+  /* The gap between the top line and the fields under it belongs to the
+     grid, not to the button: a margin under the button lifts it off the
+     line it is supposed to stand on (the owner, 2026-09-18). */
+  row-gap: 0.75rem;
+  align-items: end;
+}
+
+.vehicle-column--describe > .field {
+  grid-row: 1;
+  grid-column: 1;
+}
+
+.vehicle-column--describe > .button {
+  grid-row: 1;
+  grid-column: 2;
+  margin: 0;
+}
+
+.vehicle-column--describe > .field-stack {
+  grid-row: 2;
+  grid-column: 1;
+  margin-bottom: 0;
+}
+
+.vehicle-column--describe > .library-status {
+  grid-row: 3;
+  grid-column: 1 / -1;
+}
+
+/* Too narrow to set a button beside a field without crushing the field: the
+   button goes back under the fields, at the foot of its own column. */
+@media (max-width: 1100px) {
+  .vehicle-column--describe {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .vehicle-column--describe > .button {
+    grid-row: 3;
+    grid-column: 1;
+    justify-self: start;
+  }
+
+  .vehicle-column--describe > .library-status {
+    grid-row: 4;
+  }
 }
 
 .survey-stats {
@@ -2362,7 +2421,7 @@ main.flow {
 
 .rail-vehicle-title {
   font-size: 0.95rem;
-  font-weight: 650;
+  font-weight: 600;
 }
 
 .rail-vehicle-detail {
@@ -2672,9 +2731,14 @@ body,
 
 .bench-scenario input {
   width: 4.5rem;
-  padding: 0.35rem 0.5rem;
+  /* The same height as every other control on this row: it stood 30 points
+     against their 36 and read as a different kind of thing (the owner,
+     2026-09-18). */
+  height: var(--control-h);
+  min-height: var(--control-h);
+  padding: 0 0.75rem;
   border: 1px solid var(--border);
-  border-radius: var(--radius);
+  border-radius: 999px;
   background: var(--background);
   color: var(--text);
   font: inherit;
@@ -2705,7 +2769,7 @@ body,
   margin: 0.1rem 0 0;
   color: var(--muted);
   font-size: 0.78rem;
-  font-weight: 560;
+  font-weight: 500;
   letter-spacing: 0.01em;
 }
 
@@ -3392,18 +3456,8 @@ table.live-read-identifiers label {
   background: rgb(255 255 255 / 20%);
 }
 
-/* The bench badge is the one capsule with a colour of its own: the bench's
-   Namib Orange, with the scenario set in a circle on its right. It carries
-   the state the bands used to (the owner, 2026-09-18). */
-.app-shell .app-header .status-badge--bench {
-  border-color: #c8763a;
-  background: #c8763a;
-  color: #fff;
-}
-
-.app-shell .app-header .status-badge--bench .status-badge__dot {
-  background: #fff;
-}
+/* The bench badge's own colour is written at the foot of this sheet, after
+   the capsule rules that would otherwise paint over it. */
 
 .status-badge__mark {
   display: inline-flex;
@@ -3417,7 +3471,7 @@ table.live-read-identifiers label {
   background: #fff;
   color: #8a4a17;
   font-size: 0.85em;
-  font-weight: 800;
+  font-weight: 700;
   font-variant-numeric: tabular-nums;
   line-height: 1;
 }
@@ -3481,6 +3535,7 @@ table.live-read-identifiers label {
 .app-shell .flow-rail select,
 .app-shell .flow-body input[type="text"],
 .app-shell .flow-body input[type="search"],
+.app-shell .flow-body input[type="number"],
 .app-shell .flow-body input:not([type]) {
   border-radius: 999px;
   border: 1px solid var(--ink-hairline);
@@ -3515,9 +3570,12 @@ table.live-read-identifiers label {
   background: rgb(24 34 49 / 13%);
 }
 
-/* A field is the same capsule, sunk a shade into the screen. */
+/* A field is the same capsule, sunk a shade into the screen. A number field
+   was left out of this list and kept the small corner radius, so the bench
+   scenario box sat square among capsules (the owner, 2026-09-18). */
 .app-shell .flow-body input[type="text"],
 .app-shell .flow-body input[type="search"],
+.app-shell .flow-body input[type="number"],
 .app-shell .flow-body input:not([type]),
 .app-shell .field input {
   border-radius: 999px;
@@ -3581,7 +3639,7 @@ table.live-read-identifiers label {
 /* Narrower and lighter: a cut line is thinner than a brush stroke, and the
    sample's lettering is set close. */
 .app-shell .app-header h1 {
-  font-weight: 420;
+  font-weight: 400;
   letter-spacing: -0.012em;
 }
 
@@ -3591,12 +3649,12 @@ table.live-read-identifiers label {
 }
 
 .app-shell .flow-section-heading h2 {
-  font-weight: 450;
+  font-weight: 500;
   letter-spacing: 0.004em;
 }
 
 .app-shell .flow-section-steps {
-  font-weight: 450;
+  font-weight: 500;
   letter-spacing: 0.09em;
 }
 
@@ -3628,7 +3686,7 @@ table.live-read-identifiers label {
 .app-shell .app-header .status-badge,
 .app-shell .flow-section-heading .status-badge {
   color: rgb(var(--milk) / 76%);
-  font-weight: 450;
+  font-weight: 500;
   letter-spacing: 0.012em;
 }
 
@@ -5027,4 +5085,268 @@ table.live-read-identifiers label {
 .clear-outcome-codes {
   margin: 0;
   padding-left: 1.1rem;
+}
+
+/* ===================================================================== */
+/* The bench badge, 2026-09-18.                                            */
+/*                                                                         */
+/* While a virtual vehicle answers, nothing on the screen came from a car,  */
+/* and that is the one thing the eye must catch without being asked. The    */
+/* badge is therefore red and filled, with the scenario in a circle on its  */
+/* right, rather than the glass every other capsule is.                     */
+/*                                                                         */
+/* It is written at the foot of the sheet on purpose. The plate's own       */
+/* capsule rules — the glass, the milled outline, the white hairline — name */
+/* `.app-shell .app-header .status-badge` and carry the same weight as this */
+/* one, so wherever they stand later they win. The colour this badge was    */
+/* given when the red bands were withdrawn sat above them and had been      */
+/* painted over ever since: the bench read as an ordinary capsule, and the  */
+/* owner had no sign he was on it (2026-09-18).                             */
+/* ===================================================================== */
+
+.app-shell .app-header .status-badge--bench,
+.app-shell .flow-section-heading .status-badge--bench {
+  border-color: var(--negative, #b3261e);
+  background: var(--negative, #b3261e);
+  color: #fff;
+  font-weight: 600;
+}
+
+.app-shell .app-header .status-badge--bench .status-badge__dot,
+.app-shell .flow-section-heading .status-badge--bench .status-badge__dot {
+  background: #fff;
+}
+
+.app-shell .app-header .status-badge--bench .status-badge__mark,
+.app-shell .flow-section-heading .status-badge--bench .status-badge__mark {
+  background: #fff;
+  color: var(--negative, #b3261e);
+}
+
+/* ===================================================================== */
+/* The mark that says "this opens", 2026-09-18.                            */
+/*                                                                         */
+/* Every browser draws its own arrow on a select, and on Windows it is a   */
+/* hard little wedge that belongs to no part of this plate. The owner named */
+/* it: "оті стрілки для розгортання, вони візуально страшні". One mark now  */
+/* does the job everywhere a thing opens — a select and a details summary   */
+/* alike: a chevron set in a circle, drawn in the same ink as the hairline  */
+/* round every capsule, so it reads as part of the control rather than as   */
+/* the operating system leaning in.                                         */
+/*                                                                         */
+/* It is written at the foot of the sheet because the capsule rules above   */
+/* set `background` in shorthand, which clears a background image; these    */
+/* selectors carry the same weight as those and stand after them.           */
+/* ===================================================================== */
+
+.app-shell {
+  --chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Ccircle cx='10' cy='10' r='9' fill='%23182231' fill-opacity='0.06' stroke='%23182231' stroke-opacity='0.24'/%3E%3Cpath d='M6.8 8.9 10 12.2 13.2 8.9' fill='none' stroke='%23182231' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  --chevron-quiet: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Ccircle cx='10' cy='10' r='9' fill='none' stroke='%23182231' stroke-opacity='0.12'/%3E%3Cpath d='M6.8 8.9 10 12.2 13.2 8.9' fill='none' stroke='%23182231' stroke-opacity='0.34' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+}
+
+.app-shell select,
+.app-shell .field select,
+.app-shell .adapter-select select,
+.app-shell .flow-body select,
+.app-shell .flow-rail select,
+.app-shell .app-header select {
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: var(--chevron);
+  background-repeat: no-repeat;
+  background-position: right 0.5rem center;
+  background-size: 20px 20px;
+  padding-right: 2.3rem;
+}
+
+/* A hover paints the capsule again in shorthand, which would take the mark
+   off with it. */
+.app-shell .flow-body select:hover,
+.app-shell .flow-rail select:hover,
+.app-shell .app-header select:hover {
+  background-image: var(--chevron);
+  background-repeat: no-repeat;
+  background-position: right 0.5rem center;
+  background-size: 20px 20px;
+}
+
+.app-shell select:disabled,
+.app-shell .field select:disabled,
+.app-shell .flow-body select:disabled,
+.app-shell .flow-rail select:disabled {
+  background-image: var(--chevron-quiet);
+}
+
+/* A summary opens the same way a select does, so it carries the same mark
+   rather than the browser's triangle. The circle turns over when it is open.
+   The WebKit rule is for the macOS build, which draws its own marker. */
+.app-shell summary {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  list-style: none;
+}
+
+.app-shell summary::-webkit-details-marker {
+  display: none;
+}
+
+.app-shell summary::before {
+  content: "";
+  flex: none;
+  width: 18px;
+  height: 18px;
+  background: var(--chevron) center / 18px 18px no-repeat;
+  transition: transform 140ms ease;
+}
+
+.app-shell details[open] > summary::before {
+  transform: rotate(180deg);
+}
+
+/* ===================================================================== */
+/* What the car answered, 2026-09-18.                                      */
+/*                                                                         */
+/* The check reads every reachable module's confirmed fault codes and kept  */
+/* them inside whichever module was clicked, so a check that found two      */
+/* dozen codes and one that found none looked the same. This is the list    */
+/* the check was for, and it sits directly under the map.                   */
+/* ===================================================================== */
+
+.fault-summary {
+  background: var(--surface, #fff);
+  border: 1px solid var(--border, #d9dee5);
+  border-radius: 14px;
+  padding: 1rem 1.25rem 1.25rem;
+  margin-top: 1.25rem;
+}
+
+.fault-summary-module {
+  margin-top: 1rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--border, #d9dee5);
+}
+
+.fault-summary-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.75rem;
+}
+
+.fault-summary-codes {
+  margin: 0.5rem 0 0;
+  padding-left: 1.1rem;
+  line-height: 1.5;
+}
+
+.fault-summary-codes strong {
+  font-family: ui-monospace, "SF Mono", "Cascadia Mono", Consolas, monospace;
+}
+
+/* ===================================================================== */
+/* A header that does not move when the language does, 2026-09-18.         */
+/*                                                                         */
+/* Measured on the owner's window at 1500 points: switching English to     */
+/* Russian moved the left edge of this row 205 points, and at 800 points   */
+/* the row wrapped, the header grew from 36 to 81 tall, everything under   */
+/* it dropped 45 points, and the language switch itself fell to the second */
+/* line — the control the hand had just pressed left the place it was      */
+/* pressed in.                                                             */
+/*                                                                         */
+/* Two things hold it still. The switch is outside the group that wraps,   */
+/* so it keeps the right edge whatever the labels do. And every capsule in */
+/* the row reserves the width of its longest language, so the same         */
+/* geometry is drawn in all three: the text is shorter than the reserved   */
+/* width everywhere, which is what makes them equal.                       */
+/* ===================================================================== */
+
+.header-status {
+  flex-wrap: nowrap;
+}
+
+.header-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.6rem;
+  min-width: 0;
+}
+
+/* The widest of the three languages, in characters of this face, with the
+   capsule's own padding on top. A translation longer than this would push
+   its capsule wider and start the movement again, so a test counts them. */
+.app-shell .app-header .status-badge {
+  /* 207 points is the longest of every state in every language, measured in
+     this face: "Библиотека: встроенная". A little over it, and no more.
+     The root of this sheet is 15 points, so the reservation is in those. */
+  min-width: 14.2rem;
+  justify-content: flex-start;
+  white-space: nowrap;
+}
+
+.app-shell .app-header .header-controls > button {
+  /* 166 points: "Сервисный режим". */
+  min-width: 11.5rem;
+  white-space: nowrap;
+}
+
+/* ===================================================================== */
+/* The two reference sections are spoilers, 2026-09-18.                    */
+/*                                                                         */
+/* What a module declares it can be asked to do, and the self tests it     */
+/* names, are worth having and are not what a person came to the panel     */
+/* for. They were open at all times and pushed the reading off the screen. */
+/* They now sit closed, in the same shape as the exchange above them, and  */
+/* open on a click (the owner, 2026-09-18).                                */
+/* ===================================================================== */
+
+.self-tests,
+.accepted-operations {
+  margin-top: 1rem;
+  padding: 0;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  background: transparent;
+}
+
+.self-tests > summary,
+.accepted-operations > summary {
+  min-height: 46px;
+  padding: 0.75rem 1rem;
+  color: #000000;
+  cursor: pointer;
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+/* What is inside keeps the tint the self tests always had, and both get
+   the same breathing room under the summary. */
+.self-tests > :not(summary),
+.accepted-operations > :not(summary) {
+  margin-left: 1rem;
+  margin-right: 1rem;
+}
+
+.self-tests > :last-child,
+.accepted-operations > :last-child {
+  margin-bottom: 1rem;
+}
+
+.self-tests[open] > summary {
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 0.75rem;
+}
+
+.accepted-operations[open] > summary {
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 0.75rem;
+}
+
+/* The option that modifies "check all modules" sits under the row of
+   actions, on a line of its own (2026-09-18). */
+.network-option {
+  display: inline-flex;
+  margin-top: 0.6rem;
 }

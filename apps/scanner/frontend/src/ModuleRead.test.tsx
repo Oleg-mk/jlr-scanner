@@ -303,8 +303,10 @@ describe("module read", () => {
     expect(client.requests[0].ecuFamily).toBe("BCM");
     expect(client.requests[0].kind).toBe("FAULT_CODES");
     expect(client.requests[0].context.vehicleProgram).toBe("L405");
-    expect(screen.getByText("P0301")).toBeVisible();
-    expect(screen.getByText("Cylinder 1 misfire detected")).toBeVisible();
+    // The code is on screen twice now, on purpose: in the list of what the
+    // check found and in the module's own panel (2026-09-18).
+    expect(screen.getAllByText("P0301").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Cylinder 1 misfire detected").length).toBeGreaterThan(0);
     expect(screen.getByText("BCM on hs-can (UNVERIFIED)")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Save read report" })).toBeEnabled();
   });
@@ -317,7 +319,9 @@ describe("module read", () => {
     fireEvent.click(await screen.findByRole("button", { name: "BCM: Unverified route" }));
     await screen.findByRole("heading", { name: "BCM" });
 
-    expect(screen.getByRole("heading", { name: "Self tests this module declares" })).toBeVisible();
+    const selfTests = screen.getByText("Self tests this module declares");
+    expect(selfTests).toBeVisible();
+    fireEvent.click(selfTests);
     expect(screen.getByText("Synthetic door lock cycle")).toBeVisible();
     // SDD's identifier, the time it states, and the class that keeps it out
     // of this stage, on one line.
@@ -332,7 +336,7 @@ describe("module read", () => {
     fireEvent.click(screen.getByRole("button", { name: "PCM: Reachable" }));
     await screen.findByRole("heading", { name: "PCM" });
     expect(
-      screen.queryByRole("heading", { name: "Self tests this module declares" }),
+      screen.queryByText("Self tests this module declares"),
     ).toBeNull();
   });
 
@@ -349,7 +353,9 @@ describe("module read", () => {
     fireEvent.click(await screen.findByRole("button", { name: "PCM: Reachable" }));
     await screen.findByRole("heading", { name: "PCM" });
 
-    expect(screen.getByRole("heading", { name: "What this module will accept" })).toBeVisible();
+    const accepts = screen.getByText("What this module will accept");
+    expect(accepts).toBeVisible();
+    fireEvent.click(accepts);
     expect(screen.getByText(/sends none of them/)).toBeVisible();
     // The service, the session, the security level, the run time and the
     // class it would cost, on one line each.
@@ -371,7 +377,7 @@ describe("module read", () => {
     // A module that declares none shows no section at all.
     fireEvent.click(screen.getByRole("button", { name: "BCM: Unverified route" }));
     await screen.findByRole("heading", { name: "BCM" });
-    expect(screen.queryByRole("heading", { name: "What this module will accept" })).toBeNull();
+    expect(screen.queryByText("What this module will accept")).toBeNull();
   });
 
   it("says a self test in SDD's own words, Russian to a Ukrainian reader unless told otherwise", async () => {
@@ -382,6 +388,9 @@ describe("module read", () => {
     fireEvent.click(screen.getByRole("button", { name: "Survey modules" }));
     fireEvent.click(await screen.findByRole("button", { name: "BCM: Unverified route" }));
     await screen.findByRole("heading", { name: "BCM" });
+    // The self tests are a spoiler now (2026-09-18): opened once here, and
+    // it stays open while the language changes underneath.
+    fireEvent.click(screen.getByText("Self tests this module declares"));
     expect(screen.getByText("Synthetic screen text, second line.")).toBeVisible();
 
     // The interface's own language picker, the way a reader changes it.
@@ -391,9 +400,7 @@ describe("module read", () => {
     expect(
       await screen.findByText("Синтетический текст экрана, вторая строка."),
     ).toBeVisible();
-    expect(
-      screen.getByRole("heading", { name: "Самотести, які оголошує цей модуль" }),
-    ).toBeVisible();
+    expect(screen.getByText("Самотести, які оголошує цей модуль")).toBeVisible();
     // And English one switch away; Ukrainian is not on offer for SDD's own
     // text — the only Ukrainian mark on screen is the interface's own, which
     // lives on the plate in the header.
@@ -416,7 +423,7 @@ describe("module read", () => {
     fireEvent.change(screen.getByLabelText("Operation"), { target: { value: "IDENTIFIER" } });
     const read = screen.getByRole("button", { name: "Read" });
     expect(read).toBeDisabled();
-    fireEvent.change(screen.getByLabelText("Identifier"), { target: { value: "0x1945" } });
+    fireEvent.change(screen.getByLabelText("Which value"), { target: { value: "0x1945" } });
     expect(read).toBeEnabled();
     fireEvent.click(read);
     await screen.findByRole("button", { name: "PCM: Answered" });

@@ -1,4 +1,4 @@
-import { act, render, renderHook, screen } from "@testing-library/react";
+import { act, fireEvent, render, renderHook, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { PassportPanel } from "./components/PassportPanel";
 import { LANGUAGE_STORAGE_KEY, passportLabel, setCurrentLanguage } from "./i18n";
@@ -72,6 +72,15 @@ class ScriptedClient implements PassportClient {
   }
 }
 
+/**
+ * A passport read of a whole car is dozens of rows per module. It is on
+ * screen when the read arrives and goes away on one button (the owner,
+ * 2026-09-18).
+ */
+function putThePassportsAway() {
+  fireEvent.click(screen.getByRole("button", { name: "Put the passports away" }));
+}
+
 describe("the module passport", () => {
   afterEach(() => {
     setCurrentLanguage("en");
@@ -139,7 +148,8 @@ describe("the module passport", () => {
       />,
     );
 
-    // One table per module, the module named as its heading.
+    // One table per module, the module named as its heading, on screen as
+    // soon as the read is in.
     expect(screen.getByRole("heading", { name: "PCM" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "ABS" })).toBeInTheDocument();
     // Our label, SDD's name beneath it, the text as held.
@@ -156,6 +166,11 @@ describe("the module passport", () => {
     for (const verdict of [/outdated/i, /obsolete/i, /wrong part/i, /застаріл/i]) {
       expect(document.body.textContent).not.toMatch(verdict);
     }
+    // And one button puts the whole lot away again; the count of what was
+    // read stays, because that is the answer to "did it work".
+    putThePassportsAway();
+    expect(screen.queryByRole("heading", { name: "PCM" })).toBeNull();
+    expect(screen.getByText(/4 of 4 identifier reads over 2 modules, 3 answered/)).toBeInTheDocument();
   });
 
   it("sets each number against JLR's catalogue in four states and calls none of them a fault", () => {

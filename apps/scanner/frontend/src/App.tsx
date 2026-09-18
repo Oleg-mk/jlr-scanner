@@ -33,6 +33,7 @@ import { CcfPanel } from "./components/CcfPanel";
 import { StandardObdPanel } from "./components/StandardObdPanel";
 import { LibraryPanel } from "./components/LibraryPanel";
 import { hasTauriRuntime } from "./files";
+import { FaultSummary } from "./components/FaultSummary";
 import { ModuleDetails } from "./components/ModuleDetails";
 import { NetworkMap } from "./components/NetworkMap";
 import { ReportPanel } from "./components/ReportPanel";
@@ -369,30 +370,39 @@ export function App({
       tone="bench"
       mark={{ value: benchScenario, label: t("Scenario {scenario}", { scenario: benchScenario }) }}
     >
-      {t("Bench: virtual vehicle")}
+      {t("Bench")}
     </StatusBadge>
   ) : controller.snapshot.state === "CONNECTED" && adapterReady ? (
       <StatusBadge tone="positive">{t("Adapter ready")}</StatusBadge>
     ) : controller.snapshot.state === "CONNECTED" ? (
-      <StatusBadge tone="pending">{t("Adapter connected, board unverified")}</StatusBadge>
+      <StatusBadge tone="pending">{t("Board unverified")}</StatusBadge>
     ) : controller.snapshot.state === "ADAPTER_DETECTED" ? (
-      <StatusBadge tone="pending">{t("Adapter found, not connected")}</StatusBadge>
+      <StatusBadge tone="pending">{t("Adapter found")}</StatusBadge>
+    ) : controller.snapshot.state === "CONNECTING" ? (
+      // Without this the badge fell through to the grey "no adapter" while a
+      // connection was being made, so nothing at the top changed when the
+      // person acted (the owner, 2026-09-18).
+      <StatusBadge tone="pending">{t("Connecting…")}</StatusBadge>
     ) : controller.snapshot.state === "ERROR" ? (
       <StatusBadge tone="negative">{t("Adapter error")}</StatusBadge>
     ) : (
       <StatusBadge tone="neutral">{t("No adapter")}</StatusBadge>
     );
+  /*
+   * The badges name the thing and let the dot carry the state. They used to
+   * carry whole sentences, and a sentence is a different length in every
+   * language: switching to Russian moved the left edge of this row by 205
+   * points, 141 of them from the library badge alone (measured 2026-09-18).
+   * What the sentence said is said in full by the panel underneath, which is
+   * where a person goes for the detail anyway.
+   */
   const libraryPill =
     library.library.state === "LOADED" || library.library.state === "PARTIALLY_LOADED" ? (
-      <StatusBadge tone="positive">
-        {t("Library: {records} records", {
-          records: library.library.records.toLocaleString(language === "uk" ? "uk-UA" : "en-GB"),
-        })}
-      </StatusBadge>
+      <StatusBadge tone="positive">{t("Library")}</StatusBadge>
     ) : library.library.state === "FAILED" ? (
-      <StatusBadge tone="negative">{t("Library failed to load")}</StatusBadge>
+      <StatusBadge tone="negative">{t("Library: failed")}</StatusBadge>
     ) : (
-      <StatusBadge tone="neutral">{t("Library: built-in only")}</StatusBadge>
+      <StatusBadge tone="neutral">{t("Library: built-in")}</StatusBadge>
     );
 
   return (
@@ -407,6 +417,10 @@ export function App({
           {demoPreview ? <span className="demo-badge">{t("Simulator UI preview")}</span> : null}
         </div>
         <div className="header-status">
+          {/* Everything but the language switch wraps inside this group, so
+              the switch keeps its place at the right edge whatever the
+              language does to the labels (the owner, 2026-09-18). */}
+          <div className="header-controls">
           <BatteryCard
             snapshot={battery.snapshot}
             busy={battery.busy}
@@ -442,6 +456,7 @@ export function App({
           {/* Three marks milled into one plate, and a disc of glass that
               slides to the one in use — the operating system's own list has
               no place on an instrument (2026-09-13). */}
+          </div>
           <div
             className="language-switch"
             role="group"
@@ -536,6 +551,8 @@ export function App({
                   <div className="flow-two-up">
                     <AdapterPanel
                       snapshot={controller.snapshot}
+                      pending={controller.pending}
+                      surveying={library.surveying}
                       selectedPort={controller.selectedPort}
                       onSelectPort={controller.setSelectedPort}
                       onDetect={() => void controller.refresh()}
@@ -615,6 +632,15 @@ export function App({
                       ccfBusy={ccf.busy}
                       onReadCcf={() => void ccf.start()}
                       onStopCcf={() => void ccf.stop()}
+                    />
+                    {/* What the check found, in one place: the codes used to
+                        live only inside whichever module was clicked, so a
+                        check that found two dozen looked like one that found
+                        none (the owner, 2026-09-18). */}
+                    <FaultSummary
+                      results={results}
+                      modules={surveyModules}
+                      onSelect={selectModule}
                     />
                     <ModuleDetails
                       module={selected}

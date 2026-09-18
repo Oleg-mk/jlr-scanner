@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it } from "vitest";
 import { App } from "./App";
 import { createEmptySnapshot, type AdapterClient, type AdapterSnapshot } from "./adapter";
@@ -203,7 +203,12 @@ describe("data library and module survey", () => {
     fireEvent.click(surveyButton);
 
     expect(
-      await screen.findByText(/2 modules known: 1 reachable over the adapter, 1 not/),
+      // The sentence is the interface's now, built from the counts the shell
+      // sends, so that a Ukrainian or Russian screen has no English line in
+      // the middle of it (2026-09-18).
+      await screen.findByText(
+        /2 modules known: 1 reachable over the adapter, 0 on an unverified route, 1 not reachable\./,
+      ),
     ).toBeVisible();
     expect(client.surveyedVehicle).toEqual({
       vehicleProgram: "SYNTHA",
@@ -235,6 +240,51 @@ describe("data library and module survey", () => {
     ).toBeGreaterThan(0);
     expect(screen.getByRole("button", { name: "Read" })).toBeDisabled();
   });
+  it("keeps the bench out of reach while the survey it is built from is running", async () => {
+    /*
+     * The bench answers for the vehicle the survey describes, so it is built
+     * from what the survey finds and cannot be built while that is still
+     * being found. Asking for it anyway used to wait for the session the
+     * survey holds — and the wait held the adapter with it, so the whole
+     * connection card sat on its empty state for minutes (the owner,
+     * 2026-09-18). The button now says why it is not available.
+     */
+    class HeldSurveyClient extends ControlledLibraryClient {
+      release: (() => void) | null = null;
+      override surveyVehicle(vehicle: VehicleDescription): Promise<VehicleSurveySnapshot> {
+        this.surveyedVehicle = vehicle;
+        return new Promise((resolve) => {
+          this.release = () => resolve(surveyOf(vehicle));
+        });
+      }
+    }
+    const client = new HeldSurveyClient();
+    renderApp(client);
+    await screen.findByText("Built-in data only.");
+    const benchName = "Connect the bench (virtual vehicle)";
+    expect(screen.getByRole("button", { name: benchName })).toBeEnabled();
+
+    fireEvent.change(screen.getByLabelText("Programme"), { target: { value: "SYNTHA" } });
+    fireEvent.change(screen.getByLabelText("Model year"), { target: { value: "2010" } });
+    fireEvent.change(screen.getByLabelText("SDD breakpoint marker"), {
+      target: { value: "MY10" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Survey modules" }));
+
+    await waitFor(() => expect(screen.getByRole("button", { name: benchName })).toBeDisabled());
+    expect(
+      screen.getByText(
+        "The modules are being surveyed. The bench answers for what that survey finds, so it waits for it to end.",
+      ),
+    ).toBeVisible();
+
+    // The survey ends, and the bench is on offer again.
+    await act(async () => {
+      client.release?.();
+    });
+    await waitFor(() => expect(screen.getByRole("button", { name: benchName })).toBeEnabled());
+  });
+
   it("offers the vehicle as a list once the library describes programmes", async () => {
     class CataloguedLibraryClient extends ControlledLibraryClient {
       getCatalogue(): Promise<VehicleCatalogueSnapshot> {

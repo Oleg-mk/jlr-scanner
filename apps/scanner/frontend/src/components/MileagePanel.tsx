@@ -1,3 +1,4 @@
+import { useReadOpen } from "../useReadOpen";
 import { parameterNote, t, useLanguage } from "../i18n";
 import { parameterName } from "../parameterNames";
 import type { MileageReading, MileageSurveySnapshot } from "../mileage";
@@ -58,6 +59,9 @@ export function MileagePanel({
   useLanguage();
   const current = snapshot.readings.filter((row) => row.kind === "CURRENT");
   const events = snapshot.readings.filter((row) => row.kind === "EVENT");
+  const modules = new Set(snapshot.readings.map((row) => row.ecuFamily)).size;
+  // Shown when the read arrives, away on one button, like the passports.
+  const [open, setOpen] = useReadOpen(snapshot.readings.length);
 
   const rows = (list: MileageReading[]) =>
     list.map((row) => (
@@ -96,6 +100,18 @@ export function MileagePanel({
           <p className="eyebrow">{t("Mileage")}</p>
           <h2 id="mileage-title">{t("What every module says about the distance")}</h2>
         </div>
+        {snapshot.readings.length > 0 ? (
+          <button
+            className="button button--quiet"
+            type="button"
+            aria-expanded={open}
+            onClick={() => setOpen((shown) => !shown)}
+          >
+            {open
+              ? t("Put the readings away")
+              : t("Show the readings of {modules} module(s)", { modules })}
+          </button>
+        ) : null}
         {badge(snapshot, running, bench)}
       </div>
       <p className="operation-copy">
@@ -127,7 +143,7 @@ export function MileagePanel({
         </div>
       ) : null}
 
-      {snapshot.highest !== null ? (
+      {open && snapshot.highest !== null ? (
         <p className="mileage-highest">
           {t("The highest reading on this car: {value} {unit}, from {module}", {
             value: grouped(snapshot.highest),
@@ -137,7 +153,7 @@ export function MileagePanel({
         </p>
       ) : null}
 
-      {current.length > 0 ? (
+      {open && current.length > 0 ? (
         <table className="module-table">
           <thead>
             <tr>
@@ -173,7 +189,7 @@ export function MileagePanel({
         </>
       ) : null}
 
-      {snapshot.readings.length > 0 ? (
+      {open && snapshot.readings.length > 0 ? (
         <p className="button-hint mileage-caveat">
           {t(
             "Modules disagree for honest reasons too: a replaced cluster, a gearbox or an airbag module fitted after a repair all carry their own count. These are readings, not a conclusion.",

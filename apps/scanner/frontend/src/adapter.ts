@@ -23,6 +23,8 @@ export type AdapterErrorCode =
   | "DISCOVERY_FAILED"
   | "DISCONNECT_FAILED"
   | "SESSION_MODE_MISMATCH"
+  // The module survey is running, and it is what the bench is built from.
+  | "SESSION_BUSY"
   // The interface's own: the call to connect the bench failed before the shell answered.
   | "BENCH_FAILED";
 

@@ -230,26 +230,33 @@ export function ModuleDetails({
                   <>
                     <option value="FAULT_CODES">{t("Fault memory")}</option>
                     {module.protocol === "DS2" ? (
-                      <option value="IDENTIFIER">{t("Identification")}</option>
+                      <option value="IDENTIFIER">{t("What the module says it is")}</option>
                     ) : null}
                   </>
                 ) : (
                   <>
                     <option value="FAULT_CODES">{t("Confirmed fault codes")}</option>
-                    <option value="IDENTIFIER">{t("Identifier")}</option>
+                    {/*
+                      "Identifier" named the address and not the thing at it,
+                      so the closed list said nothing about what the operation
+                      would bring back (the owner, 2026-09-18: "хочеться
+                      зрозуміти що ми ідентифікуємо"). The option now says
+                      what you get; the number is in the list under it.
+                    */}
+                    <option value="IDENTIFIER">{t("One value the module holds")}</option>
                   </>
                 )}
               </select>
             </label>
             {kind === "IDENTIFIER" && !serial ? (
               <label className="field">
-                <span>{t("Identifier")}</span>
+                <span>{t("Which value")}</span>
                 <select
                   name="readIdentifier"
                   value={identifier}
                   onChange={(event) => onIdentifierChange(event.target.value)}
                 >
-                  <option value="">{t("Choose an identifier")}</option>
+                  <option value="">{t("Choose a value")}</option>
                   {module.readableIdentifiers.map((entry) => (
                     <option key={entry.identifier} value={entry.identifier}>
                       {entry.identifier} — {entry.parameters.map(parameterName).join(", ")}
@@ -491,8 +498,8 @@ export function ModuleDetails({
           asked to do stands after what was actually read, so the read
           button keeps its place beside the identifier that feeds it. */}
           {module.selfTests.length > 0 ? (
-            <div className="self-tests">
-              <h3>{t("Self tests this module declares")}</h3>
+            <details className="self-tests">
+              <summary>{t("Self tests this module declares")}</summary>
               <p className="module-validation">
                 {t(
                   "SDD can command these; this application does not. A self test is a routine, not a read, and routines belong to a later stage with their own safety rules. The list is here because knowing what a module can be asked to do is worth having.",
@@ -530,11 +537,11 @@ export function ModuleDetails({
                   </li>
                 ))}
               </ul>
-            </div>
+            </details>
           ) : null}
           {(module.acceptedOperations ?? []).length > 0 ? (
-            <div className="accepted-operations">
-              <h3>{t("What this module will accept")}</h3>
+            <details className="accepted-operations">
+              <summary>{t("What this module will accept")}</summary>
               <p className="module-validation">
                 {t(
                   "SDD declares these; this application sends none of them. A value written into a module, an output driven by hand and a routine the module runs are three different kinds of change, and each belongs to a later stage with its own safety rules. The list is here because the cost of an operation is worth knowing long before anyone decides whether to allow it.",
@@ -571,7 +578,7 @@ export function ModuleDetails({
                   </li>
                 ))}
               </ul>
-            </div>
+            </details>
           ) : null}
     </section>
   );

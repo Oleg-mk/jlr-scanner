@@ -3,6 +3,32 @@ import type { ModuleSurveyEntry, VehicleSurveySnapshot } from "../library";
 import type { ModuleReadSnapshot } from "../moduleRead";
 import { lanes, nodeStatus, type NodeState } from "../networkMap";
 
+/**
+ * The one line under the map, in the reader's own language.
+ *
+ * The shell built this sentence in English and the interface printed it as
+ * it came, so a Ukrainian or Russian screen carried one English line in the
+ * middle of it (the owner, 2026-09-18). The counts are the shell's; the
+ * sentence is the interface's.
+ */
+function surveyCount(survey: VehicleSurveySnapshot): string {
+  // Nothing found is its own sentence, and it says what to check.
+  if (survey.modules.length === 0) {
+    return t(
+      "No modules are known for this vehicle in the loaded data. Check the programme name and the SDD breakpoint marker, and that a library is loaded.",
+    );
+  }
+  return t(
+    "{known} modules known: {reachable} reachable over the adapter, {hypothesis} on an unverified route, {unreachable} not reachable.",
+    {
+      known: survey.modules.length,
+      reachable: survey.reachable,
+      hypothesis: survey.hypothesis,
+      unreachable: survey.unreachable,
+    },
+  );
+}
+
 interface NetworkMapProps {
   survey: VehicleSurveySnapshot | null;
   results: Record<string, ModuleReadSnapshot>;
@@ -123,21 +149,20 @@ export function NetworkMap({
   const busy = checking !== null;
   return (
     <section className="network-map" aria-labelledby="network-title">
-      <div className="section-heading section-heading--action">
+      {/*
+        The actions have the width of the panel to themselves, and the option
+        that modifies one of them stands under them rather than in front of
+        them. Beside the heading there were 843 points for four buttons that
+        need 912 in Russian, so the last one dropped to a line of its own and
+        the row read as a mistake (the owner, 2026-09-18).
+      */}
+      <div className="section-heading">
         <div>
           <p className="eyebrow">{t("Every module the data knows")}</p>
           <h2 id="network-title">{t("Vehicle network")}</h2>
         </div>
-        <div className="network-actions">
-          <label className="check-option">
-            <input
-              type="checkbox"
-              checked={includeHypothesis}
-              disabled={busy}
-              onChange={(event) => onIncludeHypothesisChange(event.target.checked)}
-            />
-            <span>{t("Also try unverified routes")}</span>
-          </label>
+      </div>
+      <div className="network-actions">
           {busy ? (
             <button className="button button--secondary" type="button" onClick={onCancelCheck}>
               {t("Stop after this module ({done}/{total})", { done: checking.done, total: checking.total })}
@@ -163,7 +188,7 @@ export function NetworkMap({
               onClick={onReadMileage}
               disabled={!adapterReady || survey === null || busy || mileageBusy}
             >
-              {t("Read the mileage")}
+              {t("Mileage")}
             </button>
           )}
           {passportRunning ? (
@@ -177,7 +202,7 @@ export function NetworkMap({
               onClick={onReadPassports}
               disabled={!adapterReady || survey === null || busy || passportBusy || mileageRunning}
             >
-              {t("Read the module passports")}
+              {t("Module passports")}
             </button>
           )}
           {ccfRunning ? (
@@ -193,11 +218,19 @@ export function NetworkMap({
                 !adapterReady || survey === null || busy || ccfBusy || mileageRunning || passportRunning
               }
             >
-              {t("Read the configuration (CCF)")}
+              {t("Configuration (CCF)")}
             </button>
           )}
-        </div>
       </div>
+      <label className="check-option network-option">
+        <input
+          type="checkbox"
+          checked={includeHypothesis}
+          disabled={busy}
+          onChange={(event) => onIncludeHypothesisChange(event.target.checked)}
+        />
+        <span>{t("Also try unverified routes")}</span>
+      </label>
 
       {survey === null ? (
         <p className="operation-copy">
@@ -208,7 +241,7 @@ export function NetworkMap({
       ) : (
         <>
           <p className="operation-copy" role="status">
-            {survey.message}
+            {surveyCount(survey)}
             {!adapterReady
               ? t(" Connect and verify the adapter to read modules; the check sends one read-only fault-code request per module.")
               : t(" The check sends one read-only fault-code request per module and marks what answered.")}
