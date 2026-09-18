@@ -7,14 +7,17 @@
 //! addresses, the service bytes and a sum checksum; a length that does not
 //! fit the format byte follows the addresses as a byte of its own.
 //!
-//! Three requests exist here: `StartCommunication 0x81`, the link handshake
+//! Four requests exist here: `StartCommunication 0x81`, the link handshake
 //! ISO 14230-2 requires after the fast initialisation and before anything
 //! else — a handshake, not a diagnostic session; `ReadEcuIdentification
-//! 0x1A`; and `ReadDiagnosticTroubleCodesByStatus 0x18`. No session control,
-//! no tester-present, no clear (`0x14`), no security access, no routine, no
-//! write of any kind: the encoder is private so that no caller can frame a
-//! service this crate does not name, and the architecture check lists the
-//! forbidden constructors. Nothing here interprets what a module says
+//! 0x1A`; `ReadDiagnosticTroubleCodesByStatus 0x18`; and - since ADR-0036 -
+//! `ClearDiagnosticInformation 0x14`, the one service operation of stage 2's
+//! first step, sent only as a prepared service after the person's
+//! confirmation. No session control, no tester-present, no security access,
+//! no routine, no write of any kind: the encoder is private so that no
+//! caller can frame a service this crate does not name, and the
+//! architecture check lists the forbidden constructors. Nothing here
+//! interprets what a module says
 //! beyond the message: an identification is the record's bytes and their
 //! printable text; a fault list is code and status byte, joined to SDD's
 //! index where the index is.
@@ -38,6 +41,8 @@ pub const SID_START_COMMUNICATION: u8 = 0x81;
 pub const SID_READ_ECU_IDENTIFICATION: u8 = 0x1A;
 /// `ReadDiagnosticTroubleCodesByStatus`, by status mask and group.
 pub const SID_READ_DTC_BY_STATUS: u8 = 0x18;
+/// ClearDiagnosticInformation (ADR-0036): a service operation, never a read.
+pub const SID_CLEAR_DIAGNOSTIC_INFORMATION: u8 = 0x14;
 /// The first byte of a negative response.
 pub const NEGATIVE_RESPONSE_SID: u8 = 0x7F;
 /// A positive response carries the request's service id plus this.
@@ -61,7 +66,7 @@ const FORMAT_LENGTH_MASK: u8 = 0x3F;
 /// Format byte, target, source and checksum around an empty payload.
 pub const MIN_MESSAGE_LEN: usize = 4;
 
-/// A request this product makes: one of the three named services, framed
+/// A request this product makes: one of the four named services, framed
 /// with physical addressing from the tester to one module.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct KwpRequest {
@@ -95,6 +100,18 @@ impl KwpRequest {
             bytes: encode_physical(
                 target,
                 &[SID_READ_DTC_BY_STATUS, status_mask, group_high, group_low],
+            ),
+        }
+    }
+
+    /// Clear the codes of a group - [`ALL_DTC_GROUPS`] for every group
+    /// (ADR-0036). The module answers with the service echoed and the group.
+    pub fn clear_diagnostic_information(target: u8, group: u16) -> Self {
+        let [group_high, group_low] = group.to_be_bytes();
+        Self {
+            bytes: encode_physical(
+                target,
+                &[SID_CLEAR_DIAGNOSTIC_INFORMATION, group_high, group_low],
             ),
         }
     }
@@ -447,3 +464,23 @@ impl fmt::Display for KwpError {
 }
 
 impl std::error::Error for KwpError {}
+
+#[cfg(test)]
+mod service_tests {
+    use super::*;
+
+    /// ADR-0036: the clear is a physically addressed message like the reads.
+    #[test]
+    fn the_clear_is_framed_like_every_request() {
+        let request = KwpRequest::clear_diagnostic_information(0x28, ALL_DTC_GROUPS);
+        assert_eq!(request.target(), 0x28);
+        assert_eq!(request.source(), TESTER_ADDRESS);
+        assert_eq!(request.service_id(), SID_CLEAR_DIAGNOSTIC_INFORMATION);
+        assert_eq!(&request.as_bytes()[3..6], &[0x14, 0xff, 0x00]);
+        let bytes = request.as_bytes();
+        assert_eq!(
+            bytes.last().copied(),
+            Some(sum_checksum(&bytes[..bytes.len() - 1]))
+        );
+    }
+}

@@ -428,6 +428,48 @@ const uk: Record<string, string> = {
   "Only informative": "Тільки актуальні",
   "{count} rows at zero hidden": "приховано нульових: {count}",
   "Clear marks": "Скинути позначки",
+  // The service mode and the clear of the codes (ADR-0036, 2026-09-18)
+  "Service mode": "Сервісний режим",
+  "Turn the service mode on": "Увімкнути сервісний режим",
+  "Service mode lets this application change what a module holds: clear its fault codes, run its routines, drive its outputs, change its adaptations.":
+    "Сервісний режим дозволяє застосунку змінювати те, що тримає модуль: стирати коди несправностей, запускати рутини, керувати виходами, змінювати адаптації.",
+  "Each operation will ask you again, one at a time, and is written into the session report with what it changed. This application undoes nothing by itself.":
+    "Кожна операція перепитає окремо, по одній, і буде записана в звіт сесії разом із тим, що змінила. Застосунок нічого не відкочує сам.",
+  "The car stands still, the ignition is on and the engine is off unless a procedure says otherwise.":
+    "Авто стоїть, запалювання увімкнене, двигун вимкнений, якщо процедура не каже інакше.",
+  "What follows is your decision for the car in front of you.": "Далі це ваше рішення для авто перед вами.",
+  "SERVICE MODE · operations that change what a module holds are on · each one asks again":
+    "СЕРВІСНИЙ РЕЖИМ · операції, що змінюють вміст модуля, увімкнені · кожна перепитає окремо",
+  "Clear the fault codes": "Стерти коди несправностей",
+  "Clearing…": "Стираю…",
+  "Clear the fault codes of {module}": "Стерти коди несправностей {module}",
+  "Clear the codes of {module}": "Стерти коди {module}",
+  "Operation: clear the fault codes · class SERVICE_ROUTINE": "Операція: стирання кодів несправностей · клас SERVICE_ROUTINE",
+  "{count} code(s) will be erased from the module. They stay in this session's report.":
+    "З модуля буде стерто кодів: {count}. Вони лишаються у звіті цієї сесії.",
+  "The car stands still, the ignition is on, the engine is off.": "Авто стоїть, запалювання увімкнене, двигун вимкнений.",
+  "After a positive answer the codes are read again at once.": "Після позитивної відповіді коди одразу читаються знову.",
+  "SERVICE_ROUTINE · the codes above stay in this session's report; the module is read again afterwards.":
+    "SERVICE_ROUTINE · коди вище лишаються у звіті цієї сесії; після стирання модуль читається знову.",
+  "The module accepted the clear.": "Модуль прийняв стирання.",
+  "in session {session}": "у сесії {session}",
+  "bench, synthetic": "стенд, синтетично",
+  "The module refused the clear: {refusal}": "Модуль відмовив у стиранні: {refusal}",
+  "The clear was not made.": "Стирання не виконано.",
+  "The clear is not offered": "Стирання не пропонується",
+  "Read again: no codes reported.": "Прочитано знову: кодів немає.",
+  "Read again: {count} code(s) returned at once.": "Прочитано знову: одразу повернулося кодів: {count}.",
+  "{count} code(s) were held before the clear; they stay in this session's report.":
+    "До стирання модуль тримав кодів: {count}; вони лишаються у звіті цієї сесії.",
+  "Service operations": "Сервісні операції",
+  "Time": "Час",
+  "Codes before": "Кодів до",
+  "Codes after": "Кодів після",
+  "cleared": "стерто",
+  "refused": "відмова",
+  "not made": "не виконано",
+  "Each operation was confirmed by the person and is a service routine; the codes it erased are kept in the session bundle.":
+    "Кожну операцію підтвердила людина, і кожна є сервісною процедурою; стерті нею коди збережені у пакеті сесії.",
   // The instrument panel (2026-09-17)
   "Instrument panel": "Панель приладів",
   "Out of limits": "Поза межами",
@@ -1590,6 +1632,48 @@ const ru: Record<string, string> = {
   "Only informative": "Только актуальные",
   "{count} rows at zero hidden": "скрыто нулевых: {count}",
   "Clear marks": "Сбросить отметки",
+  // The service mode and the clear of the codes (ADR-0036, 2026-09-18)
+  "Service mode": "Сервисный режим",
+  "Turn the service mode on": "Включить сервисный режим",
+  "Service mode lets this application change what a module holds: clear its fault codes, run its routines, drive its outputs, change its adaptations.":
+    "Сервисный режим позволяет приложению менять то, что хранит модуль: стирать коды неисправностей, запускать рутины, управлять выходами, менять адаптации.",
+  "Each operation will ask you again, one at a time, and is written into the session report with what it changed. This application undoes nothing by itself.":
+    "Каждая операция переспросит отдельно, по одной, и будет записана в отчёт сессии вместе с тем, что изменила. Приложение ничего не откатывает само.",
+  "The car stands still, the ignition is on and the engine is off unless a procedure says otherwise.":
+    "Автомобиль стоит, зажигание включено, двигатель выключен, если процедура не говорит иначе.",
+  "What follows is your decision for the car in front of you.": "Дальше это ваше решение для автомобиля перед вами.",
+  "SERVICE MODE · operations that change what a module holds are on · each one asks again":
+    "СЕРВИСНЫЙ РЕЖИМ · операции, меняющие содержимое модуля, включены · каждая переспросит отдельно",
+  "Clear the fault codes": "Стереть коды неисправностей",
+  "Clearing…": "Стираю…",
+  "Clear the fault codes of {module}": "Стереть коды неисправностей {module}",
+  "Clear the codes of {module}": "Стереть коды {module}",
+  "Operation: clear the fault codes · class SERVICE_ROUTINE": "Операция: стирание кодов неисправностей · класс SERVICE_ROUTINE",
+  "{count} code(s) will be erased from the module. They stay in this session's report.":
+    "Из модуля будет стёрто кодов: {count}. Они остаются в отчёте этой сессии.",
+  "The car stands still, the ignition is on, the engine is off.": "Автомобиль стоит, зажигание включено, двигатель выключен.",
+  "After a positive answer the codes are read again at once.": "После положительного ответа коды сразу читаются снова.",
+  "SERVICE_ROUTINE · the codes above stay in this session's report; the module is read again afterwards.":
+    "SERVICE_ROUTINE · коды выше остаются в отчёте этой сессии; после стирания модуль читается снова.",
+  "The module accepted the clear.": "Модуль принял стирание.",
+  "in session {session}": "в сессии {session}",
+  "bench, synthetic": "стенд, синтетически",
+  "The module refused the clear: {refusal}": "Модуль отказал в стирании: {refusal}",
+  "The clear was not made.": "Стирание не выполнено.",
+  "The clear is not offered": "Стирание не предлагается",
+  "Read again: no codes reported.": "Прочитано снова: кодов нет.",
+  "Read again: {count} code(s) returned at once.": "Прочитано снова: сразу вернулось кодов: {count}.",
+  "{count} code(s) were held before the clear; they stay in this session's report.":
+    "До стирания модуль хранил кодов: {count}; они остаются в отчёте этой сессии.",
+  "Service operations": "Сервисные операции",
+  "Time": "Время",
+  "Codes before": "Кодов до",
+  "Codes after": "Кодов после",
+  "cleared": "стёрто",
+  "refused": "отказ",
+  "not made": "не выполнено",
+  "Each operation was confirmed by the person and is a service routine; the codes it erased are kept in the session bundle.":
+    "Каждую операцию подтвердил человек, и каждая является сервисной процедурой; стёртые ею коды сохранены в пакете сессии.",
   // The instrument panel (2026-09-17)
   "Instrument panel": "Панель приборов",
   "Out of limits": "За пределами",

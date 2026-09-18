@@ -1,11 +1,14 @@
-//! Offline-only compilation and execution of evidence-backed read-only UDS
-//! intent.
+//! Compilation of evidence-backed UDS intent, and its offline execution.
 //!
 //! The sibling of `diagnostic-execution` decided in ADR-0012: the same one-way
-//! boundary from an F6 resolved plan into offline replay or simulator
-//! execution, for ISO 14229 reads. Only ReadDataByIdentifier and
-//! ReadDTCInformation are reachable. There is no live source, no session
-//! control, no arbitrary payload and no CAN transmission API.
+//! boundary from an F6 resolved plan into a prepared transaction, for ISO
+//! 14229. The reads - ReadDataByIdentifier and ReadDTCInformation - compile to
+//! a [`PreparedUdsTransaction`] and run offline here or live on the adapter.
+//! Since ADR-0036 the first service operation, ClearDiagnosticInformation,
+//! compiles to a [`PreparedUdsService`]: the same route, a class that is not
+//! read-only, and the session it may need. It runs live only, after the
+//! person's confirmation, and the read path refuses it by its class. There is
+//! still no arbitrary payload and no CAN transmission API.
 
 use diagnostic_environment::{
     CanIdFormat, DiagnosticEnvironmentResolution, PlanEvidenceTrace, ReadableIdentifier,
@@ -26,6 +29,15 @@ use uds::{
 pub const READ_DATA_BY_IDENTIFIER_CAPABILITY: &str =
     "uds.service22.read_data_by_identifier.read_only";
 pub const READ_DTC_INFORMATION_CAPABILITY: &str = "uds.service19.read_dtc_information.read_only";
+/// The capability a prepared clear carries (`ADR-0036`): this product's own
+/// name for the service operation. Nothing in the knowledge base claims a
+/// module accepts a clear; ISO 14229 does.
+pub const CLEAR_DIAGNOSTIC_INFORMATION_CAPABILITY: &str =
+    "uds.service14.clear_diagnostic_information.service_routine";
+/// The operation name `SAFETY_BOUNDARIES.md` and the report use for a clear.
+pub const DTC_CLEAR_OPERATION: &str = "DTC_CLEAR";
+/// The group that means every code, re-exported so the shell needs no protocol crate.
+pub use uds::ALL_DTC_GROUPS;
 /// Diagnostic protocol name the SDD platform corpus declares for UDS buses.
 pub const UDS_PROTOCOL_FAMILY: &str = "ISO14229";
 /// ISO 15765-2 addressing modes this crate can frame: the request and response
@@ -147,9 +159,68 @@ impl ReadOnlyUdsIntent {
     }
 }
 
+/// The service operations of stage 2 (`ADR-0036`), one per step. Each names
+/// its target and what it asks; the class and the session come with it.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum ServiceUdsIntent {
+    /// `0x14`: clear the diagnostic information of a group of codes -
+    /// [`uds::ALL_DTC_GROUPS`] for every code the module holds.
+    ClearDiagnosticInformation {
+        target: DiagnosticTargetIdentity,
+        group: u32,
+    },
+}
+
+impl ServiceUdsIntent {
+    pub fn clear_diagnostic_information(target: DiagnosticTargetIdentity, group: u32) -> Self {
+        Self::ClearDiagnosticInformation { target, group }
+    }
+
+    fn target(&self) -> &DiagnosticTargetIdentity {
+        match self {
+            Self::ClearDiagnosticInformation { target, .. } => target,
+        }
+    }
+
+    /// The operation's name in the safety table and the report.
+    pub fn operation(&self) -> &'static str {
+        match self {
+            Self::ClearDiagnosticInformation { .. } => DTC_CLEAR_OPERATION,
+        }
+    }
+
+    pub fn safety_class(&self) -> TransactionSafetyClass {
+        match self {
+            Self::ClearDiagnosticInformation { .. } => TransactionSafetyClass::ServiceRoutine,
+        }
+    }
+
+    /// How the operation uses the extended diagnostic session.
+    pub fn session_use(&self) -> SessionUse {
+        match self {
+            // ISO 14229 allows a clear in the default session; a module that
+            // refuses it there is asked again in the extended one.
+            Self::ClearDiagnosticInformation { .. } => SessionUse::DefaultThenExtended,
+        }
+    }
+}
+
+/// How an operation uses the extended diagnostic session (`ADR-0036`,
+/// decision 4). Whatever it uses, the session is left when it ends.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum SessionUse {
+    /// Try in the default session; on `serviceNotSupportedInActiveSession`
+    /// open the extended one and try once more.
+    DefaultThenExtended,
+    /// Open the extended session first: the data requires it.
+    Extended,
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum TransactionSafetyClass {
     ReadOnly,
+    /// A validated service procedure (`ADR-0036`): the clear of the codes.
+    ServiceRoutine,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
@@ -275,6 +346,42 @@ impl PreparedUdsTransaction {
     }
 }
 
+/// One service operation, compiled from a resolved plan (`ADR-0036`). It
+/// carries the same route a read does and a class that is not read-only;
+/// the live path takes it through its own function and the read function
+/// refuses it by its class.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct PreparedUdsService {
+    transaction: PreparedUdsTransaction,
+    operation: &'static str,
+    session_use: SessionUse,
+}
+
+impl PreparedUdsService {
+    pub fn transaction(&self) -> &PreparedUdsTransaction {
+        &self.transaction
+    }
+
+    /// A read dressed as a service, for the tests that prove the live path
+    /// refuses it by its class. Never built by the product.
+    #[doc(hidden)]
+    pub fn from_read_for_test(transaction: PreparedUdsTransaction) -> Self {
+        Self {
+            transaction,
+            operation: DTC_CLEAR_OPERATION,
+            session_use: SessionUse::DefaultThenExtended,
+        }
+    }
+
+    pub fn operation(&self) -> &'static str {
+        self.operation
+    }
+
+    pub fn session_use(&self) -> SessionUse {
+        self.session_use
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum PreparationError {
     EnvironmentIndeterminate(Vec<UnresolvedFact>),
@@ -368,6 +475,129 @@ pub fn prepare_read_only_transaction(
     intent: ReadOnlyUdsIntent,
     readable: &[ReadableIdentifier],
 ) -> Result<PreparedUdsTransaction, PreparationError> {
+    let mut route = compile_route(
+        resolution,
+        intent.target().clone(),
+        Some(intent.required_capability()),
+    )?;
+    let (request, identifier) = match &intent {
+        ReadOnlyUdsIntent::ReadDataByIdentifier { identifier, .. } => {
+            let entry = readable
+                .iter()
+                .find(|entry| entry.identifier == *identifier)
+                .cloned()
+                .ok_or(PreparationError::IdentifierNotReadable {
+                    identifier: *identifier,
+                })?;
+            (
+                UdsRequest::read_data_by_identifier(*identifier),
+                Some(entry),
+            )
+        }
+        ReadOnlyUdsIntent::ReadDtcInformation { status_mask, .. } => (
+            UdsRequest::read_dtc_information(
+                SUB_FUNCTION_REPORT_DTC_BY_STATUS_MASK,
+                &[status_mask.byte()],
+            ),
+            None,
+        ),
+    };
+    if let Some(entry) = &identifier {
+        route
+            .provenance
+            .traces
+            .insert(ProvenanceField::Identifier, entry.evidence.clone());
+    }
+    let capability_id = route.capability_id.clone();
+    Ok(route.into_transaction(
+        TransactionSafetyClass::ReadOnly,
+        capability_id,
+        request,
+        identifier,
+    ))
+}
+
+/// Compile one service operation against a RESOLVED plan (`ADR-0036`): the
+/// same route a read takes, the request ISO 14229 names for it, the class
+/// that keeps it out of the read path, and how it uses the extended session.
+/// The plan's read capability is not what admits it - a clear is a standard
+/// service - but the plan must still be resolved, ISO 14229, for this module.
+pub fn prepare_service_transaction(
+    resolution: &DiagnosticEnvironmentResolution,
+    intent: ServiceUdsIntent,
+) -> Result<PreparedUdsService, PreparationError> {
+    let route = compile_route(resolution, intent.target().clone(), None)?;
+    let (request, capability_id) = match &intent {
+        ServiceUdsIntent::ClearDiagnosticInformation { group, .. } => (
+            UdsRequest::clear_diagnostic_information(*group),
+            CLEAR_DIAGNOSTIC_INFORMATION_CAPABILITY.to_string(),
+        ),
+    };
+    Ok(PreparedUdsService {
+        transaction: route.into_transaction(intent.safety_class(), capability_id, request, None),
+        operation: intent.operation(),
+        session_use: intent.session_use(),
+    })
+}
+
+/// Everything a prepared UDS transaction takes from the plan, before the
+/// request itself is chosen.
+struct CompiledRoute {
+    target: DiagnosticTargetIdentity,
+    logical_network: String,
+    physical_connector: String,
+    physical_pins: Vec<u8>,
+    backend_route: String,
+    bitrate_bps: u32,
+    protocol_family: String,
+    addressing_mode: String,
+    physical_request_id: CanId,
+    expected_response_id: CanId,
+    functional_request_id: Option<CanId>,
+    capability_id: String,
+    provenance: ExecutionProvenance,
+}
+
+impl CompiledRoute {
+    fn into_transaction(
+        self,
+        safety_class: TransactionSafetyClass,
+        capability_id: String,
+        request: UdsRequest,
+        identifier: Option<ReadableIdentifier>,
+    ) -> PreparedUdsTransaction {
+        PreparedUdsTransaction {
+            safety_class,
+            target: self.target,
+            logical_network: self.logical_network,
+            physical_connector: self.physical_connector,
+            physical_pins: self.physical_pins,
+            backend_route: self.backend_route,
+            bitrate_bps: self.bitrate_bps,
+            protocol_family: self.protocol_family,
+            addressing_mode: self.addressing_mode,
+            physical_request_id: self.physical_request_id,
+            expected_response_id: self.expected_response_id,
+            functional_request_id: self.functional_request_id,
+            capability_id,
+            request,
+            identifier,
+            provenance: self.provenance,
+        }
+    }
+}
+
+/// The plan checked and its route taken: resolved, for this module, ISO
+/// 14229 in an addressing mode this crate frames, every mandatory field
+/// present, the identifiers valid for the declared width.
+/// `required_capability` is the read-only capability a read must find in the
+/// plan; a service passes `None`, because the plan's read capability does not
+/// admit it and nothing in the knowledge base claims a module accepts a clear.
+fn compile_route(
+    resolution: &DiagnosticEnvironmentResolution,
+    target: DiagnosticTargetIdentity,
+    required_capability: Option<&str>,
+) -> Result<CompiledRoute, PreparationError> {
     let plan = match resolution {
         DiagnosticEnvironmentResolution::Resolved(plan) => plan,
         DiagnosticEnvironmentResolution::Indeterminate {
@@ -382,7 +612,6 @@ pub fn prepare_read_only_transaction(
         }
     };
 
-    let target = intent.target().clone();
     if target.ecu_family != plan.ecu_family.value {
         return Err(PreparationError::TargetEcuMismatch {
             expected: target.ecu_family,
@@ -409,11 +638,12 @@ pub fn prepare_read_only_transaction(
             plan.protocol_family.value.clone(),
         ));
     }
-    let required_capability = intent.required_capability();
-    if plan.read_only_capability.value.id != required_capability {
-        return Err(PreparationError::UnsupportedCapability(
-            plan.read_only_capability.value.id.clone(),
-        ));
+    if let Some(required) = required_capability {
+        if plan.read_only_capability.value.id != required {
+            return Err(PreparationError::UnsupportedCapability(
+                plan.read_only_capability.value.id.clone(),
+            ));
+        }
     }
     if plan.logical_network.value.trim().is_empty() {
         return Err(PreparationError::InvalidRoute("logical_network"));
@@ -455,29 +685,6 @@ pub fn prepare_read_only_transaction(
         .as_ref()
         .map(|field| can_id("functional_request_id", field.value))
         .transpose()?;
-
-    let (request, identifier) = match &intent {
-        ReadOnlyUdsIntent::ReadDataByIdentifier { identifier, .. } => {
-            let entry = readable
-                .iter()
-                .find(|entry| entry.identifier == *identifier)
-                .cloned()
-                .ok_or(PreparationError::IdentifierNotReadable {
-                    identifier: *identifier,
-                })?;
-            (
-                UdsRequest::read_data_by_identifier(*identifier),
-                Some(entry),
-            )
-        }
-        ReadOnlyUdsIntent::ReadDtcInformation { status_mask, .. } => (
-            UdsRequest::read_dtc_information(
-                SUB_FUNCTION_REPORT_DTC_BY_STATUS_MASK,
-                &[status_mask.byte()],
-            ),
-            None,
-        ),
-    };
 
     let mut traces = BTreeMap::new();
     traces.insert(
@@ -531,12 +738,8 @@ pub fn prepare_read_only_transaction(
         ProvenanceField::Capability,
         plan.read_only_capability.evidence.clone(),
     );
-    if let Some(entry) = &identifier {
-        traces.insert(ProvenanceField::Identifier, entry.evidence.clone());
-    }
 
-    Ok(PreparedUdsTransaction {
-        safety_class: TransactionSafetyClass::ReadOnly,
+    Ok(CompiledRoute {
         target,
         logical_network: plan.logical_network.value.clone(),
         physical_connector: plan.physical_route.value.connector.clone(),
@@ -549,8 +752,6 @@ pub fn prepare_read_only_transaction(
         expected_response_id,
         functional_request_id,
         capability_id: plan.read_only_capability.value.id.clone(),
-        request,
-        identifier,
         provenance: ExecutionProvenance { traces },
     })
 }
@@ -719,6 +920,40 @@ pub fn decode_response(
         TypedDiagnosticResult::Negative(negative) => UdsReadOutcome::Negative(negative),
         // The two request constructors cannot yield any other service;
         // anything else is an uncorrelated answer.
+        _ => return Err(ExecutionError::Uds(UdsError::CorrelationMismatch)),
+    };
+    Ok(Some(outcome))
+}
+
+/// What the module answered to a service operation (`ADR-0036`). A
+/// negative response is an answer, not a failure of this crate.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum UdsServiceOutcome {
+    /// The module cleared the group it was asked to clear.
+    Cleared {
+        group: u32,
+    },
+    Negative(NegativeResponse),
+}
+
+/// Decode one complete response to a prepared service, for the live backend.
+/// `Ok(None)` is ResponsePending: the module is still working.
+pub fn decode_service_response(
+    service: &PreparedUdsService,
+    payload: &[u8],
+) -> Result<Option<UdsServiceOutcome>, ExecutionError> {
+    let request = &service.transaction.request;
+    let response = uds::parse_response(request, payload)?;
+    if let UdsResponse::Negative(negative) = &response {
+        if negative.code == NegativeResponseCode::ResponsePending {
+            return Ok(None);
+        }
+    }
+    let outcome = match uds::typed_result(request, response)? {
+        TypedDiagnosticResult::ClearDiagnosticInformation { group } => {
+            UdsServiceOutcome::Cleared { group }
+        }
+        TypedDiagnosticResult::Negative(negative) => UdsServiceOutcome::Negative(negative),
         _ => return Err(ExecutionError::Uds(UdsError::CorrelationMismatch)),
     };
     Ok(Some(outcome))

@@ -77,6 +77,22 @@ struct SessionReport {
     /// The battery read (`ADR-0030`): one record per read made.
     #[serde(default)]
     battery_reads: Vec<BatteryRead>,
+    /// The clear of a module's codes (`ADR-0036`): the read that found the
+    /// codes before, and the read made after, are reads like any other and
+    /// are taken as such; the clear itself is an action, not evidence about
+    /// a route, and is not recorded here.
+    #[serde(default)]
+    dtc_clears: Vec<DtcClear>,
+}
+
+/// As much of a clear as the intake reads: the two fault-code reads around
+/// it.
+#[derive(Debug, Deserialize)]
+struct DtcClear {
+    #[serde(default)]
+    before: Option<ModuleReadReport>,
+    #[serde(default)]
+    after: Option<ModuleReadReport>,
 }
 
 /// As much of a battery read as the intake reads: the reads it made. What
@@ -237,6 +253,12 @@ pub fn intake(
                 .battery_reads
                 .iter()
                 .flat_map(|battery| battery.reads.iter()),
+        )
+        .chain(
+            report
+                .dtc_clears
+                .iter()
+                .flat_map(|clear| clear.before.iter().chain(clear.after.iter())),
         );
     for read in every_read {
         let program = read.vehicle.vehicle_program.trim();
@@ -339,9 +361,28 @@ pub fn intake(
         }
     }
 
+    for (clear_index, clear) in report.dtc_clears.iter().enumerate() {
+        if let Some(record) = &clear.before {
+            builder.read(
+                format!("dtc_clears[{clear_index}].before"),
+                format!("clear.{clear_index:02}.before"),
+                record,
+                library,
+            )?;
+        }
+        if let Some(record) = &clear.after {
+            builder.read(
+                format!("dtc_clears[{clear_index}].after"),
+                format!("clear.{clear_index:02}.after"),
+                record,
+                library,
+            )?;
+        }
+    }
+
     if builder.records.is_empty() {
         return Err(KnowledgeError::Parse(
-            "the report holds nothing this intake can record: no module read, capture, calibration read, live-read run, mileage survey, module passport, configuration read or battery read".into(),
+            "the report holds nothing this intake can record: no module read, capture, calibration read, live-read run, mileage survey, module passport, configuration read, battery read or the reads around a clear".into(),
         ));
     }
     Ok(IntakeOutcome {

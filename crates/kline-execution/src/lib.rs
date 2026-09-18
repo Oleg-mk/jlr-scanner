@@ -99,6 +99,46 @@ impl ReadOnlyKlineIntent {
     }
 }
 
+/// The service operations of stage 2 over K-line (`ADR-0036`), each in its
+/// protocol's own words: the clear of a module's fault memory. Prepared from
+/// the same plan as a read, sent only as a [`PreparedKlineService`] after the
+/// person's confirmation, and never mistaken for a read: the class says so.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum ServiceKlineIntent {
+    /// DS2 `0x05`: clear the fault memory.
+    Ds2ClearFaultMemory { target: KlineTarget },
+    /// KWP2000 `0x14`: clear the diagnostic information of every group.
+    KwpClearDiagnosticInformation { target: KlineTarget },
+}
+
+impl ServiceKlineIntent {
+    pub fn target(&self) -> &KlineTarget {
+        match self {
+            Self::Ds2ClearFaultMemory { target }
+            | Self::KwpClearDiagnosticInformation { target } => target,
+        }
+    }
+
+    /// The protocol family this intent belongs to, as SDD names it.
+    pub fn protocol_family(&self) -> &'static str {
+        match self {
+            Self::Ds2ClearFaultMemory { .. } => DS2_PROTOCOL_FAMILY,
+            Self::KwpClearDiagnosticInformation { .. } => KWP2000_PROTOCOL_FAMILY,
+        }
+    }
+
+    /// The operation's name in the safety table and the report.
+    pub fn operation(&self) -> &'static str {
+        DTC_CLEAR_OPERATION
+    }
+}
+
+/// The operation name `SAFETY_BOUNDARIES.md` and the report use for a clear.
+pub const DTC_CLEAR_OPERATION: &str = "DTC_CLEAR";
+/// The capability a prepared clear carries: this product's own name for the
+/// service operation, not a claim the knowledge base makes about a module.
+pub const DTC_CLEAR_SERVICE_CAPABILITY: &str = "kline.dtc_clear.service_routine";
+
 /// How a serial line carries a byte, as the platform document states it.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct SerialFraming {
@@ -163,6 +203,8 @@ impl KlineRequest {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum TransactionSafetyClass {
     ReadOnly,
+    /// A validated service procedure (`ADR-0036`): the clear of the codes.
+    ServiceRoutine,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
@@ -280,6 +322,26 @@ impl PreparedKlineTransaction {
     }
 }
 
+/// One service operation over K-line, compiled from a resolved plan
+/// (`ADR-0036`). It carries the same route a read does and a class that is
+/// not read-only; the live path takes it through its own function, and the
+/// read function refuses it by its class.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct PreparedKlineService {
+    transaction: PreparedKlineTransaction,
+    operation: &'static str,
+}
+
+impl PreparedKlineService {
+    pub fn transaction(&self) -> &PreparedKlineTransaction {
+        &self.transaction
+    }
+
+    pub fn operation(&self) -> &'static str {
+        self.operation
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum PreparationError {
     EnvironmentIndeterminate(Vec<UnresolvedFact>),
@@ -368,16 +430,133 @@ impl fmt::Display for PreparationError {
 
 impl std::error::Error for PreparationError {}
 
-/// Compiles one read-only K-line intent against a resolved plan.
-///
-/// Every refusal here is a refusal to guess: a protocol this product does
-/// not speak, an addressing mode that is not a node address, a bus with no
-/// stated framing or wake-up. A plan that passes carries everything the
-/// adapter needs and nothing it has to invent.
+/// Compile one read-only K-line intent against a RESOLVED plan.
 pub fn prepare_read_only_kline_read(
     resolution: &DiagnosticEnvironmentResolution,
     intent: ReadOnlyKlineIntent,
 ) -> Result<PreparedKlineTransaction, PreparationError> {
+    let route = compile_route(
+        resolution,
+        intent.target().clone(),
+        intent.protocol_family(),
+        Some(intent.required_capability()),
+    )?;
+    let node_address = route.node_address;
+    let request = match &intent {
+        ReadOnlyKlineIntent::Ds2Identification { .. } => {
+            KlineRequest::Ds2(ds2::Ds2Request::ecu_identification(node_address))
+        }
+        ReadOnlyKlineIntent::Ds2FaultMemory { .. } => {
+            KlineRequest::Ds2(ds2::Ds2Request::fault_memory(node_address))
+        }
+        ReadOnlyKlineIntent::KwpEcuIdentification { option, .. } => KlineRequest::Kwp(
+            kwp2000::KwpRequest::read_ecu_identification(node_address, *option),
+        ),
+        ReadOnlyKlineIntent::KwpDtcByStatus { status_mask, .. } => {
+            KlineRequest::Kwp(kwp2000::KwpRequest::read_dtc_by_status(
+                node_address,
+                *status_mask,
+                kwp2000::ALL_DTC_GROUPS,
+            ))
+        }
+    };
+    let capability_id = route.capability_id.clone();
+    Ok(route.into_transaction(TransactionSafetyClass::ReadOnly, capability_id, request))
+}
+
+/// Compile one service operation against a RESOLVED plan (`ADR-0036`): the
+/// same route a read takes, the request the protocol names for the clear,
+/// and the class that keeps it out of the read path. The plan's read
+/// capability is not what admits it - a clear is a standard service of each
+/// protocol - but the plan must still be resolved, on a serial line, for
+/// this module.
+pub fn prepare_kline_service(
+    resolution: &DiagnosticEnvironmentResolution,
+    intent: ServiceKlineIntent,
+) -> Result<PreparedKlineService, PreparationError> {
+    let route = compile_route(
+        resolution,
+        intent.target().clone(),
+        intent.protocol_family(),
+        None,
+    )?;
+    let node_address = route.node_address;
+    let request = match &intent {
+        ServiceKlineIntent::Ds2ClearFaultMemory { .. } => {
+            KlineRequest::Ds2(ds2::Ds2Request::clear_fault_memory(node_address))
+        }
+        ServiceKlineIntent::KwpClearDiagnosticInformation { .. } => {
+            KlineRequest::Kwp(kwp2000::KwpRequest::clear_diagnostic_information(
+                node_address,
+                kwp2000::ALL_DTC_GROUPS,
+            ))
+        }
+    };
+    Ok(PreparedKlineService {
+        transaction: route.into_transaction(
+            TransactionSafetyClass::ServiceRoutine,
+            DTC_CLEAR_SERVICE_CAPABILITY.to_string(),
+            request,
+        ),
+        operation: intent.operation(),
+    })
+}
+
+/// Everything a prepared K-line transaction takes from the plan, before the
+/// request itself is chosen.
+struct CompiledRoute {
+    target: KlineTarget,
+    logical_network: String,
+    physical_connector: String,
+    physical_pins: Vec<u8>,
+    backend_route: String,
+    bitrate_bps: u32,
+    protocol_family: String,
+    framing: SerialFraming,
+    wakeup: String,
+    node_address: u8,
+    capability_id: String,
+    provenance: ExecutionProvenance,
+}
+
+impl CompiledRoute {
+    fn into_transaction(
+        self,
+        safety_class: TransactionSafetyClass,
+        capability_id: String,
+        request: KlineRequest,
+    ) -> PreparedKlineTransaction {
+        PreparedKlineTransaction {
+            safety_class,
+            target: self.target,
+            logical_network: self.logical_network,
+            physical_connector: self.physical_connector,
+            physical_pins: self.physical_pins,
+            backend_route: self.backend_route,
+            bitrate_bps: self.bitrate_bps,
+            protocol_family: self.protocol_family,
+            framing: self.framing,
+            wakeup: self.wakeup,
+            node_address: self.node_address,
+            capability_id,
+            request,
+            provenance: self.provenance,
+        }
+    }
+}
+
+/// The plan checked and its route taken: resolved, for this module, on a
+/// serial line in the named protocol, every mandatory field present, the
+/// node address the same in both identifier fields. `required_capability`
+/// is the read-only capability a read must find in the plan; a service
+/// passes `None`, because the plan's read capability does not admit it and
+/// nothing in the knowledge base claims a module accepts a clear.
+fn compile_route(
+    resolution: &DiagnosticEnvironmentResolution,
+    target: KlineTarget,
+    protocol_family: &str,
+    required_capability: Option<&str>,
+) -> Result<CompiledRoute, PreparationError> {
     let plan = match resolution {
         DiagnosticEnvironmentResolution::Resolved(plan) => plan,
         DiagnosticEnvironmentResolution::Indeterminate {
@@ -392,22 +571,23 @@ pub fn prepare_read_only_kline_read(
         }
     };
 
-    let target = intent.target().clone();
     if target.ecu_family != plan.ecu_family.value {
         return Err(PreparationError::TargetEcuMismatch {
             expected: target.ecu_family,
             actual: plan.ecu_family.value.clone(),
         });
     }
-    if plan.protocol_family.value != intent.protocol_family() {
+    if plan.protocol_family.value != protocol_family {
         return Err(PreparationError::UnsupportedProtocol(
             plan.protocol_family.value.clone(),
         ));
     }
-    if plan.read_only_capability.value.id != intent.required_capability() {
-        return Err(PreparationError::UnsupportedCapability(
-            plan.read_only_capability.value.id.clone(),
-        ));
+    if let Some(required) = required_capability {
+        if plan.read_only_capability.value.id != required {
+            return Err(PreparationError::UnsupportedCapability(
+                plan.read_only_capability.value.id.clone(),
+            ));
+        }
     }
     if plan.addressing_mode.value != SERIAL_NODE_ADDRESSING_MODE {
         return Err(PreparationError::UnsupportedAddressingMode(
@@ -456,25 +636,6 @@ pub fn prepare_read_only_kline_read(
         .as_ref()
         .ok_or(PreparationError::MissingWakeup)?;
 
-    let request = match &intent {
-        ReadOnlyKlineIntent::Ds2Identification { .. } => {
-            KlineRequest::Ds2(ds2::Ds2Request::ecu_identification(node_address))
-        }
-        ReadOnlyKlineIntent::Ds2FaultMemory { .. } => {
-            KlineRequest::Ds2(ds2::Ds2Request::fault_memory(node_address))
-        }
-        ReadOnlyKlineIntent::KwpEcuIdentification { option, .. } => KlineRequest::Kwp(
-            kwp2000::KwpRequest::read_ecu_identification(node_address, *option),
-        ),
-        ReadOnlyKlineIntent::KwpDtcByStatus { status_mask, .. } => {
-            KlineRequest::Kwp(kwp2000::KwpRequest::read_dtc_by_status(
-                node_address,
-                *status_mask,
-                kwp2000::ALL_DTC_GROUPS,
-            ))
-        }
-    };
-
     let mut traces = BTreeMap::new();
     traces.insert(
         ProvenanceField::VehicleApplicability,
@@ -516,8 +677,7 @@ pub fn prepare_read_only_kline_read(
         plan.read_only_capability.evidence.clone(),
     );
 
-    Ok(PreparedKlineTransaction {
-        safety_class: TransactionSafetyClass::ReadOnly,
+    Ok(CompiledRoute {
         target,
         logical_network: plan.logical_network.value.clone(),
         physical_connector: plan.physical_route.value.connector.clone(),
@@ -529,7 +689,6 @@ pub fn prepare_read_only_kline_read(
         wakeup: wakeup_field.value.clone(),
         node_address,
         capability_id: plan.read_only_capability.value.id.clone(),
-        request,
         provenance: ExecutionProvenance { traces },
     })
 }
@@ -591,6 +750,64 @@ impl fmt::Display for DecodeError {
 }
 
 impl std::error::Error for DecodeError {}
+
+/// What a module answered to a service operation (`ADR-0036`), read as
+/// the protocol reads it: the clear was accepted, or it was refused with
+/// the module's own word for it.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum KlineServiceOutcome {
+    /// DS2: the module accepted the clear.
+    Ds2Cleared { node_address: u8 },
+    /// DS2: the module answered, and its first data byte is not acceptance.
+    Ds2NotAccepted { node_address: u8, status: u8 },
+    /// KWP2000: the module cleared the group it was asked to.
+    KwpCleared,
+    /// KWP2000: a refusal, with the standard's own word for the code.
+    KwpNegative { code: u8, text: String },
+}
+
+/// Reads back what the line carried after a service operation: the echo of
+/// our own request first, then the module's acceptance or refusal.
+pub fn decode_service_response(
+    service: &PreparedKlineService,
+    bytes: &[u8],
+) -> Result<KlineServiceOutcome, DecodeError> {
+    match (&service.transaction.request, bytes) {
+        (KlineRequest::Ds2(request), stream) => {
+            let rest = ds2::strip_echo(stream, request);
+            if rest.is_empty() {
+                return Err(DecodeError::NoAnswer);
+            }
+            let (frame, _) = ds2::parse_leading_frame(rest).map_err(DecodeError::Ds2)?;
+            if frame.accepted() {
+                Ok(KlineServiceOutcome::Ds2Cleared {
+                    node_address: frame.node_address,
+                })
+            } else {
+                Ok(KlineServiceOutcome::Ds2NotAccepted {
+                    node_address: frame.node_address,
+                    status: frame.status().unwrap_or_default(),
+                })
+            }
+        }
+        (KlineRequest::Kwp(request), stream) => {
+            let rest = kwp2000::strip_echo(stream, request);
+            if rest.is_empty() {
+                return Err(DecodeError::NoAnswer);
+            }
+            let (message, _) = kwp2000::parse_leading_message(rest).map_err(DecodeError::Kwp)?;
+            let reply =
+                kwp2000::interpret(&message, request.service_id()).map_err(DecodeError::Kwp)?;
+            match reply {
+                kwp2000::KwpReply::Negative { code, .. } => Ok(KlineServiceOutcome::KwpNegative {
+                    code,
+                    text: kwp2000::response_code_text(code).to_string(),
+                }),
+                kwp2000::KwpReply::Positive { .. } => Ok(KlineServiceOutcome::KwpCleared),
+            }
+        }
+    }
+}
 
 /// Reads back what the line carried: the echo of our own request first, as
 /// a K-line always carries it, then the module's answer.

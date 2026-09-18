@@ -22,10 +22,12 @@ use transport_api::CanId;
 use transport_replay::{PlaybackMode, ReplaySource};
 use uds::NegativeResponseCode;
 use uds_execution::{
-    execute_replay, execute_simulator, prepare_read_only_transaction, DiagnosticTargetIdentity,
-    DtcStatusMask, OfflineExecutionSource, PreparationError, ProvenanceField, ReadOnlyUdsIntent,
-    TransactionSafetyClass, UdsReadOutcome, READ_DATA_BY_IDENTIFIER_CAPABILITY,
-    READ_DTC_INFORMATION_CAPABILITY,
+    decode_service_response, execute_replay, execute_simulator, prepare_read_only_transaction,
+    prepare_service_transaction, DiagnosticTargetIdentity, DtcStatusMask, OfflineExecutionSource,
+    PreparationError, ProvenanceField, ReadOnlyUdsIntent, ServiceUdsIntent, SessionUse,
+    TransactionSafetyClass, UdsReadOutcome, UdsServiceOutcome, ALL_DTC_GROUPS,
+    CLEAR_DIAGNOSTIC_INFORMATION_CAPABILITY, DTC_CLEAR_OPERATION,
+    READ_DATA_BY_IDENTIFIER_CAPABILITY, READ_DTC_INFORMATION_CAPABILITY,
 };
 
 const PLATFORM: &str = include_str!("../../../fixtures/knowledge/synthetic/f9_platform.xml");
@@ -510,4 +512,63 @@ fn capability_identifiers_match_the_ingester() {
         uds_execution::UDS_PROTOCOL_FAMILY,
         sdd_ingest::UDS_DIAGNOSTIC_PROTOCOL
     );
+}
+
+/// ADR-0036, stage 2 step 1: the clear compiles against the plan the
+/// fault-code read resolves to - the same route, the request ISO 14229
+/// names, a class the read path refuses, and the session it may need - and
+/// its answers decode as the clear's own.
+#[test]
+fn a_clear_prepares_as_a_service_on_the_reads_route_with_its_own_class() {
+    let service = prepare_service_transaction(
+        &resolved(READ_DTC_INFORMATION_CAPABILITY),
+        ServiceUdsIntent::clear_diagnostic_information(family(), ALL_DTC_GROUPS),
+    )
+    .expect("the clear prepares from the read's plan");
+    let transaction = service.transaction();
+    assert_eq!(
+        transaction.safety_class(),
+        TransactionSafetyClass::ServiceRoutine
+    );
+    assert_eq!(transaction.encoded_payload(), [0x14, 0xFF, 0xFF, 0xFF]);
+    assert_eq!(
+        transaction.capability_id(),
+        CLEAR_DIAGNOSTIC_INFORMATION_CAPABILITY
+    );
+    assert_eq!(service.operation(), DTC_CLEAR_OPERATION);
+    assert_eq!(service.session_use(), SessionUse::DefaultThenExtended);
+    assert!(transaction.readable_identifier().is_none());
+
+    // The same module, the same identifiers, the same route as a read.
+    let read = prepared_did_read(0x1945);
+    assert_eq!(
+        transaction.physical_request_id(),
+        read.physical_request_id()
+    );
+    assert_eq!(
+        transaction.expected_response_id(),
+        read.expected_response_id()
+    );
+    assert_eq!(transaction.backend_route(), read.backend_route());
+
+    // Its answers: accepted, still working, refused in this session.
+    assert_eq!(
+        decode_service_response(&service, &[0x54]).unwrap(),
+        Some(UdsServiceOutcome::Cleared {
+            group: ALL_DTC_GROUPS
+        })
+    );
+    assert_eq!(
+        decode_service_response(&service, &[0x7F, 0x14, 0x78]).unwrap(),
+        None
+    );
+    match decode_service_response(&service, &[0x7F, 0x14, 0x7F]).unwrap() {
+        Some(UdsServiceOutcome::Negative(negative)) => assert_eq!(
+            negative.code,
+            NegativeResponseCode::ServiceNotSupportedInActiveSession
+        ),
+        other => panic!("a refusal was expected, got {other:?}"),
+    }
+    // A read's answer is not the clear's.
+    assert!(decode_service_response(&service, &[0x59, 0x02, 0xFF]).is_err());
 }

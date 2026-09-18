@@ -73,6 +73,22 @@ export interface ModuleReadSnapshot {
   reportAvailable: boolean;
 }
 
+/**
+ * The reads that bring a module's fault codes, by the shell's own names for
+ * them: over CAN and over the two K-line protocols. A clear (ADR-0036) is
+ * offered only after one of them, in this session, so the record keeps what
+ * the clear erases.
+ */
+export const FAULT_CODE_OPERATIONS = [
+  "Read confirmed fault codes",
+  "Read the DS2 fault memory",
+  "Read the KWP2000 fault codes",
+];
+
+export function isFaultCodesRead(snapshot: ModuleReadSnapshot): boolean {
+  return snapshot.state === "SUCCEEDED" && FAULT_CODE_OPERATIONS.includes(snapshot.operation);
+}
+
 export interface ModuleReadClient {
   getState(): Promise<ModuleReadSnapshot>;
   read(request: ModuleReadRequest): Promise<ModuleReadSnapshot>;

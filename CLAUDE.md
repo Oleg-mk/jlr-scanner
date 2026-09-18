@@ -102,16 +102,23 @@ Taken from `docs/DEVELOPMENT_PRINCIPLES.md`; these are not style preferences.
 ## Safety boundaries
 
 Every diagnostic operation carries exactly one safety class; see
-`docs/SAFETY_BOUNDARIES.md`. Currently only `READ_ONLY` operations exist.
+`docs/SAFETY_BOUNDARIES.md`. Stage 1 is `READ_ONLY` throughout. Stage 2 was
+authorised on 2026-09-18 (`ADR-0036`) and proceeds one operation class at a
+time behind a per-session service mode; its first operation, the clear of a
+module's fault codes, is `SERVICE_ROUTINE`.
 
 Never add: a public `send_raw` / `send_can` / `send_bytes` / `send_payload` or
 any arbitrary CAN transmit API; ECU firmware, VBF, bootloader, or recovery
 flashing; key, immobilizer, or security programming; arbitrary EEPROM writes;
 or use of X250 diagnostic connector pins 12/13.
 
-The first write operation in the product will be DTC clear (F12). It requires its
-own ADR, an explicit safety class, and explicit user confirmation — it must not
-be folded into a read phase.
+The first write operation in the product is the DTC clear of `ADR-0036`
+(stage 2, step 1, 2026-09-18): its own ADR, the class `SERVICE_ROUTINE`, the
+service mode's consent and one confirmation per operation, the architecture
+guard loosened for exactly that service in the commit that added it. Every
+later operation of stage 2 follows the same path — an amendment to that ADR,
+its row in `SAFETY_BOUNDARIES.md`, its guard rule — and none is folded into
+a read.
 
 ## Validation strategy and owner-only gates
 

@@ -3,10 +3,12 @@
 //!
 //! The sibling of `uds_live` for the serial lines, and the same one-way
 //! boundary: only a `PreparedKlineTransaction` from `kline-execution` can
-//! reach this code, the line is opened for that transaction's own protocol,
+//! reach the read, the line is opened for that transaction's own protocol,
 //! pin, baud and framing, the request bytes go out once, whatever the line
 //! carries back is returned undecoded, and the line is closed whatever
-//! happens.
+//! happens. Since `ADR-0036` a service operation - the clear of the fault
+//! memory - reaches this code too, only as a `PreparedKlineService` and only
+//! through its own function; the exchange on the line is the same.
 //!
 //! What the adapter has said about the words below, and what it has not, is
 //! in `crate::kline` and in `docs/evidence/mongoose-probe-2026-09-12/`. The
@@ -18,7 +20,10 @@
 use crate::device::{MongooseDiagnosticError, MongooseJlrDevice};
 use crate::kline::{self, LineParity};
 use crate::passive::VehicleRouteId;
-use kline_execution::{Parity, PreparedKlineTransaction, TransactionSafetyClass};
+use kline_execution::{
+    Parity, PreparedKlineService, PreparedKlineTransaction, TransactionSafetyClass,
+    DTC_CLEAR_SERVICE_CAPABILITY,
+};
 use std::time::{Duration, Instant};
 use transport_api::ByteTransport;
 
@@ -47,7 +52,32 @@ impl<T: ByteTransport> MongooseJlrDevice<T> {
         transaction: &PreparedKlineTransaction,
         timeout: Duration,
     ) -> Result<MongooseKlineReadResult, MongooseDiagnosticError> {
-        let route_id = validate_kline_transaction(transaction)?;
+        let route_id = validate_kline_transaction(transaction, TransactionSafetyClass::ReadOnly)?;
+        self.kline_open_exchange_close(transaction, route_id, timeout)
+    }
+
+    /// Executes one prepared service operation on a serial line
+    /// (`ADR-0036`): the clear of a module's fault memory. Only a
+    /// `PreparedKlineService` reaches it. A serial protocol has no session
+    /// to open: the exchange is the read's, with the request the protocol
+    /// names for the clear.
+    pub fn execute_prepared_kline_service(
+        &mut self,
+        service: &PreparedKlineService,
+        timeout: Duration,
+    ) -> Result<MongooseKlineReadResult, MongooseDiagnosticError> {
+        let transaction = service.transaction();
+        let route_id =
+            validate_kline_transaction(transaction, TransactionSafetyClass::ServiceRoutine)?;
+        self.kline_open_exchange_close(transaction, route_id, timeout)
+    }
+
+    fn kline_open_exchange_close(
+        &mut self,
+        transaction: &PreparedKlineTransaction,
+        route_id: VehicleRouteId,
+        timeout: Duration,
+    ) -> Result<MongooseKlineReadResult, MongooseDiagnosticError> {
         let pin = kline::pin_for_route(route_id).ok_or(
             MongooseDiagnosticError::UnsupportedTransaction("a K-line read needs a K-line route"),
         )?;
@@ -120,14 +150,26 @@ impl<T: ByteTransport> MongooseJlrDevice<T> {
     }
 }
 
-/// The transaction must describe exactly what this backend can do: a
-/// read-only K-line read, on one of the adapter's own K-line routes, with
-/// that route's pin, a baud rate the line states and a wake-up the adapter
-/// can perform.
+/// The transaction must describe exactly what this backend can do: a K-line
+/// request of the expected class - a read, or the one service operation of
+/// `ADR-0036` - on one of the adapter's own K-line routes, with that route's
+/// pin, a baud rate the line states and a wake-up the adapter can perform.
 fn validate_kline_transaction(
     transaction: &PreparedKlineTransaction,
+    expected_class: TransactionSafetyClass,
 ) -> Result<VehicleRouteId, MongooseDiagnosticError> {
-    let TransactionSafetyClass::ReadOnly = transaction.safety_class();
+    if transaction.safety_class() != expected_class {
+        return Err(MongooseDiagnosticError::UnsupportedTransaction(
+            "safety class is not the one this function executes",
+        ));
+    }
+    if expected_class == TransactionSafetyClass::ServiceRoutine
+        && transaction.capability_id() != DTC_CLEAR_SERVICE_CAPABILITY
+    {
+        return Err(MongooseDiagnosticError::UnsupportedTransaction(
+            "capability is not the one K-line service operation",
+        ));
+    }
     let route_id: VehicleRouteId = transaction.backend_route().parse().map_err(|_| {
         MongooseDiagnosticError::UnsupportedTransaction("unknown adapter route for a K-line read")
     })?;

@@ -1,4 +1,9 @@
-//! Generic UDS message correlation and a deliberately narrow safe request API.
+//! Generic UDS message correlation and a deliberately narrow request API:
+//! the reads of stage 1, the session control and tester present that keep a
+//! session, and - since ADR-0036 - the first service operation, clearing the
+//! diagnostic information (0x14). Nothing here writes an identifier, runs a
+//! routine, drives an output or touches security; those constructors do not
+//! exist until their own step adds them.
 
 use std::fmt;
 
@@ -8,9 +13,16 @@ pub use dtc::{
 };
 
 pub const SID_DIAGNOSTIC_SESSION_CONTROL: u8 = 0x10;
+/// ClearDiagnosticInformation: the first operation of stage 2 (ADR-0036).
+pub const SID_CLEAR_DIAGNOSTIC_INFORMATION: u8 = 0x14;
 pub const SID_READ_DTC_INFORMATION: u8 = 0x19;
 pub const SID_READ_DATA_BY_IDENTIFIER: u8 = 0x22;
 pub const SID_TESTER_PRESENT: u8 = 0x3e;
+/// The default diagnostic session and the extended one, as ISO 14229 numbers them.
+pub const DEFAULT_SESSION: u8 = 0x01;
+pub const EXTENDED_DIAGNOSTIC_SESSION: u8 = 0x03;
+/// The groupOfDTC that means every code the module holds.
+pub const ALL_DTC_GROUPS: u32 = 0x00FF_FFFF;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct UdsRequest {
@@ -37,6 +49,16 @@ impl UdsRequest {
                 (identifier >> 8) as u8,
                 identifier as u8,
             ],
+        }
+    }
+
+    /// Clear the diagnostic information of one group of codes -
+    /// [`ALL_DTC_GROUPS`] for every code. A service operation, class
+    /// SERVICE_ROUTINE, sent only as a prepared service (ADR-0036).
+    pub fn clear_diagnostic_information(group: u32) -> Self {
+        let [_, high, middle, low] = group.to_be_bytes();
+        Self {
+            bytes: vec![SID_CLEAR_DIAGNOSTIC_INFORMATION, high, middle, low],
         }
     }
 
@@ -74,6 +96,8 @@ pub enum NegativeResponseCode {
     ExceededNumberOfAttempts,
     RequiredTimeDelayNotExpired,
     ResponsePending,
+    SubFunctionNotSupportedInActiveSession,
+    ServiceNotSupportedInActiveSession,
     Other(u8),
 }
 
@@ -91,6 +115,8 @@ impl NegativeResponseCode {
             0x36 => Self::ExceededNumberOfAttempts,
             0x37 => Self::RequiredTimeDelayNotExpired,
             0x78 => Self::ResponsePending,
+            0x7E => Self::SubFunctionNotSupportedInActiveSession,
+            0x7F => Self::ServiceNotSupportedInActiveSession,
             other => Self::Other(other),
         }
     }
@@ -118,10 +144,26 @@ pub enum UdsResponse {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum TypedDiagnosticResult {
-    DiagnosticSessionControl { session: u8, parameters: Vec<u8> },
-    ReadDtcInformation { sub_function: u8, data: Vec<u8> },
-    ReadDataByIdentifier { identifier: u16, data: Vec<u8> },
-    TesterPresent { sub_function: u8, data: Vec<u8> },
+    DiagnosticSessionControl {
+        session: u8,
+        parameters: Vec<u8>,
+    },
+    ReadDtcInformation {
+        sub_function: u8,
+        data: Vec<u8>,
+    },
+    ReadDataByIdentifier {
+        identifier: u16,
+        data: Vec<u8>,
+    },
+    TesterPresent {
+        sub_function: u8,
+        data: Vec<u8>,
+    },
+    /// The module cleared the group it was asked to clear.
+    ClearDiagnosticInformation {
+        group: u32,
+    },
     Negative(NegativeResponse),
 }
 
@@ -244,6 +286,16 @@ pub fn typed_result(
                 data: positive.payload[2..].to_vec(),
             })
         }
+        SID_CLEAR_DIAGNOSTIC_INFORMATION => {
+            // ISO 14229-1: the positive response to a clear carries nothing
+            // but its own service identifier.
+            if !positive.payload.is_empty() {
+                return Err(UdsError::MalformedPositiveResponse);
+            }
+            let bytes = request.as_bytes();
+            let group = u32::from_be_bytes([0, bytes[1], bytes[2], bytes[3]]);
+            Ok(TypedDiagnosticResult::ClearDiagnosticInformation { group })
+        }
         SID_TESTER_PRESENT => {
             let (&sub_function, data) = positive
                 .payload
@@ -284,6 +336,41 @@ mod tests {
             &[0x22, 0x12, 0x34]
         );
         assert_eq!(UdsRequest::tester_present(false).as_bytes(), &[0x3e, 0]);
+        assert_eq!(
+            UdsRequest::clear_diagnostic_information(ALL_DTC_GROUPS).as_bytes(),
+            &[0x14, 0xff, 0xff, 0xff]
+        );
+    }
+
+    /// ADR-0036: the clear answers with its bare service identifier, and a
+    /// module that will not clear in this session says so by name.
+    #[test]
+    fn decodes_a_clear_and_its_refusals() {
+        let request = UdsRequest::clear_diagnostic_information(ALL_DTC_GROUPS);
+        assert_eq!(
+            decode(&request, &[0x54]).unwrap(),
+            TypedDiagnosticResult::ClearDiagnosticInformation {
+                group: ALL_DTC_GROUPS
+            }
+        );
+        assert_eq!(
+            decode(&request, &[0x54, 0x00]),
+            Err(UdsError::MalformedPositiveResponse)
+        );
+        let TypedDiagnosticResult::Negative(negative) =
+            decode(&request, &[0x7f, 0x14, 0x7f]).unwrap()
+        else {
+            panic!("a negative response");
+        };
+        assert_eq!(
+            negative.code,
+            NegativeResponseCode::ServiceNotSupportedInActiveSession
+        );
+        assert_eq!(
+            decode(&request, &[0x7f, 0x14, 0x22])
+                .map(|result| matches!(result, TypedDiagnosticResult::Negative(n) if n.code == NegativeResponseCode::ConditionsNotCorrect)),
+            Ok(true)
+        );
     }
 
     #[test]

@@ -1,20 +1,33 @@
-//! Live execution of a prepared UDS read on the MongoosePro JLR (ADR-0015).
+//! Live execution of a prepared UDS read on the MongoosePro JLR (ADR-0015),
+//! and - since ADR-0036 - of a prepared UDS service operation.
 //!
 //! Mirrors the F8 calibration path: only a `PreparedUdsTransaction` from
-//! `uds-execution` can reach this code, the route is validated against the
+//! `uds-execution` can reach the read, the route is validated against the
 //! adapter's own descriptor before anything is sent, one single-frame request
 //! goes out padded to eight bytes, a First Frame is answered with one Flow
 //! Control, ResponsePending is waited through, and the route is closed
 //! whatever happens. The raw response is returned undecoded; decoding is the
 //! `uds_execution::decode_response` the offline paths use.
+//!
+//! A service operation reaches this code only as a `PreparedUdsService`, a
+//! class that is not read-only, and only through its own function. That
+//! function is the one place in the product that opens the extended
+//! diagnostic session: it tries the operation where the data allows it,
+//! opens `0x10 03` when the module asks for it, and always returns the module
+//! to the default session before the route is closed. The read function
+//! opens no session - the guard reads its body to make sure.
 
 use crate::device::{MongooseDiagnosticError, MongooseJlrDevice};
 use crate::passive::CanIdFormat;
 use crate::passive::{self, VehicleRouteId};
 use std::time::{Duration, Instant};
 use transport_api::ByteTransport;
+use uds::{
+    NegativeResponseCode, UdsRequest, UdsResponse, DEFAULT_SESSION, EXTENDED_DIAGNOSTIC_SESSION,
+};
 use uds_execution::{
-    PreparedUdsTransaction, TransactionSafetyClass, READ_DATA_BY_IDENTIFIER_CAPABILITY,
+    PreparedUdsService, PreparedUdsTransaction, SessionUse, TransactionSafetyClass,
+    CLEAR_DIAGNOSTIC_INFORMATION_CAPABILITY, READ_DATA_BY_IDENTIFIER_CAPABILITY,
     READ_DTC_INFORMATION_CAPABILITY, UDS_PROTOCOL_FAMILY,
 };
 
@@ -33,6 +46,26 @@ pub struct MongooseUdsReadResult {
     pub pending_responses: u32,
 }
 
+/// What a service operation brought back (ADR-0036): the module's final
+/// answer to the operation itself, and which session it was given in. The
+/// session exchanges around it are recorded too, so a report can show that
+/// the extended session was opened and left.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct MongooseUdsServiceResult {
+    pub route: VehicleRouteId,
+    pub responder: u32,
+    pub request_payload: Vec<u8>,
+    pub raw_diagnostic_response: Vec<u8>,
+    pub pending_responses: u32,
+    /// The diagnostic session the operation was answered in: 0x01 or 0x03.
+    pub session: u8,
+    /// Every exchange of the sequence, request then answer, in order: the
+    /// operation in the default session, then - where the module asked for
+    /// it - the session opening, the operation again, and the return to the
+    /// default session.
+    pub exchanges: Vec<(Vec<u8>, Vec<u8>)>,
+}
+
 impl<T: ByteTransport> MongooseJlrDevice<T> {
     /// Executes one prepared read-only UDS request. The wire-level primitives
     /// are private; callers must provide a transaction `uds-execution`
@@ -42,10 +75,15 @@ impl<T: ByteTransport> MongooseJlrDevice<T> {
         transaction: &PreparedUdsTransaction,
         timeout: Duration,
     ) -> Result<MongooseUdsReadResult, MongooseDiagnosticError> {
-        let route_id = validate_uds_transaction(transaction)?;
+        let route_id = validate_uds_transaction(transaction, TransactionSafetyClass::ReadOnly)?;
         self.open_route_internal(route_id, false)
             .map_err(MongooseDiagnosticError::CanConnection)?;
-        let result = self.execute_uds_inner(transaction, route_id, timeout);
+        let result = self.exchange_uds(
+            transaction,
+            transaction.encoded_payload(),
+            route_id,
+            timeout,
+        );
         let close = self.close_route();
         match (result, close) {
             (Ok(result), Ok(())) => Ok(result),
@@ -54,17 +92,111 @@ impl<T: ByteTransport> MongooseJlrDevice<T> {
         }
     }
 
-    fn execute_uds_inner(
+    /// Executes one prepared service operation (ADR-0036): the clear of the
+    /// codes today. Only a `PreparedUdsService` reaches it, prepared by
+    /// `uds-execution` from a resolved plan and carrying a class that is not
+    /// read-only. The operation is sent where its data allows: in the
+    /// default session first when it may be, and in the extended session
+    /// when the module answers that the service is not supported in the
+    /// active one; a module that answers anything else is not asked again.
+    /// Whenever the extended session was opened, the module is returned to
+    /// the default session before the route is closed, whatever the
+    /// operation's outcome.
+    pub fn execute_prepared_uds_service(
+        &mut self,
+        service: &PreparedUdsService,
+        timeout: Duration,
+    ) -> Result<MongooseUdsServiceResult, MongooseDiagnosticError> {
+        let transaction = service.transaction();
+        let route_id =
+            validate_uds_transaction(transaction, TransactionSafetyClass::ServiceRoutine)?;
+        self.open_route_internal(route_id, false)
+            .map_err(MongooseDiagnosticError::CanConnection)?;
+        let result = self.service_sequence(service, route_id, timeout);
+        let close = self.close_route();
+        match (result, close) {
+            (Ok(result), Ok(())) => Ok(result),
+            (Ok(_), Err(error)) => Err(MongooseDiagnosticError::ChannelClose(error)),
+            (Err(error), _) => Err(error),
+        }
+    }
+
+    /// The operation, the session around it where needed, and the way back.
+    fn service_sequence(
+        &mut self,
+        service: &PreparedUdsService,
+        route_id: VehicleRouteId,
+        timeout: Duration,
+    ) -> Result<MongooseUdsServiceResult, MongooseDiagnosticError> {
+        let transaction = service.transaction();
+        let operation = transaction.encoded_payload().to_vec();
+        let mut exchanges = Vec::new();
+
+        if service.session_use() == SessionUse::DefaultThenExtended {
+            let answer = self.exchange_uds(transaction, &operation, route_id, timeout)?;
+            exchanges.push((operation.clone(), answer.raw_diagnostic_response.clone()));
+            if !refused_in_this_session(&answer.raw_diagnostic_response) {
+                return Ok(MongooseUdsServiceResult {
+                    route: route_id,
+                    responder: answer.responder,
+                    request_payload: operation,
+                    raw_diagnostic_response: answer.raw_diagnostic_response,
+                    pending_responses: answer.pending_responses,
+                    session: DEFAULT_SESSION,
+                    exchanges,
+                });
+            }
+        }
+
+        // The extended session: opened for this operation, and left after it
+        // whether the operation was accepted or not.
+        let open = UdsRequest::diagnostic_session_control(EXTENDED_DIAGNOSTIC_SESSION);
+        let opened = self.exchange_uds(transaction, open.as_bytes(), route_id, timeout)?;
+        exchanges.push((
+            open.as_bytes().to_vec(),
+            opened.raw_diagnostic_response.clone(),
+        ));
+        if !is_positive(&opened.raw_diagnostic_response) {
+            return Err(MongooseDiagnosticError::UnsupportedTransaction(
+                "the module did not open the extended diagnostic session",
+            ));
+        }
+        let answer = self.exchange_uds(transaction, &operation, route_id, timeout);
+        let back = UdsRequest::diagnostic_session_control(DEFAULT_SESSION);
+        let returned = self.exchange_uds(transaction, back.as_bytes(), route_id, timeout);
+        let answer = answer?;
+        exchanges.push((operation.clone(), answer.raw_diagnostic_response.clone()));
+        // A module that fell silent on the way back has left the session on
+        // its own timer; the operation's answer still stands.
+        if let Ok(returned) = returned {
+            exchanges.push((back.as_bytes().to_vec(), returned.raw_diagnostic_response));
+        }
+        Ok(MongooseUdsServiceResult {
+            route: route_id,
+            responder: answer.responder,
+            request_payload: operation,
+            raw_diagnostic_response: answer.raw_diagnostic_response,
+            pending_responses: answer.pending_responses,
+            session: EXTENDED_DIAGNOSTIC_SESSION,
+            exchanges,
+        })
+    }
+
+    /// One request and its one final answer on an open route: the frames,
+    /// the flow control, the waiting through ResponsePending. Shared by the
+    /// read and by every exchange of a service sequence.
+    fn exchange_uds(
         &mut self,
         transaction: &PreparedUdsTransaction,
+        payload: &[u8],
         route_id: VehicleRouteId,
         timeout: Duration,
     ) -> Result<MongooseUdsReadResult, MongooseDiagnosticError> {
-        let request_payload = transaction.encoded_payload().to_vec();
+        let request_payload = payload.to_vec();
         let request_frames = isotp::segment(&request_payload, Some(PADDING))?;
         let [request_frame] = request_frames.as_slice() else {
             return Err(MongooseDiagnosticError::UnsupportedTransaction(
-                "UDS read request must be one ISO-TP single frame",
+                "UDS request must be one ISO-TP single frame",
             ));
         };
         let request_id = transaction.physical_request_id();
@@ -74,7 +206,7 @@ impl<T: ByteTransport> MongooseJlrDevice<T> {
         } else {
             CanIdFormat::Standard
         };
-        let service_id = transaction.protocol_request().service_id();
+        let service_id = request_payload[0];
         self.transmit_diagnostic_frame(request_id, request_frame)
             .map_err(MongooseDiagnosticError::RequestTransmission)?;
 
@@ -145,23 +277,53 @@ fn is_response_pending(payload: &[u8], service_id: u8) -> bool {
     matches!(payload, [0x7F, sid, 0x78, ..] if *sid == service_id)
 }
 
-/// The transaction must describe exactly what this backend can do: a
-/// read-only allowlisted UDS service, ISO 14229 over normal 11-bit addressing,
-/// on one of the adapter's own routes with that route's pins and rate.
+/// A positive response: anything that is not a negative response frame.
+fn is_positive(payload: &[u8]) -> bool {
+    matches!(uds::parse_message(payload), Ok(UdsResponse::Positive(_)))
+}
+
+/// The module said the service or its sub-function is not supported in the
+/// active session (NRC 0x7F, 0x7E): the one refusal the extended session
+/// answers. Any other answer, positive or negative, is final.
+fn refused_in_this_session(payload: &[u8]) -> bool {
+    matches!(
+        uds::parse_message(payload),
+        Ok(UdsResponse::Negative(negative))
+            if matches!(
+                negative.code,
+                NegativeResponseCode::ServiceNotSupportedInActiveSession
+                    | NegativeResponseCode::SubFunctionNotSupportedInActiveSession
+            )
+    )
+}
+
+/// The transaction must describe exactly what this backend can do: an
+/// allowlisted UDS service of the expected class - the two reads, or the one
+/// service operation of ADR-0036 - ISO 14229 over normal 11-bit or normal
+/// fixed 29-bit addressing, on one of the adapter's own routes with that
+/// route's pins and rate.
 fn validate_uds_transaction(
     transaction: &PreparedUdsTransaction,
+    expected_class: TransactionSafetyClass,
 ) -> Result<VehicleRouteId, MongooseDiagnosticError> {
-    if transaction.safety_class() != TransactionSafetyClass::ReadOnly {
+    if transaction.safety_class() != expected_class {
         return Err(MongooseDiagnosticError::UnsupportedTransaction(
-            "safety class is not READ_ONLY",
+            "safety class is not the one this function executes",
         ));
     }
     let capability = transaction.capability_id();
-    if capability != READ_DATA_BY_IDENTIFIER_CAPABILITY
-        && capability != READ_DTC_INFORMATION_CAPABILITY
-    {
+    let allowed = match expected_class {
+        TransactionSafetyClass::ReadOnly => {
+            capability == READ_DATA_BY_IDENTIFIER_CAPABILITY
+                || capability == READ_DTC_INFORMATION_CAPABILITY
+        }
+        TransactionSafetyClass::ServiceRoutine => {
+            capability == CLEAR_DIAGNOSTIC_INFORMATION_CAPABILITY
+        }
+    };
+    if !allowed {
         return Err(MongooseDiagnosticError::UnsupportedTransaction(
-            "capability is not an allowlisted UDS read",
+            "capability is not an allowlisted UDS service for this class",
         ));
     }
     if transaction.protocol_family() != UDS_PROTOCOL_FAMILY {
@@ -214,7 +376,8 @@ mod tests {
     use std::sync::{Arc, Mutex};
     use transport_api::TransportError;
     use uds_execution::{
-        prepare_read_only_transaction, DiagnosticTargetIdentity, DtcStatusMask, ReadOnlyUdsIntent,
+        prepare_read_only_transaction, prepare_service_transaction, DiagnosticTargetIdentity,
+        DtcStatusMask, PreparedUdsService, ReadOnlyUdsIntent, ServiceUdsIntent,
     };
 
     enum Step {
@@ -335,6 +498,160 @@ mod tests {
             Step::Bytes(command_response(CHANNEL, OPEN_CHANNEL_RESPONSE, 2, 0)),
             Step::Bytes(command_response(CHANNEL, SET_PIN_RESPONSE, 3, 0)),
         ]
+    }
+
+    /// The clear (ADR-0036), prepared from the plan the fault-code read uses.
+    fn clear_service() -> PreparedUdsService {
+        prepare_service_transaction(
+            &plan(READ_DTC_INFORMATION_CAPABILITY, "normal", "hs-can"),
+            ServiceUdsIntent::clear_diagnostic_information(
+                DiagnosticTargetIdentity::family(ECU_FAMILY).unwrap(),
+                uds::ALL_DTC_GROUPS,
+            ),
+        )
+        .unwrap()
+    }
+
+    /// One request answered by one single frame, as the scripted adapter
+    /// reports it: the outbound acknowledgement, then the module's frame.
+    fn exchange(sequence: u16, timestamp: u32, answer: &[u8; 8]) -> [Step; 2] {
+        [
+            Step::Bytes(command_response(
+                CHANNEL,
+                OUTBOUND_DATA_RESPONSE,
+                sequence,
+                0,
+            )),
+            Step::Bytes(inbound_can_frame(CHANNEL, 0, timestamp, 0x7E8, answer)),
+        ]
+    }
+
+    /// ADR-0036: a module that accepts the clear in the default session is
+    /// asked once, no session is opened, and the answer comes back raw.
+    #[test]
+    fn a_clear_accepted_in_the_default_session_opens_no_session() {
+        let mut steps = opened();
+        steps.extend(exchange(4, 10, &[0x01, 0x54, 0, 0, 0, 0, 0, 0]));
+        steps.push(Step::Bytes(command_response(
+            CHANNEL,
+            CLOSE_CHANNEL_RESPONSE,
+            5,
+            0,
+        )));
+        let (transport, writes) = ScriptedTransport::new(steps);
+        let mut device = MongooseJlrDevice::open(transport);
+
+        let result = device
+            .execute_prepared_uds_service(&clear_service(), Duration::from_millis(250))
+            .unwrap();
+        assert_eq!(result.session, DEFAULT_SESSION);
+        assert_eq!(result.request_payload, [0x14, 0xFF, 0xFF, 0xFF]);
+        assert_eq!(result.raw_diagnostic_response, [0x54]);
+        assert_eq!(result.exchanges.len(), 1);
+
+        let writes = writes.lock().unwrap();
+        // Board-info, open, pins, the clear, close: nothing else went out.
+        assert_eq!(writes.len(), 5);
+        assert!(writes[3]
+            .ends_with(&[0x00, 0x00, 0x07, 0xE0, 0x04, 0x14, 0xFF, 0xFF, 0xFF, 0x00, 0x00, 0x00]));
+    }
+
+    /// ADR-0036 decision 4: a module that answers "not in this session"
+    /// gets the extended session opened, the clear again, and the default
+    /// session back - whatever the clear's outcome - before the route closes.
+    #[test]
+    fn a_module_that_wants_the_extended_session_gets_it_and_is_returned() {
+        let mut steps = opened();
+        steps.extend(exchange(4, 10, &[0x03, 0x7F, 0x14, 0x7F, 0, 0, 0, 0]));
+        steps.extend(exchange(
+            5,
+            20,
+            &[0x06, 0x50, 0x03, 0x00, 0x32, 0x01, 0xF4, 0],
+        ));
+        steps.extend(exchange(6, 30, &[0x01, 0x54, 0, 0, 0, 0, 0, 0]));
+        steps.extend(exchange(
+            7,
+            40,
+            &[0x06, 0x50, 0x01, 0x00, 0x32, 0x01, 0xF4, 0],
+        ));
+        steps.push(Step::Bytes(command_response(
+            CHANNEL,
+            CLOSE_CHANNEL_RESPONSE,
+            8,
+            0,
+        )));
+        let (transport, writes) = ScriptedTransport::new(steps);
+        let mut device = MongooseJlrDevice::open(transport);
+
+        let result = device
+            .execute_prepared_uds_service(&clear_service(), Duration::from_millis(250))
+            .unwrap();
+        assert_eq!(result.session, EXTENDED_DIAGNOSTIC_SESSION);
+        assert_eq!(result.raw_diagnostic_response, [0x54]);
+        let requests: Vec<Vec<u8>> = result
+            .exchanges
+            .iter()
+            .map(|(request, _)| request.clone())
+            .collect();
+        assert_eq!(
+            requests,
+            vec![
+                vec![0x14, 0xFF, 0xFF, 0xFF],
+                vec![0x10, 0x03],
+                vec![0x14, 0xFF, 0xFF, 0xFF],
+                vec![0x10, 0x01],
+            ],
+            "the clear, the session opened, the clear again, the way back"
+        );
+        assert_eq!(writes.lock().unwrap().len(), 8);
+    }
+
+    /// Any refusal other than "not in this session" is final: the module is
+    /// not asked again and no session is opened for it.
+    #[test]
+    fn a_refusal_other_than_the_session_is_final() {
+        let mut steps = opened();
+        steps.extend(exchange(4, 10, &[0x03, 0x7F, 0x14, 0x22, 0, 0, 0, 0]));
+        steps.push(Step::Bytes(command_response(
+            CHANNEL,
+            CLOSE_CHANNEL_RESPONSE,
+            5,
+            0,
+        )));
+        let (transport, writes) = ScriptedTransport::new(steps);
+        let mut device = MongooseJlrDevice::open(transport);
+
+        let result = device
+            .execute_prepared_uds_service(&clear_service(), Duration::from_millis(250))
+            .unwrap();
+        assert_eq!(result.session, DEFAULT_SESSION);
+        assert_eq!(result.raw_diagnostic_response, [0x7F, 0x14, 0x22]);
+        assert_eq!(result.exchanges.len(), 1);
+        assert_eq!(writes.lock().unwrap().len(), 5);
+    }
+
+    /// The read function refuses a service and the service function refuses
+    /// a read, each by the class, before anything is written to the adapter.
+    #[test]
+    fn the_read_path_and_the_service_path_refuse_each_others_transactions() {
+        let (transport, writes) = ScriptedTransport::new(Vec::new());
+        let mut device = MongooseJlrDevice::open(transport);
+        let refused = device
+            .execute_prepared_uds_read(clear_service().transaction(), Duration::from_millis(50))
+            .expect_err("a service is not a read");
+        assert!(matches!(
+            refused,
+            MongooseDiagnosticError::UnsupportedTransaction(_)
+        ));
+        let refused = device.execute_prepared_uds_service(
+            &PreparedUdsService::from_read_for_test(dtc_transaction()),
+            Duration::from_millis(50),
+        );
+        assert!(matches!(
+            refused,
+            Err(MongooseDiagnosticError::UnsupportedTransaction(_))
+        ));
+        assert!(writes.lock().unwrap().is_empty(), "nothing was written");
     }
 
     #[test]

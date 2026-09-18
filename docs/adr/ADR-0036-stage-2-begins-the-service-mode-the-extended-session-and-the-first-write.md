@@ -257,3 +257,50 @@ made a repeated read record every sample; `ADR-0035` listed what a module
 accepts and sent none of it. Stage 2 is those four rules applied to a
 write: prepared, run in on the bench, recorded, and listed before it is
 sent.
+
+## Amendment, 2026-09-18: step 1 built
+
+Built the day the record was accepted, on the branch `stage-2`, so the
+owner's running window was not restarted under him. What the decision said
+and what the code does met in these places:
+
+1. **The session (decision 4).** The clear is short enough to need no
+   TesterPresent: the whole sequence — the clear, and where the module asks
+   the session opened, the clear again, the way back — runs well inside the
+   five seconds a module keeps a session without one. The keep-alive is
+   therefore not sent for the clear; a routine that runs longer (step 2)
+   adds it. The way back is sent whatever the clear answered, and a module
+   that fell silent on the way back has left the session on its own timer.
+2. **The K-line (decision 9).** DS2 `0x05` and KWP2000 `0x14` exist, are
+   prepared on the same line the fault-memory read uses, and the bench
+   answers both; the end-to-end test proves the UDS path on the bench, the
+   K-line path is proved at the crate level. A serial protocol has no
+   session to open.
+3. **The collective confirmation (decision 3)** — "clear the codes of every
+   surveyed module" — is not in this commit. The per-module clear is
+   complete; the sequence over the surveyed modules, with its one
+   confirmation listing them, follows in a later commit of the step.
+4. **The record (decision 5).** `dtc_clears` carries the read that found the
+   codes (`before`) and the read made after (`after`) whole, beside the
+   codes themselves, the answer, the session and every exchange.
+   `report-intake` takes the two reads as reads under
+   `dtc_clears[n].before` and `.after`, and the clear itself as nothing: an
+   action is not evidence about a route.
+5. **The guard (decision 6).** Rewritten one rule at a time: the live UDS
+   read's body is read and may name no session control; the service reaches
+   the adapter only as a `PreparedUdsService`; the DS2 and KWP2000 crates
+   have three and four constructors; `ServiceUdsIntent` has one variant and
+   `ServiceKlineIntent` two; `SecurityAccess`, `RequestDownload`,
+   `TransferData`, `InputOutputControl` and `EcuReset` stay forbidden in the
+   live path.
+6. **The bench.** Half its modules, by the parity of their family's hash,
+   refuse the clear in the default session with `0x7F 0x14 0x7F` and accept
+   it in the extended one, so both paths of decision 4 run on every commit;
+   a cleared module holds no codes for the rest of the session, and the
+   scenario's codes return with the next connection.
+7. **Beside the step:** a Windows checkout gave the shell scripts carriage
+   returns and the Linux container refused them; `.gitattributes` now pins
+   `*.sh` to LF.
+
+The version turns 1.2.0 with the owner's word, and the installer goes to him
+alone (decision 8).

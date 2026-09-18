@@ -546,6 +546,59 @@ pub struct ModuleReadRequest {
     pub context: VehicleContextInput,
 }
 
+/// The clear of one module's fault codes (`ADR-0036`, stage 2 step 1): the
+/// first operation of this product that changes what a module holds. Offered
+/// only in the service mode, for a module whose codes were read in this
+/// session, after the person's confirmation.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DtcClearRequest {
+    pub ecu_family: String,
+    pub context: VehicleContextInput,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum DtcClearState {
+    Idle,
+    /// The module accepted the clear.
+    Cleared,
+    /// The module answered, and the answer was a refusal.
+    Refused,
+    /// Nothing was cleared: the operation could not be prepared or sent.
+    Failed,
+}
+
+/// What the clear came to, for the panel and the record (`ADR-0036`).
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DtcClearSnapshot {
+    pub state: DtcClearState,
+    pub ecu_family: String,
+    /// `DTC_CLEAR`.
+    pub operation: String,
+    /// `SERVICE_ROUTINE`.
+    pub safety_class: String,
+    pub route_id: String,
+    pub route_validation: String,
+    pub protocol: String,
+    /// The diagnostic session the module answered in - `0x01` or `0x03` -
+    /// or none on a serial line, which has no sessions.
+    pub session: Option<String>,
+    pub request_hex: String,
+    pub raw_response_hex: Option<String>,
+    /// The module's refusal, in the protocol's own word for it.
+    pub refusal: Option<String>,
+    /// The codes the module held when they were read in this session,
+    /// before the clear: what the clear erased, kept.
+    pub codes_before: Vec<DtcSummary>,
+    /// What the module answered when its codes were read again after the
+    /// clear; `None` until that read has happened.
+    pub codes_after: Option<Vec<DtcSummary>>,
+    pub error: Option<DiagnosticError>,
+    pub report_available: bool,
+}
+
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct DtcSummary {
@@ -647,6 +700,13 @@ pub struct SessionReportSnapshot {
     pub ccf_reads: u32,
     /// Battery readings recorded in this session (ADR-0030).
     pub battery_reads: u32,
+    /// Clears of fault codes recorded in this session (`ADR-0036`).
+    #[serde(default)]
+    pub dtc_clears: u32,
+    /// Whether the service mode is on for this session (`ADR-0036`): the
+    /// operations of stage 2 exist in the interface only while it is.
+    #[serde(default)]
+    pub service_mode: bool,
     pub report_available: bool,
     /// `bench` or `real`, once an adapter of either kind took part; a session
     /// is one or the other, never both (ADR-0020).

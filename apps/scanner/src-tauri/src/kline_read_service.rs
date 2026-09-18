@@ -12,7 +12,9 @@
 //! module, which this library does not carry yet, and is refused rather than
 //! guessed at with a default option.
 
-use crate::module_read_service::{hex, preparation_error};
+use crate::module_read_service::{
+    hex, preparation_error, DS2_FAULT_MEMORY_OPERATION, KWP_FAULT_CODES_OPERATION,
+};
 use crate::read_record::{serial_read_record, ReadIdentity, SerialOutcome, SerialRead};
 use app_contracts::ModuleReadReport;
 use app_contracts::{
@@ -75,7 +77,7 @@ impl KlineReadService {
                         target: target.clone(),
                     },
                     KLINE_OPERATION_FAULT_MEMORY,
-                    "Read the DS2 fault memory",
+                    DS2_FAULT_MEMORY_OPERATION,
                 ),
                 (
                     kwp2000::READ_DTC_BY_STATUS_CAPABILITY,
@@ -85,7 +87,7 @@ impl KlineReadService {
                         status_mask: 0x00,
                     },
                     KLINE_OPERATION_FAULT_MEMORY,
-                    "Read the KWP2000 fault codes",
+                    KWP_FAULT_CODES_OPERATION,
                 ),
             ]
             .to_vec(),

@@ -1,9 +1,12 @@
+import { useState } from "react";
 import { useHelpLanguage } from "../helpLanguage";
 import { codeText, dataText, helpLines, parameterNote, sddText, t, useLanguage } from "../i18n";
+import { ConfirmDialog } from "./ConfirmDialog";
 import { DtcHelp } from "./DtcHelp";
 import { HelpLanguageSwitch } from "./HelpLanguageSwitch";
 import type { ModuleSurveyEntry } from "../library";
-import type { ModuleReadKind, ModuleReadSnapshot } from "../moduleRead";
+import { isFaultCodesRead, type ModuleReadKind, type ModuleReadSnapshot } from "../moduleRead";
+import type { DtcClearSnapshot } from "../serviceMode";
 import { moduleReasons, moduleRoute, nodeStatus, routeText } from "../networkMap";
 import { parameterName } from "../parameterNames";
 import { withUnit } from "../units";
@@ -23,6 +26,68 @@ interface ModuleDetailsProps {
   onSaveReport: () => void;
   /** On the bench (ADR-0020) nothing is saved. */
   bench?: boolean;
+  /** The service mode (ADR-0036): while it is on, the clear is offered
+   *  under a module's fault codes once they have been read. */
+  serviceMode?: boolean;
+  /** The last clear, shown under the module it was made on. */
+  clear?: DtcClearSnapshot;
+  clearing?: boolean;
+  onClearCodes?: (ecuFamily: string) => void;
+}
+
+/**
+ * What a clear came to (ADR-0036): the module's answer, the session it was
+ * given in, and what the module said when read again - a code that returned
+ * at once is a fault that is present, not one that was missed.
+ */
+function ClearOutcome({ clear }: { clear: DtcClearSnapshot }) {
+  return (
+    <div className={`clear-outcome clear-outcome--${clear.state.toLowerCase()}`} role="status">
+      {clear.state === "CLEARED" ? (
+        <p>
+          <strong>{t("The module accepted the clear.")}</strong>
+          {clear.session !== null ? ` ${t("in session {session}", { session: clear.session })}` : ""}
+          {clear.routeValidation === "SYNTHETIC" ? ` · ${t("bench, synthetic")}` : ""}
+        </p>
+      ) : null}
+      {clear.state === "REFUSED" ? (
+        <p>
+          <strong>{t("The module refused the clear: {refusal}", { refusal: clear.refusal ?? "—" })}</strong>
+        </p>
+      ) : null}
+      {clear.state === "FAILED" ? (
+        <p>
+          <strong>{t("The clear was not made.")}</strong>
+          {clear.error !== null ? ` ${t(clear.error.message)}` : ""}
+          {clear.error?.technicalDetails ? (
+            <span className="module-validation"> {clear.error.technicalDetails}</span>
+          ) : null}
+        </p>
+      ) : null}
+      {clear.codesAfter !== null ? (
+        clear.codesAfter.length === 0 ? (
+          <p>{t("Read again: no codes reported.")}</p>
+        ) : (
+          <>
+            <p>{t("Read again: {count} code(s) returned at once.", { count: clear.codesAfter.length })}</p>
+            <ul className="clear-outcome-codes">
+              {clear.codesAfter.map((dtc) => (
+                <li key={`${dtc.code}-${dtc.failureType}`}>
+                  <strong>{dtc.code}</strong>
+                  {dtc.description !== null ? ` — ${dtc.description}` : ""}
+                </li>
+              ))}
+            </ul>
+          </>
+        )
+      ) : null}
+      <p className="module-validation">
+        {t("{count} code(s) were held before the clear; they stay in this session's report.", {
+          count: clear.codesBefore.length,
+        })}
+      </p>
+    </div>
+  );
 }
 
 
@@ -56,8 +121,14 @@ export function ModuleDetails({
   onRead,
   onSaveReport,
   bench = false,
+  serviceMode = false,
+  clear,
+  clearing = false,
+  onClearCodes,
 }: ModuleDetailsProps) {
   const language = useLanguage();
+  // The one question before a clear (ADR-0036, decision 3).
+  const [confirmClear, setConfirmClear] = useState(false);
   const [helpLanguage] = useHelpLanguage(language);
   if (module === null) {
     return (
@@ -327,6 +398,51 @@ export function ModuleDetails({
             </table>
           ) : outcome.negativeResponse === null && outcome.dataHex === null ? (
             <p className="survey-summary">{t("No confirmed fault codes reported.")}</p>
+          ) : null}
+          {serviceMode && onClearCodes !== undefined && isFaultCodesRead(outcome) ? (
+            <div className="mode-operation">
+              <button
+                className="button button--service"
+                type="button"
+                disabled={clearing || busy || !adapterReady}
+                onClick={() => setConfirmClear(true)}
+              >
+                {clearing ? t("Clearing…") : t("Clear the fault codes")}
+              </button>
+              <span className="button-hint">
+                {t("SERVICE_ROUTINE · the codes above stay in this session's report; the module is read again afterwards.")}
+              </span>
+            </div>
+          ) : null}
+          {clear !== undefined && clear.state !== "IDLE" && clear.ecuFamily === module.ecuFamily ? (
+            <ClearOutcome clear={clear} />
+          ) : null}
+          {confirmClear ? (
+            <ConfirmDialog
+              title={t("Clear the fault codes of {module}", { module: module.ecuFamily })}
+              confirmLabel={t("Clear the codes of {module}", { module: module.ecuFamily })}
+              cancelLabel={t("Cancel")}
+              onConfirm={() => {
+                setConfirmClear(false);
+                onClearCodes?.(module.ecuFamily);
+              }}
+              onCancel={() => setConfirmClear(false)}
+            >
+              <p>
+                <strong>{module.ecuFamily}</strong>
+                {dataText(module.names, module.name, language) !== null
+                  ? ` — ${dataText(module.names, module.name, language)}`
+                  : ""}
+              </p>
+              <p>{t("Operation: clear the fault codes · class SERVICE_ROUTINE")}</p>
+              <p>
+                {t("{count} code(s) will be erased from the module. They stay in this session's report.", {
+                  count: outcome.dtcs.length,
+                })}
+              </p>
+              <p>{t("The car stands still, the ignition is on, the engine is off.")}</p>
+              <p>{t("After a positive answer the codes are read again at once.")}</p>
+            </ConfirmDialog>
           ) : null}
           <details className="technical-details">
             <summary>{t("Exchange as it happened")}</summary>

@@ -630,3 +630,60 @@ fn a_live_read_run_and_a_mileage_survey_confirm_what_one_read_confirms() {
     assert!(error.contains("module passport"), "{error}");
     assert!(error.contains("configuration read"), "{error}");
 }
+
+/// ADR-0036: a clear is an action, not evidence about a route, and is not
+/// recorded; the two fault-code reads around it are reads like any other
+/// and confirm what one read confirms.
+#[test]
+fn the_reads_around_a_clear_are_taken_and_the_clear_itself_is_not() {
+    let before = library(&[]);
+    let codes_before = read_report(Some("0x72E"), Some("59 02 FF 03 00 00 09"));
+    let codes_after = read_report(Some("0x72E"), Some("59 02 FF"));
+    let bundle = serde_json::json!({
+        "schema": "jlr-scanner.session-report",
+        "schema_version": 1,
+        "application_version": "0.0.0-test",
+        "session_started_unix_ms": 1_788_479_000_000u64,
+        "saved_unix_ms": 1_788_480_000_000u64,
+        "validation": "session bundle",
+        "adapter": null,
+        "library": null,
+        "survey": null,
+        "captures": [],
+        "module_reads": [],
+        "calibration_reads": [],
+        "dtc_clears": [{
+            "schema": "prowlone.dtc-clear",
+            "operation": "DTC_CLEAR",
+            "safety_class": "SERVICE_ROUTINE",
+            "ecu_family": "RELAYMOD",
+            "state": "CLEARED",
+            "session": "0x03",
+            "before": codes_before,
+            "after": codes_after
+        }]
+    })
+    .to_string();
+    let outcome = intake(&bundle, "session.json", &before).unwrap();
+    assert!(outcome
+        .summary
+        .confirmations
+        .iter()
+        .any(|line| line.starts_with("dtc_clears[0].before RELAYMOD")));
+    assert!(outcome
+        .summary
+        .confirmations
+        .iter()
+        .any(|line| line.starts_with("dtc_clears[0].after RELAYMOD")));
+    let manifest = serde_json::to_string(&outcome.batch).unwrap();
+    assert!(manifest.contains(".clear.00.before.") && manifest.contains(".clear.00.after."));
+    assert!(
+        !manifest.contains("SERVICE_ROUTINE") && !manifest.contains("DTC_CLEAR"),
+        "the clear itself is not evidence: {manifest}"
+    );
+    let after = library(&[("captured.json".into(), manifest)]);
+    assert_eq!(
+        status_of(&after, "RELAYMOD"),
+        (RouteStatus::Reachable, "CAPTURE_VALIDATED".into())
+    );
+}

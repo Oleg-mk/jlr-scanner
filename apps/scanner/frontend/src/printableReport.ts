@@ -53,6 +53,19 @@ export interface SessionBundle {
   module_passports?: PassportRun[];
   ccf_reads?: CcfRun[];
   battery_reads?: BatteryRun[];
+  /** The clears of fault codes (ADR-0036): each with what it erased. */
+  dtc_clears?: DtcClearRecord[];
+}
+
+interface DtcClearRecord {
+  ecu_family?: string;
+  state?: string;
+  session?: string | null;
+  route_validation?: string;
+  refusal?: string | null;
+  codes_before?: Array<{ code?: string }>;
+  codes_after?: Array<{ code?: string }> | null;
+  timestamp_unix_ms?: number;
 }
 
 interface VehicleContext {
@@ -368,6 +381,39 @@ export function buildReport(
         text(row.ecuFamily),
       ]),
       note: t("The values the modules hold; the rows SDD's own editor shows."),
+    });
+  }
+
+  // The service operations (ADR-0036): what was sent rather than asked,
+  // each confirmed by the person, with what it erased and what came back.
+  const clears = bundle.dtc_clears ?? [];
+  if (clears.length > 0) {
+    const answer = (clear: DtcClearRecord): string => {
+      switch (clear.state) {
+        case "CLEARED":
+          return clear.session ? `${t("cleared")} · ${t("in session {session}", { session: clear.session })}` : t("cleared");
+        case "REFUSED":
+          return `${t("refused")}${clear.refusal ? `: ${clear.refusal}` : ""}`;
+        default:
+          return t("not made");
+      }
+    };
+    sections.push({
+      id: "service-operations",
+      title: t("Service operations"),
+      worth: worthOf(clears[0].route_validation),
+      columns: [t("Time"), t("Module"), t("Operation"), t("Answer"), t("Codes before"), t("Codes after")],
+      rows: clears.map((clear) => [
+        stamp(clear.timestamp_unix_ms),
+        text(clear.ecu_family),
+        `${t("Clear the fault codes")} · SERVICE_ROUTINE`,
+        answer(clear),
+        String(clear.codes_before?.length ?? 0),
+        clear.codes_after === null || clear.codes_after === undefined ? "—" : String(clear.codes_after.length),
+      ]),
+      note: t(
+        "Each operation was confirmed by the person and is a service routine; the codes it erased are kept in the session bundle.",
+      ),
     });
   }
 

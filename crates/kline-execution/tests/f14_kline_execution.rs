@@ -9,9 +9,11 @@
 
 use diagnostic_environment::{DiagnosticEnvironmentResolution, DiagnosticEnvironmentResolver};
 use kline_execution::{
-    decode_response, prepare_read_only_kline_read, DecodeError, KlineReadOutcome, KlineRequest,
-    KlineTarget, Parity, PreparationError, ProvenanceField, ReadOnlyKlineIntent, SerialFraming,
-    TransactionSafetyClass, SERIAL_NODE_ADDRESSING_MODE,
+    decode_response, decode_service_response, prepare_kline_service, prepare_read_only_kline_read,
+    DecodeError, KlineReadOutcome, KlineRequest, KlineServiceOutcome, KlineTarget, Parity,
+    PreparationError, ProvenanceField, ReadOnlyKlineIntent, SerialFraming, ServiceKlineIntent,
+    TransactionSafetyClass, DTC_CLEAR_OPERATION, DTC_CLEAR_SERVICE_CAPABILITY,
+    SERIAL_NODE_ADDRESSING_MODE,
 };
 use knowledge::{
     sha256_bytes, ContentFingerprint, JsonManifestAdapter, KnowledgeStore, RedistributionStatus,
@@ -347,4 +349,49 @@ fn a_ds2_fault_memory_offers_its_words_and_decides_no_layout() {
     };
     assert_eq!(bytes, [0x00, 0x0B, 0x00, 0x2A]);
     assert_eq!(words, [0x000B, 0x002A]);
+}
+
+/// ADR-0036, stage 2 step 1: the DS2 clear compiles on the line the read
+/// uses, framed as the protocol frames a command, with a class the read
+/// path refuses; the module's acceptance and its refusal read as such, and
+/// silence is no answer.
+#[test]
+fn a_ds2_clear_prepares_as_a_service_on_the_line_the_read_uses() {
+    let service = prepare_kline_service(
+        &resolved("DS2MOD", ds2::FAULT_MEMORY_CAPABILITY),
+        ServiceKlineIntent::Ds2ClearFaultMemory {
+            target: ds2_target(),
+        },
+    )
+    .expect("the clear prepares from the fault memory's plan");
+    let transaction = service.transaction();
+    assert_eq!(
+        transaction.safety_class(),
+        TransactionSafetyClass::ServiceRoutine
+    );
+    assert_eq!(transaction.encoded_payload(), [0x72, 0x04, 0x05, 0x73]);
+    assert_eq!(transaction.capability_id(), DTC_CLEAR_SERVICE_CAPABILITY);
+    assert_eq!(transaction.node_address(), 0x72);
+    assert_eq!(transaction.backend_route(), "k-line-7");
+    assert_eq!(service.operation(), DTC_CLEAR_OPERATION);
+
+    let accepted = on_the_wire(transaction.encoded_payload(), &ds2_reply(0x72, &[]));
+    assert_eq!(
+        decode_service_response(&service, &accepted).unwrap(),
+        KlineServiceOutcome::Ds2Cleared { node_address: 0x72 }
+    );
+    let mut refusal = vec![0x72, 0x04, 0xA1];
+    refusal.push(ds2::xor_checksum(&refusal));
+    let refused = on_the_wire(transaction.encoded_payload(), &refusal);
+    assert_eq!(
+        decode_service_response(&service, &refused).unwrap(),
+        KlineServiceOutcome::Ds2NotAccepted {
+            node_address: 0x72,
+            status: 0xA1
+        }
+    );
+    assert!(matches!(
+        decode_service_response(&service, transaction.encoded_payload()),
+        Err(DecodeError::NoAnswer)
+    ));
 }
