@@ -205,7 +205,7 @@ fn a_clear_empties_the_codes_for_the_session_and_the_session_is_opened_and_left(
     assert!(!before.is_empty());
 
     let mut answer = ask(&mut bench, &[0x04, 0x14, 0xFF, 0xFF, 0xFF]);
-    if &answer[0].data[..4] == [0x03, 0x7F, 0x14, 0x7F] {
+    if answer[0].data[..4] == [0x03, 0x7F, 0x14, 0x7F] {
         // The asking half: the extended session first, then the clear.
         let opened = ask(&mut bench, &[0x02, 0x10, 0x03]);
         assert_eq!(&opened[0].data[..3], &[0x06, 0x50, 0x03]);
