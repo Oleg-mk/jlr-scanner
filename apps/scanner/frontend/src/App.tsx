@@ -361,8 +361,16 @@ export function App({
   );
   const readingModule = check.current ?? (moduleRead.busy ? selectedModule : null);
 
+  // The bench says itself on this badge - its own colour, the scenario in a
+  // circle - since the owner withdrew the bands (2026-09-18).
+  const benchScenario = controller.snapshot.benchScenario ?? BENCH_SCENARIO_DEFAULT;
   const adapterPill = bench ? (
-    <StatusBadge tone="pending">{t("Bench: virtual vehicle")}</StatusBadge>
+    <StatusBadge
+      tone="bench"
+      mark={{ value: benchScenario, label: t("Scenario {scenario}", { scenario: benchScenario }) }}
+    >
+      {t("Bench: virtual vehicle")}
+    </StatusBadge>
   ) : controller.snapshot.state === "CONNECTED" && adapterReady ? (
       <StatusBadge tone="positive">{t("Adapter ready")}</StatusBadge>
     ) : controller.snapshot.state === "CONNECTED" ? (
@@ -457,12 +465,6 @@ export function App({
           </div>
         </div>
       </header>
-      {bench ? (
-        <div className="bench-band" role="status">
-          {t("BENCH · virtual vehicle · synthetic data")} · {t("Scenario")}{" "}
-          {controller.snapshot.benchScenario ?? BENCH_SCENARIO_DEFAULT}
-        </div>
-      ) : null}
       {service.consentOpen ? (
         <ConfirmDialog
           title={t("Service mode")}
@@ -759,12 +761,6 @@ export function App({
           })}
         </div>
       </main>
-      {bench ? (
-        <div className="bench-band">
-          {t("BENCH · virtual vehicle · synthetic data")} · {t("Scenario")}{" "}
-          {controller.snapshot.benchScenario ?? BENCH_SCENARIO_DEFAULT}
-        </div>
-      ) : null}
       <footer className="app-footer">
         <div className="app-footer__row">
         <span>

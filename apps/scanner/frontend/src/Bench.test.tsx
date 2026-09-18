@@ -103,13 +103,14 @@ describe("the bench (ADR-0020)", () => {
     );
     await waitFor(() => expect(container.querySelector(".app-shell--bench")).not.toBeNull());
     expect(client.benchRequests).toBe(1);
-    // The band at the top and at the bottom, the pill, the panel. The band
-    // names the scenario, because what the screen shows depends on it.
+    // The badge in the header, in the bench's own colour, with the scenario
+    // in a circle on its right - the bands are gone (the owner, 2026-09-18);
+    // the panel; the whole screen tinted. The scenario is named, because
+    // what the screen shows depends on it.
     expect(client.scenario).toBe(1);
-    expect(
-      screen.getAllByText("BENCH · virtual vehicle · synthetic data · Scenario 1"),
-    ).toHaveLength(2);
+    expect(screen.queryByText(/BENCH ·/)).toBeNull();
     expect(screen.getByText("Bench: virtual vehicle")).toBeInTheDocument();
+    expect(screen.getByLabelText("Scenario 1")).toHaveTextContent("1");
     expect(screen.getByText("Virtual vehicle (bench)")).toBeInTheDocument();
     expect(
       screen.getByText("Bench: virtual vehicle from the library; every value is synthetic."),
@@ -147,9 +148,7 @@ describe("the bench (ADR-0020)", () => {
     expect(
       await screen.findByText("0 — a vehicle in good order, no fault codes"),
     ).toBeInTheDocument();
-    expect(
-      screen.getAllByText("BENCH · virtual vehicle · synthetic data · Scenario 0"),
-    ).toHaveLength(2);
+    expect(screen.getByLabelText("Scenario 0")).toHaveTextContent("0");
   });
 
   it("shows the report on screen and offers no file while on the bench", async () => {

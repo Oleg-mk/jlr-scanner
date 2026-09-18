@@ -357,7 +357,7 @@ const uk: Record<string, string> = {
   "Virtual vehicle (bench)": "Віртуальне авто (стенд)",
   Bench: "Стенд",
   "Bench: virtual vehicle": "Стенд: віртуальне авто",
-  "BENCH · virtual vehicle · synthetic data": "СТЕНД · віртуальне авто · дані синтетичні",
+  "Scenario {scenario}": "Сценарій {scenario}",
   Scenario: "Сценарій",
   "a vehicle in good order, no fault codes": "справне авто, жодного коду",
   "The scenario decides the fault codes: 0 is a vehicle in good order with none at all, and any other number draws codes the library describes for each module — the same number always draws the same ones.":
@@ -1559,7 +1559,7 @@ const ru: Record<string, string> = {
   "Virtual vehicle (bench)": "Виртуальный автомобиль (стенд)",
   Bench: "Стенд",
   "Bench: virtual vehicle": "Стенд: виртуальный автомобиль",
-  "BENCH · virtual vehicle · synthetic data": "СТЕНД · виртуальный автомобиль · данные синтетические",
+  "Scenario {scenario}": "Сценарий {scenario}",
   Scenario: "Сценарий",
   "a vehicle in good order, no fault codes": "исправный автомобиль, ни одного кода",
   "The scenario decides the fault codes: 0 is a vehicle in good order with none at all, and any other number draws codes the library describes for each module — the same number always draws the same ones.":

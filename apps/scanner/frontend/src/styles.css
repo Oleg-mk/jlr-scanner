@@ -2030,7 +2030,6 @@ body {
 
 .app-header,
 .demo-banner,
-.bench-band,
 .app-footer {
   flex: 0 0 auto;
 }
@@ -2648,17 +2647,6 @@ body,
   --surface-subtle: #f0d6c2;
   --border: #e2c1a6;
   --border-strong: #cfa585;
-}
-
-.bench-band {
-  padding: 0.45rem var(--content-pad);
-  background: #c8763a;
-  color: #fff;
-  font-size: 0.82rem;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-align: center;
-  text-transform: uppercase;
 }
 
 .bench-offer {
@@ -3402,6 +3390,45 @@ table.live-read-identifiers label {
 
 .app-shell .app-header .button--primary:hover:not(:disabled) {
   background: rgb(255 255 255 / 20%);
+}
+
+/* The bench badge is the one capsule with a colour of its own: the bench's
+   Namib Orange, with the scenario set in a circle on its right. It carries
+   the state the bands used to (the owner, 2026-09-18). */
+.app-shell .app-header .status-badge--bench {
+  border-color: #c8763a;
+  background: #c8763a;
+  color: #fff;
+}
+
+.app-shell .app-header .status-badge--bench .status-badge__dot {
+  background: #fff;
+}
+
+.status-badge__mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.35em;
+  height: 1.35em;
+  margin-left: 0.45em;
+  padding: 0 0.3em;
+  border-radius: 999px;
+  background: #fff;
+  color: #8a4a17;
+  font-size: 0.85em;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+/* The service mode's switch in the header is red while the mode is on: the
+   header's glass rule is more specific than the plain button rule, so it is
+   said here as well (the owner, 2026-09-18). */
+.app-shell .app-header .button--service[aria-pressed="true"] {
+  border-color: var(--negative, #b3261e);
+  background: var(--negative, #b3261e);
+  color: #fff;
 }
 
 /* On a badge the dot does the talking; the capsule stays glass. */

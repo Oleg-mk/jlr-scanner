@@ -164,8 +164,9 @@ vehicle)** in the adapter panel. No adapter is needed. A virtual vehicle,
 built from the library for the programme and model year you choose,
 answers the same commands the real path sends: survey it, check all
 modules, read a module, listen to a bus, look at the report. The whole
-window turns orange-sand with a BENCH band top and bottom while the bench is
-connected, every value is marked synthetic, and nothing from a bench
+window turns orange-sand while the bench is connected, the adapter badge in
+the header turns the same orange and carries the scenario number in a
+circle, every value is marked synthetic, and nothing from a bench
 session can be saved: the report is shown on screen only. Bench data
 proves the software, never a car; do not send us bench screenshots as
 Beside the button is a **Scenario** number, which decides what the bench

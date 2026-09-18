@@ -233,3 +233,16 @@ them. The application shows what a module says — on the bench and on a car
 alike — and states no threshold of its own: a limit is the operator's to
 set. What the bench says is now believable; it is still synthetic, and every
 row still says so.
+
+## Amendment, 2026-09-18: the bands are withdrawn; the badge carries the state
+
+Decision 7 put a band with the word BENCH in the header and the footer. On
+2026-09-18 the owner withdrew it, the same day he withdrew the service
+mode's bands («стенд полосу також прибирай, перенось індикацію на верх»):
+the ground of the whole window still turns Namib Orange while the bench is
+connected, and the adapter badge in the header - the one capsule with a
+colour of its own - turns the bench's orange and carries the scenario number
+in a circle on its right, with the scenario named for a reader. Nothing else
+of the decision changes: every value is marked SYNTHETIC, nothing from a
+bench session reaches the disk, and a screenshot still cannot pass for a
+car.
