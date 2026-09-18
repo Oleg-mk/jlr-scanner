@@ -37,6 +37,12 @@ pub struct SessionReportService {
     ccf_reads: Vec<Value>,
     /// Battery readings (ADR-0030).
     battery_reads: Vec<Value>,
+    /// Clears of fault codes (`ADR-0036`): the first records of an operation
+    /// that changed what a module holds, each with what it erased.
+    dtc_clears: Vec<Value>,
+    /// The service mode (`ADR-0036`): on for this session after the person's
+    /// consent, off on every start and every new session, never remembered.
+    service_mode: bool,
     mode: Option<String>,
     /// The bench scenario this session was connected on (ADR-0020), so the
     /// bundle can say which picture it holds even after the bench is gone.
@@ -56,9 +62,21 @@ impl SessionReportService {
             module_passports: Vec::new(),
             ccf_reads: Vec::new(),
             battery_reads: Vec::new(),
+            dtc_clears: Vec::new(),
+            service_mode: false,
             mode: None,
             bench_scenario: None,
         }
+    }
+
+    /// Switch the service mode for this session (`ADR-0036`, decision 2).
+    pub fn set_service_mode(&mut self, on: bool) {
+        self.service_mode = on;
+    }
+
+    /// Whether the operations of stage 2 may be offered in this session.
+    pub fn service_mode(&self) -> bool {
+        self.service_mode
     }
 
     /// Whether a record of `wanted` kind may join this session: yes while
@@ -94,7 +112,8 @@ impl SessionReportService {
             + self.mileage_surveys.len()
             + self.module_passports.len()
             + self.ccf_reads.len()
-            + self.battery_reads.len();
+            + self.battery_reads.len()
+            + self.dtc_clears.len();
         SessionReportSnapshot {
             captures: self.captures.len() as u32,
             module_reads: self.module_reads.len() as u32,
@@ -105,6 +124,8 @@ impl SessionReportService {
             module_passports: self.module_passports.len() as u32,
             ccf_reads: self.ccf_reads.len() as u32,
             battery_reads: self.battery_reads.len() as u32,
+            dtc_clears: self.dtc_clears.len() as u32,
+            service_mode: self.service_mode,
             report_available: total > 0,
             mode: self.mode.clone(),
         }
@@ -154,6 +175,12 @@ impl SessionReportService {
         Ok(())
     }
 
+    /// One clear of a module's fault codes, with what it erased (`ADR-0036`).
+    pub fn add_dtc_clear(&mut self, json: &str) -> Result<(), String> {
+        self.dtc_clears.push(parse(json)?);
+        Ok(())
+    }
+
     pub fn add_calibration_read(&mut self, json: &str) -> Result<(), String> {
         self.calibration_reads.push(parse(json)?);
         Ok(())
@@ -194,6 +221,7 @@ impl SessionReportService {
             "module_passports": self.module_passports,
             "ccf_reads": self.ccf_reads,
             "battery_reads": self.battery_reads,
+            "dtc_clears": self.dtc_clears,
         });
         serde_json::to_string_pretty(&bundle).map_err(|error| error.to_string())
     }

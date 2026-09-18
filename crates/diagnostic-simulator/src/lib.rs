@@ -198,6 +198,8 @@ fn nrc_byte(code: NegativeResponseCode) -> u8 {
         NegativeResponseCode::ExceededNumberOfAttempts => 0x36,
         NegativeResponseCode::RequiredTimeDelayNotExpired => 0x37,
         NegativeResponseCode::ResponsePending => 0x78,
+        NegativeResponseCode::SubFunctionNotSupportedInActiveSession => 0x7E,
+        NegativeResponseCode::ServiceNotSupportedInActiveSession => 0x7F,
         NegativeResponseCode::Other(value) => value,
     }
 }

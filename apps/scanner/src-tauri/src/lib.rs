@@ -5,6 +5,7 @@ mod battery_service;
 mod capture_service;
 mod ccf_service;
 mod diagnostic_service;
+mod dtc_clear_service;
 mod kline_read_service;
 mod live_read_service;
 mod mileage_service;
@@ -18,11 +19,12 @@ mod standard_obd_service;
 use adapter_service::{lock_service, shared_service, SharedAdapterService};
 use app_contracts::{
     AdapterSnapshot, AdapterState, BatteryReadRequest, BatteryReadSnapshot, CaptureSnapshot,
-    CcfReadRequest, CcfReadSnapshot, DiagnosticError, DiagnosticSnapshot, LibrarySnapshot,
-    LiveReadRequest, LiveReadSnapshot, MileageSurveyRequest, MileageSurveySnapshot,
-    ModulePassportRequest, ModulePassportSnapshot, ModuleReadRequest, ModuleReadSnapshot,
-    SessionReportSnapshot, StandardObdRequest, StandardObdSnapshot, VehicleCatalogueSnapshot,
-    VehicleContextInput, VehicleSurveySnapshot, VinDecodeSnapshot,
+    CcfReadRequest, CcfReadSnapshot, DiagnosticError, DiagnosticSnapshot, DtcClearRequest,
+    DtcClearSnapshot, DtcClearState, LibrarySnapshot, LiveReadRequest, LiveReadSnapshot,
+    MileageSurveyRequest, MileageSurveySnapshot, ModulePassportRequest, ModulePassportSnapshot,
+    ModuleReadKind, ModuleReadRequest, ModuleReadSnapshot, ModuleReadState, SessionReportSnapshot,
+    StandardObdRequest, StandardObdSnapshot, VehicleCatalogueSnapshot, VehicleContextInput,
+    VehicleSurveySnapshot, VinDecodeSnapshot,
 };
 use battery_service::{BatteryService, BATTERY_READ_TIMEOUT};
 use bench_vehicle::BenchVehicle;
@@ -30,6 +32,9 @@ use capture_service::CaptureService;
 use ccf_service::{CcfService, CCF_READ_TIMEOUT};
 use diagnostic_service::DiagnosticService;
 use diagnostic_session::parameter_text;
+use dtc_clear_service::{
+    not_offered, ClearResult, DtcClearService, PreparedDtcClear, DTC_CLEAR_TIMEOUT,
+};
 use kline_read_service::{KlineReadService, PreparedKlineRead, KLINE_READ_TIMEOUT};
 use live_read_service::{LiveReadService, LIVE_READ_TIMEOUT};
 use mileage_service::{MileageService, MILEAGE_READ_TIMEOUT};
@@ -57,6 +62,7 @@ type SharedMileageService = Mutex<MileageService>;
 type SharedPassportService = Mutex<PassportService>;
 type SharedCcfService = Mutex<CcfService>;
 type SharedBatteryService = Mutex<BatteryService>;
+type SharedDtcClearService = Mutex<DtcClearService>;
 
 fn lock_battery<'a>(state: &'a State<'a, SharedBatteryService>) -> MutexGuard<'a, BatteryService> {
     state
@@ -136,6 +142,15 @@ fn refresh_bench(bench: &SharedBench, session: &SessionService, scenario: u32) {
     *bench
         .lock()
         .unwrap_or_else(std::sync::PoisonError::into_inner) = vehicle;
+}
+
+fn lock_dtc_clear<'a>(
+    state: &'a State<'a, SharedDtcClearService>,
+) -> MutexGuard<'a, DtcClearService> {
+    state
+        .inner()
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
 }
 
 fn lock_module_read<'a>(
@@ -770,6 +785,9 @@ async fn start_new_session(
     replace(app.state::<SharedMileageService>(), MileageService::new());
     replace(app.state::<SharedPassportService>(), PassportService::new());
     replace(app.state::<SharedCcfService>(), CcfService::new());
+    // A clear belongs to the session it was made in; the service mode is
+    // off in the new one until the person turns it on again (ADR-0036).
+    replace(app.state::<SharedDtcClearService>(), DtcClearService::new());
     app.state::<SharedSessionService>()
         .inner()
         .lock()
@@ -923,6 +941,194 @@ async fn read_module(
         report_state,
         request,
     ))
+}
+
+// ---------------------------------------------------------------------------
+// Stage 2, step 1: the service mode and the clear of the codes (ADR-0036)
+// ---------------------------------------------------------------------------
+
+/// Switch the service mode for this session (`ADR-0036`, decision 2). The
+/// interface asks the person's consent before it calls this with `true`;
+/// the shell keeps the state and offers the operations of stage 2 only
+/// while it is on. A new session turns it off.
+#[tauri::command]
+async fn set_service_mode(
+    report_state: State<'_, SharedSessionReportService>,
+    on: bool,
+) -> Result<SessionReportSnapshot, String> {
+    let mut session_report = lock_session_report(&report_state);
+    session_report.set_service_mode(on);
+    Ok(session_report.snapshot())
+}
+
+#[tauri::command]
+async fn get_dtc_clear_state(
+    clear_state: State<'_, SharedDtcClearService>,
+) -> Result<DtcClearSnapshot, String> {
+    Ok(lock_dtc_clear(&clear_state).snapshot())
+}
+
+/// Clear one module's fault codes (`ADR-0036`, decision 9). Refused before
+/// anything is sent unless the service mode is on and the module's codes
+/// were read in this session; after a positive answer the codes are read
+/// again, so what returned at once is seen for what it is.
+#[tauri::command]
+async fn clear_dtcs(
+    adapter_state: State<'_, SharedAdapterService>,
+    session_state: State<'_, SharedSessionService>,
+    module_read_state: State<'_, SharedModuleReadService>,
+    clear_state: State<'_, SharedDtcClearService>,
+    report_state: State<'_, SharedSessionReportService>,
+    request: DtcClearRequest,
+) -> Result<DtcClearSnapshot, String> {
+    Ok(clear_dtcs_now(
+        adapter_state,
+        session_state,
+        module_read_state,
+        clear_state,
+        report_state,
+        request,
+    ))
+}
+
+fn clear_dtcs_now(
+    adapter_state: State<'_, SharedAdapterService>,
+    session_state: State<'_, SharedSessionService>,
+    module_read_state: State<'_, SharedModuleReadService>,
+    clear_state: State<'_, SharedDtcClearService>,
+    report_state: State<'_, SharedSessionReportService>,
+    request: DtcClearRequest,
+) -> DtcClearSnapshot {
+    // The two preconditions, checked before the plan is even resolved.
+    if !lock_session_report(&report_state).service_mode() {
+        return lock_dtc_clear(&clear_state).finish(
+            &request,
+            None,
+            None,
+            None,
+            Err(not_offered("the service mode is off for this session")),
+        );
+    }
+    let before = lock_module_read(&module_read_state)
+        .last_fault_codes(&request.ecu_family)
+        .cloned();
+    let Some(before) = before else {
+        return lock_dtc_clear(&clear_state).finish(
+            &request,
+            None,
+            None,
+            None,
+            Err(not_offered(
+                "this module's fault codes have not been read in this session; read them first, so the record keeps what the clear erases",
+            )),
+        );
+    };
+
+    let prepared = {
+        let session = lock_session(&session_state);
+        DtcClearService::prepare(session.library(), &request)
+    };
+    let prepared = match prepared {
+        Ok(prepared) => prepared,
+        Err(error) => {
+            return lock_dtc_clear(&clear_state).finish(
+                &request,
+                None,
+                None,
+                Some(&before),
+                Err(error),
+            )
+        }
+    };
+
+    let (adapter, result, bench) = {
+        let mut service = lock_service(&adapter_state);
+        let Some(adapter) = service.connected_adapter() else {
+            return lock_dtc_clear(&clear_state).finish(
+                &request,
+                Some(&prepared),
+                None,
+                Some(&before),
+                Err(adapter_unavailable()),
+            );
+        };
+        let result = match &prepared {
+            PreparedDtcClear::Uds {
+                service: prepared_service,
+                ..
+            } => service
+                .execute_uds_service(prepared_service, DTC_CLEAR_TIMEOUT)
+                .map(ClearResult::Uds),
+            PreparedDtcClear::Kline {
+                service: prepared_service,
+                ..
+            } => service
+                .execute_kline_service(prepared_service, DTC_CLEAR_TIMEOUT)
+                .map(ClearResult::Kline),
+        };
+        let Some(result) = result else {
+            return lock_dtc_clear(&clear_state).finish(
+                &request,
+                Some(&prepared),
+                None,
+                Some(&before),
+                Err(adapter_unavailable()),
+            );
+        };
+        (adapter, result, service.is_bench())
+    };
+
+    let mut snapshot = {
+        let mut clears = lock_dtc_clear(&clear_state);
+        let mut snapshot = clears.finish(
+            &request,
+            Some(&prepared),
+            Some(&adapter),
+            Some(&before),
+            Ok(result),
+        );
+        if bench {
+            snapshot = clears.mark_synthetic();
+        }
+        snapshot
+    };
+
+    // A module that accepted the clear is read again at once: what it
+    // answers now is a fault that is present, not one that was missed.
+    if snapshot.state == DtcClearState::Cleared {
+        let reread = read_module_now(
+            adapter_state.clone(),
+            session_state.clone(),
+            module_read_state.clone(),
+            report_state.clone(),
+            ModuleReadRequest {
+                ecu_family: request.ecu_family.clone(),
+                kind: ModuleReadKind::FaultCodes,
+                identifier: None,
+                context: request.context.clone(),
+            },
+        );
+        if reread.state == ModuleReadState::Succeeded {
+            let after = lock_module_read(&module_read_state)
+                .last_fault_codes(&request.ecu_family)
+                .cloned();
+            if let Some(after) = after {
+                snapshot = lock_dtc_clear(&clear_state).attach_after(&after);
+            }
+        }
+    }
+
+    let record = lock_dtc_clear(&clear_state).record_json();
+    if let Ok(json) = record {
+        let mut session_report = lock_session_report(&report_state);
+        session_report.set_mode(if bench {
+            SESSION_MODE_BENCH
+        } else {
+            SESSION_MODE_REAL
+        });
+        let _ = session_report.add_dtc_clear(&json);
+    }
+    snapshot
 }
 
 // ---------------------------------------------------------------------------
@@ -1738,6 +1944,7 @@ pub fn run() {
         .manage(Mutex::new(PassportService::new()))
         .manage(Mutex::new(CcfService::new()))
         .manage(Mutex::new(BatteryService::new()))
+        .manage(Mutex::new(DtcClearService::new()))
         .manage(Mutex::new(SessionReportService::new()))
         .invoke_handler(tauri::generate_handler![
             get_adapter_state,
@@ -1783,6 +1990,9 @@ pub fn run() {
             ccf_read_step,
             finish_ccf_read,
             get_module_read_report_json,
+            set_service_mode,
+            get_dtc_clear_state,
+            clear_dtcs,
             get_session_report_state,
             get_session_report_json,
             save_text_file,

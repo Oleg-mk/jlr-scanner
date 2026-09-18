@@ -176,11 +176,59 @@ fn an_unknown_identifier_draws_request_out_of_range_and_an_unknown_service_not_s
         &request(BenchRoute::HsCan, 0x7E0, &[0x03, 0x22, 0xDE, 0xAD]),
     );
     assert_eq!(&answers[0].data[..4], &[0x03, 0x7F, 0x22, 0x31]);
+    // A write (0x2E) is a service of a later step: not supported, as before.
     let answers = bench.on_frame(
         BenchRoute::HsCan,
-        &request(BenchRoute::HsCan, 0x7E0, &[0x02, 0x10, 0x03]),
+        &request(
+            BenchRoute::HsCan,
+            0x7E0,
+            &[0x05, 0x2E, 0x12, 0x59, 0x00, 0x01],
+        ),
     );
-    assert_eq!(&answers[0].data[..4], &[0x03, 0x7F, 0x10, 0x11]);
+    assert_eq!(&answers[0].data[..4], &[0x03, 0x7F, 0x2E, 0x11]);
+}
+
+/// ADR-0036, stage 2 step 1: the bench opens and leaves the extended
+/// session, clears a module's codes - at once, or only after the session is
+/// opened, by the module's half - and holds no codes for the rest of the
+/// session.
+#[test]
+fn a_clear_empties_the_codes_for_the_session_and_the_session_is_opened_and_left() {
+    let library = library();
+    let mut bench =
+        BenchVehicle::from_library(&library, &vehicle(), None, bench_vehicle::SCENARIO_DEFAULT);
+    let ask = |bench: &mut BenchVehicle, data: &[u8]| {
+        bench.on_frame(BenchRoute::HsCan, &request(BenchRoute::HsCan, 0x7E0, data))
+    };
+    // The codes the scenario gave the module, as a read reports them.
+    let before = ask(&mut bench, &[0x03, 0x19, 0x02, 0xFF]);
+    assert!(!before.is_empty());
+
+    let mut answer = ask(&mut bench, &[0x04, 0x14, 0xFF, 0xFF, 0xFF]);
+    if &answer[0].data[..4] == [0x03, 0x7F, 0x14, 0x7F] {
+        // The asking half: the extended session first, then the clear.
+        let opened = ask(&mut bench, &[0x02, 0x10, 0x03]);
+        assert_eq!(&opened[0].data[..3], &[0x06, 0x50, 0x03]);
+        answer = ask(&mut bench, &[0x04, 0x14, 0xFF, 0xFF, 0xFF]);
+    }
+    assert_eq!(
+        &answer[0].data[..2],
+        &[0x01, 0x54],
+        "{:02X?}",
+        answer[0].data
+    );
+
+    // Nothing left: the report is the mask alone.
+    let after = ask(&mut bench, &[0x03, 0x19, 0x02, 0xFF]);
+    assert_eq!(&after[0].data[..4], &[0x03, 0x59, 0x02, 0xFF]);
+    assert!(after[0].data[4..].iter().all(|byte| *byte == 0));
+
+    // The way back is answered too, whatever session the module was in.
+    let back = ask(&mut bench, &[0x02, 0x10, 0x01]);
+    assert_eq!(&back[0].data[..3], &[0x06, 0x50, 0x01]);
+    // A group this bench does not hold is out of range, not a clear.
+    let partial = ask(&mut bench, &[0x04, 0x14, 0x00, 0x03, 0x00]);
+    assert_eq!(&partial[0].data[..4], &[0x03, 0x7F, 0x14, 0x31]);
 }
 
 #[test]

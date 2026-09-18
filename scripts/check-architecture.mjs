@@ -313,15 +313,32 @@ const mongooseUdsSource = await readFile(
 if (!/pub\s+fn\s+execute_prepared_uds_read\s*\([\s\S]*?transaction:\s*&PreparedUdsTransaction/.test(mongooseUdsSource)) {
   failures.push("Mongoose live UDS execution does not require PreparedUdsTransaction");
 }
+// ADR-0036 (stage 2, step 1): the one service operation reaches the adapter
+// only as a prepared service, through its own function, and that function is
+// the only place a diagnostic session is opened. The read function's body
+// names no session control; the crate names no service of a later step.
+if (!/pub\s+fn\s+execute_prepared_uds_service\s*\([\s\S]*?service:\s*&PreparedUdsService/.test(mongooseUdsSource)) {
+  failures.push("Mongoose live UDS service execution does not require PreparedUdsService");
+}
+const udsReadStart = mongooseUdsSource.indexOf("pub fn execute_prepared_uds_read(");
+const udsServiceStart = mongooseUdsSource.indexOf("pub fn execute_prepared_uds_service(");
+const udsReadBody =
+  udsReadStart >= 0 && udsServiceStart > udsReadStart
+    ? mongooseUdsSource.slice(udsReadStart, udsServiceStart)
+    : "";
+if (udsReadBody === "" || /diagnostic_session_control\s*\(|tester_present\s*\(/.test(udsReadBody)) {
+  failures.push("Mongoose live UDS read opens a diagnostic session, or the read and the service are not laid out as ADR-0036 says");
+}
 for (const forbidden of [
   /physical_request_id\s*\+\s*8/,
   /wrapping_add\(8\)/,
-  /diagnostic_session_control\s*\(/,
-  /tester_present\s*\(/,
   /\bSecurityAccess\b/,
   /\bRoutineControl\b/,
   /\bWriteDataByIdentifier\b/,
+  /\bInputOutputControl\w*\b/,
   /\bEcuReset\b/,
+  /\bRequestDownload\b/,
+  /\bTransferData\b/,
 ]) {
   if (forbidden.test(mongooseUdsSource)) {
     failures.push("Mongoose live UDS path exposes forbidden behaviour");
@@ -338,6 +355,10 @@ const mongooseKlineSource = await readFile(
 if (!/pub\s+fn\s+execute_prepared_kline_read\s*\([\s\S]*?transaction:\s*&PreparedKlineTransaction/.test(mongooseKlineSource)) {
   failures.push("Mongoose live K-line execution does not require PreparedKlineTransaction");
 }
+// ADR-0036: the K-line clear reaches the adapter only as a prepared service.
+if (!/pub\s+fn\s+execute_prepared_kline_service\s*\([\s\S]*?service:\s*&PreparedKlineService/.test(mongooseKlineSource)) {
+  failures.push("Mongoose live K-line service execution does not require PreparedKlineService");
+}
 // Comments may name the write command in order to forbid it; code may not.
 const withoutComments = (source) =>
   source
@@ -352,13 +373,13 @@ for (const source of klineSources) {
   for (const forbidden of [
     /0x0014/,
     /SetData/,
-    /\bclear_fault/i,
     /\bsecurity_access/i,
     /start_diagnostic_session/i,
     /routine_control/i,
+    /write_memory/i,
   ]) {
     if (forbidden.test(source)) {
-      failures.push("Mongoose K-line path names a write or a non-read-only service");
+      failures.push("Mongoose K-line path names a write or a service outside ADR-0029 and ADR-0036");
     }
   }
 }
@@ -371,7 +392,6 @@ for (const forbidden of [
   /pub\s+fn\s+execute_raw\b/,
   /pub\s+fn\s+send_\w*\(/,
   /pub\s+fn\s+transmit\w*\(/,
-  /\bclear_fault\b/i,
   /\bsecurity_access\b/i,
   /\bstart_diagnostic_session\b/i,
   /\broutine_control\b/i,
@@ -380,6 +400,20 @@ for (const forbidden of [
   if (forbidden.test(klineExecutionSource)) {
     failures.push("kline-execution exposes forbidden raw or non-read-only behaviour");
   }
+}
+// ADR-0036 step 1: the service intents are the two clears and no third.
+const serviceEnumStart = klineExecutionSource.indexOf("pub enum ServiceKlineIntent {");
+const serviceEnumEnd =
+  serviceEnumStart >= 0
+    ? klineExecutionSource.indexOf(String.fromCharCode(10) + "}", serviceEnumStart)
+    : -1;
+const klineServiceBlock =
+  serviceEnumStart >= 0 && serviceEnumEnd > serviceEnumStart
+    ? klineExecutionSource.slice(serviceEnumStart, serviceEnumEnd)
+    : "";
+const klineServices = (klineServiceBlock.match(/^\s{4}(Ds2|Kwp)\w+\s*\{/gm) ?? []).length;
+if (klineServices !== 2) {
+  failures.push(`kline-execution declares ${klineServices} service intents, ADR-0036 step 1 names 2`);
 }
 // The four reads of ADR-0029 and no fifth.
 const enumStart = klineExecutionSource.indexOf("pub enum ReadOnlyKlineIntent {");
@@ -491,36 +525,35 @@ for (const forbidden of [
   if (forbidden.test(udsSource)) failures.push("UDS exposes an out-of-scope active/programming service");
 }
 
-// ADR-0029 decision 7: the K-line protocol crates speak their read-only
-// services and nothing that writes. DS2 has no clear-fault (0x05) and no
-// public frame encoder; KWP2000 has no session control beyond the link
-// handshake, no tester-present, no clear (0x14), no security access, no
-// routine, no write, no download or upload, and no public encoder either.
+// ADR-0029 decision 7, amended by ADR-0036 step 1: the K-line protocol
+// crates speak their read-only services and, since stage 2, the one clear
+// each - DS2 clear-fault (0x05), KWP2000 ClearDiagnosticInformation (0x14) -
+// and nothing else that writes. No public frame encoder; KWP2000 has no
+// session control beyond the link handshake, no tester-present, no security
+// access, no routine, no write, no download or upload.
 const ds2Source = await readFile(new URL("crates/ds2/src/lib.rs", root), "utf8");
 for (const forbidden of [
-  /^\s*pub\s+fn\s+(clear|erase|reset|write|program|code|secur|session|frame|encode|raw|send|transmit)\w*\(/im,
-  /COMMAND_CLEAR/,
-  /CLEAR_FAULT/i,
+  /^\s*pub\s+fn\s+(?!clear_fault_memory\()(clear|erase|reset|write|program|code|secur|session|frame|encode|raw|send|transmit)\w*\(/im,
+  /COMMAND_(?!CLEAR_FAULT_MEMORY\b)(CLEAR|ERASE|RESET|WRITE|CODE|PROGRAM)/,
 ]) {
-  if (forbidden.test(ds2Source)) failures.push("DS2 exposes a service or an encoder outside ADR-0029");
+  if (forbidden.test(ds2Source)) failures.push("DS2 exposes a service or an encoder outside ADR-0029 and ADR-0036");
 }
 const kwpSource = await readFile(new URL("crates/kwp2000/src/lib.rs", root), "utf8");
 for (const forbidden of [
-  /^\s*pub\s+fn\s+(clear|erase|reset|write|program|secur|routine|session|tester_present|stop_communication|input_output|download|upload|transfer|memory|frame|encode|raw|send|transmit)\w*\(/im,
-  /SID_(CLEAR|SECURITY|WRITE|ROUTINE|ECU_RESET|START_DIAGNOSTIC_SESSION|TESTER_PRESENT|INPUT_OUTPUT|REQUEST_DOWNLOAD|REQUEST_UPLOAD|TRANSFER_DATA|STOP_COMMUNICATION|ACCESS_TIMING)/,
-  /\bClearDiagnosticInformation\b/,
+  /^\s*pub\s+fn\s+(?!clear_diagnostic_information\()(clear|erase|reset|write|program|secur|routine|session|tester_present|stop_communication|input_output|download|upload|transfer|memory|frame|encode|raw|send|transmit)\w*\(/im,
+  /SID_(?!CLEAR_DIAGNOSTIC_INFORMATION\b)(CLEAR|SECURITY|WRITE|ROUTINE|ECU_RESET|START_DIAGNOSTIC_SESSION|TESTER_PRESENT|INPUT_OUTPUT|REQUEST_DOWNLOAD|REQUEST_UPLOAD|TRANSFER_DATA|STOP_COMMUNICATION|ACCESS_TIMING)/,
   /\bSecurityAccess\b/,
   /\bWriteDataBy/,
   /\bStartDiagnosticSession\b/,
 ]) {
-  if (forbidden.test(kwpSource)) failures.push("KWP2000 exposes a service or an encoder outside ADR-0029");
+  if (forbidden.test(kwpSource)) failures.push("KWP2000 exposes a service or an encoder outside ADR-0029 and ADR-0036");
 }
-// The K-line request types must have exactly the constructors ADR-0029
-// names: two for DS2, three for KWP2000.
+// The K-line request types must have exactly the constructors ADR-0029 and
+// ADR-0036 name: three for DS2, four for KWP2000.
 const ds2Constructors = (ds2Source.match(/^\s{4}pub fn \w+\(node_address: u8/gm) ?? []).length;
-if (ds2Constructors !== 2) failures.push(`DS2 has ${ds2Constructors} request constructors, ADR-0029 names 2`);
+if (ds2Constructors !== 3) failures.push(`DS2 has ${ds2Constructors} request constructors, ADR-0029 and ADR-0036 name 3`);
 const kwpConstructors = (kwpSource.match(/^\s{4}pub fn \w+\(target: u8/gm) ?? []).length;
-if (kwpConstructors !== 3) failures.push(`KWP2000 has ${kwpConstructors} request constructors, ADR-0029 names 3`);
+if (kwpConstructors !== 4) failures.push(`KWP2000 has ${kwpConstructors} request constructors, ADR-0029 and ADR-0036 name 4`);
 
 for (const path of [
   "crates/transport-api/src/can.rs",
@@ -584,6 +617,24 @@ for (const forbidden of [
   if (forbidden.test(udsExecutionSource)) {
     failures.push("uds-execution exposes forbidden raw/live/session/non-read-only behavior");
   }
+}
+// ADR-0036 step 1: one service intent, the clear, prepared as a service the
+// read path cannot take.
+if (!/pub\s+struct\s+PreparedUdsService\b/.test(udsExecutionSource)) {
+  failures.push("uds-execution does not prepare a service as its own type (ADR-0036)");
+}
+const udsServiceEnumStart = udsExecutionSource.indexOf("pub enum ServiceUdsIntent {");
+const udsServiceEnumEnd =
+  udsServiceEnumStart >= 0
+    ? udsExecutionSource.indexOf(String.fromCharCode(10) + "}", udsServiceEnumStart)
+    : -1;
+const udsServiceBlock =
+  udsServiceEnumStart >= 0 && udsServiceEnumEnd > udsServiceEnumStart
+    ? udsExecutionSource.slice(udsServiceEnumStart, udsServiceEnumEnd)
+    : "";
+const udsServices = (udsServiceBlock.match(/^\s{4}[A-Z]\w+\s*\{/gm) ?? []).length;
+if (udsServices !== 1) {
+  failures.push(`uds-execution declares ${udsServices} service intents, ADR-0036 step 1 names 1`);
 }
 
 const diagnosticsCoreSource = await readFile(

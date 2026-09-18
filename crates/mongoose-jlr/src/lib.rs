@@ -28,4 +28,4 @@ pub use passive::{
     list_vehicle_routes, CanIdFormat, NetworkType, OpenReceiveRoute, PassiveCapability,
     RawCanFrame, VehicleRoute, VehicleRouteId,
 };
-pub use uds_live::{MongooseUdsReadResult, UDS_PENDING_TIMEOUT};
+pub use uds_live::{MongooseUdsReadResult, MongooseUdsServiceResult, UDS_PENDING_TIMEOUT};

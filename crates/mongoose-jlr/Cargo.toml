@@ -12,6 +12,7 @@ isotp.workspace = true
 kline-execution.workspace = true
 obd-j1979.workspace = true
 transport-api.workspace = true
+uds.workspace = true
 uds-execution.workspace = true
 
 [dev-dependencies]

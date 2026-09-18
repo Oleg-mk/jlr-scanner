@@ -7,10 +7,12 @@
 //! over everything before it. The module answers in the same shape, its
 //! first data byte saying whether the request was accepted.
 //!
-//! Two requests exist here: the identification (`0x00`) and the fault
-//! memory (`0x04`). The clear-fault request (`0x05`) and every other
-//! command are deliberately absent, the frame encoder is private so that
-//! no caller can build a command this crate does not name, and the
+//! Three requests exist here: the identification (`0x00`), the fault
+//! memory (`0x04`), and - since ADR-0036 - the clear of the fault memory
+//! (`0x05`), the one service operation of stage 2's first step, which the
+//! product sends only as a prepared service after the person's confirmation.
+//! Every other command is deliberately absent, the frame encoder is private
+//! so that no caller can build a command this crate does not name, and the
 //! architecture check keeps both so. Nothing here interprets a module's
 //! data beyond the frame: the bytes, their printable text, and the
 //! module's own acceptance byte. Which words of a fault memory are codes
@@ -31,6 +33,8 @@ pub const FAULT_MEMORY_CAPABILITY: &str = "ds2.fault_memory.read_only";
 pub const COMMAND_IDENTIFICATION: u8 = 0x00;
 /// The fault-memory request: the codes the module holds.
 pub const COMMAND_FAULT_MEMORY: u8 = 0x04;
+/// Clear the fault memory (ADR-0036): a service operation, never a read.
+pub const COMMAND_CLEAR_FAULT_MEMORY: u8 = 0x05;
 /// The first data byte of a reply to a request the module accepted.
 pub const REPLY_ACCEPTED: u8 = 0xA0;
 /// The physical layer DS2 is specified on. The bus record from the platform
@@ -43,8 +47,8 @@ pub const NOMINAL_FRAMING: &str = "data_bits=8;parity=even;stop_bits=1";
 /// The shortest frame: address, length and checksum.
 pub const MIN_FRAME_LEN: usize = 3;
 
-/// A request this product makes: one of the two named commands, framed for
-/// one node address. There is no constructor for any other command.
+/// A request this product makes: one of the three named commands, framed
+/// for one node address. There is no constructor for any other command.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Ds2Request {
     bytes: Vec<u8>,
@@ -62,6 +66,14 @@ impl Ds2Request {
     pub fn fault_memory(node_address: u8) -> Self {
         Self {
             bytes: encode(node_address, &[COMMAND_FAULT_MEMORY]),
+        }
+    }
+
+    /// The clear of one module's fault memory (ADR-0036). The module
+    /// answers with its acceptance byte, as it answers every command.
+    pub fn clear_fault_memory(node_address: u8) -> Self {
+        Self {
+            bytes: encode(node_address, &[COMMAND_CLEAR_FAULT_MEMORY]),
         }
     }
 
@@ -323,3 +335,22 @@ impl fmt::Display for Ds2Error {
 }
 
 impl std::error::Error for Ds2Error {}
+
+#[cfg(test)]
+mod service_tests {
+    use super::*;
+
+    /// ADR-0036: the clear is framed like every DS2 command, for one node.
+    #[test]
+    fn the_clear_is_a_framed_command_for_one_node() {
+        let request = Ds2Request::clear_fault_memory(0x72);
+        assert_eq!(request.node_address(), 0x72);
+        assert_eq!(request.command(), COMMAND_CLEAR_FAULT_MEMORY);
+        let bytes = request.as_bytes();
+        assert_eq!(bytes[1] as usize, bytes.len());
+        assert_eq!(
+            bytes.last().copied(),
+            Some(xor_checksum(&bytes[..bytes.len() - 1]))
+        );
+    }
+}

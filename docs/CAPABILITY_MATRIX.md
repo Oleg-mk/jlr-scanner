@@ -21,7 +21,7 @@ Written 2026-09-12 at the owner's request, updated 2026-09-17 when the last row 
 | `not found in the data` | not found in SDD 169's data; may still exist in its runtime |
 | `—` | not applicable, or already answered by the column before |
 
-**Counts.** 99 rows. SDD does 63 of them. ProwlOne today: 44 built, 1 partly, none open inside stage 1 — the graphs and gauges of F15 were built on 2026-09-17. The roadmap: 20 in stage 2, 8 in stage 3. The ceiling: 38 already reached, 49 possible, 3 need other hardware, 8 excluded for good, 1 no. 10 rows are things SDD does not do and ProwlOne already does; 8 rows are things SDD does that ProwlOne will never do.
+**Counts.** 99 rows. SDD does 63 of them. ProwlOne today: 46 built, 1 partly, none open inside stage 1 — the graphs and gauges of F15 were built on 2026-09-17, and on 2026-09-18 stage 2 began with the clear of the codes and the extended session around it. The roadmap: 18 in stage 2, 8 in stage 3. The ceiling: 40 already reached, 47 possible, 3 need other hardware, 8 excluded for good, 1 no. 10 rows are things SDD does not do and ProwlOne already does; 8 rows are things SDD does that ProwlOne will never do.
 
 ## Vehicle, modules, network
 
@@ -56,7 +56,7 @@ Written 2026-09-12 at the owner's request, updated 2026-09-17 when the last row 
 | Legislated OBD codes (modes 03, 07, 0A) | **not found in the data** | **built** — 04 and 08 deliberately absent | **—** | **built** | obd-j1979 |
 | OBD readiness monitors (mode 01) | **not found in the data** | **built** | **—** | **built** | obd-j1979 current_data |
 | Monitor test results (mode 06) | **not found in the data** | **built** | **—** | **built** | obd-j1979 |
-| Clearing codes (UDS 0x14, mode 04) | **yes** | **no** — the product's first write | **stage 2** — F12: own ADR, class, confirmation | **possible** — the report records what was cleared | SAFETY_BOUNDARIES; ROADMAP stage 2 |
+| Clearing codes (UDS 0x14, mode 04) | **yes** | **built** — stage 2 step 1 (2026-09-18): in the service mode, after one confirmation, over UDS and K-line; the report keeps what was cleared and what came back | **—** | **built** | ADR-0036; ROADMAP F23 |
 | Fault history across sessions | **not found in the data** | **no** | **—** | **possible** | — |
 
 ## Live data
@@ -116,7 +116,7 @@ Written 2026-09-12 at the owner's request, updated 2026-09-17 when the last row 
 | On-demand self test (ODST, routine 0x0202) | **yes** — 123 tests, 93 modules | **no** — listed with SDD's own words, run by nothing | **stage 2** | **possible** | ADR-0032; COMMON_SDD_DATA_ODST; MDX ROUTINE_IDENTIFIERS |
 | Actuator control (0x2F) | **yes** — ≈120 controllable identifiers in the data | **no** | **stage 2** | **possible** | MDX_*.xml CONTROLLABLE |
 | Routines (0x31): calibrations, resets, checks | **yes** | **no** | **stage 2** | **possible** | MDX_*.xml ROUTINE; UMF scripts |
-| Extended diagnostic session (0x10 03) | **yes** | **no** — everything is read in the default session | **stage 2** — most routines need it | **possible** | PLATFORM diag/prog sessions |
+| Extended diagnostic session (0x10 03) | **yes** | **built** — opened for a service operation where the module asks for it, and left after it (2026-09-18); every read stays in the default session | **—** | **built** | ADR-0036 decision 4 |
 | Security access (0x27, seed/key) | **yes** — AlgData.dll | **no** | **no** — not in the plan | **possible** — only with the algorithms, which are JLR's; without them, unavailable | MDX SECURITY_REFS; CURRENT_JLR_ALGDATA_RUNTIME |
 
 ## Vehicle configuration

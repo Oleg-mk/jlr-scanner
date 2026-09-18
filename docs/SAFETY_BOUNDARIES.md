@@ -35,10 +35,18 @@ Actuator commands whose effects end with the session or power cycle.
 ### `SERVICE_ROUTINE`
 
 Explicit, validated service procedures. SDD's on-demand self tests are
-classified here and are therefore unavailable in stage 1. Since `ADR-0032`
-the product **lists** them per module, with SDD's own name, timings and
-instructions, and runs none: listing is knowledge, running is a routine, and
-the class is what keeps the two apart.
+classified here; since `ADR-0032` the product **lists** them per module, with
+SDD's own name, timings and instructions, and runs none yet: listing is
+knowledge, running is a routine, and the class is what keeps the two apart.
+
+The operations of this class the product has, since stage 2 began
+(`ADR-0036`, 2026-09-18). Each exists in the interface only inside the
+service mode the person switched on for the session, asks its own
+confirmation, and is recorded with what it changed:
+
+| bundle field | record schema | what it is | decided |
+| --- | --- | --- | --- |
+| `dtc_clears` | `prowlone.dtc-clear`, operation `DTC_CLEAR` | one `ClearDiagnosticInformation` (UDS `0x14`, every group; DS2 `0x05`; KWP2000 `0x14`) to one module whose fault codes were read in this session — the read that found them and the read made after the clear travel with the record, so what was erased is kept; over UDS the clear is tried in the default session and, where the module asks, in the extended session opened for it and left after it | `ADR-0036`, step 1 |
 
 ### `PERSISTENT_CHANGE`
 

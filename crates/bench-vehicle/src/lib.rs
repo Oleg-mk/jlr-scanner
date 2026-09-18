@@ -43,6 +43,9 @@ use transport_api::{BenchBus, BenchRoute, CanFrame, CanId};
 
 /// ISO-TP padding, as the application pads its own requests.
 const PADDING: u8 = 0x00;
+/// The default and the extended diagnostic session, as ISO 14229 numbers them.
+const DEFAULT_SESSION: u8 = 0x01;
+const EXTENDED_SESSION: u8 = 0x03;
 /// The VIN identifier every module answers, with the described vehicle's VIN.
 const VIN_IDENTIFIER: u16 = 0xF190;
 /// Data bytes for an identifier whose catalogue entry records no byte range.
@@ -135,7 +138,14 @@ struct ModuleResponder {
     /// framing the module answers in (`ADR-0029`).
     protocol: String,
     /// Faults as they go on the wire: code high, code low, failure type.
+    /// A clear (ADR-0036) empties the list for the rest of the session; the
+    /// scenario's faults return with the next connection.
     faults: Vec<[u8; 3]>,
+    /// The diagnostic session the module is in: the default one until a
+    /// tester opens another (ADR-0036). Half the bench's modules clear
+    /// their codes in the default session and half ask for the extended
+    /// one, so both paths of a service operation run on the bench.
+    session: u8,
     /// Consecutive frames waiting for the tester's flow control.
     pending: Vec<Vec<u8>>,
     /// Requests this module has answered with a value; the values walk
@@ -225,6 +235,7 @@ impl BenchVehicle {
                 texts,
                 configuration,
                 faults: choose_faults(library, &entry.ecu_family, scenario),
+                session: DEFAULT_SESSION,
                 pending: Vec::new(),
                 answered: 0,
             });
@@ -333,6 +344,33 @@ impl BenchVehicle {
                     Self::answer_vehicle_information(vin, module, info_type)
                 }
                 _ => vec![0x7F, 0x09, 0x12],
+            },
+            // The diagnostic session (ADR-0036): the default one and the
+            // extended one open, and the module says which it is in, with
+            // the standard's timing parameters after it.
+            0x10 => match request.get(1) {
+                Some(&session) if session == DEFAULT_SESSION || session == EXTENDED_SESSION => {
+                    module.session = session;
+                    vec![0x50, session, 0x00, 0x32, 0x01, 0xF4]
+                }
+                _ => vec![0x7F, 0x10, 0x12],
+            },
+            // The clear (ADR-0036): every code, or nothing. A module of the
+            // asking half refuses it in the default session with the one
+            // refusal the extended session answers.
+            0x14 => match request.get(1..4) {
+                Some([0xFF, 0xFF, 0xFF]) => {
+                    if module.session != EXTENDED_SESSION
+                        && asks_for_extended_session(&module.family)
+                    {
+                        vec![0x7F, 0x14, 0x7F]
+                    } else {
+                        module.faults.clear();
+                        vec![0x54]
+                    }
+                }
+                Some(_) => vec![0x7F, 0x14, 0x31],
+                None => vec![0x7F, 0x14, 0x13],
             },
             0x3E => match request.get(1) {
                 Some(sub) if sub & 0x80 != 0 => return None,
@@ -541,6 +579,12 @@ impl BenchVehicle {
                         }
                         bytes
                     }
+                    // The clear (ADR-0036): accepted, and the memory is empty
+                    // for the rest of the session.
+                    Some(ds2::COMMAND_CLEAR_FAULT_MEMORY) => {
+                        module.faults.clear();
+                        Vec::new()
+                    }
                     // A command this bench does not answer draws the
                     // module's own refusal, as a real one would.
                     _ => return Some(ds2_reply(node, 0x00, &[])),
@@ -573,6 +617,16 @@ impl BenchVehicle {
                             bytes.push(0x60);
                         }
                         bytes
+                    }
+                    // The clear (ADR-0036): the group echoed back, the codes gone
+                    // for the rest of the session.
+                    kwp2000::SID_CLEAR_DIAGNOSTIC_INFORMATION => {
+                        module.faults.clear();
+                        message
+                            .payload
+                            .get(1..3)
+                            .map(<[u8]>::to_vec)
+                            .unwrap_or_default()
                     }
                     _ => return Some(answer),
                 };
@@ -905,6 +959,14 @@ fn write_number(span: &mut [u8], mask: u64, value: u64) {
     for (index, byte) in span.iter_mut().rev().take(width).enumerate() {
         *byte = (value >> (8 * index)) as u8;
     }
+}
+
+/// Whether a bench module clears its codes only in the extended session:
+/// half of them do, by the parity of their family's hash, so that a service
+/// operation's two paths - accepted at once, and accepted after the session
+/// is opened - both run on the bench (ADR-0036).
+fn asks_for_extended_session(family: &str) -> bool {
+    fnv(family) & 1 == 1
 }
 
 fn fnv(text: &str) -> u32 {

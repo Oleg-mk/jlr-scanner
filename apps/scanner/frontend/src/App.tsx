@@ -71,6 +71,9 @@ import { defaultStandardObdClient, type StandardObdClient } from "./standardObd"
 import { useModuleReadController } from "./useModuleReadController";
 import { useNetworkCheckController } from "./useNetworkCheckController";
 import { useSessionReportController } from "./useSessionReportController";
+import { ConfirmDialog } from "./components/ConfirmDialog";
+import { defaultServiceClient, type ServiceClient } from "./serviceMode";
+import { useServiceModeController } from "./useServiceModeController";
 import "./styles.css";
 
 interface AppProps {
@@ -86,6 +89,8 @@ interface AppProps {
   captureClient?: CaptureClient;
   moduleReadClient?: ModuleReadClient;
   sessionReportClient?: SessionReportClient;
+  /** The service mode and its operations (ADR-0036). */
+  serviceClient?: ServiceClient;
   parameterNameClient?: ParameterNameClient;
   pollIntervalMs?: number;
   /** What restarts the interface once the shell has dropped the session; reloads the page by default. */
@@ -145,6 +150,7 @@ export function App({
   captureClient = defaultCaptureClient,
   moduleReadClient = defaultModuleReadClient,
   sessionReportClient = defaultSessionReportClient,
+  serviceClient = defaultServiceClient,
   parameterNameClient = defaultParameterNameClient,
   pollIntervalMs,
   onNewSession,
@@ -187,6 +193,14 @@ export function App({
   const ccf = useCcfController(ccfClient, library.vehicle);
   const battery = useBatteryController(batteryClient, library.vehicle);
   const session = useSessionReportController(sessionReportClient);
+  // The service mode (ADR-0036): the session's own switch, behind one
+  // consent; the shell keeps the truth of it in the session snapshot.
+  const service = useServiceModeController(
+    serviceClient,
+    library.vehicle,
+    session.snapshot.serviceMode,
+    session.refresh,
+  );
   // The bench (ADR-0020): a virtual vehicle behind a stand-in adapter. The
   // whole screen says so, and the session is bench-only or real-only.
   const bench = isBench(controller.snapshot);
@@ -310,10 +324,13 @@ export function App({
   // rhythm, one, a short pause, two, then the longer rest. Once the adapter
   // is verified and the car is described, the beating stops and it settles
   // to a quiet green: reading, and only reading. The third state is red and
-  // steady, for the day something is sent rather than asked; nothing sets it
-  // yet, because nothing in stage 1 can.
-  const lamp: "waiting" | "live" | "sending" =
-    adapterReady && library.vehicle.vehicleProgram.trim() !== "" ? "live" : "waiting";
+  // steady, for when something may be sent rather than asked: the service
+  // mode of ADR-0036, while it is on.
+  const lamp: "waiting" | "live" | "sending" = service.on
+    ? "sending"
+    : adapterReady && library.vehicle.vehicleProgram.trim() !== ""
+      ? "live"
+      : "waiting";
   // The card is offered when there is something to read it with and a car
   // to read it from; the reason is said rather than the button hidden.
   const batteryDisabledReason = !adapterReady
@@ -399,6 +416,20 @@ export function App({
           >
             {t("New session")}
           </button>
+          {/* The service mode (ADR-0036): one switch for the session, behind
+              one consent; while it is on the bands below say so. */}
+          <button
+            className={`button ${service.on ? "button--service" : "button--secondary"}`}
+            type="button"
+            aria-pressed={service.on}
+            disabled={service.switching}
+            onClick={() => {
+              if (service.on) void service.turnOff();
+              else service.askToTurnOn();
+            }}
+          >
+            {t("Service mode")}
+          </button>
           {/* Three marks milled into one plate, and a disc of glass that
               slides to the one in use — the operating system's own list has
               no place on an instrument (2026-09-13). */}
@@ -430,6 +461,40 @@ export function App({
           {t("BENCH · virtual vehicle · synthetic data")} · {t("Scenario")}{" "}
           {controller.snapshot.benchScenario ?? BENCH_SCENARIO_DEFAULT}
         </div>
+      ) : null}
+      {service.on ? (
+        <div className="mode-band" role="status">
+          {t("SERVICE MODE · operations that change what a module holds are on · each one asks again")}
+        </div>
+      ) : null}
+      {service.consentOpen ? (
+        <ConfirmDialog
+          title={t("Service mode")}
+          confirmLabel={t("Turn the service mode on")}
+          cancelLabel={t("Cancel")}
+          busy={service.switching}
+          onConfirm={() => void service.acceptConsent()}
+          onCancel={service.declineConsent}
+        >
+          <p>
+            {t(
+              "Service mode lets this application change what a module holds: clear its fault codes, run its routines, drive its outputs, change its adaptations.",
+            )}
+          </p>
+          <p>
+            {t(
+              "Each operation will ask you again, one at a time, and is written into the session report with what it changed. This application undoes nothing by itself.",
+            )}
+          </p>
+          <p>
+            {t(
+              "The car stands still, the ignition is on and the engine is off unless a procedure says otherwise.",
+            )}
+          </p>
+          <p>
+            <strong>{t("What follows is your decision for the car in front of you.")}</strong>
+          </p>
+        </ConfirmDialog>
       ) : null}
       {demoPreview ? (
         <div className="demo-banner" role="status">
@@ -566,6 +631,10 @@ export function App({
                       onIdentifierChange={moduleRead.setIdentifier}
                       onRead={() => void moduleRead.read()}
                       onSaveReport={() => void moduleRead.saveReport()}
+                      serviceMode={service.on}
+                      clear={service.clear}
+                      clearing={service.clearing}
+                      onClearCodes={(ecuFamily) => void service.clearCodes(ecuFamily)}
                     />
                   </div>
                 ) : null}
@@ -698,6 +767,11 @@ export function App({
         <div className="bench-band">
           {t("BENCH · virtual vehicle · synthetic data")} · {t("Scenario")}{" "}
           {controller.snapshot.benchScenario ?? BENCH_SCENARIO_DEFAULT}
+        </div>
+      ) : null}
+      {service.on ? (
+        <div className="mode-band">
+          {t("SERVICE MODE · operations that change what a module holds are on · each one asks again")}
         </div>
       ) : null}
       <footer className="app-footer">

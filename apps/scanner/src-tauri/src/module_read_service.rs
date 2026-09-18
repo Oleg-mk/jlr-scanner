@@ -13,6 +13,7 @@ use diagnostic_environment::{DiagnosticEnvironmentResolution, DiagnosticEnvironm
 use diagnostic_session::decode::decode_parameters;
 use diagnostic_session::{validation_label, vehicle_context, KnowledgeLibrary};
 use mongoose_jlr::{MongooseDiagnosticError, MongooseUdsReadResult};
+use std::collections::BTreeMap;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
 use uds_execution::{
@@ -22,6 +23,13 @@ use uds_execution::{
 };
 
 static SESSION_COUNTER: AtomicU64 = AtomicU64::new(1);
+
+/// The human names of the reads that bring a module's fault codes: over UDS,
+/// and over the two K-line protocols. A clear (`ADR-0036`) is offered only
+/// for a module one of these has read in this session.
+pub const FAULT_CODES_OPERATION: &str = "Read confirmed fault codes";
+pub const DS2_FAULT_MEMORY_OPERATION: &str = "Read the DS2 fault memory";
+pub const KWP_FAULT_CODES_OPERATION: &str = "Read the KWP2000 fault codes";
 
 /// A read the library could plan: the typed transaction plus what the UI
 /// shows about it before anything is sent.
@@ -35,6 +43,10 @@ pub struct PreparedModuleRead {
 #[derive(Default)]
 pub struct ModuleReadService {
     last: Option<(ModuleReadSnapshot, ModuleReadReport)>,
+    /// The last successful fault-code read of each module in this session,
+    /// by family: what a clear (`ADR-0036`) is allowed to erase, because the
+    /// record already keeps it.
+    fault_codes: BTreeMap<String, (ModuleReadSnapshot, ModuleReadReport)>,
 }
 
 impl ModuleReadService {
@@ -59,7 +71,7 @@ impl ModuleReadService {
         let (capability, operation) = match request.kind {
             ModuleReadKind::FaultCodes => (
                 READ_DTC_INFORMATION_CAPABILITY,
-                "Read confirmed fault codes".to_string(),
+                FAULT_CODES_OPERATION.to_string(),
             ),
             ModuleReadKind::Identifier => (
                 READ_DATA_BY_IDENTIFIER_CAPABILITY,
@@ -272,6 +284,7 @@ impl ModuleReadService {
             decoded_result,
         );
         self.last = Some((snapshot.clone(), report));
+        self.remember_fault_codes();
         snapshot
     }
 
@@ -283,7 +296,35 @@ impl ModuleReadService {
             snapshot.route_validation = "SYNTHETIC".into();
             report.route_validation = "SYNTHETIC".into();
         }
+        self.remember_fault_codes();
         self.snapshot()
+    }
+
+    /// Keep the last read where it is a module's successful fault-code read,
+    /// so a clear can be offered for that module and can say what it erased.
+    fn remember_fault_codes(&mut self) {
+        let Some((snapshot, report)) = &self.last else {
+            return;
+        };
+        let brings_codes = matches!(
+            snapshot.operation.as_str(),
+            FAULT_CODES_OPERATION | DS2_FAULT_MEMORY_OPERATION | KWP_FAULT_CODES_OPERATION
+        );
+        if brings_codes && snapshot.state == ModuleReadState::Succeeded {
+            self.fault_codes.insert(
+                snapshot.ecu_family.clone(),
+                (snapshot.clone(), report.clone()),
+            );
+        }
+    }
+
+    /// The last successful fault-code read of a module in this session, if
+    /// any: the precondition of a clear (`ADR-0036`, decision 9).
+    pub fn last_fault_codes(
+        &self,
+        ecu_family: &str,
+    ) -> Option<&(ModuleReadSnapshot, ModuleReadReport)> {
+        self.fault_codes.get(ecu_family)
     }
 
     /// Take in a read another path made — today the K-line's (`ADR-0029`
@@ -296,6 +337,7 @@ impl ModuleReadService {
         report: ModuleReadReport,
     ) -> ModuleReadSnapshot {
         self.last = Some((snapshot.clone(), report));
+        self.remember_fault_codes();
         snapshot
     }
 

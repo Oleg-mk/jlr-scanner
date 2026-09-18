@@ -6,6 +6,7 @@ use super::adapter_service::{AdapterService, SystemAdapterBackend, BENCH_PORT, B
 use super::battery_service::{BatteryService, BATTERY_READ_TIMEOUT};
 use super::capture_service::CaptureService;
 use super::ccf_service::{CcfService, CCF_READ_TIMEOUT};
+use super::dtc_clear_service::{ClearResult, DtcClearService, PreparedDtcClear, DTC_CLEAR_TIMEOUT};
 use super::kline_read_service::KlineReadService;
 use super::live_read_service::{LiveReadService, LIVE_READ_TIMEOUT};
 use super::mileage_service::{MileageService, MILEAGE_READ_TIMEOUT};
@@ -21,6 +22,7 @@ use app_contracts::{
     ModulePassportState, ModuleReadKind, ModuleReadRequest, ModuleReadState, StandardObdReadKind,
     StandardObdRequest, VehicleContextInput,
 };
+use app_contracts::{DtcClearRequest, DtcClearState};
 use diagnostic_session::KnowledgeLibrary;
 use knowledge::{
     sha256_bytes, ContentFingerprint, IngestionAdapter, RedistributionStatus, SourceId,
@@ -914,6 +916,82 @@ fn the_bench_connects_without_a_port_reads_the_surveyed_vehicle_and_marks_everyt
     assert!(capture_json.contains("synthetic_bench_capture_not_vehicle_evidence"));
     assert!(capture_json.contains("bench-capture-hs-can-"));
 
+    // Stage 2, step 1 (ADR-0036): the clear of the codes, on the bench - last,
+    // because every read above wants the scenario's codes still there. The
+    // fault-code read is its precondition and what it will have erased; the bench
+    // module clears - half of the bench's modules only after the extended
+    // session is opened - and is read again, empty, for the rest of the
+    // session.
+    let clear_request = DtcClearRequest {
+        ecu_family: "SYNTHMOD".into(),
+        context: vehicle(),
+    };
+    let prepared_clear = DtcClearService::prepare(session.library(), &clear_request)
+        .expect("the clear prepares from the same plan as the read");
+    let PreparedDtcClear::Uds {
+        service: ref clear_service,
+        ..
+    } = prepared_clear
+    else {
+        panic!("SYNTHMOD is on CAN");
+    };
+    assert_eq!(
+        clear_service.transaction().encoded_payload(),
+        [0x14, 0xFF, 0xFF, 0xFF]
+    );
+    let before = reads
+        .last_fault_codes("SYNTHMOD")
+        .cloned()
+        .expect("the codes were read in this session");
+    assert_eq!(before.0.dtcs.len(), faults.dtcs.len());
+    let clear_result = adapter
+        .execute_uds_service(clear_service, DTC_CLEAR_TIMEOUT)
+        .expect("the bench is connected");
+    let mut clears = DtcClearService::new();
+    let cleared = clears.finish(
+        &clear_request,
+        Some(&prepared_clear),
+        Some(&info),
+        Some(&before),
+        Ok(ClearResult::Uds(clear_result)),
+    );
+    assert_eq!(cleared.state, DtcClearState::Cleared, "{cleared:?}");
+    assert_eq!(cleared.operation, "DTC_CLEAR");
+    assert_eq!(cleared.safety_class, "SERVICE_ROUTINE");
+    assert_eq!(cleared.codes_before.len(), faults.dtcs.len());
+    assert!(cleared.session.is_some(), "{cleared:?}");
+    assert_ne!(cleared.route_validation, "SYNTHETIC");
+    let cleared = clears.mark_synthetic();
+    assert_eq!(cleared.route_validation, "SYNTHETIC");
+    // Read again: nothing left, and the record says so beside what was there.
+    let faults_request = ModuleReadRequest {
+        ecu_family: "SYNTHMOD".into(),
+        kind: ModuleReadKind::FaultCodes,
+        identifier: None,
+        context: vehicle(),
+    };
+    let prepared_again = ModuleReadService::prepare(session.library(), &faults_request).unwrap();
+    let again = adapter
+        .execute_uds_read(&prepared_again.transaction, Duration::from_secs(2))
+        .unwrap()
+        .map_err(map_live_error);
+    let after = reads.finish(
+        &faults_request,
+        Some(&prepared_again),
+        Some(&info),
+        Some(session.library()),
+        again,
+    );
+    assert_eq!(after.state, ModuleReadState::Succeeded, "{after:?}");
+    assert!(after.dtcs.is_empty(), "{after:?}");
+    let after_record = reads.last_fault_codes("SYNTHMOD").cloned().unwrap();
+    let cleared = clears.attach_after(&after_record);
+    assert_eq!(cleared.codes_after.as_deref(), Some(&[][..]));
+    let clear_json = clears.record_json().unwrap();
+    assert!(clear_json.contains("\"schema\": \"prowlone.dtc-clear\""));
+    assert!(clear_json.contains("\"route_validation\": \"SYNTHETIC\""));
+    assert!(clear_json.contains("\"before\": {"), "{clear_json}");
+
     // The session is a bench session: it says so in the bundle, it refuses a
     // real adapter once it holds records, and the intake refuses the bundle.
     let mut report = SessionReportService::new();
@@ -938,6 +1016,13 @@ fn the_bench_connects_without_a_port_reads_the_surveyed_vehicle_and_marks_everyt
     report.add_ccf_read(&ccf_json).unwrap();
     report.add_battery_read(&battery_json).unwrap();
     assert_eq!(report.snapshot().ccf_reads, 1);
+    // The service mode is the session's (ADR-0036): off until switched, and
+    // the clear's record joins the bundle like every other record.
+    assert!(!report.snapshot().service_mode);
+    report.set_service_mode(true);
+    assert!(report.snapshot().service_mode);
+    report.add_dtc_clear(&clear_json).unwrap();
+    assert_eq!(report.snapshot().dtc_clears, 1);
     assert!(report.is_bench());
     assert!(report.accepts(SESSION_MODE_BENCH));
     assert!(!report.accepts(SESSION_MODE_REAL));
@@ -949,6 +1034,7 @@ fn the_bench_connects_without_a_port_reads_the_surveyed_vehicle_and_marks_everyt
         )
         .unwrap();
     assert!(bundle.contains("\"session_mode\": \"bench\""));
+    assert!(bundle.contains("\"dtc_clears\""), "{bundle}");
     // The number that reproduces this session's codes travels with it.
     assert!(bundle.contains("\"bench_scenario\": 1"), "{bundle}");
     let refused = report_intake::intake(&bundle, "bench-session.json", session.library())
@@ -973,14 +1059,20 @@ fn the_bench_connects_without_a_port_reads_the_surveyed_vehicle_and_marks_everyt
         .iter()
         .map(|service| format!("{service:#04X}"))
         .collect();
+    // Since ADR-0036 the clear is among them - and, for a module of the
+    // asking half, the session opened and left around it, which is why 0x10
+    // may appear and 0x3E still may not.
+    let expected: Vec<&str> = if seen.contains(&0x10) {
+        vec!["0x01", "0x03", "0x10", "0x14", "0x19", "0x22"]
+    } else {
+        vec!["0x01", "0x03", "0x14", "0x19", "0x22"]
+    };
     assert_eq!(
-        asked,
-        vec!["0x01", "0x03", "0x19", "0x22"],
+        asked, expected,
         "every service the bench vehicle was asked for"
     );
     for (service, what) in [
-        (0x10u8, "DiagnosticSessionControl"),
-        (0x11, "ECUReset"),
+        (0x11u8, "ECUReset"),
         (0x27, "SecurityAccess"),
         (0x2E, "WriteDataByIdentifier"),
         (0x2F, "InputOutputControlByIdentifier"),

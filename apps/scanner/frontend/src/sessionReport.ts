@@ -18,6 +18,10 @@ export interface SessionReportSnapshot {
   ccfReads: number;
   /** Battery readings, each recorded whole (ADR-0030). */
   batteryReads: number;
+  /** Clears of fault codes, each recorded with what it erased (ADR-0036). */
+  dtcClears: number;
+  /** Whether the service mode is on for this session (ADR-0036). */
+  serviceMode: boolean;
   reportAvailable: boolean;
   /** "bench" or "real" once the session holds records of either kind (ADR-0020). */
   mode: "bench" | "real" | null;
@@ -38,6 +42,8 @@ export const createSessionReportSnapshot = (): SessionReportSnapshot => ({
   modulePassports: 0,
   ccfReads: 0,
   batteryReads: 0,
+  dtcClears: 0,
+  serviceMode: false,
   reportAvailable: false,
   mode: null,
 });

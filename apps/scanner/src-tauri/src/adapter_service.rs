@@ -4,14 +4,15 @@ use app_contracts::{
     VehicleInterfaceCapability, VehicleValidationState,
 };
 use diagnostic_execution::PreparedDiagnosticTransaction;
-use kline_execution::PreparedKlineTransaction;
+use kline_execution::{PreparedKlineService, PreparedKlineTransaction};
 use mongoose_jlr::bench::{BenchTransport, SharedBenchBus};
 use mongoose_jlr::MongooseJ1979ReadResult;
 use mongoose_jlr::MongooseKlineReadResult;
 use mongoose_jlr::{list_vehicle_routes, MongooseJlrDevice, VehicleRouteId};
 use mongoose_jlr::{MongooseCalibrationIdentificationResult, MongooseDiagnosticError};
 use mongoose_jlr::{
-    MongooseUdsReadResult, ProtocolError, RouteCapture, CAPTURE_IDLE_TIMEOUT, CAPTURE_MAX_FRAMES,
+    MongooseUdsReadResult, MongooseUdsServiceResult, ProtocolError, RouteCapture,
+    CAPTURE_IDLE_TIMEOUT, CAPTURE_MAX_FRAMES,
 };
 use std::sync::{Mutex, MutexGuard};
 use std::time::Duration;
@@ -19,7 +20,7 @@ use transport_serial::{
     matching_devices, vendor_devices, SerialDevice, SerialTransport, SystemSerialDeviceEnumerator,
     MONGOOSE_JLR_USB_PID, MONGOOSE_JLR_USB_VID,
 };
-use uds_execution::PreparedUdsTransaction;
+use uds_execution::{PreparedUdsService, PreparedUdsTransaction};
 
 const ADAPTER_NAME: &str = "MongoosePro JLR";
 const TRANSPORT_NAME: &str = "USB CDC / Serial";
@@ -146,6 +147,30 @@ impl Link {
         match self {
             Self::Serial(device) => device.execute_prepared_kline_read(transaction, timeout),
             Self::Bench(device) => device.execute_prepared_kline_read(transaction, timeout),
+        }
+    }
+
+    /// One service operation over UDS (`ADR-0036`), on either link.
+    fn execute_prepared_uds_service(
+        &mut self,
+        service: &PreparedUdsService,
+        timeout: Duration,
+    ) -> Result<MongooseUdsServiceResult, MongooseDiagnosticError> {
+        match self {
+            Self::Serial(device) => device.execute_prepared_uds_service(service, timeout),
+            Self::Bench(device) => device.execute_prepared_uds_service(service, timeout),
+        }
+    }
+
+    /// One service operation on a serial line (`ADR-0036`), on either link.
+    fn execute_prepared_kline_service(
+        &mut self,
+        service: &PreparedKlineService,
+        timeout: Duration,
+    ) -> Result<MongooseKlineReadResult, MongooseDiagnosticError> {
+        match self {
+            Self::Serial(device) => device.execute_prepared_kline_service(service, timeout),
+            Self::Bench(device) => device.execute_prepared_kline_service(service, timeout),
         }
     }
 
@@ -644,6 +669,35 @@ impl AdapterService<SystemAdapterBackend> {
             connection
                 .device
                 .execute_prepared_kline_read(transaction, timeout)
+        })
+    }
+
+    /// One prepared service operation over UDS, live (`ADR-0036`): the
+    /// device method accepts nothing but a service `uds-execution` prepared
+    /// from a resolved plan, and it is the one place that opens the
+    /// extended session.
+    pub fn execute_uds_service(
+        &mut self,
+        service: &PreparedUdsService,
+        timeout: Duration,
+    ) -> Option<Result<MongooseUdsServiceResult, MongooseDiagnosticError>> {
+        self.connection.as_mut().map(|connection| {
+            connection
+                .device
+                .execute_prepared_uds_service(service, timeout)
+        })
+    }
+
+    /// One prepared service operation on a serial line, live (`ADR-0036`).
+    pub fn execute_kline_service(
+        &mut self,
+        service: &PreparedKlineService,
+        timeout: Duration,
+    ) -> Option<Result<MongooseKlineReadResult, MongooseDiagnosticError>> {
+        self.connection.as_mut().map(|connection| {
+            connection
+                .device
+                .execute_prepared_kline_service(service, timeout)
         })
     }
 

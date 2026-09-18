@@ -554,6 +554,44 @@ only — `0x01`, `0x03`, `0x19`, `0x22` — and for none of the ten that stage 2
 and stage 3 would need. The guard says the constructors are absent; the bench
 says the vehicle was never asked. Both run on every commit.
 
+### F23 — stage 2, step 1: the clear of the fault codes (built 2026-09-18, `ADR-0036`)
+
+Built, on the branch `stage-2`, the day the owner authorised stage 2. The
+first operation of this product that changes what a module holds, and the
+mechanics every later operation of stage 2 reuses:
+
+- **the service mode** — a switch for the session behind one consent, off
+  on every start and every new session, a band in the header and the footer
+  while it is on, the lamp in the corner red; the shell keeps its state and
+  offers nothing of stage 2 while it is off;
+- **the clear** — `0x14` for every group over UDS, DS2 `0x05` and KWP2000
+  `0x14` on a serial line; offered under a module's fault codes only once
+  they were read in this session, after one question that names the module,
+  the operation, its class and what will be erased; tried in the default
+  session and, where the module answers "not in this session", in the
+  extended session opened for it and left after it; then the codes read
+  again, so what returned at once is seen for what it is;
+- **the record** — `dtc_clears`, schema `prowlone.dtc-clear`, class
+  `SERVICE_ROUTINE`, with the read that found the codes and the read made
+  after, the answer, the session and every exchange; `report-intake` takes
+  the two reads as reads and the clear itself as nothing; the readable
+  report gains "Service operations";
+- **the guard** — the constructors `0x14`, DS2 `0x05` and KWP2000 `0x14`
+  exist and are the only ones of their kind; the live path takes a service
+  only as a prepared service of its class, through its own function, and
+  the read function's body opens no session; `SecurityAccess`, the
+  programming services and `EcuReset` stay forbidden everywhere;
+- **the bench** — answers `0x10`, `0x14`, DS2 `0x05` and KWP2000 `0x14`,
+  forgets a cleared module's codes for the rest of the session, and half its
+  modules ask for the extended session first, so both paths run on every
+  commit in the end-to-end test.
+
+Not yet in this step: the one collective confirmation, "clear the codes of
+every surveyed module", which the decision allows and a later commit of the
+step adds. What outranks all of it is unchanged: no operation has met a car,
+and the first write on one is the owner's, after a real read session has
+been reported.
+
 ### F14 — K-line transport for the legacy buses (brought forward 2026-09-12, `ADR-0029`)
 
 ISO 9141 / ISO 14230 over J1962 pins 7 and 8, which the MongoosePro JLR variant
