@@ -4677,7 +4677,12 @@ table.live-read-identifiers label {
   margin: 0.75rem 0 0.5rem;
   padding: 0.9rem 1rem 0.7rem;
   border-radius: var(--radius-card, 12px);
-  background: #0b0d10;
+  /* A dark green screen with a faint turn to violet at the far corner, and
+     a large grid barely there: the owner's colour (2026-09-18). */
+  background:
+    repeating-linear-gradient(0deg, rgb(255 255 255 / 3.5%) 0 1px, transparent 1px 56px),
+    repeating-linear-gradient(90deg, rgb(255 255 255 / 3.5%) 0 1px, transparent 1px 56px),
+    linear-gradient(135deg, #0c2118 0%, #0f281d 58%, #24203a 100%);
   color: #f2f3f5;
   box-shadow: inset 0 0 0 1px rgb(255 255 255 / 8%);
 }
@@ -4695,8 +4700,8 @@ table.live-read-identifiers label {
 }
 
 .live-dash-face {
-  fill: #11151a;
-  stroke: #2a3138;
+  fill: #0e2219;
+  stroke: #2f4a3b;
   stroke-width: 1;
 }
 
@@ -4825,7 +4830,7 @@ table.live-read-identifiers label {
   justify-content: center;
   gap: 0.2rem;
   padding: 0.55rem 0.6rem;
-  background: #0b0d10;
+  background: rgb(9 24 17 / 90%);
   text-align: center;
 }
 
