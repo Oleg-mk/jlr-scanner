@@ -531,6 +531,15 @@ formatting document describes the bytes of the ones this product can decode.
 Nothing is judged, nothing is written, and no health percentage is computed
 out of parts SDD did not put together.
 
+Amended twice on 2026-09-19, on the owner's own car. A battery in SDD's own
+low band — under 11.6 V, the edge its battery monitor's configuration
+carries — is a precondition of the session, said in one line under the
+header and inside the clear's confirmation. And because the X250's battery
+monitor declares no voltage of its own, the voltage is the freshest of three
+reads — the battery read's headline, the legislated `0x42`, a live supply
+voltage — and stands on the cell of the key; the bench's rail follows the
+scenario on all three.
+
 ### F22 — what a module will accept, listed and not sent (2026-09-16, `ADR-0035`)
 
 Built. Until now the product read SDD's module index for one half only: the
