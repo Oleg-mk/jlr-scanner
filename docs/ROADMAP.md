@@ -597,6 +597,10 @@ mechanics every later operation of stage 2 reuses:
   modules ask for the extended session first, so both paths run on every
   commit in the end-to-end test.
 
+Judged illogical by the owner at the screen on 2026-09-18, reworked over
+two days with his list, and accepted by him in the running window on
+2026-09-19: «все тепер логічно».
+
 Not yet in this step: the one collective confirmation, "clear the codes of
 every surveyed module", which the decision allows and a later commit of the
 step adds. What outranks all of it is unchanged: no operation has met a car,
