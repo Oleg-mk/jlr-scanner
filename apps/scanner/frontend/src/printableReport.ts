@@ -68,6 +68,10 @@ interface RoutineRunRecord {
   route_validation?: string;
   elapsed_ms?: number;
   timestamp_unix_ms?: number;
+  /** The module's codes read again once the run had ended; null where it was not read. */
+  codes_after?: Array<{ code?: string }> | null;
+  /** The codes after the run that were not there before: what the test logged. */
+  codes_found?: Array<{ code?: string }>;
 }
 
 interface DtcClearRecord {
@@ -452,16 +456,21 @@ export function buildReport(
       id: "routine-runs",
       title: t("Self tests run"),
       worth: worthOf(runs[0].route_validation),
-      columns: [t("Time"), t("Module"), t("Test"), t("Answer"), t("Seconds")],
+      columns: [t("Time"), t("Module"), t("Test"), t("Answer"), t("Seconds"), t("Found")],
       rows: runs.map((run) => [
         stamp(run.timestamp_unix_ms),
         text(run.ecu_family),
         text(run.test_name),
         ended(run),
         String(Math.round((run.elapsed_ms ?? 0) / 1000)),
+        run.codes_after === null || run.codes_after === undefined
+          ? "—"
+          : (run.codes_found ?? [])
+              .map((dtc) => dtc.code ?? "?")
+              .join(", ") || "0",
       ]),
       note: t(
-        "Each run was confirmed by the person and is a service routine; the result is the bytes the module answered with, and this library does not describe them.",
+        "Each run was confirmed by the person and is a service routine; the result is the bytes the module answered with, and this library does not describe them. Found: the codes the module held once the run had ended and not before it.",
       ),
     });
   }

@@ -629,9 +629,13 @@ low-battery line; then the run, stepped by the interface one request at a
 time — the extended session opened and held with a keep-alive, the request
 for results once the data's time has run, the way back — and the module's
 answer shown as the bytes it is, with the plain statement that this library
-does not describe them; a stop gets through between two steps. The record
-`routine_runs` carries every exchange; the readable report gains "Self
-tests run". The guard was loosened for exactly this: one constructor, one
+does not describe them; a stop gets through between two steps. Once the
+run has ended the module's codes are read again, as after a clear, and
+the codes that were not there before are listed as what the test found —
+the way SDD's own screens say a self test works: the module runs its
+monitors now and logs what it finds. The record `routine_runs` carries
+every exchange and both reads; the readable report gains "Self tests
+run". The guard was loosened for exactly this: one constructor, one
 intent, one routine in a closed type. On the bench the whole-stack test
 runs the test end to end on `SYNTHMOD` and finds the record.
 

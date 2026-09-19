@@ -1395,6 +1395,7 @@ async fn get_routine_run_state(
 async fn start_routine_run(
     adapter_state: State<'_, SharedAdapterService>,
     session_state: State<'_, SharedSessionService>,
+    module_read_state: State<'_, SharedModuleReadService>,
     routine_state: State<'_, SharedRoutineRunService>,
     report_state: State<'_, SharedSessionReportService>,
     request: RoutineRunRequest,
@@ -1402,6 +1403,7 @@ async fn start_routine_run(
     Ok(start_routine_run_now(
         adapter_state,
         session_state,
+        module_read_state,
         routine_state,
         report_state,
         request,
@@ -1411,11 +1413,15 @@ async fn start_routine_run(
 #[tauri::command]
 async fn routine_run_step(
     adapter_state: State<'_, SharedAdapterService>,
+    session_state: State<'_, SharedSessionService>,
+    module_read_state: State<'_, SharedModuleReadService>,
     routine_state: State<'_, SharedRoutineRunService>,
     report_state: State<'_, SharedSessionReportService>,
 ) -> Result<RoutineRunSnapshot, String> {
     Ok(routine_run_step_now(
         adapter_state,
+        session_state,
+        module_read_state,
         routine_state,
         report_state,
     ))
@@ -1424,19 +1430,67 @@ async fn routine_run_step(
 #[tauri::command]
 async fn stop_routine_run(
     adapter_state: State<'_, SharedAdapterService>,
+    session_state: State<'_, SharedSessionService>,
+    module_read_state: State<'_, SharedModuleReadService>,
     routine_state: State<'_, SharedRoutineRunService>,
     report_state: State<'_, SharedSessionReportService>,
 ) -> Result<RoutineRunSnapshot, String> {
     Ok(stop_routine_run_now(
         adapter_state,
+        session_state,
+        module_read_state,
         routine_state,
         report_state,
     ))
 }
 
+/// The module is read again once a run has ended (ADR-0036, step 2,
+/// amended the same night): what the test logged is a code that is there
+/// now and was not in the last read before it. Once per run, before the
+/// record is taken; a refusal at the start reads nothing.
+fn reread_after_routine(
+    adapter_state: &State<'_, SharedAdapterService>,
+    session_state: &State<'_, SharedSessionService>,
+    module_read_state: &State<'_, SharedModuleReadService>,
+    routine_state: &State<'_, SharedRoutineRunService>,
+    report_state: &State<'_, SharedSessionReportService>,
+) {
+    let request = {
+        let routine = lock_routine_run(routine_state);
+        if !routine.has_ended() || !routine.record_pending() {
+            return;
+        }
+        routine.request().cloned()
+    };
+    let Some(request) = request else {
+        return;
+    };
+    let reread = read_module_now(
+        adapter_state.clone(),
+        session_state.clone(),
+        module_read_state.clone(),
+        report_state.clone(),
+        ModuleReadRequest {
+            ecu_family: request.ecu_family.clone(),
+            kind: ModuleReadKind::FaultCodes,
+            identifier: None,
+            context: request.context.clone(),
+        },
+    );
+    if reread.state == ModuleReadState::Succeeded {
+        let after = lock_module_read(module_read_state)
+            .last_fault_codes(&request.ecu_family)
+            .cloned();
+        if let Some(after) = after {
+            lock_routine_run(routine_state).attach_after(&after);
+        }
+    }
+}
+
 fn start_routine_run_now(
     adapter_state: State<'_, SharedAdapterService>,
     session_state: State<'_, SharedSessionService>,
+    module_read_state: State<'_, SharedModuleReadService>,
     routine_state: State<'_, SharedRoutineRunService>,
     report_state: State<'_, SharedSessionReportService>,
     request: RoutineRunRequest,
@@ -1489,14 +1543,27 @@ fn start_routine_run_now(
         };
         (adapter, result, service.is_bench())
     };
-    let snapshot =
-        lock_routine_run(&routine_state).start(&request, prepared, Some(&adapter), bench, result);
+    // What the module held before, if it was read in this session: the
+    // test's codes are set against it.
+    let before = lock_module_read(&module_read_state)
+        .last_fault_codes(&request.ecu_family)
+        .cloned();
+    let snapshot = lock_routine_run(&routine_state).start(
+        &request,
+        prepared,
+        Some(&adapter),
+        before.as_ref(),
+        bench,
+        result,
+    );
     record_routine_run(&routine_state, &report_state, bench);
     snapshot
 }
 
 fn routine_run_step_now(
     adapter_state: State<'_, SharedAdapterService>,
+    session_state: State<'_, SharedSessionService>,
+    module_read_state: State<'_, SharedModuleReadService>,
     routine_state: State<'_, SharedRoutineRunService>,
     report_state: State<'_, SharedSessionReportService>,
 ) -> RoutineRunSnapshot {
@@ -1532,12 +1599,21 @@ fn routine_run_step_now(
         }
         bench
     };
+    reread_after_routine(
+        &adapter_state,
+        &session_state,
+        &module_read_state,
+        &routine_state,
+        &report_state,
+    );
     record_routine_run(&routine_state, &report_state, bench);
     lock_routine_run(&routine_state).snapshot()
 }
 
 fn stop_routine_run_now(
     adapter_state: State<'_, SharedAdapterService>,
+    session_state: State<'_, SharedSessionService>,
+    module_read_state: State<'_, SharedModuleReadService>,
     routine_state: State<'_, SharedRoutineRunService>,
     report_state: State<'_, SharedSessionReportService>,
 ) -> RoutineRunSnapshot {
@@ -1555,6 +1631,13 @@ fn stop_routine_run_now(
         }
         bench
     };
+    reread_after_routine(
+        &adapter_state,
+        &session_state,
+        &module_read_state,
+        &routine_state,
+        &report_state,
+    );
     record_routine_run(&routine_state, &report_state, bench);
     lock_routine_run(&routine_state).snapshot()
 }

@@ -663,6 +663,18 @@ pub struct RoutineRunSnapshot {
     pub result_hex: Option<String>,
     /// The module's refusal, in the protocol's own word for it.
     pub refusal: Option<String>,
+    /// The codes the module held before the run, as read in this session;
+    /// none where none was read.
+    #[serde(default)]
+    pub codes_before: Vec<DtcSummary>,
+    /// What the module answered when read again once the run had ended;
+    /// null until then.
+    #[serde(default)]
+    pub codes_after: Option<Vec<DtcSummary>>,
+    /// The codes after the run that were not there before: what the test
+    /// logged.
+    #[serde(default)]
+    pub codes_found: Vec<DtcSummary>,
     /// Every exchange so far, request then answer, in hex.
     pub exchanges: Vec<(String, String)>,
     pub error: Option<DiagnosticError>,

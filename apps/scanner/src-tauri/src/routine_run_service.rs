@@ -14,8 +14,9 @@
 
 use crate::module_read_service::{hex, map_live_error, preparation_error};
 use app_contracts::{
-    AdapterInfo, DiagnosticError, DiagnosticErrorCategory, DiagnosticExecutionStage,
-    ModuleSurveyEntry, RoutineRunRequest, RoutineRunSnapshot, RoutineRunState,
+    AdapterInfo, DiagnosticError, DiagnosticErrorCategory, DiagnosticExecutionStage, DtcSummary,
+    ModuleReadReport, ModuleReadSnapshot, ModuleSurveyEntry, RoutineRunRequest, RoutineRunSnapshot,
+    RoutineRunState,
 };
 use diagnostic_environment::{DiagnosticEnvironmentResolution, DiagnosticEnvironmentResolver};
 use diagnostic_session::{validation_label, vehicle_context, KnowledgeLibrary};
@@ -81,6 +82,9 @@ pub struct RoutineRunService {
     started: Option<Instant>,
     last_exchange: Option<Instant>,
     exchanges: Vec<(Vec<u8>, Vec<u8>)>,
+    /// The fault-code read made before the run in this session, if any:
+    /// what the test's codes are set against.
+    before: Option<(ModuleReadSnapshot, ModuleReadReport)>,
     /// The record of a run that ended, until the session report takes it.
     finished: Option<Value>,
 }
@@ -101,6 +105,7 @@ impl RoutineRunService {
             started: None,
             last_exchange: None,
             exchanges: Vec::new(),
+            before: None,
             finished: None,
         }
     }
@@ -117,6 +122,25 @@ impl RoutineRunService {
 
     pub fn is_running(&self) -> bool {
         self.snapshot.state == RoutineRunState::Running
+    }
+
+    /// The run ran and ended: completed, stopped, or timed out. A refusal
+    /// at the start ran nothing, and a failure may have run anything.
+    pub fn has_ended(&self) -> bool {
+        matches!(
+            self.snapshot.state,
+            RoutineRunState::Completed | RoutineRunState::Stopped | RoutineRunState::TimedOut
+        )
+    }
+
+    /// A run has ended and its record has not been taken yet: the moment
+    /// the module is read again, once.
+    pub fn record_pending(&self) -> bool {
+        self.finished.is_some()
+    }
+
+    pub fn request(&self) -> Option<&RoutineRunRequest> {
+        self.request.as_ref()
     }
 
     pub fn prepared_start(&self) -> Option<&PreparedUdsService> {
@@ -231,6 +255,7 @@ impl RoutineRunService {
         self.prepared = None;
         self.request = None;
         self.started = None;
+        self.before = None;
         self.exchanges.clear();
         self.snapshot()
     }
@@ -241,6 +266,7 @@ impl RoutineRunService {
         request: &RoutineRunRequest,
         prepared: PreparedRoutineRun,
         adapter: Option<&AdapterInfo>,
+        before: Option<&(ModuleReadSnapshot, ModuleReadReport)>,
         synthetic: bool,
         result: Result<MongooseUdsServiceResult, MongooseDiagnosticError>,
     ) -> RoutineRunSnapshot {
@@ -257,6 +283,10 @@ impl RoutineRunService {
         snapshot.time_ms = prepared.time_ms;
         snapshot.timeout_ms = prepared.timeout_ms;
         snapshot.started_unix_ms = Some(unix_ms());
+        snapshot.codes_before = before
+            .map(|(read, _)| read.dtcs.clone())
+            .unwrap_or_default();
+        self.before = before.cloned();
         self.exchanges.clear();
         self.request = Some(request.clone());
         self.adapter = adapter.cloned();
@@ -418,6 +448,36 @@ impl RoutineRunService {
         self.snapshot()
     }
 
+    /// The module was read again once the run had ended: what it holds
+    /// now, kept beside what it held before, and the difference - what the
+    /// test logged - said on its own. The record takes both reads.
+    pub fn attach_after(
+        &mut self,
+        after: &(ModuleReadSnapshot, ModuleReadReport),
+    ) -> RoutineRunSnapshot {
+        let found: Vec<DtcSummary> = after
+            .0
+            .dtcs
+            .iter()
+            .filter(|dtc| {
+                !self
+                    .snapshot
+                    .codes_before
+                    .iter()
+                    .any(|held| held.code == dtc.code && held.failure_type == dtc.failure_type)
+            })
+            .cloned()
+            .collect();
+        self.snapshot.codes_after = Some(after.0.dtcs.clone());
+        self.snapshot.codes_found = found;
+        if let Some(record) = self.finished.as_mut() {
+            record["codes_after"] = json!(after.0.dtcs);
+            record["after"] = json!(after.1);
+            record["codes_found"] = json!(self.snapshot.codes_found);
+        }
+        self.snapshot()
+    }
+
     /// The record of a run that ended, once; nothing while one is on.
     pub fn take_report_json(&mut self) -> Option<String> {
         let record = self.finished.take()?;
@@ -471,6 +531,11 @@ impl RoutineRunService {
             "result_hex": self.snapshot.result_hex,
             "refusal": self.snapshot.refusal,
             "error": self.snapshot.error,
+            "codes_before": self.snapshot.codes_before,
+            "before": self.before.as_ref().map(|(_, report)| report),
+            "codes_after": Value::Null,
+            "after": Value::Null,
+            "codes_found": Vec::<DtcSummary>::new(),
             "exchanges": self.snapshot.exchanges,
             "answers": answers,
             "validation": "a service operation of stage 2; the person confirmed it, the module answered, the result is the bytes it answered with and nothing is read into them; nothing here is vehicle-confirmed by being here",
@@ -544,6 +609,9 @@ fn idle() -> RoutineRunSnapshot {
         elapsed_ms: 0,
         result_hex: None,
         refusal: None,
+        codes_before: Vec::new(),
+        codes_after: None,
+        codes_found: Vec::new(),
         exchanges: Vec::new(),
         error: None,
         report_available: false,

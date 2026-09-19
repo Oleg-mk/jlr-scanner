@@ -311,6 +311,18 @@ export function App({
     session.refresh,
     routineStepMs,
   );
+  // A run that read the module again says what the module holds now, as a
+  // clear does: the list of what the car answered follows it.
+  useEffect(() => {
+    const after = routine.snapshot.codesAfter;
+    if (after === null) return;
+    const family = routine.snapshot.ecuFamily;
+    setResults((previous) => {
+      const known = previous[family];
+      if (known === undefined || known.dtcs === after) return previous;
+      return { ...previous, [family]: { ...known, dtcs: after } };
+    });
+  }, [routine.snapshot]);
   const check = useNetworkCheckController(moduleReadClient, library.vehicle, recordResult);
   const [selectedModule, setSelectedModule] = useState<string | null>(null);
   const setModuleReadTarget = moduleRead.setEcuFamily;

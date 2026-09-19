@@ -1327,13 +1327,23 @@ fn the_bench_connects_without_a_port_reads_the_surveyed_vehicle_and_marks_everyt
     let started = adapter
         .execute_uds_service(&routine_prepared.start, ROUTINE_STEP_TIMEOUT)
         .expect("the bench is connected");
+    // The codes held before the run are the codes the clear above left:
+    // none. What the test logs is set against them.
+    let before_test = reads.last_fault_codes("SYNTHMOD").cloned();
+    assert!(
+        before_test.is_some(),
+        "the fault codes were read in this session"
+    );
     let running = routine.start(
         &routine_request,
         routine_prepared,
         Some(&info),
+        before_test.as_ref(),
         true,
         started,
     );
+    assert!(running.codes_before.is_empty(), "{running:?}");
+    assert_eq!(running.codes_after, None);
     assert_eq!(running.state, RoutineRunState::Running, "{running:?}");
     assert_eq!(running.session.as_deref(), Some("0x03"));
     assert_eq!(running.route_validation, "SYNTHETIC");
@@ -1378,9 +1388,41 @@ fn the_bench_connects_without_a_port_reads_the_surveyed_vehicle_and_marks_everyt
         ],
         "the session opened, the start, the keep-alives, the results, the way back"
     );
+    // Read again once the run has ended, as the shell does: what the test
+    // logged is a code that is there now and was not before. The bench's
+    // module logs none.
+    let prepared_after_test =
+        ModuleReadService::prepare(session.library(), &faults_request).unwrap();
+    let after_test = adapter
+        .execute_uds_read(&prepared_after_test.transaction, Duration::from_secs(2))
+        .unwrap()
+        .map_err(map_live_error);
+    let after_test = reads.finish(
+        &faults_request,
+        Some(&prepared_after_test),
+        Some(&info),
+        Some(session.library()),
+        after_test,
+    );
+    assert_eq!(
+        after_test.state,
+        ModuleReadState::Succeeded,
+        "{after_test:?}"
+    );
+    let after_test_record = reads.last_fault_codes("SYNTHMOD").cloned().unwrap();
+    let done = routine.attach_after(&after_test_record);
+    assert_eq!(done.state, RoutineRunState::Completed, "{done:?}");
+    assert_eq!(done.codes_after.as_deref(), Some(&[][..]));
+    assert!(done.codes_found.is_empty(), "{:?}", done.codes_found);
     let routine_json = routine
         .take_report_json()
         .expect("a run that ended is a record");
+    assert!(routine_json.contains("\"before\": {"), "{routine_json}");
+    assert!(routine_json.contains("\"after\": {"), "{routine_json}");
+    assert!(
+        routine_json.contains("\"codes_found\": []"),
+        "{routine_json}"
+    );
     assert!(
         routine_json.contains("\"schema\": \"prowlone.routine-run\""),
         "{routine_json}"

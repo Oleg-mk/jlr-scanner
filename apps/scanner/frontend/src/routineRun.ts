@@ -1,6 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { browserDemoEnabled } from "./adapter";
 import type { VehicleDescription } from "./library";
+import type { DtcSummary } from "./moduleRead";
 
 /**
  * A run of a routine a module declares (ADR-0036, step 2): the on-demand
@@ -49,6 +50,12 @@ export interface RoutineRunSnapshot {
   /** The routine status record the module answered with, as bytes. */
   resultHex: string | null;
   refusal: string | null;
+  /** The codes the module held before the run, as read in this session. */
+  codesBefore: DtcSummary[];
+  /** What the module answered when read again once the run had ended; null until then. */
+  codesAfter: DtcSummary[] | null;
+  /** The codes after the run that were not there before: what the test logged. */
+  codesFound: DtcSummary[];
   /** Every exchange so far, request then answer, in hex. */
   exchanges: [string, string][];
   error: {
@@ -84,6 +91,9 @@ export const createRoutineRunSnapshot = (): RoutineRunSnapshot => ({
   elapsedMs: 0,
   resultHex: null,
   refusal: null,
+  codesBefore: [],
+  codesAfter: null,
+  codesFound: [],
   exchanges: [],
   error: null,
   reportAvailable: false,
@@ -157,6 +167,8 @@ class BrowserRoutineRunClient implements RoutineRunClient {
         state: "COMPLETED",
         elapsedMs,
         resultHex: "00 A5 5A",
+        codesAfter: [],
+        codesFound: [],
         exchanges: [
           ...this.last.exchanges,
           ["3E 00", "7E 00"],

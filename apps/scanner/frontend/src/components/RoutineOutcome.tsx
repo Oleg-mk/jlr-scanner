@@ -1,4 +1,5 @@
-import { t } from "../i18n";
+import { useHelpLanguage } from "../helpLanguage";
+import { codeText, t, useLanguage } from "../i18n";
 import type { RoutineRunSnapshot } from "../routineRun";
 
 interface RoutineOutcomeProps {
@@ -12,9 +13,13 @@ interface RoutineOutcomeProps {
  * it; then the module's answer as it wrote it - bytes, and the plain
  * statement that this library does not describe them - or its refusal by
  * name, or the stop, or the time that ran out. Every exchange of the run
- * is behind a spoiler, as a read's is.
+ * is behind a spoiler, as a read's is. Once the run has ended the shell
+ * reads the module's codes again; the codes that were not there before
+ * are what the test found, listed under the answer.
  */
 export function RoutineOutcome({ run, onStop }: RoutineOutcomeProps) {
+  const language = useLanguage();
+  const [helpLanguage] = useHelpLanguage(language);
   const seconds = (ms: number) => Math.round(ms / 1000);
   return (
     <div className={`clear-outcome routine-outcome routine-outcome--${run.state.toLowerCase()}`} role="status">
@@ -69,6 +74,36 @@ export function RoutineOutcome({ run, onStop }: RoutineOutcomeProps) {
           {run.error?.technicalDetails ? (
             <span className="module-validation"> {run.error.technicalDetails}</span>
           ) : null}
+        </p>
+      ) : null}
+      {run.codesAfter !== null && run.codesFound.length > 0 ? (
+        <>
+          <p>
+            <strong>{t("What the test found: {count} code(s)", { count: run.codesFound.length })}</strong>
+          </p>
+          <ul className="clear-outcome-codes">
+            {run.codesFound.map((dtc) => {
+              const wording = codeText(
+                dtc.descriptionTexts,
+                dtc.description,
+                language,
+                dtc.descriptionDataTexts,
+                helpLanguage,
+              );
+              return (
+                <li key={`${dtc.code}-${dtc.failureType}`}>
+                  <strong>{dtc.code}</strong> {wording.shown ?? t("No wording in the loaded data")}
+                </li>
+              );
+            })}
+          </ul>
+        </>
+      ) : null}
+      {run.codesAfter !== null && run.codesFound.length === 0 ? (
+        <p>
+          {t("The test logged no new code; the module holds {count} code(s).", {
+            count: run.codesAfter.length,
+          })}
         </p>
       ) : null}
       {run.exchanges.length > 0 ? (

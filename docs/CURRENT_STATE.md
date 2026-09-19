@@ -185,7 +185,13 @@ run-time guard's list of services seen on the bus gained `0x31` and
 `0x3E` and nothing else. In the interface: one key under a runnable test,
 one question with SDD's own instructions, the run stepped every second,
 the outcome in every state, and "Self tests run" in the readable report.
-`IMPLEMENTED`, `FIXTURE_TESTED`; nothing has met a car; 1.2.1 on his word.
+His question at the screen — «і про що самотест говорить нам?» — had its
+answer in SDD's own screens: the test makes the module run its monitors
+now and log what it finds. So once a run has ended the module's codes are
+read again, as after a clear, and the codes that were not there before
+are listed as what the test found, both reads in the record and taken by
+the intake as reads. `IMPLEMENTED`, `FIXTURE_TESTED`; nothing has met a
+car; 1.2.1 on his word.
 
 ### What this day did not touch
 

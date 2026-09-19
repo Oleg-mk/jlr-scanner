@@ -388,11 +388,20 @@ result bytes mean (`ADR-0032` left the results pack undecided).
    and released as the live read takes it (`ADR-0022`, decision 4), so a
    stop or a disconnect gets through between two of them.
 
-3. **The result is bytes.** What the module answers to the request for
-   results is shown as the bytes it is, with the session it came in and
-   the plain statement that this library does not describe them. Nothing
-   is inferred from them: not "passed", not "failed". A negative answer is
-   shown by its name and recorded.
+3. **The result is bytes; the codes are what the test says.** What the
+   module answers to the request for results is shown as the bytes it
+   is, with the session it came in and the plain statement that this
+   library does not describe them. Nothing is inferred from them: not
+   "passed", not "failed". A negative answer is shown by its name and
+   recorded. What the test found is said the way SDD's own screens say
+   a self test works — the module runs its monitors now and logs what
+   it finds — so once the run has ended, completed, stopped or timed
+   out, the module's codes are read again through the read this product
+   always uses, as they are after a clear; what the test logged is a
+   code that is there now and was not in the last read before it, and
+   both reads travel with the record. A refusal at the start ran
+   nothing and reads nothing (amended the same night, on the owner's
+   question at the screen: «і про що самотест говорить нам?»).
 
 4. **The confirmation.** One question per test, naming the module and
    the test, carrying SDD's own instructions for this car in the help
@@ -468,4 +477,11 @@ bench end to end.
   inside the mode; the question; the run stepped every second; the outcome
   in every state; the readable report's "Self tests run". Tested through
   the whole interface with a recording client.
+- *The codes after the run (decision 3, amended).* Once a run has ended
+  the shell reads the module's codes again, keeps them in the snapshot
+  and the record beside the codes held before, and says on its own
+  which are new; the interface lists them under the answer as "What the
+  test found"; `report-intake` takes the two reads as reads. The
+  whole-stack test reads again on the bench and finds both reads in the
+  record.
 - Nothing has met a car. The version turns 1.2.1 on the owner's word.

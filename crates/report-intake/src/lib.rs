@@ -83,11 +83,22 @@ struct SessionReport {
     /// a route, and is not recorded here.
     #[serde(default)]
     dtc_clears: Vec<DtcClear>,
-    /// Runs of a routine (`ADR-0036`, step 2): an action, not evidence
-    /// about a route; accepted, and nothing is taken from them.
+    /// Runs of a routine (`ADR-0036`, step 2): the run is an action, not
+    /// evidence about a route, and is not recorded here; the fault-code
+    /// reads before and after it are reads like any other and are taken
+    /// as such.
     #[serde(default)]
-    #[allow(dead_code)]
-    routine_runs: Vec<serde_json::Value>,
+    routine_runs: Vec<RoutineRun>,
+}
+
+/// As much of a routine run as the intake reads: the two fault-code reads
+/// around it.
+#[derive(Debug, Deserialize)]
+struct RoutineRun {
+    #[serde(default)]
+    before: Option<ModuleReadReport>,
+    #[serde(default)]
+    after: Option<ModuleReadReport>,
 }
 
 /// As much of a clear as the intake reads: the two fault-code reads around
@@ -264,6 +275,12 @@ pub fn intake(
                 .dtc_clears
                 .iter()
                 .flat_map(|clear| clear.before.iter().chain(clear.after.iter())),
+        )
+        .chain(
+            report
+                .routine_runs
+                .iter()
+                .flat_map(|run| run.before.iter().chain(run.after.iter())),
         );
     for read in every_read {
         let program = read.vehicle.vehicle_program.trim();
@@ -385,9 +402,28 @@ pub fn intake(
         }
     }
 
+    for (run_index, run) in report.routine_runs.iter().enumerate() {
+        if let Some(record) = &run.before {
+            builder.read(
+                format!("routine_runs[{run_index}].before"),
+                format!("routine.{run_index:02}.before"),
+                record,
+                library,
+            )?;
+        }
+        if let Some(record) = &run.after {
+            builder.read(
+                format!("routine_runs[{run_index}].after"),
+                format!("routine.{run_index:02}.after"),
+                record,
+                library,
+            )?;
+        }
+    }
+
     if builder.records.is_empty() {
         return Err(KnowledgeError::Parse(
-            "the report holds nothing this intake can record: no module read, capture, calibration read, live-read run, mileage survey, module passport, configuration read, battery read or the reads around a clear".into(),
+            "the report holds nothing this intake can record: no module read, capture, calibration read, live-read run, mileage survey, module passport, configuration read, battery read or the reads around a clear or a self test".into(),
         ));
     }
     Ok(IntakeOutcome {

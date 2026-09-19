@@ -27,6 +27,7 @@ import {
 } from "./library";
 import {
   createModuleReadSnapshot,
+  type DtcSummary,
   type ModuleReadClient,
   type ModuleReadRequest,
   type ModuleReadSnapshot,
@@ -263,6 +264,22 @@ class RecordingServiceClient implements ServiceClient {
   }
 }
 
+/** A code the self test logs, as the module's read after the run answers it. */
+const loggedByTheTest: DtcSummary = {
+  code: "B1D01",
+  failureType: "11",
+  status: "09",
+  description: "Steering wheel switch circuit open",
+  descriptionScope: "module",
+  failureTypeText: null,
+  failureTypeTexts: {},
+  descriptionTexts: {},
+  descriptionDataTexts: {},
+  help: [],
+  helpTexts: {},
+  helpNote: null,
+};
+
 /** The shell's side of a self test, remembered as the shell remembers it:
  *  the start, then a step or two, then the module's fixed status record. */
 class RecordingRoutineClient implements RoutineRunClient {
@@ -301,6 +318,9 @@ class RecordingRoutineClient implements RoutineRunClient {
         state: "COMPLETED",
         resultHex: "00 A5 5A",
         elapsedMs: 3100,
+        // Read again once the run ended: one code that was not there before.
+        codesAfter: [loggedByTheTest],
+        codesFound: [loggedByTheTest],
         exchanges: [
           ...this.last.exchanges,
           ["3E 00", "7E 00"],
@@ -566,6 +586,9 @@ describe("the service mode (ADR-0036)", () => {
     // Stepped until the shell says it ended; the answer is bytes, said so.
     expect(await screen.findByText("The module answered: 00 A5 5A")).toBeVisible();
     expect(routine.steps).toBeGreaterThanOrEqual(2);
+    // And what it found: the code read after the run that was not there before.
+    expect(screen.getByText("What the test found: 1 code(s)")).toBeVisible();
+    expect(screen.getByText("Steering wheel switch circuit open")).toBeVisible();
     expect(
       screen.getByText("The result is shown as the module answers it; this library does not describe it."),
     ).toBeVisible();
