@@ -249,7 +249,15 @@ measured convention beside the module's own address; the synthetic
 keeps its declared `TVMOD`, because a synthetic record may not cite
 research evidence. His second remark — that the names under the map's
 nodes jump in height and the state with them — is a fixed two-line name
-box. The library is re-exported and re-issued from this.
+box. The library is re-exported and re-issued from this: 517,927 records
+(517,595 before — the gateway claims and the 31 derived rows), nothing
+rejected, the owner's copy `4994-9DFB` valid to 2027-09-19 at
+`Desktop\prowlone-library-Oleg-4994-9DFB`; surveyed on it, an L322 of
+2010 has 33 modules reachable and 10 on the hypothesised MOST route, an
+L319 or L320 of 2010 28 and 9, and the X250 exactly what it had. The
+first export from `SDD169_EXTRACTED/Payload` gave 166,840 records, because
+that tree's file names are garbled; the roots that work are in the
+owner's guide, section 11.
 
 ### What this day did not touch
 No operation has met a car. Stage 2 is what `ADR-0036` describes; the clear's

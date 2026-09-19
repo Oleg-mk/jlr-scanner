@@ -243,3 +243,42 @@ Remove-Item -LiteralPath "HKCU:\Software\prowlone" -Recurse -Force
   двигунами, роками випуску чи ринками, тепер зберігаються всі адреси, а не
   остання. Через це в описі авто важливо вказувати двигун: без нього такі
   модулі показуються як невизначені, з поясненням, а не з чужою адресою.
+
+## 11. Бібліотека з модулями MOST (2026-09-19)
+
+- **Твоя копія перевидана**: код `4994-9DFB`, чинна до 2027-09-19, папка
+  `Desktop\prowlone-library-Oleg-4994-9DFB` (zip поруч у
+  `Downloads\prowlone-issued\prowlone-library-Oleg.zip`). У застосунку
+  вибери цю папку замість `prowlone-library-Oleg-A391-A466`; стара копія
+  чинна до 2027-09-16, але не має рядків MOST з ідентифікаторами.
+- Що в ній нового (`ADR-0039`): на кожному модулі підмережі записано її
+  шлюз так, як його заявляє SDD (модуль-шлюз, спосіб доступу, для 29-бітної
+  схеми — її числа), а для L319 і L320 2010–2011 та L322 2010–2012 модулі
+  кільця MOST мають ідентифікатори, виведені з фізичної адреси
+  (відповідь = запит + 8, як усі 1 528 оголошених пар у корпусі), і
+  маршрут ms-can через ACM — гіпотезу, яку підтвердить перше читання на
+  такому авто. На X250 і на старших L319/L320/L322 нічого не змінилося.
+- **Як експортовано.** Без Docker, з репозиторію, за 2 хв 45 с:
+
+```
+cargo run --release -q -p sdd-ingest --example export_manifests -- <куди> ^
+  Downloads\SDD169_DECRYPTED\CURRENT_JLR_XCL_XML_DATA_XML ^
+  Downloads\SDD169_DECRYPTED\CURRENT_JLR_MCP_XML_XML ^
+  Downloads\SDD169_DECRYPTED\CURRENT_JLR_VIN_DECODE_XML ^
+  Downloads\SDD169_DECRYPTED\COMMON_JLR_SMPACK_XML ^
+  Downloads\SDD169_EXTRACTED\SDD_XML_PAYLOAD\COMMON_SDD_DATA_SNAPSHOT_LANG_EN ^
+  Downloads\SDD169_EXTRACTED\SDD_XML_PAYLOAD\COMMON_SDD_DATA_DTC_HELP_LANG_EN ^
+  "<твої скрипти>\SDD_original_help\RU\COMMON_SDD_DATA_DTC_HELP_LANG_RU" ^
+  Downloads\SDD169_EXTRACTED\SDD_XML_PAYLOAD\COMMON_SDD_DATA_ODST_LANG_EN ^
+  "<твої скрипти>\SDD_ODST_RU\original\COMMON_SDD_DATA_ODST_LANG_RU" ^
+  Downloads\SDD169_EXTRACTED\SDD_XML_PAYLOAD\CURRENT_PAG_UTILS_RUNTIME ^
+  Downloads\SDD169_EXTRACTED\SDD_XML_PAYLOAD\CURRENT_PAG_MCP_TEXT_XML
+```
+
+  Саме `SDD_XML_PAYLOAD`, не `Payload`: у `Payload` імена файлів зіпсовані,
+  і експорт з нього дає 166 840 записів замість 517 927 — так і сталося
+  з першої спроби. Очікуваний підсумок: `store: … 517927 records`,
+  `rejected: 0`. Далі штамп як завжди:
+  `powershell -File scripts\stamp-library.ps1 -IssuedTo "Oleg" -Days 365
+  -Library "<куди>"`. Експорт, штамп, preflight і збірка застосунку ділять
+  `target\` — по одному за раз.
