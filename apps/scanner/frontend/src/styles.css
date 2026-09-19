@@ -5512,6 +5512,407 @@ table.live-read-identifiers label {
   padding-top: 0.5rem;
 }
 
+/* ===================================================================== */
+/* The forms of the controls (ADR-0038), 2026-09-19. Three classes, three  */
+/* forms, and depth for these three alone. A key is a pill standing in a   */
+/* bezel: the element is the bezel, the key itself is drawn under the word */
+/* by ::before, a groove round it, and it sinks only while it is pressed.  */
+/* A latch stands proud when released and sits sunk with its lamp lit when */
+/* engaged. A lens is a raised rim round a sunk flat face, the dot carrying */
+/* the state. The state is the markup's own: aria-pressed or aria-expanded */
+/* is the latch's position. Fields, the language puck, the map and         */
+/* everything inside tables stay as they are. Written at the foot, after   */
+/* every capsule rule it replaces. The first cut drew the bezel as a halo  */
+/* round the old capsule; the owner saw it for what it was («наляписто»).  */
+/* ===================================================================== */
+
+.app-shell {
+  --form-face: #fdfefd;
+  --form-face-deep: #f0f3f1;
+  --form-sunk: #e3e8e5;
+  --form-bezel: #eef2ef;
+  --form-bezel-deep: #e5eae7;
+  --form-shade: rgb(24 34 49 / 18%);
+  --form-shade-soft: rgb(24 34 49 / 10%);
+  --form-rim: rgb(24 34 49 / 22%);
+  --form-groove: rgb(24 34 49 / 13%);
+  --form-lamp: var(--positive, #1d7a38);
+  --form-lamp-off: rgb(24 34 49 / 18%);
+}
+
+/* --- A key ---------------------------------------------------------- */
+.app-shell .button {
+  position: relative;
+  isolation: isolate;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5em;
+  padding: 0 1.25rem;
+  border: 1px solid var(--form-rim);
+  border-radius: 999px;
+  background: linear-gradient(180deg, var(--form-bezel) 0%, var(--form-bezel-deep) 100%);
+  color: var(--ink);
+  box-shadow:
+    0 2px 5px var(--form-shade),
+    inset 0 1px 0 rgb(255 255 255 / 80%);
+  transition:
+    box-shadow 120ms ease,
+    background-color 140ms ease,
+    border-color 140ms ease,
+    color 140ms ease;
+}
+
+/* The key in its bezel: raised, a groove round it. */
+.app-shell .button:not([aria-pressed]):not([aria-expanded])::before {
+  content: "";
+  position: absolute;
+  inset: 3px;
+  z-index: -1;
+  border-radius: 999px;
+  background: linear-gradient(180deg, var(--form-face) 0%, var(--form-face-deep) 100%);
+  box-shadow:
+    0 0 0 1px var(--form-groove),
+    0 1px 2px var(--form-shade-soft),
+    inset 0 1px 0 #fff;
+  transition:
+    background-color 120ms ease,
+    box-shadow 120ms ease;
+}
+
+.app-shell .button:hover:not(:disabled) {
+  border-color: rgb(24 34 49 / 30%);
+}
+
+.app-shell .button:hover:not(:disabled):not([aria-pressed]):not([aria-expanded])::before {
+  background: linear-gradient(180deg, #fff 0%, var(--form-face-deep) 100%);
+}
+
+/* Down while the pointer is down, and back up. */
+.app-shell .button:active:not(:disabled):not([aria-pressed]):not([aria-expanded])::before {
+  background: linear-gradient(180deg, var(--form-sunk) 0%, var(--form-face-deep) 100%);
+  box-shadow:
+    0 0 0 1px var(--form-groove),
+    inset 0 2px 4px var(--form-shade);
+}
+
+/* The one action that carries a block forward: the accent's ink. */
+.app-shell .button--primary {
+  color: var(--accent, #0b63ce);
+}
+
+.app-shell .button--primary:not([aria-pressed]):not([aria-expanded])::before {
+  background: linear-gradient(180deg, #fff 0%, #e8effa 100%);
+  box-shadow:
+    0 0 0 1px rgb(11 99 206 / 32%),
+    0 1px 2px var(--form-shade-soft),
+    inset 0 1px 0 #fff;
+}
+
+/* A key that cannot be pressed lies flat in its bezel, lit lower. */
+.app-shell .button:disabled {
+  border-color: rgb(24 34 49 / 18%);
+  background: rgb(24 34 49 / 4%);
+  color: rgb(0 0 0 / 50%);
+  box-shadow: none;
+  cursor: not-allowed;
+}
+
+.app-shell .button:disabled:not([aria-pressed]):not([aria-expanded])::before {
+  background: transparent;
+  box-shadow: 0 0 0 1px rgb(24 34 49 / 8%);
+}
+
+.app-shell .button:focus-visible {
+  outline: 2px solid var(--accent, #0b63ce);
+  outline-offset: 3px;
+}
+
+/* --- A latch -------------------------------------------------------- */
+.app-shell .button[aria-pressed],
+.app-shell .button[aria-expanded],
+.app-shell .live-dash-caption__toggle {
+  border: 1px solid var(--form-rim);
+  border-radius: 999px;
+  background: linear-gradient(180deg, var(--form-face) 0%, var(--form-face-deep) 100%);
+  color: var(--ink);
+  box-shadow:
+    0 0 0 1px rgb(24 34 49 / 6%),
+    0 2px 4px var(--form-shade),
+    inset 0 1px 0 #fff;
+  text-decoration: none;
+}
+
+/* The lamp: unlit while the latch is released. */
+.app-shell .button[aria-pressed]::before,
+.app-shell .button[aria-expanded]::before,
+.app-shell .live-dash-caption__toggle::before {
+  content: "";
+  flex: 0 0 auto;
+  width: 0.5em;
+  height: 0.5em;
+  border-radius: 50%;
+  background: var(--form-lamp-off);
+  box-shadow: inset 0 1px 1px rgb(0 0 0 / 18%);
+  transition:
+    background-color 140ms ease,
+    box-shadow 140ms ease;
+}
+
+.app-shell .live-dash-caption__toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45em;
+  padding: 0.2rem 0.7rem;
+  color: rgb(22 48 31 / 80%);
+  font-size: 0.75rem;
+}
+
+/* Engaged: sunk, and the lamp lit. */
+.app-shell .button[aria-pressed="true"],
+.app-shell .button[aria-expanded="true"],
+.app-shell .live-dash-caption__toggle[aria-pressed="true"] {
+  border-color: rgb(24 34 49 / 30%);
+  background: linear-gradient(180deg, var(--form-sunk) 0%, var(--form-face-deep) 100%);
+  color: var(--ink);
+  box-shadow:
+    inset 0 2px 5px rgb(24 34 49 / 22%),
+    inset 0 -1px 0 #fff,
+    0 1px 0 #fff;
+}
+
+.app-shell .button[aria-pressed="true"]::before,
+.app-shell .button[aria-expanded="true"]::before,
+.app-shell .live-dash-caption__toggle[aria-pressed="true"]::before {
+  background: var(--form-lamp);
+  box-shadow: 0 0 6px var(--form-lamp);
+}
+
+.app-shell .button[aria-pressed]:disabled,
+.app-shell .button[aria-expanded]:disabled,
+.app-shell .live-dash-caption__toggle:disabled {
+  box-shadow: none;
+  background: rgb(24 34 49 / 3%);
+  color: rgb(0 0 0 / 50%);
+  cursor: not-allowed;
+}
+
+/* The service mode's switch: a latch like any other, in its own amber
+   while it is off and red while it is on (ADR-0036; the owner on
+   2026-09-18 and again on 2026-09-19, when the first cut lost the amber). */
+.app-shell .button--service[aria-pressed="false"],
+.app-shell .app-header .button--service[aria-pressed="false"] {
+  border-color: #b98a2e;
+  background: linear-gradient(180deg, #fff8ea 0%, #f6e6c4 100%);
+  color: #6d4300;
+}
+
+.app-shell .button--service[aria-pressed="false"]::before,
+.app-shell .app-header .button--service[aria-pressed="false"]::before {
+  background: rgb(109 67 0 / 28%);
+}
+
+.app-shell .button--service[aria-pressed="true"],
+.app-shell .app-header .button--service[aria-pressed="true"] {
+  border-color: rgb(0 0 0 / 25%);
+  background: linear-gradient(180deg, #a8241c 0%, var(--negative, #b3261e) 100%);
+  color: #fff;
+  box-shadow:
+    inset 0 2px 5px rgb(0 0 0 / 30%),
+    inset 0 -1px 0 rgb(255 255 255 / 25%),
+    0 1px 0 rgb(255 255 255 / 45%);
+}
+
+.app-shell .button--service[aria-pressed="true"]::before,
+.app-shell .app-header .button--service[aria-pressed="true"]::before {
+  background: #fff;
+  box-shadow: 0 0 6px rgb(255 255 255 / 90%);
+}
+
+/* --- A lens: a raised rim round a sunk face ------------------------- */
+.app-shell .flow-body .status-badge,
+.app-shell .flow-rail .status-badge,
+.app-shell .modal .status-badge {
+  position: relative;
+  isolation: isolate;
+  border: 1px solid var(--form-rim);
+  border-radius: 999px;
+  background: linear-gradient(180deg, var(--form-bezel) 0%, var(--form-bezel-deep) 100%);
+  box-shadow:
+    0 2px 5px var(--form-shade),
+    inset 0 1px 0 rgb(255 255 255 / 80%);
+  cursor: default;
+}
+
+.app-shell .flow-body .status-badge::before,
+.app-shell .flow-rail .status-badge::before,
+.app-shell .modal .status-badge::before {
+  content: "";
+  position: absolute;
+  inset: 3px;
+  z-index: -1;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #e7ece9 0%, #f3f6f4 100%);
+  box-shadow:
+    0 0 0 1px var(--form-groove),
+    inset 0 1px 3px rgb(24 34 49 / 20%),
+    inset 0 -1px 0 #fff;
+}
+
+/* --- On the plate itself: the header and the section headings ------- */
+/* The same three forms cut into the sheet: the face is the plate's own   */
+/* light, the shade is the plate's, and the milled lettering stays.       */
+.app-shell .app-header .button,
+.app-shell .flow-section-heading .button {
+  border: 1px solid rgb(0 0 0 / 30%);
+  background: linear-gradient(180deg, rgb(255 255 255 / 34%) 0%, rgb(255 255 255 / 14%) 100%);
+  color: rgb(var(--milk) / 88%);
+  box-shadow:
+    0 2px 5px rgb(0 0 0 / 22%),
+    inset 0 1px 0 rgb(255 255 255 / 60%);
+}
+
+.app-shell .app-header .button:not([aria-pressed]):not([aria-expanded])::before,
+.app-shell .flow-section-heading .button:not([aria-pressed]):not([aria-expanded])::before {
+  background: linear-gradient(180deg, rgb(255 255 255 / 72%) 0%, rgb(255 255 255 / 40%) 100%);
+  box-shadow:
+    0 0 0 1px rgb(0 0 0 / 20%),
+    0 1px 2px rgb(0 0 0 / 14%),
+    inset 0 1px 0 rgb(255 255 255 / 85%);
+}
+
+.app-shell .app-header .button:hover:not(:disabled) {
+  border-color: rgb(0 0 0 / 40%);
+}
+
+.app-shell .app-header .button:hover:not(:disabled):not([aria-pressed]):not([aria-expanded])::before {
+  background: linear-gradient(180deg, rgb(255 255 255 / 84%) 0%, rgb(255 255 255 / 50%) 100%);
+}
+
+.app-shell .app-header .button:active:not(:disabled):not([aria-pressed]):not([aria-expanded])::before {
+  background: rgb(0 0 0 / 7%);
+  box-shadow:
+    0 0 0 1px rgb(0 0 0 / 20%),
+    inset 0 2px 4px rgb(0 0 0 / 26%);
+}
+
+.app-shell .app-header .button--primary {
+  color: rgb(var(--milk) / 96%);
+}
+
+.app-shell .app-header .button[aria-pressed],
+.app-shell .app-header .button[aria-expanded] {
+  background: linear-gradient(180deg, rgb(255 255 255 / 58%) 0%, rgb(255 255 255 / 26%) 100%);
+  color: rgb(var(--milk) / 88%);
+  box-shadow:
+    0 0 0 1px rgb(0 0 0 / 8%),
+    0 2px 4px rgb(0 0 0 / 22%),
+    inset 0 1px 0 rgb(255 255 255 / 75%);
+}
+
+.app-shell .app-header .button[aria-pressed]::before,
+.app-shell .app-header .button[aria-expanded]::before {
+  background: rgb(0 0 0 / 22%);
+}
+
+.app-shell .app-header .button[aria-pressed="true"],
+.app-shell .app-header .button[aria-expanded="true"] {
+  border-color: rgb(0 0 0 / 38%);
+  background: rgb(0 0 0 / 8%);
+  box-shadow:
+    inset 0 2px 5px rgb(0 0 0 / 28%),
+    inset 0 -1px 0 rgb(255 255 255 / 40%),
+    0 1px 0 rgb(255 255 255 / 45%);
+}
+
+.app-shell .app-header .button[aria-pressed="true"]::before,
+.app-shell .app-header .button[aria-expanded="true"]::before {
+  background: var(--form-lamp);
+  box-shadow: 0 0 6px var(--form-lamp);
+}
+
+/* The service switch in the header keeps its amber and its red: said
+   again after the header's latch rules, which would paint over it. */
+.app-shell .app-header .button--service[aria-pressed="false"] {
+  border-color: #8a6420;
+  background: linear-gradient(180deg, #f7e9c9 0%, #ecd7a8 100%);
+  color: #5a3700;
+}
+
+.app-shell .app-header .button--service[aria-pressed="false"]::before {
+  background: rgb(90 55 0 / 30%);
+}
+
+.app-shell .app-header .button--service[aria-pressed="true"] {
+  border-color: rgb(0 0 0 / 25%);
+  background: linear-gradient(180deg, #a8241c 0%, var(--negative, #b3261e) 100%);
+  color: #fff;
+  box-shadow:
+    inset 0 2px 5px rgb(0 0 0 / 30%),
+    inset 0 -1px 0 rgb(255 255 255 / 25%),
+    0 1px 0 rgb(255 255 255 / 45%);
+}
+
+.app-shell .app-header .button--service[aria-pressed="true"]::before {
+  background: #fff;
+  box-shadow: 0 0 6px rgb(255 255 255 / 90%);
+}
+
+.app-shell .app-header .button:disabled,
+.app-shell .flow-rail .button:disabled {
+  border-color: rgb(0 0 0 / 32%);
+  background: rgb(0 0 0 / 4%);
+  color: rgb(var(--milk) / 60%);
+  box-shadow: none;
+}
+
+.app-shell .app-header .button:disabled:not([aria-pressed]):not([aria-expanded])::before,
+.app-shell .flow-rail .button:disabled:not([aria-pressed]):not([aria-expanded])::before {
+  background: transparent;
+  box-shadow: 0 0 0 1px rgb(0 0 0 / 12%);
+}
+
+.app-shell .app-header .status-badge,
+.app-shell .flow-section-heading .status-badge {
+  position: relative;
+  isolation: isolate;
+  border: 1px solid rgb(0 0 0 / 30%);
+  border-radius: 999px;
+  box-shadow:
+    0 2px 5px rgb(0 0 0 / 22%),
+    inset 0 1px 0 rgb(255 255 255 / 60%);
+  cursor: default;
+}
+
+.app-shell .app-header .status-badge:not(.status-badge--bench),
+.app-shell .flow-section-heading .status-badge:not(.status-badge--bench) {
+  background: linear-gradient(180deg, rgb(255 255 255 / 34%) 0%, rgb(255 255 255 / 14%) 100%);
+  color: rgb(var(--milk) / 84%);
+}
+
+.app-shell .app-header .status-badge::before,
+.app-shell .flow-section-heading .status-badge::before {
+  content: "";
+  position: absolute;
+  inset: 3px;
+  z-index: -1;
+  border-radius: 999px;
+  background: rgb(0 0 0 / 7%);
+  box-shadow:
+    0 0 0 1px rgb(0 0 0 / 18%),
+    inset 0 1px 3px rgb(0 0 0 / 26%),
+    inset 0 -1px 0 rgb(255 255 255 / 35%);
+}
+
+/* The bench badge keeps its red and takes the lens's sunk face. */
+.app-shell .app-header .status-badge--bench::before,
+.app-shell .flow-section-heading .status-badge--bench::before {
+  background: rgb(0 0 0 / 14%);
+  box-shadow:
+    0 0 0 1px rgb(0 0 0 / 22%),
+    inset 0 1px 3px rgb(0 0 0 / 35%);
+}
+
 /* The live values hold their cells (the owner, 2026-09-19): the columns
    are fixed, so a number that grows a digit does not move the rest of the
    row, and every figure is tabular. The words wrap inside their column

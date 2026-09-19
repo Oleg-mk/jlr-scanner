@@ -1,3 +1,4 @@
+import { SwapLabel } from "./StableLabel";
 import { t, useLanguage } from "../i18n";
 import type { PrintableReport as ReportModel } from "../printableReport";
 import type { SessionReportSnapshot } from "../sessionReport";
@@ -80,7 +81,11 @@ export function ReportPanel({
             onClick={preview === null ? onPreview : onHidePreview}
             disabled={!snapshot.reportAvailable}
           >
-            {preview === null ? t("Show the report on screen") : t("Hide the report")}
+            <SwapLabel
+              on={preview !== null}
+              whenOn={t("Hide the report")}
+              whenOff={t("Show the report on screen")}
+            />
           </button>
         ) : (
           <button

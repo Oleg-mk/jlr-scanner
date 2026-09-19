@@ -1,3 +1,4 @@
+import { SwapLabel } from "./StableLabel";
 import { useState } from "react";
 import { codeText, dataText, t, useLanguage } from "../i18n";
 import { useHelpLanguage } from "../helpLanguage";
@@ -78,7 +79,7 @@ export function FaultSummary({ results, modules, onSelect }: FaultSummaryProps) 
             aria-expanded={open}
             onClick={() => setOpen((shown) => !shown)}
           >
-            {open ? t("Hide the codes") : t("Show the codes")}
+            <SwapLabel on={open} whenOn={t("Hide the codes")} whenOff={t("Show the codes")} />
           </button>
         ) : null}
       </div>

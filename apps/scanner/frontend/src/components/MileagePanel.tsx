@@ -1,3 +1,4 @@
+import { SwapLabel } from "./StableLabel";
 import { useReadOpen } from "../useReadOpen";
 import { parameterNote, t, useLanguage } from "../i18n";
 import { parameterName } from "../parameterNames";
@@ -107,9 +108,11 @@ export function MileagePanel({
             aria-expanded={open}
             onClick={() => setOpen((shown) => !shown)}
           >
-            {open
-              ? t("Put the readings away")
-              : t("Show the readings of {modules} module(s)", { modules })}
+            <SwapLabel
+              on={open}
+              whenOn={t("Put the readings away")}
+              whenOff={t("Show the readings of {modules} module(s)", { modules })}
+            />
           </button>
         ) : null}
         {badge(snapshot, running, bench)}

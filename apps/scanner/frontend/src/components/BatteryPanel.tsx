@@ -1,3 +1,4 @@
+import { SwapLabel } from "./StableLabel";
 import { Fragment, useState } from "react";
 import { useReadOpen } from "../useReadOpen";
 import { BATTERY_ROLES, type BatteryReadSnapshot, type BatteryRole } from "../battery";
@@ -84,7 +85,7 @@ export function BatteryPanel({
             aria-expanded={open}
             onClick={() => setOpen((shown) => !shown)}
           >
-            {open ? t("Put the readings away") : t("Show the readings")}
+            <SwapLabel on={open} whenOn={t("Put the readings away")} whenOff={t("Show the readings")} />
           </button>
         ) : null}
         {badge(snapshot, running, bench)}

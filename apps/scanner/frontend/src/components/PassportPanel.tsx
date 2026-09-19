@@ -1,3 +1,4 @@
+import { SwapLabel } from "./StableLabel";
 import { useReadOpen } from "../useReadOpen";
 import { parameterNote, passportLabel, t, useLanguage } from "../i18n";
 import { parameterName } from "../parameterNames";
@@ -110,9 +111,11 @@ export function PassportPanel({
             aria-expanded={open}
             onClick={() => setOpen((shown) => !shown)}
           >
-            {open
-              ? t("Put the passports away")
-              : t("Show the passports of {modules} module(s)", { modules: families.length })}
+            <SwapLabel
+              on={open}
+              whenOn={t("Put the passports away")}
+              whenOff={t("Show the passports of {modules} module(s)", { modules: families.length })}
+            />
           </button>
         ) : null}
         {badge(snapshot, running, bench)}

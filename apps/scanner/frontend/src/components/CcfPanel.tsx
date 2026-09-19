@@ -1,3 +1,4 @@
+import { SwapLabel } from "./StableLabel";
 import { Fragment, useState } from "react";
 import { useReadOpen } from "../useReadOpen";
 import type { CcfReading, CcfReadSnapshot } from "../ccf";
@@ -91,7 +92,11 @@ export function CcfPanel({ snapshot, running, adapterReady, surveyed, bench = fa
             aria-expanded={open}
             onClick={() => setOpen((shown) => !shown)}
           >
-            {open ? t("Put the configuration away") : t("Show the configuration")}
+            <SwapLabel
+              on={open}
+              whenOn={t("Put the configuration away")}
+              whenOff={t("Show the configuration")}
+            />
           </button>
         ) : null}
         {badge(snapshot, running, bench)}
