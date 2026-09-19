@@ -603,7 +603,7 @@ fn the_bench_connects_without_a_port_reads_the_surveyed_vehicle_and_marks_everyt
         .execute_kline_read(&faults_prepared.transaction, Duration::from_secs(2))
         .expect("the bench is connected")
         .map_err(map_live_error);
-    let (faults_read, _) = KlineReadService::finish(
+    let (faults_read, faults_record) = KlineReadService::finish(
         &ds2_faults,
         &faults_prepared,
         Some(&info),
@@ -616,6 +616,10 @@ fn the_bench_connects_without_a_port_reads_the_surveyed_vehicle_and_marks_everyt
         ModuleReadState::Succeeded,
         "{faults_read:?}"
     );
+    // Taken in as the shell's own command takes it in, so the clear below
+    // finds what it will have erased.
+    let ds2_codes_read = faults_read.dtcs.len();
+    reads.adopt(faults_read, faults_record);
 
     // Fault codes: the bench answers with codes the library describes.
     let request = ModuleReadRequest {
@@ -1214,6 +1218,83 @@ fn the_bench_connects_without_a_port_reads_the_surveyed_vehicle_and_marks_everyt
     assert!(clear_json.contains("\"route_validation\": \"SYNTHETIC\""));
     assert!(clear_json.contains("\"before\": {"), "{clear_json}");
 
+    // The same step over the K-line (ADR-0036, decision 9): DS2MOD's fault
+    // memory was read above over the serial line; the clear-fault-memory
+    // command goes down the same line, the bench empties the memory, and
+    // the record has the shape the CAN module's has - a serial protocol has
+    // no session to open, and the record says none.
+    let ds2_clear_request = DtcClearRequest {
+        ecu_family: "DS2MOD".into(),
+        context: vehicle(),
+    };
+    let ds2_prepared_clear = DtcClearService::prepare(session.library(), &ds2_clear_request)
+        .expect("the clear prepares on the K-line from the same plan as the read");
+    let PreparedDtcClear::Kline {
+        service: ref ds2_clear_service,
+        ..
+    } = ds2_prepared_clear
+    else {
+        panic!("DS2MOD is on a K-line");
+    };
+    assert_eq!(ds2_clear_service.transaction().backend_route(), "k-line-7");
+    assert_eq!(ds2_clear_service.transaction().protocol_family(), "DS2");
+    let ds2_before = reads
+        .last_fault_codes("DS2MOD")
+        .cloned()
+        .expect("DS2MOD's codes were read in this session");
+    assert_eq!(ds2_before.0.dtcs.len(), ds2_codes_read);
+    let ds2_clear_result = adapter
+        .execute_kline_service(ds2_clear_service, DTC_CLEAR_TIMEOUT)
+        .expect("the bench is connected");
+    let mut ds2_clears = DtcClearService::new();
+    let ds2_cleared = ds2_clears.finish(
+        &ds2_clear_request,
+        Some(&ds2_prepared_clear),
+        Some(&info),
+        Some(&ds2_before),
+        Ok(ClearResult::Kline(ds2_clear_result)),
+    );
+    assert_eq!(ds2_cleared.state, DtcClearState::Cleared, "{ds2_cleared:?}");
+    assert_eq!(ds2_cleared.protocol, "DS2");
+    assert_eq!(ds2_cleared.safety_class, "SERVICE_ROUTINE");
+    assert!(
+        ds2_cleared.session.is_none(),
+        "a serial line has no session to open: {ds2_cleared:?}"
+    );
+    assert_eq!(ds2_cleared.codes_before.len(), ds2_codes_read);
+    ds2_clears.mark_synthetic();
+    // Read again over the line: the memory is empty for the rest of the session.
+    let ds2_again_prepared = KlineReadService::prepare(session.library(), &ds2_faults)
+        .expect("DS2MOD is a K-line module")
+        .expect("its fault memory prepares again");
+    let ds2_again_result = adapter
+        .execute_kline_read(&ds2_again_prepared.transaction, Duration::from_secs(2))
+        .expect("the bench is connected")
+        .map_err(map_live_error);
+    let ds2_again = KlineReadService::finish(
+        &ds2_faults,
+        &ds2_again_prepared,
+        Some(&info),
+        Some(session.library()),
+        true,
+        ds2_again_result,
+    );
+    assert_eq!(
+        ds2_again.0.state,
+        ModuleReadState::Succeeded,
+        "{:?}",
+        ds2_again.0
+    );
+    assert!(ds2_again.0.dtcs.is_empty(), "{:?}", ds2_again.0);
+    let ds2_cleared = ds2_clears.attach_after(&ds2_again);
+    assert_eq!(ds2_cleared.codes_after.as_deref(), Some(&[][..]));
+    let ds2_clear_json = ds2_clears.record_json().unwrap();
+    assert!(
+        ds2_clear_json.contains("\"protocol\": \"DS2\""),
+        "{ds2_clear_json}"
+    );
+    assert!(ds2_clear_json.contains("\"route_validation\": \"SYNTHETIC\""));
+
     // The session is a bench session: it says so in the bundle, it refuses a
     // real adapter once it holds records, and the intake refuses the bundle.
     let mut report = SessionReportService::new();
@@ -1245,6 +1326,10 @@ fn the_bench_connects_without_a_port_reads_the_surveyed_vehicle_and_marks_everyt
     assert!(report.snapshot().service_mode);
     report.add_dtc_clear(&clear_json).unwrap();
     assert_eq!(report.snapshot().dtc_clears, 1);
+    // The collective clear is a sequence of these (ADR-0036, decision 3):
+    // the second module's record joins as the first one did.
+    report.add_dtc_clear(&ds2_clear_json).unwrap();
+    assert_eq!(report.snapshot().dtc_clears, 2);
     assert!(report.is_bench());
     assert!(report.accepts(SESSION_MODE_BENCH));
     assert!(!report.accepts(SESSION_MODE_REAL));

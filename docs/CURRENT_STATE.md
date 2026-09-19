@@ -173,13 +173,15 @@ question that names every module with codes and its count, then each
 module asked in turn, each answer its own `dtc_clears` record, the list
 following the read made after each clear, and what the sequence came to
 said under it (`ADR-0036`, amendment of 2026-09-19). Tested in the
-interface over two modules; on the bench each clear of a sequence is the
-per-module path the end-to-end test already proves, and the synthetic
-fixture reaches one module, so a two-module sequence there waits for a
-second reachable module in the fixture. Step 1 is complete on the
-bench; the K-line path is still proved at the crate level only, the
-version is still 1.1.0 until he says 1.2.0, and no operation has met a
-car: `IMPLEMENTED`, `FIXTURE_TESTED`, and nothing above it.
+interface over two modules, and on the bench in the whole-stack test,
+which now clears two modules in turn — `SYNTHMOD` over CAN and `DS2MOD`
+over the K-line, DS2 `0x05` down the serial line, the memory read again
+empty, no session in the record — and finds two records. That put the
+K-line clear on the bench end to end, which the built note of 2026-09-18
+had left at the crate level; KWP2000's clear stays there, the fixture
+having no KWP2000 module. Step 1 is on the bench end to end, as decision
+1 of the record asks before the next step begins; no operation has met
+a car: `IMPLEMENTED`, `FIXTURE_TESTED`, and nothing above it.
 
 
 ## 2026-09-18 — the rework day: the interface the owner can use, and the library read once

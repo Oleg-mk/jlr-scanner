@@ -329,12 +329,17 @@ alone (decision 8).
   refusal or a failure of one module does not stop the rest; what each came
   to is said under the list when the sequence ends, and a module whose codes
   returned at once stays on the list, because the list follows the read
-  made after the clear. Tested in the interface over two modules; on the
-  bench the end-to-end test is the per-module path, and every clear of a
-  sequence is that path once more — the synthetic fixture reaches one
-  module, so a two-module sequence on the bench waits for a second
-  reachable module in the fixture.
+  made after the clear. Tested in the interface over two modules, and on
+  the bench in the whole-stack test, which now clears two modules in turn
+  — one over CAN, one over the K-line — and finds two records.
+- **The K-line clear is on the bench end to end.** The built note of
+  2026-09-18 had it at the crate level; the whole-stack test now reads
+  `DS2MOD`'s fault memory over the serial line, sends DS2 `0x05` down the
+  same line, reads the memory again empty, and records the clear with no
+  session, as a serial protocol has none. KWP2000 `0x14` stays at the
+  crate level: the synthetic fixture has no KWP2000 module.
 - Nothing else of the step moves: the per-module clear, the session, the
-  guard and the record are as the amendment of 2026-09-18 says; the K-line
-  path stays proved at the crate level; no operation has met a car. The
-  version turns 1.2.0 with the owner's word.
+  guard and the record are as the amendment of 2026-09-18 says; no
+  operation has met a car. With this the step is on the bench end to end,
+  which decision 1 asks of a step before the next begins; the version
+  turns 1.2.0 with the owner's word, given the same day.

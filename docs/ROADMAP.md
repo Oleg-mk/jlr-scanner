@@ -604,7 +604,9 @@ two days with his list, and accepted by him in the running window on
 The one collective confirmation, "clear the codes of all *n* modules", was
 built the same day (`ADR-0036`, amendment of 2026-09-19): one question that
 lists the modules, each asked in turn, each answer its own record. The step
-is complete on the bench; the K-line path is proved at the crate level.
+is complete on the bench end to end, the K-line clear (DS2) included;
+KWP2000's clear is proved at the crate level, the fixture having no KWP2000
+module.
 What outranks all of it is unchanged: no operation has met a car, and the
 first write on one is the owner's, after a real read session has been
 reported.
