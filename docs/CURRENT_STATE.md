@@ -4,7 +4,7 @@ This file records what is done. `ROADMAP.md` records what is next and why in tha
 order, including the owner-only gates. Keep both current; neither may live only
 in a chat session.
 
-Status: **2026-09-19 — the interface met the owner's own car through his library, and two things gave way. SDD names the holders of the car configuration by their diagnostic system (`RSJB_SYSTEM_A`), so the X250's configuration read planned nothing until `ADR-0037` taught the library that a system belongs to its module; and the X250's battery monitor declares no voltage, so the low-battery precondition of `ADR-0030` — amended twice today: SDD's own band, under 11.6 V, as a precondition of the session, and the voltage from whichever of three reads is freshest — could never have appeared on his car. Both are built and fixture-tested; the bench's rail follows the scenario on every read it answers, and the owner saw the line, the voltage on the cell and the headings that hold the top of the screen in the running window («все так як і планувалося»). Yesterday's two debts are closed: the operations' names are SDD's English and a caption says so, and the stopwatch is gone. The afternoon rebuilt the live read at the screen: the chooser says what each choice holds and a module's key counts what its press will add — the cap of sixteen, not the bench and not the rule, was what hid the engine speed on his car; the two dials read themselves once the survey names them and the adapter is there (`ADR-0022`, amended); the panel lost its dark screen and its grid and gained needles that rest at zero, the odometer and the gearbox in the dials' windows; and every control on the plate has one of three forms — a key, a latch, a lens (`ADR-0038`), the owner's own sketch, judged by him at the screen: «все ідеально». And at the end of the day he walked the service mode and the clear — the flow he had judged illogical the evening before — and accepted it: «ми виправили всі мої зауваження, все тепер логічно». Then, on his word, the collective clear was built and tested, the K-line clear joined the whole-stack bench test, and stage 2, step 1 is complete on the bench end to end: **1.2.0**, declared by him the same evening — the first build of stage 2, its installers his alone (`ADR-0036`, decision 8). Step 2 began the same evening, on the amendment written before its code: the on-demand self test, routine `0x0202`, runs on the bench end to end — the extended session opened and held, the result shown as the bytes it is — and is offered in the interface under a test the module's index and the ODST pack agree on; the guard was loosened for exactly that, one constructor, one intent, one routine in a closed type. 1.2.1 waits on his word. No operation has met a car.**
+Status: **2026-09-19, night — the MOST modules of the L319, L320 and L322 of MY10 are reachable on paper: `ADR-0039`, proposed and built the same night. SDD's data reaches their MOST ring through the ACM by each module's own address, with no routine, so a built-in hypothesis binds the sub-network to the medium-speed pair for exactly those three programme-years — twenty-eight module rows, unverified until one answers — while the older 29-bit `enhanced` layout stays `UNKNOWN` with its five numbers recorded verbatim, the X250's routine-opened gateway stays where it was, and every gatewayed module now says from the data which gateway fronts it and why it waits. Before that, the same day — the interface met the owner's own car through his library, and two things gave way. SDD names the holders of the car configuration by their diagnostic system (`RSJB_SYSTEM_A`), so the X250's configuration read planned nothing until `ADR-0037` taught the library that a system belongs to its module; and the X250's battery monitor declares no voltage, so the low-battery precondition of `ADR-0030` — amended twice today: SDD's own band, under 11.6 V, as a precondition of the session, and the voltage from whichever of three reads is freshest — could never have appeared on his car. Both are built and fixture-tested; the bench's rail follows the scenario on every read it answers, and the owner saw the line, the voltage on the cell and the headings that hold the top of the screen in the running window («все так як і планувалося»). Yesterday's two debts are closed: the operations' names are SDD's English and a caption says so, and the stopwatch is gone. The afternoon rebuilt the live read at the screen: the chooser says what each choice holds and a module's key counts what its press will add — the cap of sixteen, not the bench and not the rule, was what hid the engine speed on his car; the two dials read themselves once the survey names them and the adapter is there (`ADR-0022`, amended); the panel lost its dark screen and its grid and gained needles that rest at zero, the odometer and the gearbox in the dials' windows; and every control on the plate has one of three forms — a key, a latch, a lens (`ADR-0038`), the owner's own sketch, judged by him at the screen: «все ідеально». And at the end of the day he walked the service mode and the clear — the flow he had judged illogical the evening before — and accepted it: «ми виправили всі мої зауваження, все тепер логічно». Then, on his word, the collective clear was built and tested, the K-line clear joined the whole-stack bench test, and stage 2, step 1 is complete on the bench end to end: **1.2.0**, declared by him the same evening — the first build of stage 2, its installers his alone (`ADR-0036`, decision 8). Step 2 began the same evening, on the amendment written before its code: the on-demand self test, routine `0x0202`, runs on the bench end to end — the extended session opened and held, the result shown as the bytes it is — and is offered in the interface under a test the module's index and the ODST pack agree on; the guard was loosened for exactly that, one constructor, one intent, one routine in a closed type. 1.2.1 waits on his word. No operation has met a car.**
 
 Earlier — **2026-09-18, the rework — the owner walked the running window item by item and the interface was rebuilt behind him, but the day's real find was underneath: the bench had been reporting fault codes all along and the interface had nowhere to show them, and the library was being read once per module instead of once per question.** The two numbers that matter, measured on the owner's own library of 517,595 records and his own machine, in a release build: surveying 37 modules fell from 55 s to 6 s, and building the virtual vehicle from 65 s to 8 s, with a repeat of the same vehicle now free. Nothing about what the application answers changed; a test asserts that the narrowed query returns exactly what a walk of the whole store would keep. Two debts are carried to tomorrow: the help-language switch inside the self-test block does not carry all of its text, and the stopwatch used for these measurements is still in `bench_e2e.rs`, ignored by default.
 
@@ -193,8 +193,46 @@ are listed as what the test found, both reads in the record and taken by
 the intake as reads. `IMPLEMENTED`, `FIXTURE_TESTED`; nothing has met a
 car; 1.2.1 on his word.
 
-### What this day did not touch
+### The night, later: the MOST modules by their own address (`ADR-0039`)
 
+The debt the owner put next in line — «на черзі борг із недосяжної
+шини мост» — was read again from the 45 platform documents before a
+line was written, and the eight `NETWORK_ADDRESSED` documents turned
+out to be two kinds. The MY10 documents of the L319, L320 and L322
+declare `SUB_MOST` with `CAN_MS`'s own parameters — 125 kbit/s, 11-bit,
+normal addressing — behind `ACM_SYSTEM_A` by network address, and give
+its modules ordinary identifiers in the main bus's space: `AAM` 0x7A4,
+`APIM` 0x7D0, `DABM`, `DACMC`, `FEM`, `REM`, `SRM`, `TEL`, `TVM`, and the
+L322's `CDP`; twenty-eight rows. The five older documents (L319 MY05,
+L320 MY06, L322 MY04.5–07) address the same ring with a 29-bit
+`enhanced` layout — prefix `0x6F`, masks 3 and 3, network addresses
+`0x600` and `0x500` — whose composition is in no data this product
+holds. From MY12 the L319 and L320 switch the ring to `ROUTINE_CONTROL`
+behind the `FCDIM`, like the X250 and everything after it.
+
+`ADR-0039` does four things and no more: the platform adapter records
+every sub-network's gateway on its modules as SDD states it (`sdd_gateway`:
+main net, sub net, gateway, access method, the `enhanced` numbers
+verbatim); a seventh built-in manifest binds `SUB_MOST` to pins 3/11 at
+125 kbit/s and `ms-can` for L319 MY10–11, L320 MY10–11 and L322 MY10–12
+as an `ADR-0015` hypothesis, confirmed per vehicle by the first answered
+read; the older layout stays out and says so; and the survey and the
+map say, from the record, which gateway fronts a module and why it
+waits — by address and unverified, by a routine this build does not
+send, on NGI not read yet, or on a layout the data does not compose —
+falling back to the bus's name on a library issued before this. The
+read path is untouched: such a module is read on `ms-can` exactly as a
+medium-speed module is. On the bench the synthetic platform gained a
+sub-network of the same kind behind `SYNTHMOD` and a module `TVMOD` on
+it, bound by a test-side manifest of the same form; the session tests
+survey it as a hypothesis with the gateway named and the whole-stack
+test reads its codes end to end. `IMPLEMENTED`, `FIXTURE_TESTED`; the
+three real bindings are `UNVERIFIED` until an L319, L320 or L322 of
+MY10 answers. Not built: any routine to a gateway, the `enhanced`
+layout, NGI; the X250's ring still waits for a capture of a genuine SDD
+session, or the owner's decision on SDD's program binaries.
+
+### What this day did not touch
 No operation has met a car. Stage 2 is what `ADR-0036` describes; the clear's
 confirmation gained the precondition line and nothing else. The 47-second
 library load is unchanged.

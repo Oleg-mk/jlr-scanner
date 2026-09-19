@@ -476,7 +476,10 @@ programs fully and the powertrain and chassis of the other three; F14 adds
 ISO9141/ISO14230 transport over pins 7/8 as its own phase with its own ADR,
 because it is a new transport implementation and must not be debugged at the
 same time as the first multi-module pipeline. Gatewayed sub-networks (MOST,
-SUB_CAN1, NGI) stay stage 2 because gateway access is `ROUTINE_CONTROL`.
+SUB_CAN1, NGI) stay stage 2 where gateway access is `ROUTINE_CONTROL` —
+which is 28 of the 42 documents with a gateway; the MOST ring of the
+L319, L320 and L322 of MY10 is reached by network address and became a
+read-only route hypothesis on 2026-09-19 (`ADR-0039`, F25).
 
 Whatever is unsupported is **shown**, never omitted: a module the application
 cannot reach is listed with the reason, so a CAN-only build on an early Range
@@ -642,6 +645,30 @@ runs the test end to end on `SYNTHMOD` and finds the record.
 Not in this slice: any other routine, several tests in one go, a meaning
 for the result bytes, the self tests of K-line modules. No operation has
 met a car.
+
+### F25 — the MOST modules by their own address (built 2026-09-19, `ADR-0039`)
+
+The debt of the unreachable MOST ring, read again from the data: of the
+42 platform documents with a gateway, 28 open it with a routine SDD's
+data does not name, 7 are the NGI of 2016 and later, and 8 declare
+`NETWORK_ADDRESSED` — the L319, L320 and L322, all behind the `ACM`. The
+three MY10 documents address the ring's modules with plain 11-bit
+identifiers at the medium-speed bus's own parameters, so the product
+binds `SUB_MOST` to `ms-can` for L319 MY10–11, L320 MY10–11 and L322
+MY10–12 as a built-in research hypothesis in `ADR-0015`'s form: nine or
+ten more modules per car surveyed as reachable on a hypothesis, read on
+the path the medium-speed modules already use, confirmed per vehicle by
+the first answered read. The five older documents address the ring with
+a 29-bit `enhanced` layout the data does not compose; their numbers are
+recorded verbatim and the modules stay out, saying why. Every gatewayed
+module now carries its gateway from the data, and the map says from it
+why a sub-network waits. The bench reads a module behind a synthetic
+gateway end to end.
+
+Not in this slice: a routine to any gateway (the X250's ring included:
+its evidence path is a capture of a genuine SDD session, or the owner's
+decision on SDD's program binaries), the `enhanced` layout, NGI. Nothing
+has met a car.
 
 ### F14 — K-line transport for the legacy buses (brought forward 2026-09-12, `ADR-0029`)
 

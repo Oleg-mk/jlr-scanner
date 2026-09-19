@@ -32,6 +32,10 @@ const MODULE_TEXT: &str = include_str!("../../../fixtures/knowledge/synthetic/f9
 const VIN_DECODE: &str = include_str!("../../../fixtures/knowledge/synthetic/f9_vin_decode.xml");
 const ODST: &str = include_str!("../../../fixtures/knowledge/synthetic/f9_odst_info.xml");
 const IVS: &str = include_str!("../../../fixtures/knowledge/synthetic/f9_ivs_lineage.xml");
+/// The test-side binding of the synthetic sub-network to the adapter
+/// (ADR-0039, decision 5): the same form as the built-in hypotheses.
+const SUB_NETWORK_ROUTE: &str =
+    include_str!("../../../fixtures/knowledge/synthetic/f9_sub_network_route_hypothesis.json");
 
 fn synthetic_source(id: &str, text: &str) -> SourceRecord {
     SourceRecord {
@@ -106,7 +110,11 @@ fn exported_manifests() -> Vec<(String, String)> {
 }
 
 fn library() -> KnowledgeLibrary {
-    let manifests = exported_manifests();
+    let mut manifests = exported_manifests();
+    manifests.push((
+        "sub_network_route.json".to_string(),
+        SUB_NETWORK_ROUTE.to_string(),
+    ));
     KnowledgeLibrary::from_manifests(
         manifests
             .iter()
@@ -131,7 +139,7 @@ fn built_in_library_holds_the_documented_and_research_manifests() {
     let snapshot = library.snapshot();
     assert_eq!(snapshot.state, LibraryState::NotLoaded);
     assert_eq!(snapshot.directory, None);
-    assert_eq!(snapshot.sources, 6);
+    assert_eq!(snapshot.sources, 7);
     assert_eq!(snapshot.manifests_failed, 0);
     assert!(snapshot.message.contains("Built-in data only"));
 
@@ -146,12 +154,13 @@ fn exported_manifests_and_bundles_load_and_are_counted_honestly() {
     let library = library();
     let snapshot = library.snapshot();
     assert_eq!(snapshot.state, LibraryState::Loaded);
-    // Six built-in plus one manifest plus one bundle of five.
-    assert_eq!(snapshot.manifests_loaded, 12);
+    // Seven built-in plus one manifest, one bundle of five and the test-side
+    // binding of the synthetic sub-network.
+    assert_eq!(snapshot.manifests_loaded, 14);
     assert_eq!(snapshot.manifests_failed, 0);
-    assert_eq!(snapshot.sources, 12);
+    assert_eq!(snapshot.sources, 14);
     assert!(snapshot.records > 20);
-    assert!(snapshot.message.starts_with("Loaded 6 manifests"));
+    assert!(snapshot.message.starts_with("Loaded 7 manifests"));
 }
 
 #[test]
@@ -177,25 +186,27 @@ fn a_broken_manifest_is_reported_and_the_rest_still_load() {
         .collect();
     assert_eq!(files, vec!["broken.json", "wrong-shape.json"]);
     assert!(snapshot.failures[0].message.contains("not valid JSON"));
-    // The good data is still there.
-    assert_eq!(snapshot.sources, 12);
+    // The good data is still there: seven built-in, one manifest, one bundle
+    // of five, and this test loads no test-side binding.
+    assert_eq!(snapshot.sources, 13);
 }
 
 #[test]
 fn the_survey_shows_reachable_and_unreachable_modules_with_reasons() {
     let survey = library().survey(&vehicle());
-    // SYNTHMOD, OTHERMOD, LEGACYMOD, FIXEDMOD, and the two K-line modules
-    // DS2MOD and STARMOD (ADR-0029); only SYNTHMOD has a confirmed route,
-    // DS2MOD sits on a hypothesised one.
-    assert_eq!(survey.modules.len(), 6);
+    // SYNTHMOD, OTHERMOD, LEGACYMOD, FIXEDMOD, the two K-line modules DS2MOD
+    // and STARMOD (ADR-0029), and TVMOD behind a gateway (ADR-0039); only
+    // SYNTHMOD has a confirmed route, DS2MOD and TVMOD sit on hypothesised
+    // ones.
+    assert_eq!(survey.modules.len(), 7);
     assert_eq!(survey.reachable, 1);
-    assert_eq!(survey.hypothesis, 1);
+    assert_eq!(survey.hypothesis, 2);
     assert_eq!(survey.unreachable, 4);
     assert!(survey.message.starts_with(
-        "6 modules known: 1 reachable over the adapter, 1 on a hypothesised route, 4 not"
+        "7 modules known: 1 reachable over the adapter, 2 on a hypothesised route, 4 not"
     ));
 
-    // Sorted by mnemonic: DS2MOD, FIXEDMOD, LEGACYMOD, OTHERMOD, STARMOD, SYNTHMOD.
+    // Sorted by mnemonic: DS2MOD, FIXEDMOD, LEGACYMOD, OTHERMOD, STARMOD, SYNTHMOD, TVMOD.
     let reachable = &survey.modules[5];
     assert_eq!(reachable.ecu_family, "SYNTHMOD");
     assert_eq!(reachable.applicability, ModuleApplicability::Applicable);
@@ -818,4 +829,47 @@ fn a_quantity_is_a_number_with_a_real_unit_and_a_scaling() {
             "V",
         ),
     ]));
+}
+
+/// ADR-0039: a module on a sub-network SDD reaches by network address is
+/// surveyed on its main bus's route as a hypothesis, with the gateway named
+/// from the data and the reason naming the decision; the gateway module
+/// itself, on the main bus, carries no gateway.
+#[test]
+fn a_module_behind_a_network_addressed_gateway_is_a_hypothesis_on_its_main_bus() {
+    let survey = library().survey(&vehicle());
+    let tv = &survey.modules[6];
+    assert_eq!(tv.ecu_family, "TVMOD");
+    assert_eq!(tv.applicability, ModuleApplicability::Applicable);
+    assert_eq!(tv.identifier_read.status, RouteStatus::Hypothesis, "{tv:?}");
+    assert_eq!(tv.dtc_read.status, RouteStatus::Hypothesis, "{tv:?}");
+    assert_eq!(tv.logical_network.as_deref(), Some("SUB_SYNTH"));
+    assert_eq!(tv.backend_route.as_deref(), Some("hs-can"));
+    assert_eq!(tv.pins.as_deref(), Some("6/14"));
+    assert_eq!(tv.bitrate_bps, Some(500_000));
+    assert_eq!(tv.protocol.as_deref(), Some("ISO14229"));
+    assert_eq!(tv.request_id.as_deref(), Some("0x707"));
+    assert_eq!(tv.response_id.as_deref(), Some("0x70F"));
+    assert_eq!(tv.route_validation, "UNVERIFIED");
+    let gateway = tv.gateway.as_ref().expect("the data names the gateway");
+    assert_eq!(gateway.main_net.as_deref(), Some("CAN_HS"));
+    assert_eq!(gateway.sub_net.as_deref(), Some("SUB_SYNTH"));
+    assert_eq!(gateway.module, "SYNTHMOD_SYSTEM_A");
+    assert_eq!(gateway.access_method, "NETWORK_ADDRESSED");
+    assert_eq!(gateway.layout, None);
+    let reason = &tv.identifier_read.reasons[0];
+    assert!(reason.contains("ADR-0039"), "{reason}");
+    assert!(reason.contains("SYNTHMOD_SYSTEM_A"), "{reason}");
+    assert!(reason.contains("CAN_HS"), "{reason}");
+    assert_eq!(tv.dtc_read.reasons, tv.identifier_read.reasons);
+    // The same identifiers a module on the main bus gets from its set.
+    assert!(!tv.readable_identifiers.is_empty());
+
+    // The gateway module itself sits on the main bus and carries no gateway.
+    let synthmod = &survey.modules[5];
+    assert_eq!(synthmod.ecu_family, "SYNTHMOD");
+    assert_eq!(synthmod.gateway, None);
+    // And nothing else changed for the K-line hypothesis (ADR-0015 wording).
+    let ds2 = &survey.modules[0];
+    assert!(ds2.identifier_read.reasons[0].contains("ADR-0015"));
 }

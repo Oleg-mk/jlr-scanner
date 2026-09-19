@@ -20,8 +20,9 @@ use super::{refresh_bench, BenchBuild};
 use app_contracts::{
     AdapterErrorCode, AdapterInfo, AdapterState, BatteryReadState, CcfReadState,
     LiveReadEntryRequest, LiveReadRequest, LiveReadState, MileageKind, MileageSurveyState,
-    ModulePassportState, ModuleReadKind, ModuleReadRequest, ModuleReadState, RoutineRunRequest,
-    RoutineRunState, StandardObdReadKind, StandardObdRequest, VehicleContextInput,
+    ModulePassportState, ModuleReadKind, ModuleReadRequest, ModuleReadState, RouteStatus,
+    RoutineRunRequest, RoutineRunState, StandardObdReadKind, StandardObdRequest,
+    VehicleContextInput,
 };
 use app_contracts::{DtcClearRequest, DtcClearState};
 use diagnostic_session::KnowledgeLibrary;
@@ -56,6 +57,10 @@ const CCF: &str = include_str!("../../../../fixtures/knowledge/synthetic/f9_ccf_
 const MDX: &str = include_str!("../../../../fixtures/knowledge/synthetic/f9_mdx_module.xml");
 /// The self tests SYNTHMOD declares, with the screen of 0x0202 (ADR-0036, step 2).
 const ODST: &str = include_str!("../../../../fixtures/knowledge/synthetic/f9_odst_info.xml");
+/// The test-side binding of the synthetic sub-network to the adapter
+/// (ADR-0039, decision 5).
+const SUB_NETWORK_ROUTE: &str =
+    include_str!("../../../../fixtures/knowledge/synthetic/f9_sub_network_route_hypothesis.json");
 
 fn synthetic_source(id: &str, text: &str) -> SourceRecord {
     SourceRecord {
@@ -149,6 +154,10 @@ fn library() -> KnowledgeLibrary {
                 odst_batch,
             ])
             .unwrap(),
+        ),
+        (
+            "sub_network_route.json".to_string(),
+            SUB_NETWORK_ROUTE.to_string(),
         ),
     ];
     KnowledgeLibrary::from_manifests(
@@ -515,6 +524,25 @@ fn the_bench_connects_without_a_port_reads_the_surveyed_vehicle_and_marks_everyt
         .find(|module| module.ecu_family == "OTHERMOD")
         .expect("OTHERMOD is surveyed");
     assert!(othermod.accepted_operations.is_empty());
+    // A module behind a gateway SDD reaches by network address (ADR-0039):
+    // surveyed as a hypothesis on its main bus's route, with the gateway
+    // named from the data. The bench answers for it below like any module
+    // of that bus; its gateway is never spoken to.
+    let tvmod = survey
+        .modules
+        .iter()
+        .find(|module| module.ecu_family == "TVMOD")
+        .expect("TVMOD is surveyed");
+    assert_eq!(
+        tvmod.identifier_read.status,
+        RouteStatus::Hypothesis,
+        "{tvmod:?}"
+    );
+    assert_eq!(tvmod.backend_route.as_deref(), Some("hs-can"));
+    assert_eq!(tvmod.route_validation, "UNVERIFIED");
+    let gateway = tvmod.gateway.as_ref().expect("the data names the gateway");
+    assert_eq!(gateway.module, "SYNTHMOD_SYSTEM_A");
+    assert_eq!(gateway.access_method, "NETWORK_ADDRESSED");
 
     let identifier = synthmod
         .readable_identifiers
@@ -649,6 +677,31 @@ fn the_bench_connects_without_a_port_reads_the_surveyed_vehicle_and_marks_everyt
         result,
     );
     assert_eq!(faults.state, ModuleReadState::Succeeded, "{faults:?}");
+
+    // The module behind the gateway (ADR-0039), read over the main bus's
+    // route like any module of that bus: the request goes to its own
+    // identifier and the answer comes back from it; the gateway module is
+    // not addressed. The route stays what the survey said it was.
+    let tv_request = ModuleReadRequest {
+        ecu_family: "TVMOD".into(),
+        kind: ModuleReadKind::FaultCodes,
+        identifier: None,
+        context: vehicle(),
+    };
+    let tv_prepared = ModuleReadService::prepare(session.library(), &tv_request).unwrap();
+    let tv_result = adapter
+        .execute_uds_read(&tv_prepared.transaction, Duration::from_secs(2))
+        .unwrap()
+        .map_err(map_live_error);
+    let tv_read = reads.finish(
+        &tv_request,
+        Some(&tv_prepared),
+        Some(&info),
+        Some(session.library()),
+        tv_result,
+    );
+    assert_eq!(tv_read.state, ModuleReadState::Succeeded, "{tv_read:?}");
+    assert_eq!(tv_read.route_validation, "UNVERIFIED", "{tv_read:?}");
 
     // The legislated services (ADR-0022, decision 7): prepared from the
     // standard, executed over the adapter protocol, decoded by the codec —

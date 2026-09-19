@@ -109,6 +109,26 @@ export interface ModuleSurveyEntry {
    * class the operation would need, and this build grants none of them.
    */
   acceptedOperations?: AcceptedOperationSummary[];
+  /** The gateway in front of the module's sub-network, as SDD states it (ADR-0039); absent on a main bus. */
+  gateway?: GatewaySummary | null;
+}
+
+/**
+ * The gateway in front of a sub-network, as the platform document states it
+ * (ADR-0039): what the data says about why a module is or is not reached,
+ * never an instruction to reach it.
+ */
+export interface GatewaySummary {
+  /** The main bus the sub-network hangs off, such as `CAN_MS`. */
+  mainNet: string | null;
+  /** The sub-network's own name, such as `SUB_MOST`. */
+  subNet: string | null;
+  /** The module that fronts it, as SDD names it: `ACM_SYSTEM_A`. */
+  module: string;
+  /** SDD's way through it: `NETWORK_ADDRESSED`, `ROUTINE_CONTROL` or `NGI_NETWORK_ADDRESSED`. */
+  accessMethod: string;
+  /** The numbers of an `enhanced` 29-bit layout where the bus declares one; null where it does not. */
+  layout: string | null;
 }
 
 export interface AcceptedOperationSummary {

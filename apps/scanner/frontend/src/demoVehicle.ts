@@ -1,11 +1,4 @@
-import type {
-  AcceptedOperationSummary,
-  ModuleSurveyEntry,
-  SelfTestSummary,
-  VehicleCatalogueSnapshot,
-  VehicleDescription,
-  VehicleSurveySnapshot,
-} from "./library";
+import type { AcceptedOperationSummary, GatewaySummary, ModuleSurveyEntry, SelfTestSummary, VehicleCatalogueSnapshot, VehicleDescription, VehicleSurveySnapshot } from "./library";
 import type { DtcSummary, ModuleReadRequest, ModuleReadSnapshot } from "./moduleRead";
 
 /**
@@ -24,6 +17,8 @@ interface Bus {
   routeValidation: string;
   status: "REACHABLE" | "HYPOTHESIS" | "INDETERMINATE";
   reasons: string[];
+  /** The gateway in front of a sub-network, as the data would state it (ADR-0039). */
+  gateway?: GatewaySummary;
 }
 
 const HYPOTHESIS_REASON =
@@ -51,6 +46,7 @@ const MOST: Bus = {
   routeValidation: "",
   status: "INDETERMINATE",
   reasons: SUB_NETWORK_REASONS,
+  gateway: { mainNet: "CAN_MS", subNet: "SUB_MOST", module: "ICM_SYSTEM_A", accessMethod: "ROUTINE_CONTROL", layout: null },
 };
 const hypothesised = (name: string, base: Bus): Bus => ({
   ...base,
@@ -63,7 +59,11 @@ const PT_HSCAN = hypothesised("PT_HSCAN", HS);
 const CH_HSCAN = hypothesised("CH_HSCAN", HS);
 const CO_HSCAN = hypothesised("CO_HSCAN", HS);
 const BO_MSCAN = hypothesised("BO_MSCAN", MS);
-const NGI: Bus = { ...MOST, logicalNetwork: "NGI" };
+const NGI: Bus = {
+  ...MOST,
+  logicalNetwork: "NGI",
+  gateway: { mainNet: "CO_HSCAN", subNet: "NGI", module: "IMC_SYSTEM_A", accessMethod: "NGI_NETWORK_ADDRESSED", layout: null },
+};
 
 type Row = [string, string | null, string | null, Bus, string | null, string | null];
 
@@ -236,6 +236,7 @@ function entry([family, requestId, responseId, bus, identifier, parameter]: Row)
     names,
     applicability: "APPLICABLE",
     logicalNetwork: bus.logicalNetwork,
+    gateway: bus.gateway ?? null,
     requestId,
     responseId,
     backendRoute: bus.backendRoute,

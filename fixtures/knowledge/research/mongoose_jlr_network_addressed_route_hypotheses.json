@@ -1,0 +1,166 @@
+{
+  "schema_version": 1,
+  "source": {
+    "id": "jlr-scanner-network-addressed-route-hypotheses",
+    "title": "Hypothesis: the network-addressed MOST sub-network of the L319, L320 and L322 of MY10 is reached on its main bus's route, through the ACM, by each module's own address",
+    "source_type": "unverified_research",
+    "origin": "JLR Scanner reasoning over the SDD platform documents PLATFORM_L319_201000.xml, PLATFORM_L320_201000.xml and PLATFORM_L322_201000.xml and the documented binding of CAN_MS to the adapter's ms-can route (ADR-0039)",
+    "source_locator": "repository:docs/adr/ADR-0039-the-most-modules-by-their-own-address-the-network-addressed-sub-networks.md",
+    "content_fingerprint": null,
+    "acquired_on": "2026-09-19",
+    "declared_vehicle_programs": [],
+    "provenance": "Not a documented fact. The three MY10 platform documents declare SUB_MOST as a sub-network of CAN_MS behind the gateway module ACM_SYSTEM_A with access_method NETWORK_ADDRESSED, at 125 kbit/s with 11-bit identifiers under normal ISO 15765 addressing - the parameters of CAN_MS itself - and give its modules ordinary 11-bit diagnostic identifiers in the main bus's identifier space (AAM 0x7A4, APIM 0x7D0, DABM 0x7D6, DACMC 0x7D5, FEM 0x784, REM 0x771, SRM 0x782, TEL 0x781, TVM 0x707; CDP 0x770 on the L322). No routine is declared, where the same documents declare ROUTINE_CONTROL for every gateway that needs one. Hence the hypothesis that a request to such a module on the ms-can route is forwarded by the ACM without being asked, and its answer comes back the same way. Bound only for the documents that declare it so: L319 MY10-11 and L320 MY10-11, whose MY12 documents switch the sub-network to ROUTINE_CONTROL behind the FCDIM, and L322 MY10-12. The older L319, L320 and L322 documents address the same sub-network with a 29-bit enhanced layout the data does not compose, and are not bound. Confirmed per vehicle by the first answered read on such a car; refuted by its absence.",
+    "redistribution_status": "permitted",
+    "notes": "Records here resolve as Unverified and the survey shows them as a hypothesis, never as a reachable route. The bench proves the resolution and the route on a synthetic sub-network; it proves nothing about an ACM."
+  },
+  "evidence": [
+    {
+      "id": "evidence-network-addressed-route-reasoning",
+      "source_id": "jlr-scanner-network-addressed-route-hypotheses",
+      "evidence_class": "unverified_research",
+      "locator": {
+        "description": "docs/adr/ADR-0039, Decision 2: a network-addressed sub-network with normal 11-bit addressing is reached on its main bus's route, as a hypothesis; the SDD declarations it rests on are quoted in the Context",
+        "document_page": null,
+        "document_section": "Decision",
+        "record_key": "SUB_MOST L319 L320 L322 MY10",
+        "capture_timestamp_us": null
+      },
+      "excerpt": "SUB_MOST: main_net CAN_MS, gateway ACM_SYSTEM_A, access_method NETWORK_ADDRESSED, 125 kbit/s, 11-bit, normal addressing; modules with 11-bit identifiers in the main bus's space; no routine declared",
+      "notes": "Reasoning over SDD's declarations, not observation"
+    }
+  ],
+  "records": [
+    {
+      "id": "hypothesis-network-addressed-sub-most-l319-route",
+      "entity": { "kind": "network_route", "id": "SUB_MOST" },
+      "key": { "kind": "network_route" },
+      "value": {
+        "kind": "network_route",
+        "logical_name": "SUB_MOST",
+        "connector": "J1962",
+        "pins": [3, 11],
+        "bitrate_bps": 125000
+      },
+      "applicability": {
+        "vehicle_program": { "state": "one_of", "values": ["L319"] },
+        "model_year": { "state": "range", "model_year_from": 2010, "model_year_to": 2011 },
+        "architecture_generation": { "state": "any" },
+        "ecu_family": { "state": "any" },
+        "powertrain": { "state": "any" },
+        "variant": { "state": "any" },
+        "market": { "state": "any" },
+        "diagnostic_implementation": { "state": "any" },
+        "other": {}
+      },
+      "evidence_ids": ["evidence-network-addressed-route-reasoning"],
+      "validation_state": "unverified"
+    },
+    {
+      "id": "hypothesis-network-addressed-sub-most-l319-backend",
+      "entity": { "kind": "network_route", "id": "SUB_MOST" },
+      "key": { "kind": "custom", "name": "backend_route" },
+      "value": { "kind": "backend_route", "backend": "mongoose-jlr", "route_id": "ms-can" },
+      "applicability": {
+        "vehicle_program": { "state": "one_of", "values": ["L319"] },
+        "model_year": { "state": "range", "model_year_from": 2010, "model_year_to": 2011 },
+        "architecture_generation": { "state": "any" },
+        "ecu_family": { "state": "any" },
+        "powertrain": { "state": "any" },
+        "variant": { "state": "any" },
+        "market": { "state": "any" },
+        "diagnostic_implementation": { "state": "any" },
+        "other": {}
+      },
+      "evidence_ids": ["evidence-network-addressed-route-reasoning"],
+      "validation_state": "unverified"
+    },
+    {
+      "id": "hypothesis-network-addressed-sub-most-l320-route",
+      "entity": { "kind": "network_route", "id": "SUB_MOST" },
+      "key": { "kind": "network_route" },
+      "value": {
+        "kind": "network_route",
+        "logical_name": "SUB_MOST",
+        "connector": "J1962",
+        "pins": [3, 11],
+        "bitrate_bps": 125000
+      },
+      "applicability": {
+        "vehicle_program": { "state": "one_of", "values": ["L320"] },
+        "model_year": { "state": "range", "model_year_from": 2010, "model_year_to": 2011 },
+        "architecture_generation": { "state": "any" },
+        "ecu_family": { "state": "any" },
+        "powertrain": { "state": "any" },
+        "variant": { "state": "any" },
+        "market": { "state": "any" },
+        "diagnostic_implementation": { "state": "any" },
+        "other": {}
+      },
+      "evidence_ids": ["evidence-network-addressed-route-reasoning"],
+      "validation_state": "unverified"
+    },
+    {
+      "id": "hypothesis-network-addressed-sub-most-l320-backend",
+      "entity": { "kind": "network_route", "id": "SUB_MOST" },
+      "key": { "kind": "custom", "name": "backend_route" },
+      "value": { "kind": "backend_route", "backend": "mongoose-jlr", "route_id": "ms-can" },
+      "applicability": {
+        "vehicle_program": { "state": "one_of", "values": ["L320"] },
+        "model_year": { "state": "range", "model_year_from": 2010, "model_year_to": 2011 },
+        "architecture_generation": { "state": "any" },
+        "ecu_family": { "state": "any" },
+        "powertrain": { "state": "any" },
+        "variant": { "state": "any" },
+        "market": { "state": "any" },
+        "diagnostic_implementation": { "state": "any" },
+        "other": {}
+      },
+      "evidence_ids": ["evidence-network-addressed-route-reasoning"],
+      "validation_state": "unverified"
+    },
+    {
+      "id": "hypothesis-network-addressed-sub-most-l322-route",
+      "entity": { "kind": "network_route", "id": "SUB_MOST" },
+      "key": { "kind": "network_route" },
+      "value": {
+        "kind": "network_route",
+        "logical_name": "SUB_MOST",
+        "connector": "J1962",
+        "pins": [3, 11],
+        "bitrate_bps": 125000
+      },
+      "applicability": {
+        "vehicle_program": { "state": "one_of", "values": ["L322"] },
+        "model_year": { "state": "range", "model_year_from": 2010, "model_year_to": 2012 },
+        "architecture_generation": { "state": "any" },
+        "ecu_family": { "state": "any" },
+        "powertrain": { "state": "any" },
+        "variant": { "state": "any" },
+        "market": { "state": "any" },
+        "diagnostic_implementation": { "state": "any" },
+        "other": {}
+      },
+      "evidence_ids": ["evidence-network-addressed-route-reasoning"],
+      "validation_state": "unverified"
+    },
+    {
+      "id": "hypothesis-network-addressed-sub-most-l322-backend",
+      "entity": { "kind": "network_route", "id": "SUB_MOST" },
+      "key": { "kind": "custom", "name": "backend_route" },
+      "value": { "kind": "backend_route", "backend": "mongoose-jlr", "route_id": "ms-can" },
+      "applicability": {
+        "vehicle_program": { "state": "one_of", "values": ["L322"] },
+        "model_year": { "state": "range", "model_year_from": 2010, "model_year_to": 2012 },
+        "architecture_generation": { "state": "any" },
+        "ecu_family": { "state": "any" },
+        "powertrain": { "state": "any" },
+        "variant": { "state": "any" },
+        "market": { "state": "any" },
+        "diagnostic_implementation": { "state": "any" },
+        "other": {}
+      },
+      "evidence_ids": ["evidence-network-addressed-route-reasoning"],
+      "validation_state": "unverified"
+    }
+  ]
+}

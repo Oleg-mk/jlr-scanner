@@ -454,6 +454,24 @@ const uk: Record<string, string> = {
     "Файла штампа немає; дані несуть копію {code}. Бібліотеку не завантажено; попросіть нову копію.",
   "SDD reaches this sub-network through a gateway module with a routine command. This stage only reads and sends no commands, so these modules wait for stage 2; their addresses are known and nothing else is missing.":
     "SDD дістає до цієї підмережі через модуль-шлюз командою запуску процедури. Цей етап лише читає і команд не надсилає, тому ці модулі чекають на другий етап; їхні адреси відомі, і більше нічого не бракує.",
+  "Behind the gateway {module}: SDD opens it with a routine command, which this read-only stage does not send. Planned for stage 2; the address is known.":
+    "За шлюзом {module}: SDD відкриває його командою запуску процедури, якої цей етап лише читання не надсилає. Заплановано на другий етап; адреса відома.",
+  "Behind the gateway {module}: SDD addresses this sub-network with a 29-bit layout whose composition is not in the data. It waits for a capture or a document that names it.":
+    "За шлюзом {module}: SDD адресує цю підмережу 29-бітною схемою, склад якої в даних не описано. Вона чекає на запис із шини або документ, що її назве.",
+  "Behind the gateway {module}, by each module's own address; no adapter route is recorded for this car.":
+    "За шлюзом {module}, за власною адресою кожного модуля; для цього авто маршрут адаптера не записано.",
+  "Behind the gateway {module} on NGI, which this product has not read about yet.":
+    "За шлюзом {module} на NGI, про який цей продукт ще не читав.",
+  "Behind the gateway {module} ({method}).":
+    "За шлюзом {module} ({method}).",
+  "SDD reaches this sub-network through {module} by each module's own address, with no command. That the gateway forwards a read unasked is this product's reading of the data, unverified until a module here answers.":
+    "SDD дістає до цієї підмережі через {module} за власною адресою кожного модуля, без команди. Що шлюз пропускає читання без запиту — прочитання даних цим продуктом, неперевірене, доки якийсь модуль тут не відповість.",
+  "SDD reaches this sub-network through {module} with a routine command. This stage only reads and sends no commands, so these modules wait for stage 2; their addresses are known and nothing else is missing.":
+    "SDD дістає до цієї підмережі через {module} командою запуску процедури. Цей етап лише читає і команд не надсилає, тому ці модулі чекають на другий етап; їхні адреси відомі, і більше нічого не бракує.",
+  "SDD reaches this sub-network through {module} by network address on a 29-bit layout whose composition is not in the data; these modules wait for a capture or a document that names it.":
+    "SDD дістає до цієї підмережі через {module} за мережевою адресою у 29-бітній схемі, склад якої в даних не описано; ці модулі чекають на запис із шини або документ, що її назве.",
+  "SDD reaches this sub-network through {module} on NGI, which this product has not read about yet; these modules wait.":
+    "SDD дістає до цієї підмережі через {module} на NGI, про який цей продукт ще не читав; ці модулі чекають.",
   "Behind a gateway: SDD opens it with a routine command, which this read-only stage does not send. Planned for stage 2; the address is known.":
     "За шлюзом: SDD відкриває його командою запуску процедури, якої цей етап лише читання не надсилає. Заплановано на другий етап; адреса відома.",
   "Connection": "З'єднання",
@@ -1750,6 +1768,24 @@ const ru: Record<string, string> = {
     "Файла штампа нет; данные несут копию {code}. Библиотека не загружена; попросите новую копию.",
   "SDD reaches this sub-network through a gateway module with a routine command. This stage only reads and sends no commands, so these modules wait for stage 2; their addresses are known and nothing else is missing.":
     "SDD достигает этой подсети через модуль-шлюз командой запуска процедуры. Этот этап только читает и команд не посылает, поэтому эти модули ждут второго этапа; их адреса известны, и больше ничего не недостаёт.",
+  "Behind the gateway {module}: SDD opens it with a routine command, which this read-only stage does not send. Planned for stage 2; the address is known.":
+    "За шлюзом {module}: SDD открывает его командой запуска процедуры, которую этот этап только чтения не посылает. Запланировано на второй этап; адрес известен.",
+  "Behind the gateway {module}: SDD addresses this sub-network with a 29-bit layout whose composition is not in the data. It waits for a capture or a document that names it.":
+    "За шлюзом {module}: SDD адресует эту подсеть 29-битной схемой, состав которой в данных не описан. Она ждёт записи с шины или документа, который её назовёт.",
+  "Behind the gateway {module}, by each module's own address; no adapter route is recorded for this car.":
+    "За шлюзом {module}, по собственному адресу каждого модуля; для этого автомобиля маршрут адаптера не записан.",
+  "Behind the gateway {module} on NGI, which this product has not read about yet.":
+    "За шлюзом {module} на NGI, о котором этот продукт ещё не читал.",
+  "Behind the gateway {module} ({method}).":
+    "За шлюзом {module} ({method}).",
+  "SDD reaches this sub-network through {module} by each module's own address, with no command. That the gateway forwards a read unasked is this product's reading of the data, unverified until a module here answers.":
+    "SDD достигает этой подсети через {module} по собственному адресу каждого модуля, без команды. Что шлюз пропускает чтение без запроса — прочтение данных этим продуктом, непроверенное, пока какой-нибудь модуль здесь не ответит.",
+  "SDD reaches this sub-network through {module} with a routine command. This stage only reads and sends no commands, so these modules wait for stage 2; their addresses are known and nothing else is missing.":
+    "SDD достигает этой подсети через {module} командой запуска процедуры. Этот этап только читает и команд не посылает, поэтому эти модули ждут второго этапа; их адреса известны, и больше ничего не недостаёт.",
+  "SDD reaches this sub-network through {module} by network address on a 29-bit layout whose composition is not in the data; these modules wait for a capture or a document that names it.":
+    "SDD достигает этой подсети через {module} по сетевому адресу в 29-битной схеме, состав которой в данных не описан; эти модули ждут записи с шины или документа, который её назовёт.",
+  "SDD reaches this sub-network through {module} on NGI, which this product has not read about yet; these modules wait.":
+    "SDD достигает этой подсети через {module} на NGI, о котором этот продукт ещё не читал; эти модули ждут.",
   "Behind a gateway: SDD opens it with a routine command, which this read-only stage does not send. Planned for stage 2; the address is known.":
     "За шлюзом: SDD открывает его командой запуска процедуры, которую этот этап только чтения не посылает. Запланировано на второй этап; адрес известен.",
   "Connection": "Подключение",

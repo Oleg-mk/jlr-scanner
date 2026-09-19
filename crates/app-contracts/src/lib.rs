@@ -406,6 +406,31 @@ pub struct ModuleSurveyEntry {
     /// be driven, routines it can run. Listed, never sent.
     #[serde(default)]
     pub accepted_operations: Vec<AcceptedOperationSummary>,
+    /// The gateway in front of the module's sub-network, as SDD states it
+    /// (`ADR-0039`); none for a module on a main bus.
+    #[serde(default)]
+    pub gateway: Option<GatewaySummary>,
+}
+
+/// The gateway in front of a sub-network, as the platform document states
+/// it (`ADR-0039`): knowledge about why a module is or is not reached,
+/// never an instruction to reach it.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GatewaySummary {
+    /// The main bus the sub-network hangs off, such as `CAN_MS`.
+    pub main_net: Option<String>,
+    /// The sub-network's own name, such as `SUB_MOST`.
+    pub sub_net: Option<String>,
+    /// The module that fronts it, as SDD names it: `ACM_SYSTEM_A`.
+    pub module: String,
+    /// SDD's way through it: `NETWORK_ADDRESSED`, `ROUTINE_CONTROL` or
+    /// `NGI_NETWORK_ADDRESSED`.
+    pub access_method: String,
+    /// The numbers of an `enhanced` 29-bit layout where the bus declares
+    /// one — `prefix=0x6F;main_net_mask=3;…` — and nothing where it does
+    /// not. Recorded, not composed.
+    pub layout: Option<String>,
 }
 
 /// One operation a module declares it will accept (`ADR-0035`). It is

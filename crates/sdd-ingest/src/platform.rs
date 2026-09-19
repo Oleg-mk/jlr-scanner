@@ -15,6 +15,13 @@ const PLATFORM_PARSER_VERSION: &str = "1.0.0";
 
 /// Claim key under which a module's SDD network membership is recorded.
 pub const NETWORK_CLAIM: &str = "sdd_network";
+/// The gateway in front of a module's sub-network, as the platform document
+/// states it (`ADR-0039`): `main_net`, `sub_net`, `gateway`, `access` and, for
+/// an `enhanced` bus, the `prefix`, the masks and the network addresses of
+/// its layout, verbatim, in the escaped `key=value;…` text of `ADR-0028`.
+/// Recorded per module, as the bus facts are, so the survey reads it where
+/// it reads the module.
+pub const GATEWAY_CLAIM: &str = "sdd_gateway";
 /// Custom claim holding a module's physical (node) address verbatim, for the
 /// addressing schemes — `normal_fixed`, `enhanced` — whose CAN identifiers are
 /// derived from a prefix and this address rather than stated. The derivation
@@ -192,6 +199,75 @@ struct Network {
     physical_prefix: Option<u32>,
     /// A serial K-line bus (`<iso>`), as the platform states it (ADR-0029).
     iso: Option<IsoBus>,
+    /// The gateway in front of a sub-network (ADR-0039), where the platform
+    /// declares one.
+    gateway: Option<Gateway>,
+}
+
+/// The gateway in front of a sub-network, as the platform document states
+/// it (ADR-0039): the module that fronts it and SDD's way through it,
+/// verbatim. Knowledge about why a module is or is not reached, never an
+/// instruction to reach it.
+#[derive(Clone, Debug)]
+struct Gateway {
+    main_net: Option<String>,
+    sub_net: Option<String>,
+    module: String,
+    access_method: String,
+    /// The numbers of an `enhanced` 29-bit layout, verbatim; how they
+    /// compose an identifier is not in the data and is not derived.
+    enhanced: Option<EnhancedLayout>,
+}
+
+#[derive(Clone, Debug)]
+struct EnhancedLayout {
+    prefix: Option<String>,
+    main_net_mask: Option<String>,
+    sub_net_mask: Option<String>,
+    main_net_address: Option<String>,
+    sub_net_address: Option<String>,
+}
+
+impl Gateway {
+    /// The claim's text: `main_net=…;sub_net=…;gateway=…;access=…`, and the
+    /// layout's numbers after them where the bus is `enhanced`.
+    fn fields_text(&self) -> String {
+        let mut fields: Vec<(&str, &str)> = Vec::new();
+        if let Some(main_net) = &self.main_net {
+            fields.push(("main_net", main_net));
+        }
+        if let Some(sub_net) = &self.sub_net {
+            fields.push(("sub_net", sub_net));
+        }
+        fields.push(("gateway", &self.module));
+        fields.push(("access", &self.access_method));
+        if let Some(layout) = &self.enhanced {
+            for (name, value) in [
+                ("prefix", &layout.prefix),
+                ("main_net_mask", &layout.main_net_mask),
+                ("sub_net_mask", &layout.sub_net_mask),
+                ("main_net_address", &layout.main_net_address),
+                ("sub_net_address", &layout.sub_net_address),
+            ] {
+                if let Some(value) = value {
+                    fields.push((name, value));
+                }
+            }
+        }
+        fields
+            .iter()
+            .map(|(name, value)| format!("{name}={}", escape_field(value)))
+            .collect::<Vec<_>>()
+            .join(";")
+    }
+}
+
+/// The separators of the claim's text, escaped inside a value (ADR-0028).
+fn escape_field(text: &str) -> String {
+    text.replace('%', "%25")
+        .replace(';', "%3B")
+        .replace('|', "%7C")
+        .replace('=', "%3D")
 }
 
 /// The physical layer of a K-line bus: the baud rate, the byte framing, the
@@ -832,6 +908,29 @@ impl PlatformAdapter {
                     },
                     KnowledgeValue::Text {
                         value: network_id.to_string(),
+                    },
+                    base.clone(),
+                    evidence,
+                    records,
+                )?;
+            }
+            // The gateway in front of the module's sub-network (ADR-0039):
+            // recorded per module, as the bus facts are below, so the survey
+            // reads it where it reads the module.
+            if let Some(gateway) = network.and_then(|network| network.gateway.as_ref()) {
+                self.push(
+                    format!("{}.module.{segment}.gateway{suffix}", self.source.id.0),
+                    format!("network_architecture/network[@net_id='{network_id}']/gateway"),
+                    format!(
+                        "{program} {acronym} on {network_id} behind {} by {}",
+                        gateway.module, gateway.access_method
+                    ),
+                    entity.clone(),
+                    ClaimKey::Custom {
+                        name: GATEWAY_CLAIM.to_string(),
+                    },
+                    KnowledgeValue::Text {
+                        value: gateway.fields_text(),
                     },
                     base.clone(),
                     evidence,
@@ -1483,6 +1582,54 @@ fn networks(root: roxmltree::Node<'_, '_>) -> Result<BTreeMap<String, Network>, 
                     .and_then(|prefix| prefix.text())
                     .and_then(|text| parse_hex(text.trim()))
             });
+        // The gateway in front of a sub-network (ADR-0039): the module that
+        // fronts it and the way SDD reaches through it, verbatim; for an
+        // `enhanced` bus the numbers of its layout as well, recorded and
+        // not composed.
+        let attribute = |name: &str| {
+            node.attribute(name)
+                .map(str::trim)
+                .filter(|value| !value.is_empty())
+                .map(str::to_string)
+        };
+        let gateway = child_element(node, "gateway").and_then(|gateway| {
+            let module = child_text(gateway, "gateway_module")?.trim().to_string();
+            let access_method = child_text(gateway, "access_method")?.trim().to_string();
+            if module.is_empty() || access_method.is_empty() {
+                return None;
+            }
+            let enhanced = scheme
+                .filter(|child| child.tag_name().name() == "enhanced")
+                .map(|enhanced| {
+                    let typed = |tag: &str, kind: &str| {
+                        enhanced
+                            .children()
+                            .find(|child| {
+                                child.is_element()
+                                    && child.tag_name().name() == tag
+                                    && child.attribute("type") == Some(kind)
+                            })
+                            .and_then(|child| child.text())
+                            .map(str::trim)
+                            .filter(|text| !text.is_empty())
+                            .map(str::to_string)
+                    };
+                    EnhancedLayout {
+                        prefix: typed("can_id_prefix", "all"),
+                        main_net_mask: typed("network_mask", "main_net"),
+                        sub_net_mask: typed("network_mask", "sub_net"),
+                        main_net_address: typed("network_address", "main_net"),
+                        sub_net_address: typed("network_address", "sub_net"),
+                    }
+                });
+            Some(Gateway {
+                main_net: attribute("main_net"),
+                sub_net: attribute("sub_net"),
+                module,
+                access_method,
+                enhanced,
+            })
+        });
         networks.insert(
             id.clone(),
             Network {
@@ -1493,6 +1640,7 @@ fn networks(root: roxmltree::Node<'_, '_>) -> Result<BTreeMap<String, Network>, 
                 diagnostic_protocol,
                 physical_prefix,
                 iso,
+                gateway,
             },
         );
     }

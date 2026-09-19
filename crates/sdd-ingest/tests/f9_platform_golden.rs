@@ -10,7 +10,9 @@ use knowledge::{
     EvidenceClass, KnowledgeQuery, KnowledgeStore, KnowledgeValue, RedistributionStatus, SourceId,
     SourceRecord, SourceType, ValidationState, YearConstraint,
 };
-use sdd_ingest::{BatteryFormatting, ModelYearTimeline, PlatformAdapter, NETWORK_CLAIM};
+use sdd_ingest::{
+    BatteryFormatting, ModelYearTimeline, PlatformAdapter, GATEWAY_CLAIM, NETWORK_CLAIM,
+};
 
 const FIXTURE: &str = include_str!("../../../fixtures/knowledge/synthetic/f9_platform.xml");
 /// A document that declares one acronym several times, each under its own
@@ -1034,4 +1036,56 @@ fn the_byte_description_joins_the_module_that_serves_the_parameter() {
         &resets.value,
         KnowledgeValue::IdentifierDefinition { encoding: None, .. }
     ));
+}
+
+/// ADR-0039: the gateway in front of a sub-network is recorded on each of
+/// its modules, verbatim, as SDD declares it; a module on a main bus gets
+/// nothing.
+#[test]
+fn a_sub_network_gateway_is_recorded_on_its_modules_as_sdd_states_it() {
+    let store = ingest(SourceType::Documented);
+    let gateway = store.get_record("f9-plat.module.TVMOD.gateway").unwrap();
+    assert_eq!(gateway.entity.kind, EntityKind::EcuFamily);
+    assert_eq!(gateway.entity.id, "TVMOD");
+    assert_eq!(
+        gateway.key,
+        ClaimKey::Custom {
+            name: GATEWAY_CLAIM.into()
+        }
+    );
+    assert_eq!(
+        gateway.value,
+        KnowledgeValue::Text {
+            value: "main_net=CAN_HS;sub_net=SUB_SYNTH;gateway=SYNTHMOD_SYSTEM_A;access=NETWORK_ADDRESSED"
+                .into()
+        }
+    );
+    assert_eq!(gateway.validation_state, ValidationState::SourceBacked);
+    // The module keeps its bus and its identifiers as any module does: the
+    // gateway is a fact about the bus, not a change to the address.
+    let network = store.get_record("f9-plat.module.TVMOD.network").unwrap();
+    assert_eq!(
+        network.value,
+        KnowledgeValue::Text {
+            value: "SUB_SYNTH".into()
+        }
+    );
+    let addressing = store.get_record("f9-plat.module.TVMOD.addressing").unwrap();
+    let KnowledgeValue::DiagnosticAddressing {
+        request_id,
+        response_id,
+        ..
+    } = &addressing.value
+    else {
+        panic!("expected diagnostic addressing");
+    };
+    assert_eq!(*request_id, Some(0x707));
+    assert_eq!(*response_id, Some(0x70F));
+    // A module on a main bus has no gateway record.
+    assert!(store
+        .get_record("f9-plat.module.SYNTHMOD.gateway")
+        .is_none());
+    assert!(store
+        .get_record("f9-plat.module.OTHERMOD.gateway")
+        .is_none());
 }

@@ -54,6 +54,24 @@
 			</addressing>
 		</network>
 		<!--
+		  A sub-network behind a gateway module (ADR-0039), declared the way the
+		  L319, L320 and L322 of MY10 declare their MOST ring: reached by each
+		  module's own address on the main bus, with no routine.
+		-->
+		<network net_id="SUB_SYNTH" main_net="CAN_HS" sub_net="SUB_SYNTH">
+			<protocol type="diagnostic">ISO14229</protocol>
+			<protocol type="network">MOST</protocol>
+			<gateway>
+				<gateway_module>SYNTHMOD_SYSTEM_A</gateway_module>
+				<access_method>NETWORK_ADDRESSED</access_method>
+			</gateway>
+			<can>
+				<rate>500</rate>
+				<identifier>11</identifier>
+			</can>
+			<addressing><can_iso15765><normal/></can_iso15765></addressing>
+		</network>
+		<!--
 		  Two K-line buses (ADR-0029): one states its pin, its framing and its
 		  wake-up and speaks a protocol this product implements; the other
 		  states no pin and speaks one it only names.
@@ -146,6 +164,14 @@
 			<address type="phys" session="diag">0x12</address>
 			<network>KW2000STAR</network>
 			<fitment>mandatory</fitment>
+		</module>
+		<module>
+			<module_code_name acronym="TVMOD" ISOName="TVMOD">TVMOD_SYSTEM_A</module_code_name>
+			<address type="can_tx" session="diag">0x707</address>
+			<address type="can_rx" session="diag">0x70F</address>
+			<network>SUB_SYNTH</network>
+			<data_identifier_set type="SWDL">synth_pdi</data_identifier_set>
+			<fitment>optional</fitment>
 		</module>
 	</module_fitment>
 	<!--

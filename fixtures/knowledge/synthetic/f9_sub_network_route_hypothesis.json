@@ -1,0 +1,78 @@
+{
+  "schema_version": 1,
+  "source": {
+    "id": "synthetic-sub-network-route-hypothesis",
+    "title": "Synthetic: the network-addressed sub-network SUB_SYNTH of SYNTHA is reached on its main bus's route, the way ADR-0039 binds the real ones",
+    "source_type": "unverified_research",
+    "origin": "Test fixture. The same form as fixtures/knowledge/research/mongoose_jlr_network_addressed_route_hypotheses.json, for the synthetic platform's sub-network behind SYNTHMOD_SYSTEM_A (ADR-0039, decision 5)",
+    "source_locator": "fixtures/knowledge/synthetic/f9_sub_network_route_hypothesis.json",
+    "content_fingerprint": null,
+    "acquired_on": "2026-09-19",
+    "declared_vehicle_programs": [],
+    "provenance": "Synthetic. SUB_SYNTH is declared in f9_platform.xml as a sub-network of CAN_HS behind SYNTHMOD_SYSTEM_A with access_method NETWORK_ADDRESSED, 500 kbit/s, 11-bit, normal addressing; this binds it to the hs-can route for SYNTHA MY10-11 so the resolution and the bench read of a module behind a gateway are tested end to end. It proves protocol behaviour only and is never JLR evidence.",
+    "redistribution_status": "permitted",
+    "notes": "Records here resolve as Unverified and the survey shows them as a hypothesis."
+  },
+  "evidence": [
+    {
+      "id": "evidence-synthetic-sub-network-route",
+      "source_id": "synthetic-sub-network-route-hypothesis",
+      "evidence_class": "unverified_research",
+      "locator": {
+        "description": "fixtures/knowledge/synthetic/f9_platform.xml, network SUB_SYNTH",
+        "document_page": null,
+        "document_section": "network_architecture",
+        "record_key": "SUB_SYNTH",
+        "capture_timestamp_us": null
+      },
+      "excerpt": "SUB_SYNTH: main_net CAN_HS, gateway SYNTHMOD_SYSTEM_A, access_method NETWORK_ADDRESSED, 500 kbit/s, 11-bit, normal",
+      "notes": "Synthetic reasoning over a synthetic document"
+    }
+  ],
+  "records": [
+    {
+      "id": "hypothesis-synthetic-sub-synth-route",
+      "entity": { "kind": "network_route", "id": "SUB_SYNTH" },
+      "key": { "kind": "network_route" },
+      "value": {
+        "kind": "network_route",
+        "logical_name": "SUB_SYNTH",
+        "connector": "J1962",
+        "pins": [6, 14],
+        "bitrate_bps": 500000
+      },
+      "applicability": {
+        "vehicle_program": { "state": "one_of", "values": ["SYNTHA"] },
+        "model_year": { "state": "range", "model_year_from": 2010, "model_year_to": 2011 },
+        "architecture_generation": { "state": "any" },
+        "ecu_family": { "state": "any" },
+        "powertrain": { "state": "any" },
+        "variant": { "state": "any" },
+        "market": { "state": "any" },
+        "diagnostic_implementation": { "state": "any" },
+        "other": {}
+      },
+      "evidence_ids": ["evidence-synthetic-sub-network-route"],
+      "validation_state": "unverified"
+    },
+    {
+      "id": "hypothesis-synthetic-sub-synth-backend",
+      "entity": { "kind": "network_route", "id": "SUB_SYNTH" },
+      "key": { "kind": "custom", "name": "backend_route" },
+      "value": { "kind": "backend_route", "backend": "mongoose-jlr", "route_id": "hs-can" },
+      "applicability": {
+        "vehicle_program": { "state": "one_of", "values": ["SYNTHA"] },
+        "model_year": { "state": "range", "model_year_from": 2010, "model_year_to": 2011 },
+        "architecture_generation": { "state": "any" },
+        "ecu_family": { "state": "any" },
+        "powertrain": { "state": "any" },
+        "variant": { "state": "any" },
+        "market": { "state": "any" },
+        "diagnostic_implementation": { "state": "any" },
+        "other": {}
+      },
+      "evidence_ids": ["evidence-synthetic-sub-network-route"],
+      "validation_state": "unverified"
+    }
+  ]
+}

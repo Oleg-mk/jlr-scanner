@@ -23,7 +23,7 @@ import {
   type ModuleReadRequest,
   type ModuleReadSnapshot,
 } from "./moduleRead";
-import { checkableModules, lanes, nodeStatus } from "./networkMap";
+import { checkableModules, lanes, moduleReasons, nodeStatus } from "./networkMap";
 
 const connectedSnapshot = (): AdapterSnapshot => ({
   ...createEmptySnapshot(),
@@ -121,6 +121,7 @@ const surveyed: ModuleSurveyEntry[] = [
     bitrateBps: null,
     identifierRead: { status: "INDETERMINATE", reasons: ["behind a gateway; no route"] },
     dtcRead: { status: "INDETERMINATE", reasons: ["behind a gateway; no route"] },
+    gateway: { mainNet: "CAN_MS", subNet: "SUB_MOST", module: "ICM_SYSTEM_A", accessMethod: "ROUTINE_CONTROL", layout: null },
   },
 ];
 
@@ -243,6 +244,42 @@ describe("network check", () => {
     expect(screen.getByRole("button", { name: "Check all modules (2)" })).toBeEnabled();
   });
 
+  it("names the gateway and the way through it from the data (ADR-0039)", () => {
+    // A MOST module of an L319 of MY10: reached on CAN_MS through the ACM by
+    // its own address, a hypothesis until it answers.
+    const byAddress: ModuleSurveyEntry = {
+      ...documented("AAM", "SUB_MOST"),
+      backendRoute: "ms-can",
+      pins: "3/11",
+      bitrateBps: 125_000,
+      routeValidation: "UNVERIFIED",
+      identifierRead: { status: "HYPOTHESIS", reasons: ["reached on CAN_MS through the gateway ACM_SYSTEM_A (ADR-0039)"] },
+      dtcRead: { status: "HYPOTHESIS", reasons: ["reached on CAN_MS through the gateway ACM_SYSTEM_A (ADR-0039)"] },
+      gateway: { mainNet: "CAN_MS", subNet: "SUB_MOST", module: "ACM_SYSTEM_A", accessMethod: "NETWORK_ADDRESSED", layout: null },
+    };
+    const [lane] = lanes([byAddress]);
+    expect(lane.kind).toBe("hypothesis");
+    expect(lane.route).toBe("unverified: ms-can · pins 3/11 · 125 kbit/s");
+    expect(lane.note).toContain("through ACM_SYSTEM_A by each module's own address");
+    expect(checkableModules([byAddress], true).map((module) => module.ecuFamily)).toEqual(["AAM"]);
+
+    // The same module on an L319 of MY05, whose data addresses the ring with
+    // a 29-bit layout the data does not compose: not reached, and it says why.
+    const enhanced: ModuleSurveyEntry = {
+      ...surveyed[3],
+      gateway: { mainNet: "CAN_MS", subNet: "SUB_MOST", module: "ACM_SYSTEM_A", accessMethod: "NETWORK_ADDRESSED", layout: "prefix=0x6F;main_net_mask=3" },
+    };
+    expect(moduleReasons(enhanced).at(-1)).toContain("29-bit layout whose composition is not in the data");
+    expect(lanes([enhanced])[0].note).toContain("by network address on a 29-bit layout");
+    // And the 2016-and-later NGI, not read yet.
+    const ngi: ModuleSurveyEntry = {
+      ...surveyed[3],
+      logicalNetwork: "NGI",
+      gateway: { mainNet: "CO_HSCAN", subNet: "NGI", module: "IMC_SYSTEM_A", accessMethod: "NGI_NETWORK_ADDRESSED", layout: null },
+    };
+    expect(lanes([ngi])[0].note).toContain("IMC_SYSTEM_A on NGI");
+  });
+
   it("groups modules into lanes by bus, most useful first, and states each node", () => {
     const grouped = lanes(surveyed);
     expect(grouped.map((lane) => `${lane.name}:${lane.kind}`)).toEqual([
@@ -253,6 +290,10 @@ describe("network check", () => {
     expect(grouped[0].route).toBe("hs-can · pins 6/14 · 500 kbit/s");
     expect(grouped[1].route).toBe("unverified: hs-can · pins 6/14 · 500 kbit/s");
     expect(grouped[2].route).toBe("not bound: behind a gateway; no route");
+    // The lane names the gateway and the way through it from the data (ADR-0039).
+    expect(grouped[2].note).toBe(
+      "SDD reaches this sub-network through ICM_SYSTEM_A with a routine command. This stage only reads and sends no commands, so these modules wait for stage 2; their addresses are known and nothing else is missing.",
+    );
     expect(checkableModules(surveyed, false).map((module) => module.ecuFamily)).toEqual([
       "PCM",
       "ABS",

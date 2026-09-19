@@ -19,12 +19,17 @@ send: it listens to the bus for a few seconds and records the traffic.
 
 One consequence you will see on the map: the modules on the MOST ring and
 other sub-networks — audio, telematics, navigation — show as "not
-reachable". SDD reaches them through a gateway module that it opens with
-a routine command. A command is not a read, so this stage does not send
-it. Everything needed for those modules is already known — the gateway,
-the command, the addresses — and they come in stage 2, once the first
-non-read operation has its own safety rules. The map says so under the
-bus.
+reachable" on most cars. SDD reaches them through a gateway module that
+it opens with a routine command. A command is not a read, so this stage
+does not send it. Everything needed for those modules is already known —
+the gateway, the command, the addresses — and they come in stage 2, once
+the first non-read operation has its own safety rules. The map says so
+under the bus, naming the gateway. One exception: on a Discovery 3 or
+Range Rover Sport of 2010–2011 and a Range Rover of 2010–2012, SDD's data
+reaches the MOST ring by each module's own address with no command, so
+the map shows those modules as an unverified route on pins 3/11 and the
+check may try them; an answer confirms the route for your car, silence
+refutes it, and the report records either.
 
 ## What you need
 

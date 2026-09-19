@@ -1,5 +1,5 @@
 import { t } from "./i18n";
-import type { ModuleSurveyEntry } from "./library";
+import type { GatewaySummary, ModuleSurveyEntry } from "./library";
 import type { ModuleReadSnapshot } from "./moduleRead";
 
 /**
@@ -39,12 +39,9 @@ export interface NodeStatus {
 
 export function moduleReasons(module: ModuleSurveyEntry): string[] {
   const reasons = Array.from(new Set([...module.identifierRead.reasons, ...module.dtcRead.reasons]));
-  if (moduleRoute(module) === "none" && isGatewayedSubNetwork(module.logicalNetwork)) {
-    reasons.push(
-      t(
-        "Behind a gateway: SDD opens it with a routine command, which this read-only stage does not send. Planned for stage 2; the address is known.",
-      ),
-    );
+  if (moduleRoute(module) === "none") {
+    const note = gatewayNote(module.gateway ?? null, module.logicalNetwork);
+    if (note !== null) reasons.push(note);
   }
   return reasons;
 }
@@ -161,6 +158,91 @@ export function isGatewayedSubNetwork(bus: string | null) {
   return bus !== null && (/^SUB_/.test(bus) || bus === "NGI");
 }
 
+/**
+ * Why a module behind a gateway waits, from what the data says about the
+ * gateway (ADR-0039): the routine SDD would send and this stage does not,
+ * a 29-bit layout the data does not compose, NGI not read yet. A library
+ * issued before the gateway was recorded falls back to the bus's name.
+ */
+export function gatewayNote(gateway: GatewaySummary | null, bus: string | null): string | null {
+  if (gateway === null) {
+    return isGatewayedSubNetwork(bus)
+      ? t(
+          "Behind a gateway: SDD opens it with a routine command, which this read-only stage does not send. Planned for stage 2; the address is known.",
+        )
+      : null;
+  }
+  const module = gateway.module;
+  switch (gateway.accessMethod) {
+    case "ROUTINE_CONTROL":
+      return t(
+        "Behind the gateway {module}: SDD opens it with a routine command, which this read-only stage does not send. Planned for stage 2; the address is known.",
+        { module },
+      );
+    case "NETWORK_ADDRESSED":
+      return gateway.layout !== null
+        ? t(
+            "Behind the gateway {module}: SDD addresses this sub-network with a 29-bit layout whose composition is not in the data. It waits for a capture or a document that names it.",
+            { module },
+          )
+        : t(
+            "Behind the gateway {module}, by each module's own address; no adapter route is recorded for this car.",
+            { module },
+          );
+    case "NGI_NETWORK_ADDRESSED":
+      return t("Behind the gateway {module} on NGI, which this product has not read about yet.", { module });
+    default:
+      return t("Behind the gateway {module} ({method}).", { module, method: gateway.accessMethod });
+  }
+}
+
+/**
+ * The note under a lane of a gatewayed sub-network: for one reached through
+ * its gateway by address, that the route is this product's reading of the
+ * data (ADR-0039); for one not reached, why it waits.
+ */
+function laneNote(kind: LaneKind, bus: string, modules: ModuleSurveyEntry[]): string | null {
+  const gateway = modules.find((module) => module.gateway)?.gateway ?? null;
+  if (kind === "hypothesis") {
+    return gateway !== null && gateway.accessMethod === "NETWORK_ADDRESSED"
+      ? t(
+          "SDD reaches this sub-network through {module} by each module's own address, with no command. That the gateway forwards a read unasked is this product's reading of the data, unverified until a module here answers.",
+          { module: gateway.module },
+        )
+      : null;
+  }
+  if (kind !== "unbound") return null;
+  if (gateway === null) {
+    return isGatewayedSubNetwork(bus)
+      ? t(
+          "SDD reaches this sub-network through a gateway module with a routine command. This stage only reads and sends no commands, so these modules wait for stage 2; their addresses are known and nothing else is missing.",
+        )
+      : null;
+  }
+  const module = gateway.module;
+  switch (gateway.accessMethod) {
+    case "ROUTINE_CONTROL":
+      return t(
+        "SDD reaches this sub-network through {module} with a routine command. This stage only reads and sends no commands, so these modules wait for stage 2; their addresses are known and nothing else is missing.",
+        { module },
+      );
+    case "NETWORK_ADDRESSED":
+      return gateway.layout !== null
+        ? t(
+            "SDD reaches this sub-network through {module} by network address on a 29-bit layout whose composition is not in the data; these modules wait for a capture or a document that names it.",
+            { module },
+          )
+        : gatewayNote(gateway, bus);
+    case "NGI_NETWORK_ADDRESSED":
+      return t(
+        "SDD reaches this sub-network through {module} on NGI, which this product has not read about yet; these modules wait.",
+        { module },
+      );
+    default:
+      return gatewayNote(gateway, bus);
+  }
+}
+
 const laneOrder: Record<LaneKind, number> = {
   documented: 0,
   hypothesis: 1,
@@ -201,12 +283,7 @@ export function lanes(modules: ModuleSurveyEntry[]): Lane[] {
       name: bus === "" ? t("No bus") : bus,
       kind,
       route,
-      note:
-        kind === "unbound" && isGatewayedSubNetwork(bus)
-          ? t(
-              "SDD reaches this sub-network through a gateway module with a routine command. This stage only reads and sends no commands, so these modules wait for stage 2; their addresses are known and nothing else is missing.",
-            )
-          : null,
+      note: laneNote(kind, bus, sorted),
       modules: sorted,
     });
   }

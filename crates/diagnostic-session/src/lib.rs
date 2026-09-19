@@ -30,11 +30,11 @@ pub use knowledge::VehicleContext;
 pub use knowledge::battery::SDD_VOLTAGE_LOW_MAX_MV;
 
 use app_contracts::{
-    AcceptedOperationSummary, CatalogueComparison, LibraryIssue, LibraryIssueIntegrity,
-    LibrarySnapshot, LibraryState, ManifestFailure, MarkerEntry, ModuleApplicability,
-    ModuleSurveyEntry, PassportReading, ProgrammeEntry, ReadableIdentifierSummary, RouteStatus,
-    RouteSummary, SelfTestSummary, VehicleCatalogueSnapshot, VehicleContextInput,
-    VehicleSurveySnapshot, VinDecodeSnapshot,
+    AcceptedOperationSummary, CatalogueComparison, GatewaySummary, LibraryIssue,
+    LibraryIssueIntegrity, LibrarySnapshot, LibraryState, ManifestFailure, MarkerEntry,
+    ModuleApplicability, ModuleSurveyEntry, PassportReading, ProgrammeEntry,
+    ReadableIdentifierSummary, RouteStatus, RouteSummary, SelfTestSummary,
+    VehicleCatalogueSnapshot, VehicleContextInput, VehicleSurveySnapshot, VinDecodeSnapshot,
 };
 use diagnostic_environment::{
     DiagnosticEnvironmentPlan, DiagnosticEnvironmentResolution, DiagnosticEnvironmentResolver,
@@ -85,14 +85,19 @@ const MODULE_ROUTINE_NAMESPACE: &str = "sdd_module_routine";
 const ODST_HELP_CLAIM_PREFIX: &str = "sdd_odst_help.";
 const ODST_SCREEN_CLAIM_PREFIX: &str = "sdd_odst_screen.";
 const ODST_SCREEN_ITEMS_CLAIM_PREFIX: &str = "sdd_odst_screen_items.";
+/// The gateway in front of a module's sub-network, as `sdd-ingest` records
+/// it per module (ADR-0039).
+const GATEWAY_CLAIM: &str = "sdd_gateway";
 
 /// Manifests that ship with the application: the documented adapter route
 /// bindings (ADR-0013), the X250 CCP connector route, the relayed-route
-/// hypotheses for the 2014-and-later high-speed buses (ADR-0015), and the
-/// K-line route hypotheses for the legacy buses (ADR-0029). They describe
+/// hypotheses for the 2014-and-later high-speed buses (ADR-0015), the
+/// K-line route hypotheses for the legacy buses (ADR-0029), and the route
+/// of the network-addressed MOST sub-network of the L319, L320 and L322 of
+/// MY10 (ADR-0039). They describe
 /// the adapter, public wiring documentation and this project's own
 /// reasoning, never SDD content.
-const BUILT_IN_MANIFESTS: [(&str, &str); 6] = [
+const BUILT_IN_MANIFESTS: [(&str, &str); 7] = [
     (
         "built-in:mongoose_jlr_route_bindings.json",
         include_str!("../../../fixtures/knowledge/documented/mongoose_jlr_route_bindings.json"),
@@ -111,6 +116,12 @@ const BUILT_IN_MANIFESTS: [(&str, &str); 6] = [
         "built-in:mongoose_jlr_relayed_route_hypotheses.json",
         include_str!(
             "../../../fixtures/knowledge/research/mongoose_jlr_relayed_route_hypotheses.json"
+        ),
+    ),
+    (
+        "built-in:mongoose_jlr_network_addressed_route_hypotheses.json",
+        include_str!(
+            "../../../fixtures/knowledge/research/mongoose_jlr_network_addressed_route_hypotheses.json"
         ),
     ),
     (
@@ -1374,6 +1385,8 @@ pub fn survey_vehicle(
     // The words the self tests are shown with belong to their screens, not
     // to a module, so they are read once here rather than once per module.
     let screens = self_test_screens(store, &context);
+    // The gateway in front of each sub-network, once per survey (ADR-0039).
+    let gateways = gateways_for(store, &context);
 
     let mut modules = Vec::new();
     for presence in families {
@@ -1406,6 +1419,7 @@ pub fn survey_vehicle(
             readable_identifiers: Vec::new(),
             self_tests: Vec::new(),
             accepted_operations: Vec::new(),
+            gateway: gateways.get(&presence.ecu_family).cloned(),
         };
 
         if applicability != ModuleApplicability::Applicable {
@@ -2025,6 +2039,100 @@ fn k_line_read_capabilities(protocol: Option<&str>) -> Option<(&'static str, &'s
     }
 }
 
+/// The gateway in front of each module's sub-network, as the platform
+/// document states it (ADR-0039), by module: one pass over the records
+/// per survey, as the self tests' screens are read.
+fn gateways_for(
+    store: &KnowledgeStore,
+    context: &VehicleContext,
+) -> BTreeMap<String, GatewaySummary> {
+    let result =
+        store.query(&KnowledgeQuery::for_vehicle(context.clone()).include_indeterminate(true));
+    let mut found = BTreeMap::new();
+    for entry in &result.records {
+        if entry.applicability_resolution == ApplicabilityResolution::NotApplicable
+            || entry.record.entity.kind != EntityKind::EcuFamily
+        {
+            continue;
+        }
+        let (ClaimKey::Custom { name }, KnowledgeValue::Text { value }) =
+            (&entry.record.key, &entry.record.value)
+        else {
+            continue;
+        };
+        if name != GATEWAY_CLAIM {
+            continue;
+        }
+        let fields = parse_fields(value);
+        let field = |name: &str| fields.get(name).cloned().filter(|text| !text.is_empty());
+        let (Some(module), Some(access_method)) = (field("gateway"), field("access")) else {
+            continue;
+        };
+        let layout: Vec<String> = [
+            "prefix",
+            "main_net_mask",
+            "sub_net_mask",
+            "main_net_address",
+            "sub_net_address",
+        ]
+        .iter()
+        .filter_map(|name| field(name).map(|value| format!("{name}={value}")))
+        .collect();
+        found
+            .entry(entry.record.entity.id.clone())
+            .or_insert(GatewaySummary {
+                main_net: field("main_net"),
+                sub_net: field("sub_net"),
+                module,
+                access_method,
+                layout: (!layout.is_empty()).then(|| layout.join(";")),
+            });
+    }
+    found
+}
+
+/// Why a route is a hypothesis, in the words of the decision it rests on:
+/// a network-addressed sub-network reached on its main bus through its
+/// gateway (ADR-0039) - the only binding such a bus has - or a bus bound
+/// to the adapter on reasoning alone (ADR-0015).
+fn hypothesis_reason(gateway: Option<&GatewaySummary>) -> String {
+    match gateway {
+        Some(gateway) if gateway.access_method == "NETWORK_ADDRESSED" => format!(
+            "reached on {} through the gateway {} by the module's own address (ADR-0039): an unverified hypothesis that a first read-only request confirms or refutes",
+            gateway.main_net.as_deref().unwrap_or("its main bus"),
+            gateway.module
+        ),
+        _ => "the adapter route for this bus is an unverified hypothesis (ADR-0015); a first read-only request confirms or refutes it".to_string(),
+    }
+}
+
+/// Why a module behind a gateway is not reached, from what the data says
+/// about the gateway (ADR-0039): the routine SDD would send and this
+/// build does not, a layout the data does not compose, NGI not read yet.
+fn gateway_reason(gateway: &GatewaySummary) -> String {
+    match gateway.access_method.as_str() {
+        "NETWORK_ADDRESSED" => match &gateway.layout {
+            Some(layout) => format!(
+                "behind the gateway {}: SDD addresses this sub-network with a 29-bit enhanced layout ({layout}) whose composition is not in the data (ADR-0039)",
+                gateway.module
+            ),
+            None => format!(
+                "behind the gateway {} by the module's own address; no adapter route is recorded for this car (ADR-0039)",
+                gateway.module
+            ),
+        },
+        "ROUTINE_CONTROL" => format!(
+            "behind the gateway {}, which SDD opens with a routine command this read-only build does not send; stage 2, and the command needs evidence first",
+            gateway.module
+        ),
+        "NGI_NETWORK_ADDRESSED" => format!(
+            "behind the gateway {} on NGI, which this product has not read about yet",
+            gateway.module
+        ),
+        other => format!("behind the gateway {} by {other}", gateway.module),
+    }
+}
+
 fn route_summary(
     entry: &mut ModuleSurveyEntry,
     resolution: Result<DiagnosticEnvironmentResolution, QueryError>,
@@ -2040,10 +2148,7 @@ fn route_summary(
             if route_is_hypothesis(&plan) {
                 RouteSummary {
                     status: RouteStatus::Hypothesis,
-                    reasons: vec![
-                        "the adapter route for this bus is an unverified hypothesis (ADR-0015); a first read-only request confirms or refutes it"
-                            .to_string(),
-                    ],
+                    reasons: vec![hypothesis_reason(entry.gateway.as_ref())],
                 }
             } else {
                 RouteSummary {
@@ -2057,12 +2162,16 @@ fn route_summary(
             unresolved_facts,
         }) => {
             fill_from_partial(entry, &partial);
+            let mut reasons: Vec<String> = unresolved_facts
+                .iter()
+                .map(|fact| format!("{}: {}", field_label(fact.field), fact.reason))
+                .collect();
+            // A module behind a gateway says which gateway and why it waits,
+            // from what the data says about it (ADR-0039).
+            reasons.extend(entry.gateway.as_ref().map(gateway_reason));
             RouteSummary {
                 status: RouteStatus::Indeterminate,
-                reasons: unresolved_facts
-                    .iter()
-                    .map(|fact| format!("{}: {}", field_label(fact.field), fact.reason))
-                    .collect(),
+                reasons,
             }
         }
         Ok(DiagnosticEnvironmentResolution::Conflict { partial, conflicts }) => {

@@ -493,6 +493,16 @@ what stage 2 would send, and the map's wording stays exact: the addresses
 are known and nothing else is missing on our side, but the door's key is
 not in our hands yet.
 
+*Read again on 2026-09-19 (`ADR-0039`).* The look-up above took the X250's
+gateways for all of them, and they are not: of the 42 documents with a
+gateway, 28 declare `ROUTINE_CONTROL`, 7 `NGI_NETWORK_ADDRESSED`, and 8 —
+the L319, L320 and L322 — `NETWORK_ADDRESSED`, where no routine is
+declared because none is needed. The MY10 documents of those three
+address their MOST modules with plain 11-bit identifiers at `CAN_MS`'s own
+parameters, so the ring is bound to `ms-can` as a hypothesis for exactly
+those programme-years; the older documents' 29-bit `enhanced` layout is
+recorded and not composed. The paragraph above stays true for the X250.
+
 ### What is known, and what is actually open
 
 *Reworded 2026-09-09 at the owner's insistence, and he was right: the
