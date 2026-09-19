@@ -4,7 +4,7 @@ This file records what is done. `ROADMAP.md` records what is next and why in tha
 order, including the owner-only gates. Keep both current; neither may live only
 in a chat session.
 
-Status: **2026-09-19 — the interface met the owner's own car through his library, and two things gave way. SDD names the holders of the car configuration by their diagnostic system (`RSJB_SYSTEM_A`), so the X250's configuration read planned nothing until `ADR-0037` taught the library that a system belongs to its module; and the X250's battery monitor declares no voltage, so the low-battery precondition of `ADR-0030` — amended twice today: SDD's own band, under 11.6 V, as a precondition of the session, and the voltage from whichever of three reads is freshest — could never have appeared on his car. Both are built and fixture-tested; the bench's rail follows the scenario on every read it answers, and the owner saw the line, the voltage on the cell and the headings that hold the top of the screen in the running window («все так як і планувалося»). Yesterday's two debts are closed: the operations' names are SDD's English and a caption says so, and the stopwatch is gone. No operation has met a car.**
+Status: **2026-09-19 — the interface met the owner's own car through his library, and two things gave way. SDD names the holders of the car configuration by their diagnostic system (`RSJB_SYSTEM_A`), so the X250's configuration read planned nothing until `ADR-0037` taught the library that a system belongs to its module; and the X250's battery monitor declares no voltage, so the low-battery precondition of `ADR-0030` — amended twice today: SDD's own band, under 11.6 V, as a precondition of the session, and the voltage from whichever of three reads is freshest — could never have appeared on his car. Both are built and fixture-tested; the bench's rail follows the scenario on every read it answers, and the owner saw the line, the voltage on the cell and the headings that hold the top of the screen in the running window («все так як і планувалося»). Yesterday's two debts are closed: the operations' names are SDD's English and a caption says so, and the stopwatch is gone. The afternoon rebuilt the live read at the screen: the chooser says what each choice holds and a module's key counts what its press will add — the cap of sixteen, not the bench and not the rule, was what hid the engine speed on his car; the two dials read themselves once the survey names them and the adapter is there (`ADR-0022`, amended); the panel lost its dark screen and its grid and gained needles that rest at zero, the odometer and the gearbox in the dials' windows; and every control on the plate has one of three forms — a key, a latch, a lens (`ADR-0038`), the owner's own sketch, judged by him at the screen: «все ідеально». No operation has met a car.**
 
 Earlier — **2026-09-18, the rework — the owner walked the running window item by item and the interface was rebuilt behind him, but the day's real find was underneath: the bench had been reporting fault codes all along and the interface had nowhere to show them, and the library was being read once per module instead of once per question.** The two numbers that matter, measured on the owner's own library of 517,595 records and his own machine, in a release build: surveying 37 modules fell from 55 s to 6 s, and building the virtual vehicle from 65 s to 8 s, with a repeat of the same vehicle now free. Nothing about what the application answers changed; a test asserts that the narrowed query returns exactly what a walk of the whole store would keep. Two debts are carried to tomorrow: the help-language switch inside the self-test block does not carry all of its text, and the stopwatch used for these measurements is still in `bench_e2e.rs`, ignored by default.
 
@@ -104,6 +104,55 @@ record says so rather than inventing a read.
 Every number above with a scenario in it is the bench's and `FIXTURE_TESTED`;
 the X250 numbers come from the owner's own library through the same code —
 `IMPLEMENTED`, confirmed by no car.
+
+### The afternoon: the live read, at the screen
+
+**The engine speed was never hidden by the bench or by the rule.** The
+owner chose «Quantities» for the PCM and pressed the module's button, and
+neither the engine speed nor the road speed came; by hand they came. Run
+against his library: the PCM declares 102 readable addresses, 81 of them
+quantities by the rule of the morning, and `0xDA48 Engine speed (rpm)`,
+`0xDA02 Vehicle speed (kph)` are among them. The button took the first
+sixteen by address — `0x0347` to `0xD703` — because the set holds sixteen,
+and said «81 offered» while it did. It now says what its press will
+actually add, in a ring, and how many are left for the boxes; the two
+choices stand as two buttons with their own words and their counts for
+this car; and the rule is sharper — a real unit, not `int`, a scaling, and
+no enumerated states — so a brake switch reading Inactive/Active is a
+state and not a quantity: 459 → 193 addresses on the X250, the PCM's 81 →
+39. Tested on the rule and on the chooser.
+
+**The instrument panel.** The faint grid is gone; the dark green screen
+gave way, on the owner's question and this side's recommendation, to the
+sheet's own pale surface with white dials in the plate's ink and the
+accent for the needle — a panel that belongs to the window, not a spot on
+it. Each dial has a needle now, resting at zero while nothing is read; the
+speedometer carries the odometer in its window — the highest total the
+mileage read found, or the total a run reads — and the tachometer what the
+gearbox says. The captions under the dials are switches, and the two
+parameters read themselves: once the survey names them and the adapter is
+there, the run starts without a click and the panel shows, once per
+survey; a click on a caption during a run stops it and starts it again
+with the set as it now is (`ADR-0022`, amendment of 2026-09-19). «Tile» is
+«Table» on the row marks, at the owner's word.
+
+**The forms of the controls (`ADR-0038`).** The owner's sketch of four
+forms became three classes: a key that stands in a bezel and sinks only
+while pressed, a latch that stands proud released and sits sunk with its
+lamp lit engaged, a lens — a raised rim round a sunk face — for every
+indicator. The state is the markup's own (`aria-pressed`, `aria-expanded`,
+the badge's class), so no markup moved. The first cut drew the bezel as a
+halo round the old capsule and the owner saw it for what it was; the
+second draws the bezel as geometry, the key under the word. The service
+switch keeps its amber and its red; the bench badge its red. His verdict
+at the screen: «все ідеально»; the one correction after it — the live
+values' columns jumped as the numbers grew — is a fixed table; and a
+button whose word changes with its state («Show» / «Put away», «Show all» /
+«Only informative», the report's) keeps the width of its widest word, the
+word changing in place.
+
+All of it is the interface and the bench: `IMPLEMENTED`, `FIXTURE_TESTED`
+where the bench is in the test, and nothing of it has met a car.
 
 ### What this day did not touch
 
