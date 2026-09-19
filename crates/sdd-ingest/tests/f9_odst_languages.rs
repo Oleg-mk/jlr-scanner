@@ -57,14 +57,17 @@ fn a_russian_pack_writes_the_text_of_each_used_screen_and_nothing_else() {
         .map(|entry| entry.record.id.clone())
         .collect();
     ids.sort();
-    // One screen is pointed at by a test; it is written as its text and as
-    // its items, and both ids end in the language. The unused screen is not
-    // recorded, as in English.
+    // Two screens are pointed at by tests - the self test 0x0202 joined the
+    // fixture on 2026-09-19 (ADR-0036, step 2); each is written as its text
+    // and as its items, and every id ends in the language. The unused
+    // screen is not recorded, as in English.
     assert_eq!(
         ids,
         vec![
             "f9-odst-rus.odst.SYNTHMOD.screen.DR_ODST_14_SYNTHMOD_HLP_000.rus",
+            "f9-odst-rus.odst.SYNTHMOD.screen.DR_ODST_202_SYNTHMOD_HLP_000.rus",
             "f9-odst-rus.odst.SYNTHMOD.screenitems.DR_ODST_14_SYNTHMOD_HLP_000.rus",
+            "f9-odst-rus.odst.SYNTHMOD.screenitems.DR_ODST_202_SYNTHMOD_HLP_000.rus",
         ]
     );
     // No test, no capability, no screen binding: those are the English pack's.

@@ -2,6 +2,12 @@ import { fireEvent, render, screen, waitFor, within } from "@testing-library/rea
 import { createBatterySnapshot, type BatteryClient, type BatteryReadSnapshot } from "./battery";
 import { afterEach, describe, expect, it } from "vitest";
 import { App } from "./App";
+import {
+  createRoutineRunSnapshot,
+  type RoutineRunClient,
+  type RoutineRunRequest,
+  type RoutineRunSnapshot,
+} from "./routineRun";
 import { LANGUAGE_STORAGE_KEY, setCurrentLanguage } from "./i18n";
 import { createBenchSnapshot, type AdapterClient, type AdapterSnapshot } from "./adapter";
 import {
@@ -91,7 +97,31 @@ const surveyed: ModuleSurveyEntry[] = [
     identifierRead: { status: "REACHABLE", reasons: [] },
     dtcRead: { status: "REACHABLE", reasons: [] },
     readableIdentifiers: [{ identifier: "0x1945", parameters: ["Synthetic module-scoped value"] }],
-    selfTests: [],
+    selfTests: [
+      {
+        testId: "202",
+        name: "ODST_0202_PCM_HLP",
+        timeMs: 3000,
+        timeoutMs: 5000,
+        description: ["Make sure the ignition is switched on."],
+        descriptionTexts: {},
+        modelYears: [],
+        safetyClass: "SERVICE_ROUTINE",
+      },
+    ],
+    acceptedOperations: [
+      {
+        kind: "ROUTINE",
+        identifier: "0x0202",
+        name: "Self Test",
+        service: "0x31",
+        sessions: ["03"],
+        security: null,
+        maxRunTime: null,
+        restartWhileRunning: null,
+        safetyClass: "SERVICE_ROUTINE",
+      },
+    ],
   },
 ];
 
@@ -233,6 +263,62 @@ class RecordingServiceClient implements ServiceClient {
   }
 }
 
+/** The shell's side of a self test, remembered as the shell remembers it:
+ *  the start, then a step or two, then the module's fixed status record. */
+class RecordingRoutineClient implements RoutineRunClient {
+  starts: RoutineRunRequest[] = [];
+  steps = 0;
+  stops = 0;
+  private last: RoutineRunSnapshot = createRoutineRunSnapshot();
+  getState() {
+    return Promise.resolve(this.last);
+  }
+  start(request: RoutineRunRequest) {
+    this.starts.push(request);
+    this.last = {
+      ...createRoutineRunSnapshot(),
+      state: "RUNNING",
+      ecuFamily: request.ecuFamily,
+      testId: request.testId,
+      testName: "ODST_0202_PCM_HLP",
+      routeId: "hs-can",
+      routeValidation: "SYNTHETIC",
+      session: "0x03",
+      timeMs: 3000,
+      timeoutMs: 5000,
+      exchanges: [
+        ["10 03", "50 03 00 32 01 F4"],
+        ["31 01 02 02", "71 01 02 02"],
+      ],
+    };
+    return Promise.resolve(this.last);
+  }
+  step() {
+    this.steps += 1;
+    if (this.last.state === "RUNNING" && this.steps >= 2) {
+      this.last = {
+        ...this.last,
+        state: "COMPLETED",
+        resultHex: "00 A5 5A",
+        elapsedMs: 3100,
+        exchanges: [
+          ...this.last.exchanges,
+          ["3E 00", "7E 00"],
+          ["31 03 02 02", "71 03 02 02 00 A5 5A"],
+          ["10 01", "50 01 00 32 01 F4"],
+        ],
+        reportAvailable: true,
+      };
+    }
+    return Promise.resolve(this.last);
+  }
+  stop() {
+    this.stops += 1;
+    this.last = { ...this.last, state: "STOPPED", reportAvailable: true };
+    return Promise.resolve(this.last);
+  }
+}
+
 /** A battery that always answers the same reading, for the precondition. */
 class FixedBatteryClient implements BatteryClient {
   constructor(private readonly fixed: BatteryReadSnapshot) {}
@@ -289,12 +375,15 @@ function renderApp(
   reads: TwoCodesClient,
   battery?: BatteryClient,
   modules: ModuleSurveyEntry[] = surveyed,
+  routine: RoutineRunClient = new RecordingRoutineClient(),
 ) {
   return render(
     <App
       client={new BenchAdapterClient()}
       diagnosticClient={new IdleDiagnosticClient()}
       libraryClient={new SurveyingLibraryClient(modules)}
+      routineRunClient={routine}
+      routineStepMs={10}
       moduleReadClient={reads}
       serviceClient={service}
       sessionReportClient={session}
@@ -437,6 +526,49 @@ describe("the service mode (ADR-0036)", () => {
     // Read again, both empty: the list says so, and offers no second clear.
     expect(await screen.findByRole("heading", { name: "No fault codes" })).toBeVisible();
     expect(screen.queryByRole("button", { name: /^Clear the codes of all/ })).toBeNull();
+  });
+
+  /**
+   * The on-demand self test (ADR-0036, step 2; built 2026-09-19): listed as
+   * before while the mode is off; in the mode, one key under the test the
+   * index and the pack agree on, one question with SDD's own instructions
+   * and the data's times, then the run stepped until the shell says it
+   * ended, and the module's answer shown as the bytes it is.
+   */
+  it("runs the self test after one question, steps it, and shows the result as the module answered it", async () => {
+    const session = new RecordingSessionClient();
+    const service = new RecordingServiceClient(session);
+    const routine = new RecordingRoutineClient();
+    renderApp(service, session, new TwoCodesClient(), undefined, surveyed, routine);
+    await screen.findByRole("button", { name: "Service mode" });
+    fireEvent.change(screen.getByLabelText("Programme"), { target: { value: "L405" } });
+    fireEvent.click(screen.getByRole("button", { name: "Survey modules" }));
+    fireEvent.click(await screen.findByRole("button", { name: "PCM: Reachable" }));
+    await screen.findByRole("heading", { name: "PCM" });
+    // Listed, and not offered, while the mode is off.
+    fireEvent.click(screen.getByText("Self tests this module declares"));
+    expect(screen.getByText("ODST_0202_PCM_HLP")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Run the test" })).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "Service mode" }));
+    fireEvent.click(screen.getByRole("button", { name: "Turn the service mode on" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Run the test" }));
+    // One question: the module and the test, SDD's instructions, the times,
+    // the class; the confirming control names the operation.
+    const question = screen.getByRole("dialog", { name: "Run the self test on PCM" });
+    expect(within(question).getByText("Make sure the ignition is switched on.")).toBeVisible();
+    expect(within(question).getByText("It runs 3 s; the tool waits 5 s at most.")).toBeVisible();
+    expect(within(question).getByText(/SERVICE_ROUTINE/)).toBeVisible();
+    fireEvent.click(within(question).getByRole("button", { name: "Run the test ODST_0202_PCM_HLP on PCM" }));
+
+    await waitFor(() => expect(routine.starts).toHaveLength(1));
+    expect(routine.starts[0]).toMatchObject({ ecuFamily: "PCM", testId: "202" });
+    // Stepped until the shell says it ended; the answer is bytes, said so.
+    expect(await screen.findByText("The module answered: 00 A5 5A")).toBeVisible();
+    expect(routine.steps).toBeGreaterThanOrEqual(2);
+    expect(
+      screen.getByText("The result is shown as the module answers it; this library does not describe it."),
+    ).toBeVisible();
   });
 
   it("repeats the low-battery line in the clear's confirmation (ADR-0030, 2026-09-19)", async () => {

@@ -83,6 +83,11 @@ struct SessionReport {
     /// a route, and is not recorded here.
     #[serde(default)]
     dtc_clears: Vec<DtcClear>,
+    /// Runs of a routine (`ADR-0036`, step 2): an action, not evidence
+    /// about a route; accepted, and nothing is taken from them.
+    #[serde(default)]
+    #[allow(dead_code)]
+    routine_runs: Vec<serde_json::Value>,
 }
 
 /// As much of a clear as the intake reads: the two fault-code reads around

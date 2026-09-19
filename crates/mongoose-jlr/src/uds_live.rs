@@ -28,7 +28,7 @@ use uds::{
 use uds_execution::{
     PreparedUdsService, PreparedUdsTransaction, SessionUse, TransactionSafetyClass,
     CLEAR_DIAGNOSTIC_INFORMATION_CAPABILITY, READ_DATA_BY_IDENTIFIER_CAPABILITY,
-    READ_DTC_INFORMATION_CAPABILITY, UDS_PROTOCOL_FAMILY,
+    READ_DTC_INFORMATION_CAPABILITY, ROUTINE_CONTROL_CAPABILITY, UDS_PROTOCOL_FAMILY,
 };
 
 /// How long to keep waiting once a module has answered ResponsePending.
@@ -132,6 +132,64 @@ impl<T: ByteTransport> MongooseJlrDevice<T> {
         let operation = transaction.encoded_payload().to_vec();
         let mut exchanges = Vec::new();
 
+        match service.session_use() {
+            // A routine's start (ADR-0036, step 2): the extended session
+            // opened and left open, held from here on by the keep-alives
+            // the run sends until its last step brings the module back.
+            SessionUse::OpenAndHold => {
+                let open = UdsRequest::diagnostic_session_control(EXTENDED_DIAGNOSTIC_SESSION);
+                let opened = self.exchange_uds(transaction, open.as_bytes(), route_id, timeout)?;
+                exchanges.push((
+                    open.as_bytes().to_vec(),
+                    opened.raw_diagnostic_response.clone(),
+                ));
+                if !is_positive(&opened.raw_diagnostic_response) {
+                    return Err(MongooseDiagnosticError::UnsupportedTransaction(
+                        "the module did not open the extended diagnostic session",
+                    ));
+                }
+                let answer = self.exchange_uds(transaction, &operation, route_id, timeout)?;
+                exchanges.push((operation.clone(), answer.raw_diagnostic_response.clone()));
+                return Ok(MongooseUdsServiceResult {
+                    route: route_id,
+                    responder: answer.responder,
+                    request_payload: operation,
+                    raw_diagnostic_response: answer.raw_diagnostic_response,
+                    pending_responses: answer.pending_responses,
+                    session: EXTENDED_DIAGNOSTIC_SESSION,
+                    exchanges,
+                });
+            }
+            // A routine's last step: a keep-alive so the session is still
+            // there, the operation, and the way back whatever it answered.
+            SessionUse::KeepAliveThenLeave => {
+                let alive = UdsRequest::tester_present(false);
+                let kept = self.exchange_uds(transaction, alive.as_bytes(), route_id, timeout)?;
+                exchanges.push((
+                    alive.as_bytes().to_vec(),
+                    kept.raw_diagnostic_response.clone(),
+                ));
+                let answer = self.exchange_uds(transaction, &operation, route_id, timeout);
+                let back = UdsRequest::diagnostic_session_control(DEFAULT_SESSION);
+                let returned = self.exchange_uds(transaction, back.as_bytes(), route_id, timeout);
+                let answer = answer?;
+                exchanges.push((operation.clone(), answer.raw_diagnostic_response.clone()));
+                if let Ok(returned) = returned {
+                    exchanges.push((back.as_bytes().to_vec(), returned.raw_diagnostic_response));
+                }
+                return Ok(MongooseUdsServiceResult {
+                    route: route_id,
+                    responder: answer.responder,
+                    request_payload: operation,
+                    raw_diagnostic_response: answer.raw_diagnostic_response,
+                    pending_responses: answer.pending_responses,
+                    session: EXTENDED_DIAGNOSTIC_SESSION,
+                    exchanges,
+                });
+            }
+            SessionUse::DefaultThenExtended | SessionUse::Extended => {}
+        }
+
         if service.session_use() == SessionUse::DefaultThenExtended {
             let answer = self.exchange_uds(transaction, &operation, route_id, timeout)?;
             exchanges.push((operation.clone(), answer.raw_diagnostic_response.clone()));
@@ -179,6 +237,47 @@ impl<T: ByteTransport> MongooseJlrDevice<T> {
             pending_responses: answer.pending_responses,
             session: EXTENDED_DIAGNOSTIC_SESSION,
             exchanges,
+        })
+    }
+
+    /// One keep-alive on a routine's route (ADR-0036, step 2): `0x3E` and
+    /// its answer, holding the extended session a start left open. Takes
+    /// the route for the one exchange and releases it, like every step.
+    pub fn execute_prepared_uds_keep_alive(
+        &mut self,
+        service: &PreparedUdsService,
+        timeout: Duration,
+    ) -> Result<MongooseUdsServiceResult, MongooseDiagnosticError> {
+        let transaction = service.transaction();
+        let route_id =
+            validate_uds_transaction(transaction, TransactionSafetyClass::ServiceRoutine)?;
+        self.open_route_internal(route_id, false)
+            .map_err(MongooseDiagnosticError::CanConnection)?;
+        let result = self.keep_alive_exchange(transaction, route_id, timeout);
+        let close = self.close_route();
+        match (result, close) {
+            (Ok(result), Ok(())) => Ok(result),
+            (Ok(_), Err(error)) => Err(MongooseDiagnosticError::ChannelClose(error)),
+            (Err(error), _) => Err(error),
+        }
+    }
+
+    fn keep_alive_exchange(
+        &mut self,
+        transaction: &PreparedUdsTransaction,
+        route_id: VehicleRouteId,
+        timeout: Duration,
+    ) -> Result<MongooseUdsServiceResult, MongooseDiagnosticError> {
+        let alive = UdsRequest::tester_present(false);
+        let answer = self.exchange_uds(transaction, alive.as_bytes(), route_id, timeout)?;
+        Ok(MongooseUdsServiceResult {
+            route: route_id,
+            responder: answer.responder,
+            request_payload: alive.as_bytes().to_vec(),
+            raw_diagnostic_response: answer.raw_diagnostic_response.clone(),
+            pending_responses: answer.pending_responses,
+            session: EXTENDED_DIAGNOSTIC_SESSION,
+            exchanges: vec![(alive.as_bytes().to_vec(), answer.raw_diagnostic_response)],
         })
     }
 
@@ -319,6 +418,7 @@ fn validate_uds_transaction(
         }
         TransactionSafetyClass::ServiceRoutine => {
             capability == CLEAR_DIAGNOSTIC_INFORMATION_CAPABILITY
+                || capability == ROUTINE_CONTROL_CAPABILITY
         }
     };
     if !allowed {

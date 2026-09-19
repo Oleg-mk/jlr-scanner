@@ -229,6 +229,9 @@ impl DtcClearService {
                             snapshot.refusal = Some(format!("{:?}", negative.code));
                             answer = Some(format!("refused: {:?}", negative.code));
                         }
+                        Ok(Some(UdsServiceOutcome::RoutineControlled { .. })) => {
+                            fail(&mut snapshot, "a routine answered a clear".to_string())
+                        }
                         Ok(None) => fail(
                             &mut snapshot,
                             "the final answer was still ResponsePending".to_string(),

@@ -606,6 +606,69 @@ pub struct DtcClearSnapshot {
     pub report_available: bool,
 }
 
+/// A run of a routine a module declares (`ADR-0036`, step 2): the
+/// on-demand self test first. The request names the module, the test as
+/// the ODST pack names it, and the car.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RoutineRunRequest {
+    pub ecu_family: String,
+    /// The test's identifier in the ODST pack: `202` for the self test.
+    pub test_id: String,
+    pub context: VehicleContextInput,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum RoutineRunState {
+    Idle,
+    /// Started and accepted; the session is held while the routine runs.
+    Running,
+    /// The module answered the request for results.
+    Completed,
+    /// The module refused a step, by name.
+    Refused,
+    /// The person stopped it.
+    Stopped,
+    /// The module gave no result within the time the data allows.
+    TimedOut,
+    /// Not sent, or the adapter failed under it.
+    Failed,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RoutineRunSnapshot {
+    pub state: RoutineRunState,
+    pub ecu_family: String,
+    /// The routine, `0x0202`.
+    pub routine: String,
+    pub test_id: String,
+    /// SDD's own name for the test.
+    pub test_name: String,
+    /// `ROUTINE_RUN`.
+    pub operation: String,
+    /// `SERVICE_ROUTINE`.
+    pub safety_class: String,
+    pub route_id: String,
+    pub route_validation: String,
+    /// The diagnostic session the run was answered in.
+    pub session: Option<String>,
+    /// How long the data says the test runs, and the longest it waits.
+    pub time_ms: u32,
+    pub timeout_ms: u32,
+    pub started_unix_ms: Option<u64>,
+    pub elapsed_ms: u64,
+    /// The routine status record the module answered with, as bytes.
+    pub result_hex: Option<String>,
+    /// The module's refusal, in the protocol's own word for it.
+    pub refusal: Option<String>,
+    /// Every exchange so far, request then answer, in hex.
+    pub exchanges: Vec<(String, String)>,
+    pub error: Option<DiagnosticError>,
+    pub report_available: bool,
+}
+
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct DtcSummary {
@@ -710,6 +773,9 @@ pub struct SessionReportSnapshot {
     /// Clears of fault codes recorded in this session (`ADR-0036`).
     #[serde(default)]
     pub dtc_clears: u32,
+    /// Routine runs recorded in this session (`ADR-0036`, step 2).
+    #[serde(default)]
+    pub routine_runs: u32,
     /// Whether the service mode is on for this session (`ADR-0036`): the
     /// operations of stage 2 exist in the interface only while it is.
     #[serde(default)]

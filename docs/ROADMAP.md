@@ -615,6 +615,30 @@ What outranks all of it is unchanged: no operation has met a car, and the
 first write on one is the owner's, after a real read session has been
 reported.
 
+### F24 — stage 2, step 2: the on-demand self test (built 2026-09-19, `ADR-0036`)
+
+Built the evening step 1 was released, on the amendment written before it.
+The first routine this product runs, and the only one of this slice:
+`0x0202`, the on-demand self test, where two records agree — the module's
+index declares the routine without a security level, and the ODST pack
+gives this car the test with its time and its timeout. Across the owner's
+library that is 391 modules with screens in 20 programmes. In the service
+mode, under the test in the module panel: one question with SDD's own
+instructions in the help language, the class, the times and the
+low-battery line; then the run, stepped by the interface one request at a
+time — the extended session opened and held with a keep-alive, the request
+for results once the data's time has run, the way back — and the module's
+answer shown as the bytes it is, with the plain statement that this library
+does not describe them; a stop gets through between two steps. The record
+`routine_runs` carries every exchange; the readable report gains "Self
+tests run". The guard was loosened for exactly this: one constructor, one
+intent, one routine in a closed type. On the bench the whole-stack test
+runs the test end to end on `SYNTHMOD` and finds the record.
+
+Not in this slice: any other routine, several tests in one go, a meaning
+for the result bytes, the self tests of K-line modules. No operation has
+met a car.
+
 ### F14 — K-line transport for the legacy buses (brought forward 2026-09-12, `ADR-0029`)
 
 ISO 9141 / ISO 14230 over J1962 pins 7 and 8, which the MongoosePro JLR variant

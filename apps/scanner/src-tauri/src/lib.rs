@@ -12,6 +12,7 @@ mod mileage_service;
 mod module_read_service;
 mod passport_service;
 mod read_record;
+mod routine_run_service;
 mod session_report_service;
 mod session_service;
 mod standard_obd_service;
@@ -22,9 +23,9 @@ use app_contracts::{
     CcfReadRequest, CcfReadSnapshot, DiagnosticError, DiagnosticSnapshot, DtcClearRequest,
     DtcClearSnapshot, DtcClearState, LibrarySnapshot, LiveReadRequest, LiveReadSnapshot,
     MileageSurveyRequest, MileageSurveySnapshot, ModulePassportRequest, ModulePassportSnapshot,
-    ModuleReadKind, ModuleReadRequest, ModuleReadSnapshot, ModuleReadState, SessionReportSnapshot,
-    StandardObdRequest, StandardObdSnapshot, VehicleCatalogueSnapshot, VehicleContextInput,
-    VehicleSurveySnapshot, VinDecodeSnapshot,
+    ModuleReadKind, ModuleReadRequest, ModuleReadSnapshot, ModuleReadState, RoutineRunRequest,
+    RoutineRunSnapshot, SessionReportSnapshot, StandardObdRequest, StandardObdSnapshot,
+    VehicleCatalogueSnapshot, VehicleContextInput, VehicleSurveySnapshot, VinDecodeSnapshot,
 };
 use battery_service::{BatteryService, BATTERY_READ_TIMEOUT};
 use bench_vehicle::BenchVehicle;
@@ -40,8 +41,9 @@ use live_read_service::{LiveReadService, LIVE_READ_TIMEOUT};
 use mileage_service::{MileageService, MILEAGE_READ_TIMEOUT};
 use module_read_service::{adapter_unavailable, map_live_error, ModuleReadService};
 use mongoose_jlr::bench::{share_bus, SharedBenchBus};
-use mongoose_jlr::VehicleRouteId;
+use mongoose_jlr::{MongooseDiagnosticError, VehicleRouteId};
 use passport_service::{PassportService, PASSPORT_READ_TIMEOUT};
+use routine_run_service::{RoutineDue, RoutineRunService, ROUTINE_STEP_TIMEOUT};
 use session_report_service::SessionReportService;
 use session_report_service::{SESSION_MODE_BENCH, SESSION_MODE_REAL};
 use session_service::SessionService;
@@ -63,6 +65,7 @@ type SharedPassportService = Mutex<PassportService>;
 type SharedCcfService = Mutex<CcfService>;
 type SharedBatteryService = Mutex<BatteryService>;
 type SharedDtcClearService = Mutex<DtcClearService>;
+type SharedRoutineRunService = Mutex<RoutineRunService>;
 
 fn lock_battery<'a>(state: &'a State<'a, SharedBatteryService>) -> MutexGuard<'a, BatteryService> {
     state
@@ -179,6 +182,15 @@ fn refresh_bench(
 fn lock_dtc_clear<'a>(
     state: &'a State<'a, SharedDtcClearService>,
 ) -> MutexGuard<'a, DtcClearService> {
+    state
+        .inner()
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+}
+
+fn lock_routine_run<'a>(
+    state: &'a State<'a, SharedRoutineRunService>,
+) -> MutexGuard<'a, RoutineRunService> {
     state
         .inner()
         .lock()
@@ -849,6 +861,10 @@ async fn start_new_session(
     // A clear belongs to the session it was made in; the service mode is
     // off in the new one until the person turns it on again (ADR-0036).
     replace(app.state::<SharedDtcClearService>(), DtcClearService::new());
+    replace(
+        app.state::<SharedRoutineRunService>(),
+        RoutineRunService::new(),
+    );
     app.state::<SharedSessionService>()
         .inner()
         .lock()
@@ -1343,6 +1359,204 @@ fn record_live_run(
         });
         let _ = session_report.add_live_read_run(&json);
     }
+}
+
+/// A routine run's record joins the session bundle once the run has ended
+/// (`ADR-0036`, step 2, decision 5).
+fn record_routine_run(
+    routine_state: &State<'_, SharedRoutineRunService>,
+    report_state: &State<'_, SharedSessionReportService>,
+    bench: bool,
+) {
+    let json = { lock_routine_run(routine_state).take_report_json() };
+    if let Some(json) = json {
+        let mut session_report = lock_session_report(report_state);
+        session_report.set_mode(if bench {
+            SESSION_MODE_BENCH
+        } else {
+            SESSION_MODE_REAL
+        });
+        let _ = session_report.add_routine_run(&json);
+    }
+}
+
+#[tauri::command]
+async fn get_routine_run_state(
+    routine_state: State<'_, SharedRoutineRunService>,
+) -> Result<RoutineRunSnapshot, String> {
+    Ok(lock_routine_run(&routine_state).snapshot())
+}
+
+/// Start the on-demand self test of a module (`ADR-0036`, step 2). Refused
+/// before anything is sent unless the service mode is on, the module is in
+/// this session's survey, and its index and the ODST pack agree on the
+/// test; the interface steps the run afterwards.
+#[tauri::command]
+async fn start_routine_run(
+    adapter_state: State<'_, SharedAdapterService>,
+    session_state: State<'_, SharedSessionService>,
+    routine_state: State<'_, SharedRoutineRunService>,
+    report_state: State<'_, SharedSessionReportService>,
+    request: RoutineRunRequest,
+) -> Result<RoutineRunSnapshot, String> {
+    Ok(start_routine_run_now(
+        adapter_state,
+        session_state,
+        routine_state,
+        report_state,
+        request,
+    ))
+}
+
+#[tauri::command]
+async fn routine_run_step(
+    adapter_state: State<'_, SharedAdapterService>,
+    routine_state: State<'_, SharedRoutineRunService>,
+    report_state: State<'_, SharedSessionReportService>,
+) -> Result<RoutineRunSnapshot, String> {
+    Ok(routine_run_step_now(
+        adapter_state,
+        routine_state,
+        report_state,
+    ))
+}
+
+#[tauri::command]
+async fn stop_routine_run(
+    adapter_state: State<'_, SharedAdapterService>,
+    routine_state: State<'_, SharedRoutineRunService>,
+    report_state: State<'_, SharedSessionReportService>,
+) -> Result<RoutineRunSnapshot, String> {
+    Ok(stop_routine_run_now(
+        adapter_state,
+        routine_state,
+        report_state,
+    ))
+}
+
+fn start_routine_run_now(
+    adapter_state: State<'_, SharedAdapterService>,
+    session_state: State<'_, SharedSessionService>,
+    routine_state: State<'_, SharedRoutineRunService>,
+    report_state: State<'_, SharedSessionReportService>,
+    request: RoutineRunRequest,
+) -> RoutineRunSnapshot {
+    if !lock_session_report(&report_state).service_mode() {
+        return lock_routine_run(&routine_state).refuse(
+            &request,
+            routine_run_service::not_offered("the service mode is off for this session"),
+        );
+    }
+    if lock_routine_run(&routine_state).is_running() {
+        return lock_routine_run(&routine_state).refuse(
+            &request,
+            routine_run_service::not_offered("a routine is already running; stop it first"),
+        );
+    }
+    let (module, prepared) = {
+        let session = lock_session(&session_state);
+        let module = session.last_survey().and_then(|survey| {
+            survey
+                .modules
+                .into_iter()
+                .find(|module| module.ecu_family == request.ecu_family)
+        });
+        let Some(module) = module else {
+            return lock_routine_run(&routine_state).refuse(
+                &request,
+                routine_run_service::not_offered(
+                    "this module is not in the survey of this session; survey the vehicle first",
+                ),
+            );
+        };
+        let prepared = RoutineRunService::prepare(session.library(), &module, &request);
+        (module, prepared)
+    };
+    let _ = module;
+    let prepared = match prepared {
+        Ok(prepared) => prepared,
+        Err(error) => return lock_routine_run(&routine_state).refuse(&request, error),
+    };
+
+    let (adapter, result, bench) = {
+        let mut service = lock_service(&adapter_state);
+        let Some(adapter) = service.connected_adapter() else {
+            return lock_routine_run(&routine_state).refuse(&request, adapter_unavailable());
+        };
+        let Some(result) = service.execute_uds_service(&prepared.start, ROUTINE_STEP_TIMEOUT)
+        else {
+            return lock_routine_run(&routine_state).refuse(&request, adapter_unavailable());
+        };
+        (adapter, result, service.is_bench())
+    };
+    let snapshot =
+        lock_routine_run(&routine_state).start(&request, prepared, Some(&adapter), bench, result);
+    record_routine_run(&routine_state, &report_state, bench);
+    snapshot
+}
+
+fn routine_run_step_now(
+    adapter_state: State<'_, SharedAdapterService>,
+    routine_state: State<'_, SharedRoutineRunService>,
+    report_state: State<'_, SharedSessionReportService>,
+) -> RoutineRunSnapshot {
+    let due = { lock_routine_run(&routine_state).next_due() };
+    let Some(due) = due else {
+        return lock_routine_run(&routine_state).snapshot();
+    };
+    let bench = {
+        // The adapter first, then the run: the order every routine command
+        // keeps, so two of them cannot wait on each other.
+        let mut service = lock_service(&adapter_state);
+        let bench = service.is_bench();
+        let mut routine = lock_routine_run(&routine_state);
+        match due {
+            RoutineDue::KeepAlive => {
+                let result = routine
+                    .prepared_start()
+                    .and_then(|start| service.execute_uds_keep_alive(start, ROUTINE_STEP_TIMEOUT))
+                    .map(|result| result.map_err(map_live_error))
+                    .unwrap_or_else(|| Err(adapter_unavailable()));
+                routine.record_keep_alive(result);
+            }
+            RoutineDue::RequestResults => {
+                let timeout = routine.results_timeout();
+                let result = routine
+                    .prepared_results()
+                    .and_then(|results| service.execute_uds_service(results, timeout))
+                    .unwrap_or(Err(MongooseDiagnosticError::UnsupportedTransaction(
+                        "the adapter is no longer connected",
+                    )));
+                routine.record_results(result);
+            }
+        }
+        bench
+    };
+    record_routine_run(&routine_state, &report_state, bench);
+    lock_routine_run(&routine_state).snapshot()
+}
+
+fn stop_routine_run_now(
+    adapter_state: State<'_, SharedAdapterService>,
+    routine_state: State<'_, SharedRoutineRunService>,
+    report_state: State<'_, SharedSessionReportService>,
+) -> RoutineRunSnapshot {
+    let bench = {
+        let mut service = lock_service(&adapter_state);
+        let bench = service.is_bench();
+        let mut routine = lock_routine_run(&routine_state);
+        if routine.is_running() {
+            let result = routine
+                .prepared_stop()
+                .and_then(|stop| service.execute_uds_service(stop, ROUTINE_STEP_TIMEOUT))
+                .map(|result| result.map_err(map_live_error))
+                .unwrap_or_else(|| Err(adapter_unavailable()));
+            routine.record_stop(result);
+        }
+        bench
+    };
+    record_routine_run(&routine_state, &report_state, bench);
+    lock_routine_run(&routine_state).snapshot()
 }
 
 fn start_live_read_now(
@@ -2018,6 +2232,7 @@ pub fn run() {
         .manage(Mutex::new(CcfService::new()))
         .manage(Mutex::new(BatteryService::new()))
         .manage(Mutex::new(DtcClearService::new()))
+        .manage(Mutex::new(RoutineRunService::new()))
         .manage(Mutex::new(SessionReportService::new()))
         .invoke_handler(tauri::generate_handler![
             get_adapter_state,
@@ -2066,6 +2281,10 @@ pub fn run() {
             set_service_mode,
             get_dtc_clear_state,
             clear_dtcs,
+            get_routine_run_state,
+            start_routine_run,
+            routine_run_step,
+            stop_routine_run,
             get_session_report_state,
             get_session_report_json,
             save_text_file,

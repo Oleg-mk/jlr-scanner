@@ -20,6 +20,8 @@ export interface SessionReportSnapshot {
   batteryReads: number;
   /** Clears of fault codes, each recorded with what it erased (ADR-0036). */
   dtcClears: number;
+  /** Runs of a routine - the self tests - each recorded whole (ADR-0036, step 2). */
+  routineRuns: number;
   /** Whether the service mode is on for this session (ADR-0036). */
   serviceMode: boolean;
   reportAvailable: boolean;
@@ -43,6 +45,7 @@ export const createSessionReportSnapshot = (): SessionReportSnapshot => ({
   ccfReads: 0,
   batteryReads: 0,
   dtcClears: 0,
+  routineRuns: 0,
   serviceMode: false,
   reportAvailable: false,
   mode: null,

@@ -18,6 +18,12 @@ pub const SID_CLEAR_DIAGNOSTIC_INFORMATION: u8 = 0x14;
 pub const SID_READ_DTC_INFORMATION: u8 = 0x19;
 pub const SID_READ_DATA_BY_IDENTIFIER: u8 = 0x22;
 pub const SID_TESTER_PRESENT: u8 = 0x3e;
+/// `RoutineControl`: a routine a module runs on request (`ADR-0036`, step 2).
+pub const SID_ROUTINE_CONTROL: u8 = 0x31;
+/// The three sub-functions of `RoutineControl`, as ISO 14229-1 numbers them.
+pub const ROUTINE_CONTROL_START: u8 = 0x01;
+pub const ROUTINE_CONTROL_STOP: u8 = 0x02;
+pub const ROUTINE_CONTROL_REQUEST_RESULTS: u8 = 0x03;
 /// The default diagnostic session and the extended one, as ISO 14229 numbers them.
 pub const DEFAULT_SESSION: u8 = 0x01;
 pub const EXTENDED_DIAGNOSTIC_SESSION: u8 = 0x03;
@@ -59,6 +65,17 @@ impl UdsRequest {
         let [_, high, middle, low] = group.to_be_bytes();
         Self {
             bytes: vec![SID_CLEAR_DIAGNOSTIC_INFORMATION, high, middle, low],
+        }
+    }
+
+    /// Start, stop or ask the results of a routine the module declares
+    /// (`ADR-0036`, step 2): `0x31`, the sub-function, the routine's
+    /// identifier, and no option record - the data names none. A service
+    /// operation, class SERVICE_ROUTINE, sent only as a prepared service.
+    pub fn routine_control(sub_function: u8, routine: u16) -> Self {
+        let [high, low] = routine.to_be_bytes();
+        Self {
+            bytes: vec![SID_ROUTINE_CONTROL, sub_function, high, low],
         }
     }
 
@@ -163,6 +180,14 @@ pub enum TypedDiagnosticResult {
     /// The module cleared the group it was asked to clear.
     ClearDiagnosticInformation {
         group: u32,
+    },
+    /// The module answered a routine control: the sub-function and the
+    /// routine echoed, then the routine status record as the module wrote
+    /// it - bytes whose meaning the data does not give (`ADR-0036`, step 2).
+    RoutineControl {
+        sub_function: u8,
+        routine: u16,
+        status: Vec<u8>,
     },
     Negative(NegativeResponse),
 }
@@ -295,6 +320,24 @@ pub fn typed_result(
             let bytes = request.as_bytes();
             let group = u32::from_be_bytes([0, bytes[1], bytes[2], bytes[3]]);
             Ok(TypedDiagnosticResult::ClearDiagnosticInformation { group })
+        }
+        SID_ROUTINE_CONTROL => {
+            // ISO 14229-1: the sub-function and the routine identifier come
+            // back first, then whatever status record the module keeps.
+            if positive.payload.len() < 3 {
+                return Err(UdsError::MalformedPositiveResponse);
+            }
+            let sub_function = positive.payload[0];
+            let routine = u16::from_be_bytes([positive.payload[1], positive.payload[2]]);
+            let bytes = request.as_bytes();
+            if sub_function != bytes[1] || routine != u16::from_be_bytes([bytes[2], bytes[3]]) {
+                return Err(UdsError::CorrelationMismatch);
+            }
+            Ok(TypedDiagnosticResult::RoutineControl {
+                sub_function,
+                routine,
+                status: positive.payload[3..].to_vec(),
+            })
         }
         SID_TESTER_PRESENT => {
             let (&sub_function, data) = positive

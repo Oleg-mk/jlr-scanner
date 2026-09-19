@@ -92,7 +92,7 @@ fn every_self_test_is_a_service_routine_and_never_read_only() {
             entry.record.id
         );
     }
-    assert_eq!(capabilities, 4, "four qualified self tests are declared");
+    assert_eq!(capabilities, 5, "five qualified self tests are declared");
 }
 
 #[test]
@@ -258,10 +258,11 @@ fn classification_follows_the_source_type_and_ingestion_is_idempotent() {
     let first = store.ingest(&adapter, FIXTURE).unwrap();
     let second = store.ingest(&adapter, FIXTURE).unwrap();
     assert_eq!(first, second);
-    // Four qualified capabilities, four descriptions beside them, the
-    // screen a car is given, the screen's own text (ADR-0032) and the same
-    // screen as its named items (ADR-0034).
-    assert_eq!(first.record_ids.len(), 11);
+    // Five qualified capabilities, five descriptions beside them, the two
+    // screens a car is given, each screen's own text (ADR-0032) and each
+    // screen as its named items (ADR-0034): the self test 0x0202 joined the
+    // fixture with its screen on 2026-09-19 (ADR-0036, step 2).
+    assert_eq!(first.record_ids.len(), 16);
     assert_eq!(
         store
             .get_record("f9-odst.odst.SYNTHMOD.14.0")

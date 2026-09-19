@@ -574,8 +574,8 @@ fn the_self_tests_a_module_declares_are_listed_with_sdds_own_words_and_never_off
             .iter()
             .map(|test| test.test_id.as_str())
             .collect::<Vec<_>>(),
-        ["14", "99"],
-        "both tests the data does not rule out for this car, in SDD's order"
+        ["14", "99", "202"],
+        "the three tests the data does not rule out for this car, in SDD's order"
     );
 
     let named = &tests[0];

@@ -179,6 +179,7 @@ describe("session flow", () => {
       mileageSurveys: 0,
       modulePassports: 0,
       dtcClears: 0,
+      routineRuns: 0,
       serviceMode: false,
       ccfReads: 0,
       batteryReads: 0,

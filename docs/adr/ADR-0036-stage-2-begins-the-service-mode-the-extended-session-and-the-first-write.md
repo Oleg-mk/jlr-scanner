@@ -378,9 +378,9 @@ result bytes mean (`ADR-0032` left the results pack undecided).
    `0x0202` — then `0x31 01 02 02` starts the test with no option record,
    because the data names none; a module that refuses the length says so
    by name and that refusal is the record. The session is then held with
-   `0x3E 80` while the test runs, one keep-alive per step and a step at
-   most every two seconds, the standard's five-second server timer being
-   what it is. When the data's time has run, `0x31 03 02 02` asks for the
+   `0x3E` while the test runs — the form that is answered, so every
+   keep-alive is on the record — one per step and a step at most every
+   two seconds, the standard's five-second server timer being what it is. When the data's time has run, `0x31 03 02 02` asks for the
    result once. The run ends with `0x10 01` — on the result, on a refusal,
    on the person's stop (`0x31 02 02 02` first), on the data's timeout, or
    on an adapter error — and a session is never left open, as decision 4
@@ -438,3 +438,34 @@ result bytes mean (`ADR-0032` left the results pack undecided).
 
 The version turns 1.2.1 with the owner's word, once the slice is on the
 bench end to end.
+
+### Built, 2026-09-19, the same evening — `IMPLEMENTED / FIXTURE_TESTED`
+
+- *The constructors.* `uds` gained `routine_control(sub_function, routine)`
+  and the typed answer; `uds-execution` the intent `RoutineControl` over the
+  closed type `StageTwoRoutine`, one value, `SELF_TEST_ROUTINE = 0x0202`,
+  and the closed set `STAGE_2_ROUTINES` the guard reads; two ways of using
+  the session, `OpenAndHold` for the start and `KeepAliveThenLeave` for the
+  results and the stop. The executor holds the session between steps with
+  `0x3E` — the positive-response form, so every keep-alive is on the record
+  — through `execute_prepared_uds_keep_alive`, the one new entry of the
+  adapter. The guard's rules that forbade the word became rules that
+  require the constructor, the intent, the closed set and the count of two.
+- *The shell.* `RoutineRunService` prepares the three steps from the plan
+  the read uses, refuses before anything is sent where the two records do
+  not agree, and steps the run by its clock and the data's time; four
+  commands, `start_routine_run`, `routine_run_step`, `stop_routine_run`,
+  `get_routine_run_state`; the record `routine_runs` with every exchange
+  and its answer by name; `report-intake` accepts it and takes nothing.
+- *The bench.* `SYNTHMOD` declares `0x0202` and, since this evening, has the
+  test's screen in the synthetic ODST (three goldens moved with it); the
+  bench answers the start in the extended session and refuses it in the
+  default one, answers the results with `00 A5 5A`, the stop, and the
+  keep-alive. The whole-stack test runs the test end to end and the
+  run-time guard's list of services seen on the bus gained `0x31` and
+  `0x3E` and nothing else.
+- *The interface.* One key under a runnable test in the module panel,
+  inside the mode; the question; the run stepped every second; the outcome
+  in every state; the readable report's "Self tests run". Tested through
+  the whole interface with a recording client.
+- Nothing has met a car. The version turns 1.2.1 on the owner's word.

@@ -28,11 +28,19 @@
 <odstTestSelection testID="99" timeout="5000" time="5000" flag="1">
 <odstTestQualifier model="SYNTHA" year="BASE"/>
 </odstTestSelection>
+<odstTestSelection helpScreenDataNameId="4275" testID="202" timeout="5000" time="3000" flag="4">
+<odstTestQualifier model="SYNTHA" year="BASE"/>
+</odstTestSelection>
 </odstTestQualification>
 <helpScreenQualification>
 <helpScreenDataName id="4274" name="DR_ODST_14_SYNTHMOD">
 <helpScreenSelection helpScreenId="5032" helpScreenName="DR_ODST_14_SYNTHMOD_HLP_000">
 <helpScreenQualifier model="SYNTHA" year="MY03"/>
+</helpScreenSelection>
+</helpScreenDataName>
+<helpScreenDataName id="4275" name="DR_ODST_202_SYNTHMOD">
+<helpScreenSelection helpScreenId="5034" helpScreenName="DR_ODST_202_SYNTHMOD_HLP_000">
+<helpScreenQualifier model="SYNTHA" year="BASE"/>
 </helpScreenSelection>
 </helpScreenDataName>
 </helpScreenQualification>
@@ -43,6 +51,10 @@
 <helpScreenItem mnemonicName="J_A_ENS_IGN_ON"/>
 <helpScreenItem mnemonicName="J_I_SYNTH_NO_TEXT"/>
 </helpScreen>
+<helpScreen id="5034" name="DR_ODST_202_SYNTHMOD_HLP_000">
+<helpScreenItem mnemonicName="J_I_SYNTH_ODST_202"/>
+<helpScreenItem mnemonicName="J_A_ENS_IGN_ON"/>
+</helpScreen>
 <helpScreen id="5033" name="DR_ODST_UNUSED_HLP_000">
 <helpScreenItem mnemonicName="J_A_ENS_IGN_ON"/>
 </helpScreen>
@@ -50,5 +62,6 @@
 <helpScreenMnemonicList>
 <mnemonic name="J_I_SYNTH_ODST_DESC"><![CDATA[Синтетический блок выполняет собственную проверку и записывает результат.]]></mnemonic>
 <mnemonic name="empty$I"><![CDATA[  ]]></mnemonic>
+<mnemonic name="J_I_SYNTH_ODST_202"><![CDATA[Самотест синтетического блока: три секунды, затем запись состояния.]]></mnemonic>
 </helpScreenMnemonicList>
 </odstInfo>

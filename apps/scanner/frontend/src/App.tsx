@@ -77,6 +77,8 @@ import { useNetworkCheckController } from "./useNetworkCheckController";
 import { useSessionReportController } from "./useSessionReportController";
 import { ConfirmDialog } from "./components/ConfirmDialog";
 import { defaultServiceClient, type DtcClearSnapshot, type ServiceClient } from "./serviceMode";
+import { defaultRoutineRunClient, type RoutineRunClient } from "./routineRun";
+import { useRoutineRunController } from "./useRoutineRunController";
 import { useServiceModeController } from "./useServiceModeController";
 import "./styles.css";
 
@@ -95,6 +97,9 @@ interface AppProps {
   sessionReportClient?: SessionReportClient;
   /** The service mode and its operations (ADR-0036). */
   serviceClient?: ServiceClient;
+  /** The self tests of stage 2, step 2 (ADR-0036), stepped by the interface. */
+  routineRunClient?: RoutineRunClient;
+  routineStepMs?: number;
   parameterNameClient?: ParameterNameClient;
   pollIntervalMs?: number;
   /** What restarts the interface once the shell has dropped the session; reloads the page by default. */
@@ -155,6 +160,8 @@ export function App({
   moduleReadClient = defaultModuleReadClient,
   sessionReportClient = defaultSessionReportClient,
   serviceClient = defaultServiceClient,
+  routineRunClient = defaultRoutineRunClient,
+  routineStepMs = 1000,
   parameterNameClient = defaultParameterNameClient,
   pollIntervalMs,
   onNewSession,
@@ -294,6 +301,15 @@ export function App({
     session.snapshot.serviceMode,
     session.refresh,
     applyClear,
+  );
+  // The self test (ADR-0036, step 2): the shell runs it, the interface
+  // steps it and shows it under the test it is for.
+  const routine = useRoutineRunController(
+    routineRunClient,
+    library.vehicle,
+    session.snapshot.serviceMode,
+    session.refresh,
+    routineStepMs,
   );
   const check = useNetworkCheckController(moduleReadClient, library.vehicle, recordResult);
   const [selectedModule, setSelectedModule] = useState<string | null>(null);
@@ -703,6 +719,10 @@ export function App({
                       clear={service.clear}
                       clearing={service.clearing}
                       onClearCodes={(ecuFamily) => void service.clearCodes(ecuFamily)}
+                      routineRun={routine.snapshot}
+                      routineBusy={routine.busy}
+                      onRunTest={(ecuFamily, testId) => void routine.start(ecuFamily, testId)}
+                      onStopTest={() => void routine.stop()}
                     />
                   </div>
                 ) : null}

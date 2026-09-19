@@ -12,6 +12,7 @@ use super::live_read_service::{LiveReadService, LIVE_READ_TIMEOUT};
 use super::mileage_service::{MileageService, MILEAGE_READ_TIMEOUT};
 use super::module_read_service::{map_live_error, ModuleReadService, PreparedModuleRead};
 use super::passport_service::{PassportService, PASSPORT_READ_TIMEOUT};
+use super::routine_run_service::{RoutineDue, RoutineRunService, ROUTINE_STEP_TIMEOUT};
 use super::session_report_service::{SessionReportService, SESSION_MODE_BENCH, SESSION_MODE_REAL};
 use super::session_service::SessionService;
 use super::standard_obd_service::{StandardObdService, STANDARD_OBD_TIMEOUT};
@@ -19,8 +20,8 @@ use super::{refresh_bench, BenchBuild};
 use app_contracts::{
     AdapterErrorCode, AdapterInfo, AdapterState, BatteryReadState, CcfReadState,
     LiveReadEntryRequest, LiveReadRequest, LiveReadState, MileageKind, MileageSurveyState,
-    ModulePassportState, ModuleReadKind, ModuleReadRequest, ModuleReadState, StandardObdReadKind,
-    StandardObdRequest, VehicleContextInput,
+    ModulePassportState, ModuleReadKind, ModuleReadRequest, ModuleReadState, RoutineRunRequest,
+    RoutineRunState, StandardObdReadKind, StandardObdRequest, VehicleContextInput,
 };
 use app_contracts::{DtcClearRequest, DtcClearState};
 use diagnostic_session::KnowledgeLibrary;
@@ -32,7 +33,7 @@ use mongoose_jlr::bench::share_bus;
 use mongoose_jlr::VehicleRouteId;
 use sdd_ingest::{
     BatteryFormatting, CcfAdapter, ConverterCatalogue, DidFormattingAdapter, ModelYearTimeline,
-    ModuleAccessAdapter, ModuleTextAdapter, PlatformAdapter, VinDecodeAdapter,
+    ModuleAccessAdapter, ModuleTextAdapter, OdstInfoAdapter, PlatformAdapter, VinDecodeAdapter,
 };
 use std::collections::BTreeSet;
 use std::sync::{Arc, Mutex};
@@ -53,6 +54,8 @@ const CCF: &str = include_str!("../../../../fixtures/knowledge/synthetic/f9_ccf_
 /// desk, and so that walking it proves what it is meant to prove — that
 /// nothing is sent.
 const MDX: &str = include_str!("../../../../fixtures/knowledge/synthetic/f9_mdx_module.xml");
+/// The self tests SYNTHMOD declares, with the screen of 0x0202 (ADR-0036, step 2).
+const ODST: &str = include_str!("../../../../fixtures/knowledge/synthetic/f9_odst_info.xml");
 
 fn synthetic_source(id: &str, text: &str) -> SourceRecord {
     SourceRecord {
@@ -126,6 +129,10 @@ fn library() -> KnowledgeLibrary {
             .unwrap()
             .parse(MDX)
             .unwrap();
+    let odst_batch = OdstInfoAdapter::new(synthetic_source("bench-odst", ODST))
+        .unwrap()
+        .parse(ODST)
+        .unwrap();
     let manifests = [
         (
             "platform.json".to_string(),
@@ -139,6 +146,7 @@ fn library() -> KnowledgeLibrary {
                 vin_batch,
                 ccf_batch,
                 access_batch,
+                odst_batch,
             ])
             .unwrap(),
         ),
@@ -1295,6 +1303,110 @@ fn the_bench_connects_without_a_port_reads_the_surveyed_vehicle_and_marks_everyt
     );
     assert!(ds2_clear_json.contains("\"route_validation\": \"SYNTHETIC\""));
 
+    // Stage 2, step 2 (ADR-0036, amendment of 2026-09-19): the on-demand self
+    // test, run through the whole stack. The survey's entry for SYNTHMOD
+    // declares 0x0202 in its index and carries the test's screen from the
+    // ODST pack; the start opens the extended session and holds it, a
+    // keep-alive holds it between steps, the request for results ends the
+    // run and brings the module back, and the record has every exchange.
+    let routine_request = RoutineRunRequest {
+        ecu_family: "SYNTHMOD".into(),
+        test_id: "202".into(),
+        context: vehicle(),
+    };
+    let routine_prepared =
+        RoutineRunService::prepare(session.library(), synthmod, &routine_request)
+            .expect("the index and the ODST pack agree on the self test");
+    assert_eq!(routine_prepared.time_ms, 3_000);
+    assert_eq!(routine_prepared.timeout_ms, 5_000);
+    assert_eq!(
+        routine_prepared.start.transaction().encoded_payload(),
+        [0x31, 0x01, 0x02, 0x02]
+    );
+    let mut routine = RoutineRunService::new();
+    let started = adapter
+        .execute_uds_service(&routine_prepared.start, ROUTINE_STEP_TIMEOUT)
+        .expect("the bench is connected");
+    let running = routine.start(
+        &routine_request,
+        routine_prepared,
+        Some(&info),
+        true,
+        started,
+    );
+    assert_eq!(running.state, RoutineRunState::Running, "{running:?}");
+    assert_eq!(running.session.as_deref(), Some("0x03"));
+    assert_eq!(running.route_validation, "SYNTHETIC");
+    // Too soon for anything: no keep-alive is due right after the start.
+    assert_eq!(routine.next_due(), None);
+    // A keep-alive, as the run would send one: the session holds.
+    let kept = adapter
+        .execute_uds_keep_alive(routine.prepared_start().unwrap(), ROUTINE_STEP_TIMEOUT)
+        .expect("the bench is connected")
+        .map_err(map_live_error);
+    let held = routine.record_keep_alive(kept);
+    assert_eq!(held.state, RoutineRunState::Running, "{held:?}");
+    assert_eq!(
+        held.exchanges.last().map(|(request, _)| request.as_str()),
+        Some("3E 00"),
+        "the keep-alive is on the record"
+    );
+    // The result, as the module wrote it: the bench's fixed status record.
+    let results = adapter
+        .execute_uds_service(
+            routine.prepared_results().unwrap(),
+            routine.results_timeout(),
+        )
+        .expect("the bench is connected");
+    let done = routine.record_results(results);
+    assert_eq!(done.state, RoutineRunState::Completed, "{done:?}");
+    assert_eq!(done.result_hex.as_deref(), Some("00 A5 5A"));
+    let requests: Vec<&str> = done
+        .exchanges
+        .iter()
+        .map(|(request, _)| request.as_str())
+        .collect();
+    assert_eq!(
+        requests,
+        [
+            "10 03",
+            "31 01 02 02",
+            "3E 00",
+            "3E 00",
+            "31 03 02 02",
+            "10 01"
+        ],
+        "the session opened, the start, the keep-alives, the results, the way back"
+    );
+    let routine_json = routine
+        .take_report_json()
+        .expect("a run that ended is a record");
+    assert!(
+        routine_json.contains("\"schema\": \"prowlone.routine-run\""),
+        "{routine_json}"
+    );
+    assert!(routine_json.contains("\"safety_class\": \"SERVICE_ROUTINE\""));
+    assert!(routine_json.contains("\"route_validation\": \"SYNTHETIC\""));
+    assert!(
+        routine_json.contains("\"result_hex\": \"00 A5 5A\""),
+        "{routine_json}"
+    );
+    assert!(
+        routine.take_report_json().is_none(),
+        "a record is taken once"
+    );
+    // A module in the default session refuses the start, as a real one does.
+    let cold = RoutineRunRequest {
+        ecu_family: "SYNTHMOD".into(),
+        test_id: "14".into(),
+        context: vehicle(),
+    };
+    assert!(
+        RoutineRunService::prepare(session.library(), synthmod, &cold).is_err(),
+        "only the self test is run in this step"
+    );
+    let _ = RoutineDue::KeepAlive;
+
     // The session is a bench session: it says so in the bundle, it refuses a
     // real adapter once it holds records, and the intake refuses the bundle.
     let mut report = SessionReportService::new();
@@ -1330,6 +1442,9 @@ fn the_bench_connects_without_a_port_reads_the_surveyed_vehicle_and_marks_everyt
     // the second module's record joins as the first one did.
     report.add_dtc_clear(&ds2_clear_json).unwrap();
     assert_eq!(report.snapshot().dtc_clears, 2);
+    // The routine run's record joins the bundle like every other record.
+    report.add_routine_run(&routine_json).unwrap();
+    assert_eq!(report.snapshot().routine_runs, 1);
     assert!(report.is_bench());
     assert!(report.accepts(SESSION_MODE_BENCH));
     assert!(!report.accepts(SESSION_MODE_REAL));
@@ -1342,6 +1457,7 @@ fn the_bench_connects_without_a_port_reads_the_surveyed_vehicle_and_marks_everyt
         .unwrap();
     assert!(bundle.contains("\"session_mode\": \"bench\""));
     assert!(bundle.contains("\"dtc_clears\""), "{bundle}");
+    assert!(bundle.contains("\"routine_runs\""), "{bundle}");
     // The number that reproduces this session's codes travels with it.
     assert!(bundle.contains("\"bench_scenario\": 1"), "{bundle}");
     let refused = report_intake::intake(&bundle, "bench-session.json", session.library())
@@ -1366,14 +1482,13 @@ fn the_bench_connects_without_a_port_reads_the_surveyed_vehicle_and_marks_everyt
         .iter()
         .map(|service| format!("{service:#04X}"))
         .collect();
-    // Since ADR-0036 the clear is among them - and, for a module of the
-    // asking half, the session opened and left around it, which is why 0x10
-    // may appear and 0x3E still may not.
-    let expected: Vec<&str> = if seen.contains(&0x10) {
-        vec!["0x01", "0x03", "0x10", "0x14", "0x19", "0x22"]
-    } else {
-        vec!["0x01", "0x03", "0x14", "0x19", "0x22"]
-    };
+    // Since ADR-0036 step 1 the clear is among them, with the session opened
+    // and left around it; since step 2 the routine control and the
+    // keep-alive that holds the session while the self test runs. Nothing
+    // else: no security access, no write, no reset, no download.
+    let expected: Vec<&str> = vec![
+        "0x01", "0x03", "0x10", "0x14", "0x19", "0x22", "0x31", "0x3E",
+    ];
     assert_eq!(
         asked, expected,
         "every service the bench vehicle was asked for"
@@ -1383,11 +1498,9 @@ fn the_bench_connects_without_a_port_reads_the_surveyed_vehicle_and_marks_everyt
         (0x27, "SecurityAccess"),
         (0x2E, "WriteDataByIdentifier"),
         (0x2F, "InputOutputControlByIdentifier"),
-        (0x31, "RoutineControl"),
         (0x34, "RequestDownload"),
         (0x36, "TransferData"),
         (0x37, "RequestTransferExit"),
-        (0x3E, "TesterPresent"),
     ] {
         assert!(
             !seen.contains(&service),

@@ -36,6 +36,15 @@ pub const CLEAR_DIAGNOSTIC_INFORMATION_CAPABILITY: &str =
     "uds.service14.clear_diagnostic_information.service_routine";
 /// The operation name `SAFETY_BOUNDARIES.md` and the report use for a clear.
 pub const DTC_CLEAR_OPERATION: &str = "DTC_CLEAR";
+/// The routine control a prepared service carries (`ADR-0036`, step 2).
+pub const ROUTINE_CONTROL_CAPABILITY: &str = "uds.service31.routine_control.service_routine";
+/// The operation's name in the safety table and the report.
+pub const ROUTINE_RUN_OPERATION: &str = "ROUTINE_RUN";
+/// The on-demand self test: the one routine of stage 2's second step.
+pub const SELF_TEST_ROUTINE: u16 = 0x0202;
+/// Every routine identifier this product will send, in every step of
+/// stage 2 so far - the closed set the architecture guard reads.
+pub const STAGE_2_ROUTINES: &[u16] = &[SELF_TEST_ROUTINE];
 /// The group that means every code, re-exported so the shell needs no protocol crate.
 pub use uds::ALL_DTC_GROUPS;
 /// Diagnostic protocol name the SDD platform corpus declares for UDS buses.
@@ -159,6 +168,41 @@ impl ReadOnlyUdsIntent {
     }
 }
 
+/// A routine of stage 2 as a closed type: one value per routine the
+/// record allows, so that a routine identifier is never a number the
+/// interface chose (`ADR-0036`, step 2).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum StageTwoRoutine {
+    /// `0x0202`, the on-demand self test.
+    SelfTest,
+}
+
+impl StageTwoRoutine {
+    pub fn identifier(self) -> u16 {
+        match self {
+            Self::SelfTest => SELF_TEST_ROUTINE,
+        }
+    }
+}
+
+/// What a routine control asks: the three sub-functions of `0x31`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum RoutineStep {
+    Start,
+    Stop,
+    RequestResults,
+}
+
+impl RoutineStep {
+    pub fn sub_function(self) -> u8 {
+        match self {
+            Self::Start => uds::ROUTINE_CONTROL_START,
+            Self::Stop => uds::ROUTINE_CONTROL_STOP,
+            Self::RequestResults => uds::ROUTINE_CONTROL_REQUEST_RESULTS,
+        }
+    }
+}
+
 /// The service operations of stage 2 (`ADR-0036`), one per step. Each names
 /// its target and what it asks; the class and the session come with it.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -169,6 +213,13 @@ pub enum ServiceUdsIntent {
         target: DiagnosticTargetIdentity,
         group: u32,
     },
+    /// `0x31`: one step of a routine the module declares - start it, ask
+    /// its results, or stop it (`ADR-0036`, step 2).
+    RoutineControl {
+        target: DiagnosticTargetIdentity,
+        routine: StageTwoRoutine,
+        step: RoutineStep,
+    },
 }
 
 impl ServiceUdsIntent {
@@ -176,9 +227,22 @@ impl ServiceUdsIntent {
         Self::ClearDiagnosticInformation { target, group }
     }
 
+    pub fn routine_control(
+        target: DiagnosticTargetIdentity,
+        routine: StageTwoRoutine,
+        step: RoutineStep,
+    ) -> Self {
+        Self::RoutineControl {
+            target,
+            routine,
+            step,
+        }
+    }
+
     fn target(&self) -> &DiagnosticTargetIdentity {
         match self {
             Self::ClearDiagnosticInformation { target, .. } => target,
+            Self::RoutineControl { target, .. } => target,
         }
     }
 
@@ -186,12 +250,15 @@ impl ServiceUdsIntent {
     pub fn operation(&self) -> &'static str {
         match self {
             Self::ClearDiagnosticInformation { .. } => DTC_CLEAR_OPERATION,
+            Self::RoutineControl { .. } => ROUTINE_RUN_OPERATION,
         }
     }
 
     pub fn safety_class(&self) -> TransactionSafetyClass {
         match self {
-            Self::ClearDiagnosticInformation { .. } => TransactionSafetyClass::ServiceRoutine,
+            Self::ClearDiagnosticInformation { .. } | Self::RoutineControl { .. } => {
+                TransactionSafetyClass::ServiceRoutine
+            }
         }
     }
 
@@ -201,6 +268,15 @@ impl ServiceUdsIntent {
             // ISO 14229 allows a clear in the default session; a module that
             // refuses it there is asked again in the extended one.
             Self::ClearDiagnosticInformation { .. } => SessionUse::DefaultThenExtended,
+            // The data requires the extended session for every routine it
+            // declares: opened at the start and held while the routine runs;
+            // the request for results and the stop each end the run, so each
+            // brings the module back to the default session.
+            Self::RoutineControl {
+                step: RoutineStep::Start,
+                ..
+            } => SessionUse::OpenAndHold,
+            Self::RoutineControl { .. } => SessionUse::KeepAliveThenLeave,
         }
     }
 }
@@ -214,6 +290,13 @@ pub enum SessionUse {
     DefaultThenExtended,
     /// Open the extended session first: the data requires it.
     Extended,
+    /// Open the extended session first and leave it open: the operation
+    /// starts a routine the module keeps running, and the executor's
+    /// keep-alive holds the session until the run ends (`ADR-0036`, step 2).
+    OpenAndHold,
+    /// A keep-alive first, then the operation, then the default session
+    /// back: the last step of a routine run, whatever it answers.
+    KeepAliveThenLeave,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -531,6 +614,10 @@ pub fn prepare_service_transaction(
         ServiceUdsIntent::ClearDiagnosticInformation { group, .. } => (
             UdsRequest::clear_diagnostic_information(*group),
             CLEAR_DIAGNOSTIC_INFORMATION_CAPABILITY.to_string(),
+        ),
+        ServiceUdsIntent::RoutineControl { routine, step, .. } => (
+            UdsRequest::routine_control(step.sub_function(), routine.identifier()),
+            ROUTINE_CONTROL_CAPABILITY.to_string(),
         ),
     };
     Ok(PreparedUdsService {
@@ -933,6 +1020,13 @@ pub enum UdsServiceOutcome {
     Cleared {
         group: u32,
     },
+    /// The module answered a routine control: the step and the routine
+    /// echoed, and the status record as the module wrote it.
+    RoutineControlled {
+        sub_function: u8,
+        routine: u16,
+        status: Vec<u8>,
+    },
     Negative(NegativeResponse),
 }
 
@@ -953,6 +1047,15 @@ pub fn decode_service_response(
         TypedDiagnosticResult::ClearDiagnosticInformation { group } => {
             UdsServiceOutcome::Cleared { group }
         }
+        TypedDiagnosticResult::RoutineControl {
+            sub_function,
+            routine,
+            status,
+        } => UdsServiceOutcome::RoutineControlled {
+            sub_function,
+            routine,
+            status,
+        },
         TypedDiagnosticResult::Negative(negative) => UdsServiceOutcome::Negative(negative),
         _ => return Err(ExecutionError::Uds(UdsError::CorrelationMismatch)),
     };

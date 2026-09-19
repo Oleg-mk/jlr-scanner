@@ -516,13 +516,21 @@ for (const file of await rustFiles(sddIngestRoot)) {
 const udsSource = await readFile(new URL("crates/uds/src/lib.rs", root), "utf8");
 for (const forbidden of [
   /pub\s+fn\s+security/i,
-  /pub\s+fn\s+routine/i,
   /pub\s+fn\s+write/i,
   /pub\s+fn\s+request_download/i,
   /pub\s+fn\s+transfer/i,
   /pub\s+fn\s+ecu_reset/i,
 ]) {
   if (forbidden.test(udsSource)) failures.push("UDS exposes an out-of-scope active/programming service");
+}
+// ADR-0036 step 2: the one routine constructor - the sub-function and the
+// routine, no option record - and no other routine constructor.
+const udsRoutineConstructors = (udsSource.match(/^\s*pub\s+fn\s+routine\w*\s*\(/gm) ?? []).length;
+if (
+  udsRoutineConstructors !== 1 ||
+  !/^\s*pub\s+fn\s+routine_control\(sub_function: u8, routine: u16\) -> Self/m.test(udsSource)
+) {
+  failures.push("UDS must have exactly the one routine constructor ADR-0036 step 2 names: routine_control(sub_function, routine)");
 }
 
 // ADR-0029 decision 7, amended by ADR-0036 step 1: the K-line protocol
@@ -605,7 +613,6 @@ for (const forbidden of [
   /pub\s+fn\s+execute_live\b/,
   /\bWriteDataByIdentifier\b/,
   /\bSecurityAccess\b/,
-  /\bRoutineControl\b/,
   /\bEcuReset\b/,
   /\bRequestDownload\b/,
   /\bTransferData\b/,
@@ -633,8 +640,33 @@ const udsServiceBlock =
     ? udsExecutionSource.slice(udsServiceEnumStart, udsServiceEnumEnd)
     : "";
 const udsServices = (udsServiceBlock.match(/^\s{4}[A-Z]\w+\s*\{/gm) ?? []).length;
-if (udsServices !== 1) {
-  failures.push(`uds-execution declares ${udsServices} service intents, ADR-0036 step 1 names 1`);
+if (udsServices !== 2) {
+  failures.push(`uds-execution declares ${udsServices} service intents, ADR-0036 step 2 names 2`);
+}
+// ADR-0036 step 2: the routines this product sends are a closed set, and
+// the set is the self test alone; the intent takes the closed type, never
+// a number.
+if (
+  !/pub const SELF_TEST_ROUTINE: u16 = 0x0202;/.test(udsExecutionSource) ||
+  !/pub const STAGE_2_ROUTINES: &\[u16\] = &\[SELF_TEST_ROUTINE\];/.test(udsExecutionSource)
+) {
+  failures.push("uds-execution's routines are not the closed set ADR-0036 step 2 names: 0x0202 alone");
+}
+const routineEnumStart = udsExecutionSource.indexOf("pub enum StageTwoRoutine {");
+const routineEnumEnd =
+  routineEnumStart >= 0
+    ? udsExecutionSource.indexOf(String.fromCharCode(10) + "}", routineEnumStart)
+    : -1;
+const routineBlock =
+  routineEnumStart >= 0 && routineEnumEnd > routineEnumStart
+    ? udsExecutionSource.slice(routineEnumStart, routineEnumEnd)
+    : "";
+const stageTwoRoutines = (routineBlock.match(/^\s{4}[A-Z]\w+,/gm) ?? []).length;
+if (stageTwoRoutines !== 1) {
+  failures.push(`uds-execution declares ${stageTwoRoutines} routines of stage 2, ADR-0036 step 2 names 1`);
+}
+if (!/routine: StageTwoRoutine,/.test(udsServiceBlock)) {
+  failures.push("uds-execution's routine intent must take the closed routine type, not a number");
 }
 
 const diagnosticsCoreSource = await readFile(

@@ -40,6 +40,9 @@ pub struct SessionReportService {
     /// Clears of fault codes (`ADR-0036`): the first records of an operation
     /// that changed what a module holds, each with what it erased.
     dtc_clears: Vec<Value>,
+    /// Runs of a routine a module declares (`ADR-0036`, step 2), each with
+    /// every exchange and the result as the module wrote it.
+    routine_runs: Vec<Value>,
     /// The service mode (`ADR-0036`): on for this session after the person's
     /// consent, off on every start and every new session, never remembered.
     service_mode: bool,
@@ -63,6 +66,7 @@ impl SessionReportService {
             ccf_reads: Vec::new(),
             battery_reads: Vec::new(),
             dtc_clears: Vec::new(),
+            routine_runs: Vec::new(),
             service_mode: false,
             mode: None,
             bench_scenario: None,
@@ -113,7 +117,8 @@ impl SessionReportService {
             + self.module_passports.len()
             + self.ccf_reads.len()
             + self.battery_reads.len()
-            + self.dtc_clears.len();
+            + self.dtc_clears.len()
+            + self.routine_runs.len();
         SessionReportSnapshot {
             captures: self.captures.len() as u32,
             module_reads: self.module_reads.len() as u32,
@@ -125,6 +130,7 @@ impl SessionReportService {
             ccf_reads: self.ccf_reads.len() as u32,
             battery_reads: self.battery_reads.len() as u32,
             dtc_clears: self.dtc_clears.len() as u32,
+            routine_runs: self.routine_runs.len() as u32,
             service_mode: self.service_mode,
             report_available: total > 0,
             mode: self.mode.clone(),
@@ -181,6 +187,12 @@ impl SessionReportService {
         Ok(())
     }
 
+    /// One run of a routine, with every exchange and its result (`ADR-0036`, step 2).
+    pub fn add_routine_run(&mut self, json: &str) -> Result<(), String> {
+        self.routine_runs.push(parse(json)?);
+        Ok(())
+    }
+
     pub fn add_calibration_read(&mut self, json: &str) -> Result<(), String> {
         self.calibration_reads.push(parse(json)?);
         Ok(())
@@ -222,6 +234,7 @@ impl SessionReportService {
             "ccf_reads": self.ccf_reads,
             "battery_reads": self.battery_reads,
             "dtc_clears": self.dtc_clears,
+            "routine_runs": self.routine_runs,
         });
         serde_json::to_string_pretty(&bundle).map_err(|error| error.to_string())
     }

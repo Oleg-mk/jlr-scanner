@@ -55,6 +55,19 @@ export interface SessionBundle {
   battery_reads?: BatteryRun[];
   /** The clears of fault codes (ADR-0036): each with what it erased. */
   dtc_clears?: DtcClearRecord[];
+  /** The routine runs (ADR-0036, step 2): the self tests, with their results as bytes. */
+  routine_runs?: RoutineRunRecord[];
+}
+
+interface RoutineRunRecord {
+  ecu_family?: string;
+  test_name?: string;
+  state?: string;
+  result_hex?: string | null;
+  refusal?: string | null;
+  route_validation?: string;
+  elapsed_ms?: number;
+  timestamp_unix_ms?: number;
 }
 
 interface DtcClearRecord {
@@ -413,6 +426,42 @@ export function buildReport(
       ]),
       note: t(
         "Each operation was confirmed by the person and is a service routine; the codes it erased are kept in the session bundle.",
+      ),
+    });
+  }
+
+  // The routine runs (ADR-0036, step 2): the self tests run, each confirmed
+  // by the person, with the result as the module wrote it.
+  const runs = bundle.routine_runs ?? [];
+  if (runs.length > 0) {
+    const ended = (run: RoutineRunRecord): string => {
+      switch (run.state) {
+        case "COMPLETED":
+          return `${t("completed")} · ${run.result_hex ?? "—"}`;
+        case "REFUSED":
+          return `${t("refused")}${run.refusal ? `: ${run.refusal}` : ""}`;
+        case "STOPPED":
+          return t("stopped");
+        case "TIMED_OUT":
+          return t("timed out");
+        default:
+          return t("not made");
+      }
+    };
+    sections.push({
+      id: "routine-runs",
+      title: t("Self tests run"),
+      worth: worthOf(runs[0].route_validation),
+      columns: [t("Time"), t("Module"), t("Test"), t("Answer"), t("Seconds")],
+      rows: runs.map((run) => [
+        stamp(run.timestamp_unix_ms),
+        text(run.ecu_family),
+        text(run.test_name),
+        ended(run),
+        String(Math.round((run.elapsed_ms ?? 0) / 1000)),
+      ]),
+      note: t(
+        "Each run was confirmed by the person and is a service routine; the result is the bytes the module answered with, and this library does not describe them.",
       ),
     });
   }

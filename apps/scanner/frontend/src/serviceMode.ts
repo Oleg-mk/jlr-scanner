@@ -112,6 +112,7 @@ class BrowserServiceClient implements ServiceClient {
       ccfReads: 0,
       batteryReads: 0,
       dtcClears: this.last.state === "IDLE" ? 0 : 1,
+      routineRuns: 0,
       serviceMode: on,
       reportAvailable: this.last.state !== "IDLE",
       mode: null,

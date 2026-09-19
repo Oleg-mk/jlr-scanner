@@ -164,6 +164,18 @@ impl Link {
         }
     }
 
+    /// One keep-alive on a routine's route (`ADR-0036`, step 2), on either link.
+    fn execute_prepared_uds_keep_alive(
+        &mut self,
+        service: &PreparedUdsService,
+        timeout: Duration,
+    ) -> Result<MongooseUdsServiceResult, MongooseDiagnosticError> {
+        match self {
+            Self::Serial(device) => device.execute_prepared_uds_keep_alive(service, timeout),
+            Self::Bench(device) => device.execute_prepared_uds_keep_alive(service, timeout),
+        }
+    }
+
     /// One service operation on a serial line (`ADR-0036`), on either link.
     fn execute_prepared_kline_service(
         &mut self,
@@ -699,6 +711,20 @@ impl AdapterService<SystemAdapterBackend> {
             connection
                 .device
                 .execute_prepared_uds_service(service, timeout)
+        })
+    }
+
+    /// One keep-alive on a routine's route, live (`ADR-0036`, step 2): the
+    /// extended session a start left open is held by these between steps.
+    pub fn execute_uds_keep_alive(
+        &mut self,
+        service: &PreparedUdsService,
+        timeout: Duration,
+    ) -> Option<Result<MongooseUdsServiceResult, MongooseDiagnosticError>> {
+        self.connection.as_mut().map(|connection| {
+            connection
+                .device
+                .execute_prepared_uds_keep_alive(service, timeout)
         })
     }
 

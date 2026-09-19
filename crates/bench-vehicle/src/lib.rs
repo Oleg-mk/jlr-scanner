@@ -390,6 +390,23 @@ impl BenchVehicle {
                 Some(_) => vec![0x7F, 0x14, 0x31],
                 None => vec![0x7F, 0x14, 0x13],
             },
+            // A routine (ADR-0036, step 2): the self test, 0x0202, in the
+            // extended session only. Started, it runs; asked, it answers a
+            // fixed status record; stopped, it stops. Any other routine is
+            // out of range, as a real module says.
+            0x31 => match (request.get(1), request.get(2..4)) {
+                (Some(&sub), Some([0x02, 0x02])) if (0x01..=0x03).contains(&sub) => {
+                    if module.session != EXTENDED_SESSION {
+                        vec![0x7F, 0x31, 0x7F]
+                    } else if sub == 0x03 {
+                        vec![0x71, 0x03, 0x02, 0x02, 0x00, 0xA5, 0x5A]
+                    } else {
+                        vec![0x71, sub, 0x02, 0x02]
+                    }
+                }
+                (Some(_), Some(_)) => vec![0x7F, 0x31, 0x31],
+                _ => vec![0x7F, 0x31, 0x13],
+            },
             0x3E => match request.get(1) {
                 Some(sub) if sub & 0x80 != 0 => return None,
                 _ => vec![0x7E, 0x00],

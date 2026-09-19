@@ -7,6 +7,8 @@ import { HelpLanguageSwitch } from "./HelpLanguageSwitch";
 import type { ModuleSurveyEntry } from "../library";
 import { isFaultCodesRead, type ModuleReadKind, type ModuleReadSnapshot } from "../moduleRead";
 import type { DtcClearSnapshot } from "../serviceMode";
+import { SELF_TEST_IDS, SELF_TEST_ROUTINE, type RoutineRunSnapshot } from "../routineRun";
+import { RoutineOutcome } from "./RoutineOutcome";
 import { moduleReasons, moduleRoute, nodeStatus, routeText } from "../networkMap";
 import { parameterName } from "../parameterNames";
 import { withUnit } from "../units";
@@ -39,6 +41,25 @@ interface ModuleDetailsProps {
    * clear on a sagging rail can leave a module halfway.
    */
   batteryNotice?: string | null;
+  /**
+   * The on-demand self test (ADR-0036, step 2): offered under a test the
+   * module's index and the ODST pack agree on, inside the service mode,
+   * after one question; the run is the shell's and this shows it.
+   */
+  routineRun?: RoutineRunSnapshot;
+  routineBusy?: boolean;
+  onRunTest?: (ecuFamily: string, testId: string) => void;
+  onStopTest?: () => void;
+}
+
+/** Whether the module's index declares the self test's routine, with no security level. */
+function declaresSelfTest(module: ModuleSurveyEntry): boolean {
+  return (module.acceptedOperations ?? []).some(
+    (operation) =>
+      operation.kind === "ROUTINE" &&
+      Number.parseInt(operation.identifier, 16) === SELF_TEST_ROUTINE &&
+      operation.security === null,
+  );
 }
 
 /**
@@ -132,10 +153,16 @@ export function ModuleDetails({
   clearing = false,
   onClearCodes,
   batteryNotice = null,
+  routineRun,
+  routineBusy = false,
+  onRunTest,
+  onStopTest,
 }: ModuleDetailsProps) {
   const language = useLanguage();
   // The one question before a clear (ADR-0036, decision 3).
   const [confirmClear, setConfirmClear] = useState(false);
+  // And the one before a self test: the test it is for, or none.
+  const [confirmTest, setConfirmTest] = useState<string | null>(null);
   const [helpLanguage] = useHelpLanguage(language);
   if (module === null) {
     return (
@@ -544,6 +571,73 @@ export function ModuleDetails({
                         </p>
                       ),
                     )}
+                    {serviceMode &&
+                    onRunTest !== undefined &&
+                    declaresSelfTest(module) &&
+                    SELF_TEST_IDS.includes(test.testId) &&
+                    test.timeMs !== null &&
+                    test.timeoutMs !== null ? (
+                      <div className="mode-operation">
+                        <button
+                          className="button button--service"
+                          type="button"
+                          disabled={routineBusy || busy || !adapterReady || routineRun?.state === "RUNNING"}
+                          onClick={() => setConfirmTest(test.testId)}
+                        >
+                          {t("Run the test")}
+                        </button>
+                        <span className="button-hint">
+                          {t("SERVICE_ROUTINE · runs {seconds} s; the result is shown as the module answers it.", {
+                            seconds: Math.round(test.timeMs / 1000),
+                          })}
+                        </span>
+                      </div>
+                    ) : null}
+                    {routineRun !== undefined &&
+                    routineRun.state !== "IDLE" &&
+                    routineRun.ecuFamily === module.ecuFamily &&
+                    routineRun.testId === test.testId ? (
+                      <RoutineOutcome run={routineRun} onStop={onStopTest} />
+                    ) : null}
+                    {confirmTest === test.testId ? (
+                      <ConfirmDialog
+                        title={t("Run the self test on {module}", { module: module.ecuFamily })}
+                        confirmLabel={t("Run the test {name} on {module}", {
+                          name: test.name,
+                          module: module.ecuFamily,
+                        })}
+                        cancelLabel={t("Cancel")}
+                        onConfirm={() => {
+                          setConfirmTest(null);
+                          onRunTest?.(module.ecuFamily, test.testId);
+                        }}
+                        onCancel={() => setConfirmTest(null)}
+                      >
+                        <p>
+                          <strong>{module.ecuFamily}</strong>
+                          {dataText(module.names, module.name, language) !== null
+                            ? ` — ${dataText(module.names, module.name, language)}`
+                            : ""}
+                          {` · ${test.name}`}
+                        </p>
+                        <p>{t("Operation: run the routine {routine} · class SERVICE_ROUTINE", { routine: "0x0202" })}</p>
+                        {helpLines(test.descriptionTexts, test.description, helpLanguage).map(
+                          (line, index) => (
+                            <p key={`${test.testId}-q-${index}`}>{line}</p>
+                          ),
+                        )}
+                        <p>
+                          {t("It runs {time} s; the tool waits {timeout} s at most.", {
+                            time: Math.round((test.timeMs ?? 0) / 1000),
+                            timeout: Math.round((test.timeoutMs ?? 0) / 1000),
+                          })}
+                        </p>
+                        {batteryNotice !== null ? (
+                          <p className="battery-precondition">{batteryNotice}</p>
+                        ) : null}
+                        <p>{t("The result is shown as the module answers it; this library does not describe it.")}</p>
+                      </ConfirmDialog>
+                    ) : null}
                   </li>
                 ))}
               </ul>

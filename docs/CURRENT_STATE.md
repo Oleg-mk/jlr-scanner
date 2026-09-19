@@ -4,7 +4,7 @@ This file records what is done. `ROADMAP.md` records what is next and why in tha
 order, including the owner-only gates. Keep both current; neither may live only
 in a chat session.
 
-Status: **2026-09-19 — the interface met the owner's own car through his library, and two things gave way. SDD names the holders of the car configuration by their diagnostic system (`RSJB_SYSTEM_A`), so the X250's configuration read planned nothing until `ADR-0037` taught the library that a system belongs to its module; and the X250's battery monitor declares no voltage, so the low-battery precondition of `ADR-0030` — amended twice today: SDD's own band, under 11.6 V, as a precondition of the session, and the voltage from whichever of three reads is freshest — could never have appeared on his car. Both are built and fixture-tested; the bench's rail follows the scenario on every read it answers, and the owner saw the line, the voltage on the cell and the headings that hold the top of the screen in the running window («все так як і планувалося»). Yesterday's two debts are closed: the operations' names are SDD's English and a caption says so, and the stopwatch is gone. The afternoon rebuilt the live read at the screen: the chooser says what each choice holds and a module's key counts what its press will add — the cap of sixteen, not the bench and not the rule, was what hid the engine speed on his car; the two dials read themselves once the survey names them and the adapter is there (`ADR-0022`, amended); the panel lost its dark screen and its grid and gained needles that rest at zero, the odometer and the gearbox in the dials' windows; and every control on the plate has one of three forms — a key, a latch, a lens (`ADR-0038`), the owner's own sketch, judged by him at the screen: «все ідеально». And at the end of the day he walked the service mode and the clear — the flow he had judged illogical the evening before — and accepted it: «ми виправили всі мої зауваження, все тепер логічно». Then, on his word, the collective clear was built and tested, the K-line clear joined the whole-stack bench test, and stage 2, step 1 is complete on the bench end to end: **1.2.0**, declared by him the same evening — the first build of stage 2, its installers his alone (`ADR-0036`, decision 8). No operation has met a car.**
+Status: **2026-09-19 — the interface met the owner's own car through his library, and two things gave way. SDD names the holders of the car configuration by their diagnostic system (`RSJB_SYSTEM_A`), so the X250's configuration read planned nothing until `ADR-0037` taught the library that a system belongs to its module; and the X250's battery monitor declares no voltage, so the low-battery precondition of `ADR-0030` — amended twice today: SDD's own band, under 11.6 V, as a precondition of the session, and the voltage from whichever of three reads is freshest — could never have appeared on his car. Both are built and fixture-tested; the bench's rail follows the scenario on every read it answers, and the owner saw the line, the voltage on the cell and the headings that hold the top of the screen in the running window («все так як і планувалося»). Yesterday's two debts are closed: the operations' names are SDD's English and a caption says so, and the stopwatch is gone. The afternoon rebuilt the live read at the screen: the chooser says what each choice holds and a module's key counts what its press will add — the cap of sixteen, not the bench and not the rule, was what hid the engine speed on his car; the two dials read themselves once the survey names them and the adapter is there (`ADR-0022`, amended); the panel lost its dark screen and its grid and gained needles that rest at zero, the odometer and the gearbox in the dials' windows; and every control on the plate has one of three forms — a key, a latch, a lens (`ADR-0038`), the owner's own sketch, judged by him at the screen: «все ідеально». And at the end of the day he walked the service mode and the clear — the flow he had judged illogical the evening before — and accepted it: «ми виправили всі мої зауваження, все тепер логічно». Then, on his word, the collective clear was built and tested, the K-line clear joined the whole-stack bench test, and stage 2, step 1 is complete on the bench end to end: **1.2.0**, declared by him the same evening — the first build of stage 2, its installers his alone (`ADR-0036`, decision 8). Step 2 began the same evening, on the amendment written before its code: the on-demand self test, routine `0x0202`, runs on the bench end to end — the extended session opened and held, the result shown as the bytes it is — and is offered in the interface under a test the module's index and the ODST pack agree on; the guard was loosened for exactly that, one constructor, one intent, one routine in a closed type. 1.2.1 waits on his word. No operation has met a car.**
 
 Earlier — **2026-09-18, the rework — the owner walked the running window item by item and the interface was rebuilt behind him, but the day's real find was underneath: the bench had been reporting fault codes all along and the interface had nowhere to show them, and the library was being read once per module instead of once per question.** The two numbers that matter, measured on the owner's own library of 517,595 records and his own machine, in a release build: surveying 37 modules fell from 55 s to 6 s, and building the virtual vehicle from 65 s to 8 s, with a repeat of the same vehicle now free. Nothing about what the application answers changed; a test asserts that the narrowed query returns exactly what a walk of the whole store would keep. Two debts are carried to tomorrow: the help-language switch inside the self-test block does not carry all of its text, and the stopwatch used for these measurements is still in `bench_e2e.rs`, ignored by default.
 
@@ -153,6 +153,39 @@ word changing in place.
 
 All of it is the interface and the bench: `IMPLEMENTED`, `FIXTURE_TESTED`
 where the bench is in the test, and nothing of it has met a car.
+
+### The night: step 2 begins with the self test
+
+The owner's question at the end of the day — «ми ж робимо не тільки для
+X250?» — was answered from the library before anything was built: 491
+modules across 22 programmes declare routine `0x0202`, 391 carry its
+screens; 42 of SDD's 45 platform documents have a gateway, and the gateways
+are three problems, not one — `ROUTINE_CONTROL` in 32 documents, whose
+routine number is in no data file and needs a capture for evidence;
+`NETWORK_ADDRESSED` in 8 (L319, L320, L322), a read-only route through
+enhanced addressing; `NGI_NETWORK_ADDRESSED` in 7 (2016+), to be read
+before any claim. The order he approved: the self tests first, the
+`NETWORK_ADDRESSED` route as its own ADR beside them, the rest when they
+have evidence.
+
+The amendment to `ADR-0036` came first, as decision 10 asks, then the
+code. What runs: `0x0202` and no other routine, on a module whose index
+declares it without a security level and whose screen the ODST pack gives
+this car, with its time and timeout; the extended session opened with the
+start and held with a keep-alive on every step, the request for results
+once the data's time has run, the way back with whichever step ends the
+run; the result as the bytes the module wrote, said to be undescribed by
+this library. The guard's rules that forbade `RoutineControl` became rules
+that require one constructor, one intent, one routine in a closed type
+and a count of two intents. The bench's `SYNTHMOD` gained the test's
+screen in the synthetic ODST (three goldens moved), answers the routine
+in the extended session and refuses it in the default one, and the
+whole-stack test runs the test end to end and finds its record; the
+run-time guard's list of services seen on the bus gained `0x31` and
+`0x3E` and nothing else. In the interface: one key under a runnable test,
+one question with SDD's own instructions, the run stepped every second,
+the outcome in every state, and "Self tests run" in the readable report.
+`IMPLEMENTED`, `FIXTURE_TESTED`; nothing has met a car; 1.2.1 on his word.
 
 ### What this day did not touch
 
