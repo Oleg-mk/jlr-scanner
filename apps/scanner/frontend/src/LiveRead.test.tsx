@@ -530,7 +530,7 @@ describe("live reading", () => {
     expect(screen.getByText("750 rpm")).toBeInTheDocument();
     expect(screen.getByText("742 … 768")).toBeInTheDocument();
     // The cadence the run actually achieves, not one it promises.
-    expect(screen.getByText(/a round every 350 ms/)).toBeInTheDocument();
+    expect(screen.getByText(/a round every\s+0\.35 s/)).toBeInTheDocument();
     expect(screen.getByText(/the module declined: RequestOutOfRange/)).toBeInTheDocument();
     // A run in progress does not let the set be changed under it.
     expect(screen.getByRole("checkbox")).toBeDisabled();

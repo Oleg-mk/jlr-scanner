@@ -2889,6 +2889,9 @@ table.live-read-identifiers label {
 }
 
 .live-read-cadence {
+  /* Every figure in a slot of its own width, tabular, so the line stands
+     still while the run counts (the owner, 2026-09-19). */
+  font-variant-numeric: tabular-nums;
   margin: 0.5rem 0;
 }
 

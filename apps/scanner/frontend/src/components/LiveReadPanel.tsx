@@ -56,13 +56,24 @@ function badge(snapshot: LiveReadSnapshot, running: boolean, bench: boolean) {
   }
 }
 
-function seconds(ms: number): string {
-  return (ms / 1000).toFixed(ms < 10_000 ? 1 : 0);
+/**
+ * A figure in a slot of fixed width, padded with figure spaces - each the
+ * width of a digit in tabular numerals - so a count that grows a digit
+ * moves nothing beside it (the owner, 2026-09-19: the line of rounds and
+ * readings twitched on every round).
+ */
+function slot(text: string, width: number): string {
+  return text.padStart(width, " ");
 }
 
-/** A round the way a tester reads it: milliseconds while it is quick, then seconds. */
+/** Elapsed seconds, always to a tenth, in a slot for a ten-minute run. */
+function seconds(ms: number): string {
+  return slot((ms / 1000).toFixed(1), 5);
+}
+
+/** A round, in seconds to the hundredth, in a slot wide enough for a slow bus. */
 function cadence(ms: number): string {
-  return ms < 1000 ? `${Math.round(ms)} ms` : `${(ms / 1000).toFixed(1)} s`;
+  return slot(`${(ms / 1000).toFixed(2)} s`, 7);
 }
 
 /** The value as the catalogue decodes it: a number and its unit, a named state, or the raw count. */
@@ -443,8 +454,8 @@ export function LiveReadPanel({
       {snapshot.state !== "IDLE" ? (
         <p className="live-read-cadence" role="status">
           {t("{rounds} round(s), {samples} reading(s), {elapsed} s", {
-            rounds: snapshot.rounds,
-            samples: snapshot.samples,
+            rounds: slot(String(snapshot.rounds), 4),
+            samples: slot(String(snapshot.samples), 5),
             elapsed: seconds(snapshot.elapsedMs),
           })}
           {snapshot.roundMs !== null ? (
