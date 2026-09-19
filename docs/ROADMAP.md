@@ -39,6 +39,10 @@ the third counts the builds within it. 1.1.x is stage 1 built and in the
 testers' hands; stage 2, once it is authorised, will be 1.2.x, and stage 3
 1.3.x. 1.0.x were the builds before stage 1 had its face; 1.1.0 is the
 first build after the visual layer of F15 closed the last open row.
+1.2.0 (2026-09-19) is the first build of stage 2: step 1 of `ADR-0036` — the
+service mode, the clear of the codes, the collective clear — complete on the
+bench end to end. Its installers go to the owner alone (decision 8); the
+testers stay on `release-1.1`.
 
 ## Scope, decided 2026-09-01
 
