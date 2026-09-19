@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { Fragment, useState } from "react";
+import { useReadOpen } from "../useReadOpen";
 import type { CcfReading, CcfReadSnapshot } from "../ccf";
 import { currentLanguage, parameterNote, t, useLanguage, type Language } from "../i18n";
 import { StatusBadge } from "./StatusBadge";
@@ -55,6 +56,9 @@ export function CcfPanel({ snapshot, running, adapterReady, surveyed, bench = fa
   useLanguage();
   const language = currentLanguage();
   const [showHidden, setShowHidden] = useState(false);
+  // Shown when the read arrives, away on one button, like the passports and
+  // the mileage (the owner, 2026-09-19).
+  const [open, setOpen] = useReadOpen(snapshot.readings.length);
   const rows = snapshot.readings.filter((row) => showHidden || row.display);
   const differing = new Map<string, typeof snapshot.differences>();
   for (const difference of snapshot.differences) {
@@ -75,11 +79,21 @@ export function CcfPanel({ snapshot, running, adapterReady, surveyed, bench = fa
 
   return (
     <section className="ccf-panel" aria-labelledby="ccf-title">
-      <div className="section-heading section-heading--action">
+      <div className="section-heading section-heading--action section-heading--pinned">
         <div>
           <p className="eyebrow">{t("Configuration (CCF)")}</p>
           <h2 id="ccf-title">{t("What the car is fitted with and how it is set")}</h2>
         </div>
+        {snapshot.readings.length > 0 ? (
+          <button
+            className="button button--quiet"
+            type="button"
+            aria-expanded={open}
+            onClick={() => setOpen((shown) => !shown)}
+          >
+            {open ? t("Put the configuration away") : t("Show the configuration")}
+          </button>
+        ) : null}
         {badge(snapshot, running, bench)}
       </div>
       <p className="operation-copy">
@@ -106,11 +120,16 @@ export function CcfPanel({ snapshot, running, adapterReady, surveyed, bench = fa
         <div className="error-banner" role="alert">
           <h3>{t(snapshot.error.message)}</h3>
           {snapshot.error.technicalDetails !== null ? (
-            <code>{snapshot.error.technicalDetails}</code>
+            <details className="technical-details">
+              <summary>{t("Technical details")}</summary>
+              <code>{snapshot.error.technicalDetails}</code>
+            </details>
           ) : null}
         </div>
       ) : null}
 
+      {open ? (
+        <>
       {snapshot.masterModule !== null && snapshot.readings.length > 0 ? (
         <p className="ccf-master">
           {t("Master copy read from {module}", { module: snapshot.masterModule })}
@@ -134,10 +153,14 @@ export function CcfPanel({ snapshot, running, adapterReady, surveyed, bench = fa
         </label>
       ) : null}
 
-      {groups.map((group) => (
-        <div key={group.key} className="ccf-group">
-          <h3 className="ccf-subtitle">{group.title}</h3>
-          <table className="module-table">
+      {/*
+        One table for the whole configuration, its groups as rows inside it.
+        A table per group, each with its own heading row, made a few hundred
+        one-row tables of a car's configuration and no order to read it by
+        (the owner, 2026-09-19).
+      */}
+      {groups.length > 0 ? (
+          <table className="module-table ccf-table">
             <thead>
               <tr>
                 <th scope="col">{t("Setting")}</th>
@@ -146,6 +169,13 @@ export function CcfPanel({ snapshot, running, adapterReady, surveyed, bench = fa
               </tr>
             </thead>
             <tbody>
+      {groups.map((group) => (
+        <Fragment key={group.key}>
+              <tr className="ccf-group-row">
+                <th scope="rowgroup" colSpan={3}>
+                  <h3 className="ccf-subtitle">{group.title}</h3>
+                </th>
+              </tr>
               {group.rows.map((row) => {
                 const differences = differing.get(`${row.block}/${row.parameter}`) ?? [];
                 const shown = value(language, row);
@@ -153,7 +183,9 @@ export function CcfPanel({ snapshot, running, adapterReady, surveyed, bench = fa
                   <tr key={`${row.block}-${row.parameter}`}>
                     <td>
                       <strong>{rowTitle(language, row)}</strong>
-                      <div className="module-validation">{row.parameter}</div>
+                      {rowTitle(language, row) !== row.parameter ? (
+                        <div className="module-validation">{row.parameter}</div>
+                      ) : null}
                     </td>
                     <td>
                       <code>{row.block}</code>
@@ -185,10 +217,14 @@ export function CcfPanel({ snapshot, running, adapterReady, surveyed, bench = fa
                   </tr>
                 );
               })}
+        </Fragment>
+      ))}
             </tbody>
           </table>
-        </div>
-      ))}
+      ) : null}
+
+        </>
+      ) : null}
 
       {snapshot.readings.length > 0 ? (
         <p className="button-hint ccf-caveat">

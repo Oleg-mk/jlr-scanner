@@ -98,7 +98,7 @@ export function PassportPanel({
 
   return (
     <section className="passport-panel" aria-labelledby="passport-title">
-      <div className="section-heading section-heading--action">
+      <div className="section-heading section-heading--action section-heading--pinned">
         <div>
           <p className="eyebrow">{t("Module passport")}</p>
           <h2 id="passport-title">{t("What every module says it is")}</h2>
@@ -142,7 +142,10 @@ export function PassportPanel({
         <div className="error-banner" role="alert">
           <h3>{t(snapshot.error.message)}</h3>
           {snapshot.error.technicalDetails !== null ? (
-            <code>{snapshot.error.technicalDetails}</code>
+            <details className="technical-details">
+              <summary>{t("Technical details")}</summary>
+              <code>{snapshot.error.technicalDetails}</code>
+            </details>
           ) : null}
         </div>
       ) : null}

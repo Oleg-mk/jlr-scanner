@@ -233,6 +233,17 @@ const uk: Record<string, string> = {
   "{count} code(s)": "кодів: {count}",
   "Put the passports away": "Сховати паспорти",
   "Put the readings away": "Сховати показники",
+  // The session's precondition (ADR-0030, 2026-09-19).
+  "The battery reads {volts} V, in SDD's low band, under {limit} V ({source}, {age}). Connect an external power supply before reading modules.":
+    "Акумулятор показує {volts} В, це низька смуга за SDD, нижче {limit} В ({source}, {age}). Підключіть зовнішнє живлення, перш ніж читати модулі.",
+  "from the battery monitor": "з монітора акумулятора",
+  "from the OBD read": "зі стандартного читання OBD",
+  "from the live read": "з живого читання",
+  "from the live read of {module}": "з живого читання {module}",
+  "read at an unknown time": "час читання невідомий",
+  "Show the readings": "Показати показники",
+  "Put the configuration away": "Сховати конфігурацію",
+  "Show the configuration": "Показати конфігурацію",
   "Show the readings of {modules} module(s)": "Показати показники ({modules})",
   "Show the passports of {modules} module(s)": "Показати паспорти ({modules})",
   reachable: "досяжних",
@@ -387,6 +398,8 @@ const uk: Record<string, string> = {
     "Триває огляд блоків; стенд збирається з того, що він знайде",
   "Wait for the survey to end, then connect the bench again.":
     "Дочекайтеся кінця огляду і підключіть стенд знову.",
+  "The names are SDD's own, and SDD writes them in English only; the data carries no other language for them.":
+    "Назви — власні SDD, і SDD пише їх лише англійською; іншої мови для них у даних немає.",
   "No adapter and no car needed: a virtual vehicle built from the library answers instead. Every value is synthetic.":
     "Без адаптера і без авто: замість них відповідає віртуальне авто, зібране з бібліотеки. Усі значення синтетичні.",
   "Virtual vehicle (bench)": "Віртуальне авто (стенд)",
@@ -1467,6 +1480,17 @@ const ru: Record<string, string> = {
   "{count} code(s)": "кодов: {count}",
   "Put the passports away": "Скрыть паспорта",
   "Put the readings away": "Скрыть показания",
+  // The session's precondition (ADR-0030, 2026-09-19).
+  "The battery reads {volts} V, in SDD's low band, under {limit} V ({source}, {age}). Connect an external power supply before reading modules.":
+    "Аккумулятор показывает {volts} В, это низкая полоса по SDD, ниже {limit} В ({source}, {age}). Подключите внешнее питание, прежде чем читать модули.",
+  "from the battery monitor": "с монитора аккумулятора",
+  "from the OBD read": "из стандартного чтения OBD",
+  "from the live read": "из живого чтения",
+  "from the live read of {module}": "из живого чтения {module}",
+  "read at an unknown time": "время чтения неизвестно",
+  "Show the readings": "Показать показания",
+  "Put the configuration away": "Скрыть конфигурацию",
+  "Show the configuration": "Показать конфигурацию",
   "Show the readings of {modules} module(s)": "Показать показания ({modules})",
   "Show the passports of {modules} module(s)": "Показать паспорта ({modules})",
   reachable: "достижимых",
@@ -1621,6 +1645,8 @@ const ru: Record<string, string> = {
     "Идёт осмотр модулей; стенд собирается из того, что он найдёт",
   "Wait for the survey to end, then connect the bench again.":
     "Дождитесь конца осмотра и подключите стенд снова.",
+  "The names are SDD's own, and SDD writes them in English only; the data carries no other language for them.":
+    "Названия — собственные SDD, и SDD пишет их только по-английски; другого языка для них в данных нет.",
   "No adapter and no car needed: a virtual vehicle built from the library answers instead. Every value is synthetic.":
     "Без адаптера и без автомобиля: вместо них отвечает виртуальный автомобиль, собранный из библиотеки. Все значения синтетические.",
   "Virtual vehicle (bench)": "Виртуальный автомобиль (стенд)",

@@ -33,6 +33,12 @@ interface ModuleDetailsProps {
   clear?: DtcClearSnapshot;
   clearing?: boolean;
   onClearCodes?: (ecuFamily: string) => void;
+  /**
+   * The session's low-battery line (ADR-0030, 2026-09-19), repeated in the
+   * confirmation of every operation that changes what a module holds: a
+   * clear on a sagging rail can leave a module halfway.
+   */
+  batteryNotice?: string | null;
 }
 
 /**
@@ -125,6 +131,7 @@ export function ModuleDetails({
   clear,
   clearing = false,
   onClearCodes,
+  batteryNotice = null,
 }: ModuleDetailsProps) {
   const language = useLanguage();
   // The one question before a clear (ADR-0036, decision 3).
@@ -447,6 +454,9 @@ export function ModuleDetails({
                   count: outcome.dtcs.length,
                 })}
               </p>
+              {batteryNotice !== null ? (
+                <p className="battery-precondition">{batteryNotice}</p>
+              ) : null}
               <p>{t("The car stands still, the ignition is on, the engine is off.")}</p>
               <p>{t("After a positive answer the codes are read again at once.")}</p>
             </ConfirmDialog>
@@ -546,6 +556,17 @@ export function ModuleDetails({
                 {t(
                   "SDD declares these; this application sends none of them. A value written into a module, an output driven by hand and a routine the module runs are three different kinds of change, and each belongs to a later stage with its own safety rules. The list is here because the cost of an operation is worth knowing long before anyone decides whether to allow it.",
                 )}
+              </p>
+              {/*
+                The names are SDD's, from its module files, and SDD writes
+                them in English only. ADR-0034 closed translating SDD's text
+                by anyone, so the block says why these stay English rather
+                than leaving a Ukrainian or Russian reader to wonder why the
+                language switch above did not reach them (the owner,
+                2026-09-18: "не перекладає весь текст під рожевим").
+              */}
+              <p className="module-validation">
+                {t("The names are SDD's own, and SDD writes them in English only; the data carries no other language for them.")}
               </p>
               <ul className="accepted-operation-list">
                 {(module.acceptedOperations ?? []).map((operation) => (

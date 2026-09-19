@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { Fragment, useState } from "react";
+import { useReadOpen } from "../useReadOpen";
 import { BATTERY_ROLES, type BatteryReadSnapshot, type BatteryRole } from "../battery";
-import { t, useLanguage } from "../i18n";
+import { parameterNote, t, useLanguage } from "../i18n";
 import { parameterName } from "../parameterNames";
 import { StatusBadge } from "./StatusBadge";
 import { freshness, valueText } from "../batteryFormat";
@@ -61,6 +62,9 @@ export function BatteryPanel({
 }: BatteryPanelProps) {
   useLanguage();
   const [showSilent, setShowSilent] = useState(false);
+  // Shown when the read arrives, away on one button: the rule the passports
+  // and the mileage follow (the owner, 2026-09-19).
+  const [open, setOpen] = useReadOpen(snapshot.readings.length);
   const answered = snapshot.readings.filter((row) => row.value !== null);
   const shown = showSilent ? snapshot.readings : answered;
   const silent = snapshot.readings.length - answered.length;
@@ -68,11 +72,21 @@ export function BatteryPanel({
 
   return (
     <section className="battery-panel" aria-labelledby="battery-panel-title">
-      <div className="section-heading section-heading--action">
+      <div className="section-heading section-heading--action section-heading--pinned">
         <div>
           <p className="eyebrow">{t("Battery")}</p>
           <h2 id="battery-panel-title">{t("What the battery monitor holds")}</h2>
         </div>
+        {snapshot.readings.length > 0 ? (
+          <button
+            className="button button--quiet"
+            type="button"
+            aria-expanded={open}
+            onClick={() => setOpen((shown) => !shown)}
+          >
+            {open ? t("Put the readings away") : t("Show the readings")}
+          </button>
+        ) : null}
         {badge(snapshot, running, bench)}
       </div>
       <p className="operation-copy">
@@ -102,7 +116,10 @@ export function BatteryPanel({
         <div className="error-banner" role="alert">
           <h3>{t(snapshot.error.message)}</h3>
           {snapshot.error.technicalDetails !== null ? (
-            <code>{snapshot.error.technicalDetails}</code>
+            <details className="technical-details">
+              <summary>{t("Technical details")}</summary>
+              <code>{snapshot.error.technicalDetails}</code>
+            </details>
           ) : null}
         </div>
       ) : null}
@@ -118,13 +135,16 @@ export function BatteryPanel({
         </label>
       ) : null}
 
-      {BATTERY_ROLES.map((role) => {
-        const rows = shown.filter((row) => row.role === role);
-        if (rows.length === 0) return null;
-        return (
-          <div className="battery-group" key={role}>
-            <h3 className="ccf-subtitle">{t(ROLE_TITLE[role])}</h3>
-            <table className="module-table">
+      {open ? (
+        <>
+      {/*
+        One table, its groups as rows inside it, the way the configuration
+        is drawn: a table per group gave every group its own column widths
+        and its own heading row, and the eye had nothing to line up on
+        (the owner, 2026-09-19).
+      */}
+      {shown.length > 0 ? (
+            <table className="module-table ccf-table">
               <thead>
                 <tr>
                   <th scope="col">{t("Parameter")}</th>
@@ -133,6 +153,16 @@ export function BatteryPanel({
                 </tr>
               </thead>
               <tbody>
+      {BATTERY_ROLES.map((role) => {
+        const rows = shown.filter((row) => row.role === role);
+        if (rows.length === 0) return null;
+        return (
+          <Fragment key={role}>
+                <tr className="ccf-group-row">
+                  <th scope="rowgroup" colSpan={3}>
+                    <h3 className="ccf-subtitle">{t(ROLE_TITLE[role])}</h3>
+                  </th>
+                </tr>
                 {rows.map((row) => (
                   <tr key={`${row.ecuFamily}-${row.identifier}-${row.parameter}`}>
                     <td>
@@ -142,7 +172,7 @@ export function BatteryPanel({
                     <td>
                       {valueText(row)}
                       {row.note !== null ? (
-                        <div className="module-validation">{row.note}</div>
+                        <div className="module-validation">{parameterNote(row.note)}</div>
                       ) : null}
                       {row.reason !== null ? (
                         <div className="module-validation">{row.reason}</div>
@@ -154,11 +184,12 @@ export function BatteryPanel({
                     </td>
                   </tr>
                 ))}
-              </tbody>
-            </table>
-          </div>
+          </Fragment>
         );
       })}
+              </tbody>
+            </table>
+      ) : null}
 
       {snapshot.refused.length > 0 ? (
         <ul className="battery-refused">
@@ -168,6 +199,9 @@ export function BatteryPanel({
             </li>
           ))}
         </ul>
+      ) : null}
+
+        </>
       ) : null}
 
       <p className="module-validation">

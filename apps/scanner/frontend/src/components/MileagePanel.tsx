@@ -95,7 +95,7 @@ export function MileagePanel({
 
   return (
     <section className="mileage-panel" aria-labelledby="mileage-title">
-      <div className="section-heading section-heading--action">
+      <div className="section-heading section-heading--action section-heading--pinned">
         <div>
           <p className="eyebrow">{t("Mileage")}</p>
           <h2 id="mileage-title">{t("What every module says about the distance")}</h2>
@@ -138,7 +138,10 @@ export function MileagePanel({
         <div className="error-banner" role="alert">
           <h3>{t(snapshot.error.message)}</h3>
           {snapshot.error.technicalDetails !== null ? (
-            <code>{snapshot.error.technicalDetails}</code>
+            <details className="technical-details">
+              <summary>{t("Technical details")}</summary>
+              <code>{snapshot.error.technicalDetails}</code>
+            </details>
           ) : null}
         </div>
       ) : null}

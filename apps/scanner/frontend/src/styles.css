@@ -1376,8 +1376,14 @@ summary:focus-visible {
   gap: 0.5rem;
 }
 
-.self-test-head strong {
+/* A row's name is a name, not a headline: the size of the meta text beside
+   it and the heading weight of the scale, not the browser's bold. The
+   operation names carried the body size and 700 and read as the loudest
+   thing in the panel (the owner, 2026-09-19). */
+.self-test-head strong,
+.accepted-operation-head strong {
   font-size: 0.9rem;
+  font-weight: 600;
 }
 
 .self-test-head .module-validation {
@@ -1607,7 +1613,9 @@ summary:focus-visible {
   --radius-control: 8px;
   --radius-chip: 6px;
   --radius-card: 12px;
-  --card-pad: 1.25rem 1.5rem 1.5rem;
+  --card-pad-top: 1.25rem;
+  --card-pad-x: 1.5rem;
+  --card-pad: var(--card-pad-top) var(--card-pad-x) 1.5rem;
   --accent-surface: #eaf2fd;
 }
 
@@ -3158,6 +3166,23 @@ table.live-read-identifiers label {
   padding: var(--card-pad);
 }
 
+/* The long reads' headings hold the top of the screen while the read
+   scrolls under them (the owner, 2026-09-19): the button that puts the
+   read away is at hand wherever the person is in a table thirty rows
+   long, not back at its head. Painted on the screen's own white, out to
+   the cut edge, so the rows pass under it and not through it; the cut
+   edge itself stays above everything in the window. The column of
+   windows is the scroller, so the top of it is where they hold. */
+.app-shell .section-heading--pinned {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  margin: calc(-1 * var(--card-pad-top)) calc(1px - var(--card-pad-x)) 1rem;
+  padding: var(--card-pad-top) calc(var(--card-pad-x) - 1px) 0.6rem;
+  background: var(--screen);
+  border-radius: 8px 8px 0 0;
+}
+
 /* The scroll bars, 2026-09-13. A scroll bar the system draws is a strip
    stood against the instrument. On this one it is drawn by the screen it
    belongs to: a slim bar on the white, no track, no arrows, nothing at the
@@ -4261,9 +4286,9 @@ table.live-read-identifiers label {
 /* The battery as one key, 2026-09-13. It used to be a card down in the     */
 /* session column with a gauge, a button and three tiles. Now it is the     */
 /* cell itself, up on the plate beside the other keys: press it to read,    */
-/* it fills to the state of charge as the answer comes, and the voltage     */
-/* stands to its left once there is one. The word stays where it is, over   */
-/* the fill — the key has to say what it does whether it is full or empty.  */
+/* it fills to the state of charge as the answer comes, and once a read has */
+/* brought a voltage the cell carries it. The word stays over the fill and  */
+/* comes back under the pointer - the key has to say what it does.          */
 /* ===================================================================== */
 
 .app-shell .battery-key {
@@ -4272,14 +4297,6 @@ table.live-read-identifiers label {
   align-items: center;
   gap: 0.5rem;
   margin-right: 6px;
-}
-
-.app-shell .battery-key__volts {
-  font-size: 0.82rem;
-  font-variant-numeric: tabular-nums;
-  letter-spacing: 0.01em;
-  color: var(--plate-text);
-  white-space: nowrap;
 }
 
 /* The cell. Its corner is the corner of a cell, not of a capsule. */
@@ -4326,17 +4343,54 @@ table.live-read-identifiers label {
   background: rgb(255 255 255 / 90%);
 }
 
-/* How full it is. It says how much, never whether that is good. */
+/* How full it is. It says how much, never whether that is good. The fill
+   is the phone's own green: a white at half strength on the pale plate was
+   all but invisible (the owner, 2026-09-19). */
 .app-shell .battery-key__fill {
   position: absolute;
   inset: 0 auto 0 0;
-  background: rgb(255 255 255 / 52%);
+  background: #34c759;
   transition: width 320ms ease;
 }
 
+/* The word and the voltage share one place on the cell (the owner,
+   2026-09-19: «перенести в батарейку, жирним шрифтом»): the voltage, in
+   bold, once a read has brought one; the word under it, shown while the
+   pointer is over the cell or the focus is on it, so the key still says
+   what it does. Both sit in the same grid cell, so the key is as wide as
+   the wider of the two and nothing moves under the pointer. A cell that
+   cannot read keeps the voltage: there is nothing to offer instead. */
 .app-shell .battery-key__word {
   position: relative;
   z-index: 1;
+  display: grid;
+}
+
+.app-shell .battery-key__word > span {
+  grid-area: 1 / 1;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.app-shell .battery-key__volts {
+  font-size: 0.86rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.01em;
+}
+
+.app-shell .battery-key__say--under {
+  visibility: hidden;
+}
+
+.app-shell .battery-key__cell:hover:not(:disabled) .battery-key__say--under,
+.app-shell .battery-key__cell:focus-visible .battery-key__say--under {
+  visibility: visible;
+}
+
+.app-shell .battery-key__cell:hover:not(:disabled) .battery-key__volts,
+.app-shell .battery-key__cell:focus-visible .battery-key__volts {
+  visibility: hidden;
 }
 
 /* The emblem belongs to the foot of the window, 2026-09-13: it is what the
@@ -5349,4 +5403,51 @@ table.live-read-identifiers label {
 .network-option {
   display: inline-flex;
   margin-top: 0.6rem;
+}
+
+
+/* ===================================================================== */
+/* The session's precondition, 2026-09-19 (ADR-0030, amendment).           */
+/*                                                                         */
+/* One sentence, amber, under the header and again inside a stage-2         */
+/* confirmation: the battery reads low in SDD's own terms, connect an       */
+/* external supply. Not a band, not a verdict, and gone with a fresh read.  */
+/* ===================================================================== */
+
+.battery-precondition {
+  margin: 0.6rem 1.25rem 0;
+  padding: 0.55rem 0.9rem;
+  border: 1px solid rgb(176 112 0 / 45%);
+  border-radius: 10px;
+  background: rgb(255 184 28 / 14%);
+  color: #5c3d00;
+  font-size: 0.9rem;
+  line-height: 1.4;
+}
+
+.modal .battery-precondition,
+.confirm-dialog .battery-precondition {
+  margin: 0 0 0.6rem;
+}
+
+
+/* The configuration as one table: a group is a row that names it, set a
+   little apart, and its settings follow under the one column heading
+   (2026-09-19). */
+.ccf-table .ccf-group-row th {
+  padding: 1.1rem 0.5rem 0.35rem;
+  text-align: left;
+  border-bottom: 1px solid var(--border, #d9dee5);
+  background: transparent;
+}
+
+.ccf-table .ccf-group-row .ccf-subtitle {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.ccf-table tbody tr:first-child .ccf-group-row th,
+.ccf-table .ccf-group-row:first-child th {
+  padding-top: 0.5rem;
 }
