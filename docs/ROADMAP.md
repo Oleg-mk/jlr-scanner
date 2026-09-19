@@ -663,7 +663,11 @@ a 29-bit `enhanced` layout the data does not compose; their numbers are
 recorded verbatim and the modules stay out, saying why. Every gatewayed
 module now carries its gateway from the data, and the map says from it
 why a sub-network waits. The bench reads a module behind a synthetic
-gateway end to end.
+gateway end to end. Decision 6, the same night: the MY10 documents give
+those MOST modules only a physical address, so the request is read from
+it and the response derived eight above (1,528 of 1,528 declared pairs
+in the corpus), `Unverified`, on the exporter's request; the library is
+re-exported for it.
 
 Not in this slice: a routine to any gateway (the X250's ring included:
 its evidence path is a capture of a genuine SDD session, or the owner's

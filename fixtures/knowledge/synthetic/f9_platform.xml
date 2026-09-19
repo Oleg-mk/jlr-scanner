@@ -173,6 +173,21 @@
 			<data_identifier_set type="SWDL">synth_pdi</data_identifier_set>
 			<fitment>optional</fitment>
 		</module>
+		<!--
+		  The same sub-network, addressed the way the MY10 documents address a
+		  MOST module: a physical address in the 11-bit identifier range and no
+		  can_tx/can_rx pair (ADR-0039, decision 6). Derived to identifiers only
+		  when the ingester is asked to, which the synthetic survey does not:
+		  a synthetic record may not cite research evidence.
+		-->
+		<module>
+			<module_code_name acronym="TVPHYS" ISOName="TVPHYS">TVPHYS_SYSTEM_A</module_code_name>
+			<address type="phys" session="diag">0x781</address>
+			<address type="phys" session="prog">0x781</address>
+			<network>SUB_SYNTH</network>
+			<data_identifier_set type="SWDL">synth_pdi</data_identifier_set>
+			<fitment>optional</fitment>
+		</module>
 	</module_fitment>
 	<!--
 	  Named data-identifier sets (ADR-0027). The NET set mixes identification

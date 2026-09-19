@@ -195,18 +195,20 @@ fn a_broken_manifest_is_reported_and_the_rest_still_load() {
 fn the_survey_shows_reachable_and_unreachable_modules_with_reasons() {
     let survey = library().survey(&vehicle());
     // SYNTHMOD, OTHERMOD, LEGACYMOD, FIXEDMOD, the two K-line modules DS2MOD
-    // and STARMOD (ADR-0029), and TVMOD behind a gateway (ADR-0039); only
-    // SYNTHMOD has a confirmed route, DS2MOD and TVMOD sit on hypothesised
-    // ones.
-    assert_eq!(survey.modules.len(), 7);
+    // and STARMOD (ADR-0029), and TVMOD and TVPHYS behind a gateway
+    // (ADR-0039); only SYNTHMOD has a confirmed route, DS2MOD and TVMOD sit
+    // on hypothesised ones, and TVPHYS has a physical address this library
+    // did not ask to derive.
+    assert_eq!(survey.modules.len(), 8);
     assert_eq!(survey.reachable, 1);
     assert_eq!(survey.hypothesis, 2);
-    assert_eq!(survey.unreachable, 4);
+    assert_eq!(survey.unreachable, 5);
     assert!(survey.message.starts_with(
-        "7 modules known: 1 reachable over the adapter, 2 on a hypothesised route, 4 not"
+        "8 modules known: 1 reachable over the adapter, 2 on a hypothesised route, 5 not"
     ));
 
-    // Sorted by mnemonic: DS2MOD, FIXEDMOD, LEGACYMOD, OTHERMOD, STARMOD, SYNTHMOD, TVMOD.
+    // Sorted by mnemonic: DS2MOD, FIXEDMOD, LEGACYMOD, OTHERMOD, STARMOD, SYNTHMOD,
+    // TVMOD, TVPHYS.
     let reachable = &survey.modules[5];
     assert_eq!(reachable.ecu_family, "SYNTHMOD");
     assert_eq!(reachable.applicability, ModuleApplicability::Applicable);
@@ -872,4 +874,26 @@ fn a_module_behind_a_network_addressed_gateway_is_a_hypothesis_on_its_main_bus()
     // And nothing else changed for the K-line hypothesis (ADR-0015 wording).
     let ds2 = &survey.modules[0];
     assert!(ds2.identifier_read.reasons[0].contains("ADR-0015"));
+
+    // The physically addressed module of the same sub-network (decision 6):
+    // this library did not ask for derived identifiers, so it stays
+    // unreachable, its gateway named and the route known.
+    let phys = &survey.modules[7];
+    assert_eq!(phys.ecu_family, "TVPHYS");
+    assert_eq!(
+        phys.identifier_read.status,
+        RouteStatus::Indeterminate,
+        "{phys:?}"
+    );
+    assert_eq!(phys.request_id, None);
+    assert_eq!(phys.backend_route.as_deref(), Some("hs-can"));
+    assert_eq!(
+        phys.gateway.as_ref().map(|gateway| gateway.module.as_str()),
+        Some("SYNTHMOD_SYSTEM_A")
+    );
+    assert!(phys
+        .identifier_read
+        .reasons
+        .iter()
+        .any(|reason| reason.contains("ADR-0039")));
 }

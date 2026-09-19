@@ -27,6 +27,20 @@
       },
       "excerpt": "SUB_MOST: main_net CAN_MS, gateway ACM_SYSTEM_A, access_method NETWORK_ADDRESSED, 125 kbit/s, 11-bit, normal addressing; modules with 11-bit identifiers in the main bus's space; no routine declared",
       "notes": "Reasoning over SDD's declarations, not observation"
+    },
+    {
+      "id": "evidence-eleven-bit-response-offset-convention",
+      "source_id": "jlr-scanner-network-addressed-route-hypotheses",
+      "evidence_class": "unverified_research",
+      "locator": {
+        "description": "docs/adr/ADR-0039, Decision 6: the MY10 documents give a MOST module a physical address in the 11-bit identifier range and no can_tx/can_rx pair; it is read as the request identifier, and the response is eight above it - the convention every one of the 1,528 declared diagnostic can_tx/can_rx pairs in the 45 platform documents follows, measured 2026-09-19",
+        "document_page": null,
+        "document_section": "Decision",
+        "record_key": "response_id = request_id + 8",
+        "capture_timestamp_us": null
+      },
+      "excerpt": "1,528 of 1,528 declared diagnostic can_tx/can_rx pairs across PLATFORM_*.xml have can_rx = can_tx + 8; no document states that a physical address in the 0x700 range is a request identifier; exactly 31 module rows - the MOST rows of L319_201000, L320_201000 and L322_201000 - carry such an address",
+      "notes": "A convention measured over the documents, not a statement in them; every derived 11-bit identifier cites this evidence and stays Unverified until the module answers"
     }
   ],
   "records": [

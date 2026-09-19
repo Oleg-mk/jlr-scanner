@@ -72,6 +72,9 @@ pub struct PlatformAdapter {
     source: SourceRecord,
     timeline: Option<ModelYearTimeline>,
     derive_normal_fixed: bool,
+    /// Whether a physical address in the 11-bit identifier range on a
+    /// normal 11-bit bus is derived to identifiers (ADR-0039, decision 6).
+    derive_eleven_bit: bool,
     battery_formatting: Option<std::sync::Arc<BatteryFormatting>>,
 }
 
@@ -82,6 +85,7 @@ impl PlatformAdapter {
             source,
             timeline: None,
             derive_normal_fixed: false,
+            derive_eleven_bit: false,
             battery_formatting: None,
         })
     }
@@ -99,6 +103,16 @@ impl PlatformAdapter {
     /// ingested; the application and the exporter both load them first.
     pub fn with_derived_normal_fixed_identifiers(mut self) -> Self {
         self.derive_normal_fixed = true;
+        self
+    }
+
+    /// Derive, for a module with no `can_tx`/`can_rx` on a bus declared
+    /// `normal` with 11-bit identifiers, the request identifier from its
+    /// physical address and the response eight above it (ADR-0039,
+    /// decision 6). The records cite the measured convention as research
+    /// evidence and stay `Unverified`; the exporter asks for this.
+    pub fn with_derived_eleven_bit_identifiers(mut self) -> Self {
+        self.derive_eleven_bit = true;
         self
     }
 
@@ -184,6 +198,16 @@ pub const NORMAL_FIXED_TESTER_ADDRESS_EVIDENCE: &str =
 /// test equipment address); a hypothesis for JLR enhanced diagnostics.
 pub const NORMAL_FIXED_TESTER_ADDRESS: u32 = 0xF1;
 const NORMAL_FIXED_MODE: &str = "normal_fixed";
+/// Evidence the derived 11-bit identifiers cite (ADR-0039, decision 6): the
+/// measured convention that a module answers eight identifiers above the
+/// one it is asked at, kept in
+/// `fixtures/knowledge/research/mongoose_jlr_network_addressed_route_hypotheses.json`.
+pub const ELEVEN_BIT_RESPONSE_OFFSET_EVIDENCE: &str =
+    "evidence-eleven-bit-response-offset-convention";
+/// The response identifier's distance above the request's on JLR's 11-bit
+/// buses: 1,528 of 1,528 declared pairs in the 45 platform documents.
+pub const ELEVEN_BIT_RESPONSE_OFFSET: u32 = 8;
+const NORMAL_MODE: &str = "normal";
 
 /// One declared bus, as the platform states it.
 #[derive(Clone, Debug)]
@@ -765,6 +789,78 @@ impl PlatformAdapter {
         Ok(())
     }
 
+    /// ADR-0039, decision 6: the MY10 documents of the L319, L320 and L322
+    /// give a MOST module a physical address in the 11-bit identifier range
+    /// and no `can_tx`/`can_rx`. Every one of the 1,528 declared pairs in the
+    /// corpus answers eight above its request, so the address is read as the
+    /// request and the response derived - a hypothesis, cited as such, that
+    /// the first answered read confirms per vehicle. A one-byte address on
+    /// such a bus is a node address, not an identifier, and is left alone.
+    #[allow(clippy::too_many_arguments)]
+    fn derive_eleven_bit_addressing(
+        &self,
+        segment: &str,
+        suffix: &str,
+        acronym: &str,
+        physical: &str,
+        network: &Network,
+        entity: &KnowledgeEntity,
+        base: &Applicability,
+        evidence: &mut BTreeMap<String, EvidenceRecord>,
+        records: &mut BTreeMap<String, KnowledgeRecord>,
+    ) -> Result<(), KnowledgeError> {
+        if network.addressing_mode.as_deref() != Some(NORMAL_MODE)
+            || network.can_id_format != Some(CanIdFormat::Standard11Bit)
+            || network.iso.is_some()
+        {
+            return Ok(());
+        }
+        let Some(request) = parse_hex(physical)
+            .filter(|value| *value > 0xFF && *value + ELEVEN_BIT_RESPONSE_OFFSET <= 0x7FF)
+        else {
+            return Ok(());
+        };
+        let response = request + ELEVEN_BIT_RESPONSE_OFFSET;
+        let record_id = format!("{}.module.{segment}.addressing{suffix}", self.source.id.0);
+        let own_evidence_id = format!(
+            "{}.ev.{}.module.{segment}.physical_address{suffix}",
+            self.source.id.0, self.source.id.0
+        );
+        if !evidence.contains_key(&own_evidence_id) {
+            return Err(KnowledgeError::Parse(format!(
+                "derived addressing for {acronym} has no physical-address evidence to cite"
+            )));
+        }
+        records.insert(
+            record_id.clone(),
+            KnowledgeRecord {
+                id: record_id,
+                entity: entity.clone(),
+                key: ClaimKey::DiagnosticAddressing,
+                value: KnowledgeValue::DiagnosticAddressing {
+                    request_id: Some(request),
+                    response_id: Some(response),
+                    functional_request_id: None,
+                    can_id_format: Some(CanIdFormat::Standard11Bit),
+                    addressing_mode: Some(NORMAL_MODE.to_string()),
+                },
+                applicability: base.clone(),
+                evidence_ids: {
+                    let mut ids = vec![
+                        EvidenceId::new(own_evidence_id)?,
+                        EvidenceId::new(ELEVEN_BIT_RESPONSE_OFFSET_EVIDENCE)?,
+                    ];
+                    ids.sort();
+                    ids
+                },
+                // Research evidence is among the sources: nothing stronger is
+                // claimed until the module answers.
+                validation_state: ValidationState::Unverified,
+            },
+        );
+        Ok(())
+    }
+
     #[allow(clippy::too_many_arguments)]
     fn add_modules(
         &self,
@@ -893,6 +989,14 @@ impl PlatformAdapter {
                     self.derive_normal_fixed_addressing(
                         &segment, &suffix, acronym, program, physical, network, &entity, base,
                         evidence, records,
+                    )?;
+                }
+            }
+            if self.derive_eleven_bit && request.is_none() && response.is_none() {
+                if let (Some(physical), Some(network)) = (physical.as_deref(), network) {
+                    self.derive_eleven_bit_addressing(
+                        &segment, &suffix, acronym, physical, network, &entity, base, evidence,
+                        records,
                     )?;
                 }
             }

@@ -558,6 +558,73 @@ const TESTER_ADDRESS_MANIFEST: &str = include_str!(
     "../../../fixtures/knowledge/research/normal_fixed_tester_address_hypothesis.json"
 );
 
+const NETWORK_ADDRESSED_MANIFEST: &str = include_str!(
+    "../../../fixtures/knowledge/research/mongoose_jlr_network_addressed_route_hypotheses.json"
+);
+
+/// ADR-0039, decision 6: a physical address in the 11-bit identifier range
+/// on a normal 11-bit bus is derived, on request only, to the request
+/// identifier and the response eight above it - a hypothesis citing the
+/// measured convention, Unverified until the module answers.
+#[test]
+fn eleven_bit_identifiers_are_derived_from_a_physical_address_only_on_request() {
+    use knowledge::JsonManifestAdapter;
+    use sdd_ingest::ELEVEN_BIT_RESPONSE_OFFSET_EVIDENCE;
+
+    let plain = ingest(SourceType::Documented);
+    assert!(plain
+        .get_record("f9-plat.module.TVPHYS.addressing")
+        .is_none());
+    assert!(plain
+        .get_record("f9-plat.module.TVPHYS.physical_address")
+        .is_some());
+
+    let adapter = PlatformAdapter::new(source(SourceType::Documented))
+        .unwrap()
+        .with_derived_eleven_bit_identifiers();
+    // The evidence it cites must be in the store first.
+    let mut without = KnowledgeStore::new();
+    assert!(without.ingest(&adapter, FIXTURE).is_err());
+
+    let mut store = KnowledgeStore::new();
+    store
+        .ingest(&JsonManifestAdapter, NETWORK_ADDRESSED_MANIFEST)
+        .unwrap();
+    store.ingest(&adapter, FIXTURE).unwrap();
+    let derived = store
+        .get_record("f9-plat.module.TVPHYS.addressing")
+        .expect("derived addressing");
+    assert_eq!(
+        derived.value,
+        KnowledgeValue::DiagnosticAddressing {
+            request_id: Some(0x781),
+            response_id: Some(0x789),
+            functional_request_id: None,
+            can_id_format: Some(CanIdFormat::Standard11Bit),
+            addressing_mode: Some("normal".into()),
+        }
+    );
+    assert_eq!(derived.validation_state, ValidationState::Unverified);
+    let cited: Vec<&str> = derived
+        .evidence_ids
+        .iter()
+        .map(|id| id.0.as_str())
+        .collect();
+    assert!(cited.contains(&"f9-plat.ev.f9-plat.module.TVPHYS.physical_address"));
+    // A module with a declared pair is not touched by the rule.
+    let declared = store.get_record("f9-plat.module.TVMOD.addressing").unwrap();
+    assert_eq!(declared.validation_state, ValidationState::SourceBacked);
+    assert!(cited.contains(&ELEVEN_BIT_RESPONSE_OFFSET_EVIDENCE));
+    // A one-byte address on an 11-bit bus is a node address, not an
+    // identifier: not derived. A 29-bit normal_fixed bus is ADR-0017's.
+    assert!(store
+        .get_record("f9-plat.module.LEGACYMOD.addressing")
+        .is_none());
+    assert!(store
+        .get_record("f9-plat.module.FIXEDMOD.addressing")
+        .is_none());
+}
+
 #[test]
 fn normal_fixed_identifiers_are_derived_only_on_request_and_stay_unverified() {
     use knowledge::JsonManifestAdapter;

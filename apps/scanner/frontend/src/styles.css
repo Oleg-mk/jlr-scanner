@@ -2501,6 +2501,9 @@ main.flow {
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
   overflow: hidden;
+  /* Two lines always, one-line names included, so the state under every
+     node of a lane sits at one height (the owner's remark, 2026-09-19). */
+  min-height: calc(2 * 1.15 * 0.7rem);
 }
 
 /* Owner's remarks, 2026-09-05: a chosen thing is shown by its fill, never

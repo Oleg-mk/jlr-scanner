@@ -275,11 +275,9 @@ export function NetworkMap({
                             <NodeIcon state={status.state} />
                           </span>
                           <span className="node-name">{module.ecuFamily}</span>
-                          {dataText(module.names, module.name, language) !== null ? (
-                            <span className="node-fullname">
-                              {dataText(module.names, module.name, language)}
-                            </span>
-                          ) : null}
+                          <span className="node-fullname">
+                            {dataText(module.names, module.name, language) ?? ""}
+                          </span>
                           <span className="node-state">{status.label}</span>
                         </button>
                       </li>

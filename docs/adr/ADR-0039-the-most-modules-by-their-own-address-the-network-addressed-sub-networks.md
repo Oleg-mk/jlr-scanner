@@ -206,3 +206,58 @@ the three real bindings are `Unverified` by construction and become
   reads its fault codes end to end over the main bus's route, the
   route validation `UNVERIFIED` as the survey said. Nothing has met a
   car; the three real bindings wait for an L319, L320 or L322 of MY10.
+
+## Amendment, 2026-09-19, later the same night — decision 6: the identifiers of the MY10 rows
+
+The owner surveyed an L322 at the screen and nothing had moved («L322
+нічого з недосяжного не стало доступним»). Two things were behind it.
+The car he described was an L322 of the DS2 era — MY04.5–07; the K-line
+lane on his map says so — whose ring is the `enhanced` layout decision 3
+leaves out, as intended and as said. But the L322 of 2010 had not moved
+either: surveyed on his library, its MOST rows have the route now and no
+identifiers, because the MY10 documents give a MOST module only
+`<address type="phys">0x7A4</address>` — a physical address in the
+11-bit identifier range — and no `can_tx`/`can_rx` pair, and this
+product derives identifiers from a physical address only on a
+`normal_fixed` 29-bit bus (`ADR-0017`). The claim above that twenty-eight
+rows were reachable on paper was therefore not yet true in the library.
+
+6. **A physical address in the 11-bit range on a normal 11-bit bus is
+   read as the request identifier, and the response is eight above it —
+   as a hypothesis.** Measured on 2026-09-19 over the 45 platform
+   documents: every one of the 1,528 declared diagnostic `can_tx`/`can_rx`
+   pairs has `can_rx = can_tx + 8`, and no document says that a physical
+   address is a request identifier. So the platform adapter, when asked
+   (`with_derived_eleven_bit_identifiers`), derives for a module with no
+   `can_tx`/`can_rx`, on a bus declared `normal` with 11-bit identifiers,
+   whose physical address lies above 0xFF and whose response still fits:
+   request = the address, response = the address + 8, 11-bit, `normal`.
+   The record cites the module's own physical-address evidence and one
+   research evidence — the measured convention, kept in this decision's
+   manifest beside the route hypotheses — so it is `Unverified`, the
+   survey shows the row's validation `UNVERIFIED`, and the first answered
+   read confirms it per vehicle through the F13 intake. The exporter asks
+   for it. Exactly thirty-one rows in the corpus meet the condition — the
+   MOST rows of the three MY10 documents, 10 + 10 + 11, and no other:
+   every other document gives a MOST module a one-byte node address,
+   which is not a CAN identifier and is not derived (the X250's `AAM` at
+   0x86 stays as it is), and a one-byte address on an 11-bit main bus is
+   not derived either.
+
+   Why not simply read the address as the identifier and stop: a
+   response identifier is needed to listen for the answer, and the only
+   source for it is the convention. A convention measured over 1,528
+   pairs is strong, and it is still not a statement in the data, so it is
+   recorded as what it is.
+
+Built the same night: the derivation, its evidence in the manifest, the
+exporter asking for it. The synthetic platform gained `TVPHYS`, a module
+of the same sub-network with only a physical address 0x781; the platform
+golden derives it to 0x781/0x789 on request only, `Unverified`, and
+leaves the one-byte and the 29-bit cases alone. The synthetic survey and
+the bench keep `TVMOD` with its declared pair and show `TVPHYS`
+unreachable, because a synthetic record may not cite research evidence
+(the store's own rule) — so the whole-stack proof of decision 6 is the
+golden, and the route's is `TVMOD`. The owner's library is re-exported
+and re-issued so the L319, L320 and L322 of MY10 carry their MOST rows
+with identifiers. Nothing has met a car.

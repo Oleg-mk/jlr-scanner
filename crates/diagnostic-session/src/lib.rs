@@ -2117,7 +2117,7 @@ fn gateway_reason(gateway: &GatewaySummary) -> String {
                 gateway.module
             ),
             None => format!(
-                "behind the gateway {} by the module's own address; no adapter route is recorded for this car (ADR-0039)",
+                "behind the gateway {} by the module's own address, where a route and identifiers are recorded (ADR-0039)",
                 gateway.module
             ),
         },
