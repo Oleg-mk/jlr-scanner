@@ -42,6 +42,40 @@ impl DimensionConstraint {
     pub(crate) fn mentions(&self, expected: &str) -> bool {
         matches!(self, Self::OneOf { values } if values.iter().any(|value| value == expected))
     }
+
+    /// Whether this constraint, read as a module constraint, names the
+    /// module: by its own name, or by the name of one of its diagnostic
+    /// systems (`ADR-0037`). For the module dimension only; every other
+    /// dimension is matched by `mentions`, exactly.
+    pub fn mentions_module(&self, expected: &str) -> bool {
+        matches!(
+            self,
+            Self::OneOf { values }
+                if values
+                    .iter()
+                    .any(|value| value == expected || system_family(value) == expected)
+        )
+    }
+}
+
+/// The module a name belongs to (`ADR-0037`).
+///
+/// SDD's configuration documents name an ECU's *diagnostic system* where the
+/// rest of SDD names the ECU: `RSJB_SYSTEM_A` for the `RSJB`. Measured on
+/// the owner's library on 2026-09-19, the only such suffix is `_SYSTEM_A`,
+/// it appears on the configuration's block addresses and holders and on
+/// nothing else, and every family it names also exists bare. A system name
+/// is therefore read as its family; what this accepts is exactly `_SYSTEM_`
+/// and one uppercase letter at the end of the name, and any other name is
+/// returned as it is.
+pub fn system_family(name: &str) -> &str {
+    if let Some((family, letter)) = name.rsplit_once("_SYSTEM_") {
+        if !family.is_empty() && letter.len() == 1 && letter.bytes().all(|b| b.is_ascii_uppercase())
+        {
+            return family;
+        }
+    }
+    name
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
@@ -152,7 +186,7 @@ impl Applicability {
                 &self.architecture_generation,
                 context.architecture_generation.as_deref(),
             ))
-            || !observe(resolve_text(
+            || !observe(resolve_module(
                 &self.ecu_family,
                 context.ecu_family.as_deref(),
             ))
@@ -216,6 +250,25 @@ enum DimensionResolution {
     NotMatched,
     MissingContext,
     UnknownEvidence,
+}
+
+/// The module dimension: a context naming the module matches a constraint
+/// naming the module or one of its diagnostic systems (`ADR-0037`).
+fn resolve_module(constraint: &DimensionConstraint, context: Option<&str>) -> DimensionResolution {
+    match constraint {
+        DimensionConstraint::OneOf { values } => match context {
+            Some(value)
+                if values
+                    .iter()
+                    .any(|expected| expected == value || system_family(expected) == value) =>
+            {
+                DimensionResolution::Matched
+            }
+            Some(_) => DimensionResolution::NotMatched,
+            None => DimensionResolution::MissingContext,
+        },
+        other => resolve_text(other, context),
+    }
 }
 
 fn resolve_text(constraint: &DimensionConstraint, context: Option<&str>) -> DimensionResolution {
@@ -344,5 +397,61 @@ mod tests {
         }
         .validate()
         .is_err());
+    }
+
+    /// A diagnostic system belongs to its module (`ADR-0037`): by name, in
+    /// a module constraint, and against a vehicle context. Any other shape
+    /// of name is left alone.
+    #[test]
+    fn a_diagnostic_system_belongs_to_its_module() {
+        assert_eq!(system_family("RSJB_SYSTEM_A"), "RSJB");
+        assert_eq!(system_family("PCM_SYSTEM_B"), "PCM");
+        assert_eq!(system_family("RSJB"), "RSJB");
+        assert_eq!(system_family("RSJB_SYSTEM_AB"), "RSJB_SYSTEM_AB");
+        assert_eq!(system_family("RSJB_SYSTEM_a"), "RSJB_SYSTEM_a");
+        assert_eq!(system_family("RSJB_SYSTEM_"), "RSJB_SYSTEM_");
+        assert_eq!(system_family("_SYSTEM_A"), "_SYSTEM_A");
+
+        let scoped = DimensionConstraint::one_of(vec!["RSJB_SYSTEM_A".into()]).unwrap();
+        assert!(scoped.mentions_module("RSJB"));
+        assert!(scoped.mentions_module("RSJB_SYSTEM_A"));
+        assert!(!scoped.mentions_module("PCM"));
+        // The exact match is unchanged for every other dimension.
+        assert!(!scoped.mentions("RSJB"));
+
+        let applicability = Applicability {
+            vehicle_program: DimensionConstraint::Any,
+            model_year: YearConstraint::Any,
+            architecture_generation: DimensionConstraint::Any,
+            ecu_family: scoped,
+            powertrain: DimensionConstraint::Any,
+            variant: DimensionConstraint::Any,
+            market: DimensionConstraint::Any,
+            diagnostic_implementation: DimensionConstraint::Any,
+            other: BTreeMap::new(),
+        };
+        let context = |family: &str| VehicleContext {
+            vehicle_program: None,
+            model_year: None,
+            architecture_generation: None,
+            ecu_family: Some(family.into()),
+            powertrain: None,
+            variant: None,
+            market: None,
+            diagnostic_implementation: None,
+            other: BTreeMap::new(),
+        };
+        assert_eq!(
+            applicability.resolve(&context("RSJB")),
+            ApplicabilityResolution::Applicable
+        );
+        assert_eq!(
+            applicability.resolve(&context("RSJB_SYSTEM_A")),
+            ApplicabilityResolution::Applicable
+        );
+        assert_eq!(
+            applicability.resolve(&context("PCM")),
+            ApplicabilityResolution::NotApplicable
+        );
     }
 }

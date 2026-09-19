@@ -23,6 +23,12 @@ pub use issue::ISSUE_STAMP_FILE;
 /// caller needs the library's crate and not the store's.
 pub use knowledge::VehicleContext;
 
+/// The upper edge of SDD's own low voltage band, from its battery monitor's
+/// configuration (`ADR-0030`): the one number the interface may say a
+/// battery is low by, and it is SDD's, reached through the library the way
+/// the shell reaches everything the knowledge crate holds.
+pub use knowledge::battery::SDD_VOLTAGE_LOW_MAX_MV;
+
 use app_contracts::{
     AcceptedOperationSummary, CatalogueComparison, LibraryIssue, LibraryIssueIntegrity,
     LibrarySnapshot, LibraryState, ManifestFailure, MarkerEntry, ModuleApplicability,
@@ -861,12 +867,15 @@ impl KnowledgeLibrary {
     /// The modules holding this car's configuration, the keeper of the
     /// master copy (`sync`) first and then the copies, each with its role.
     pub fn ccf_sources(&self, context: &VehicleContext) -> Vec<(String, String)> {
+        // SDD names the holders by their diagnostic system, RSJB_SYSTEM_A
+        // for the RSJB; the read plans its route by the module, so the
+        // holder is read as the family it belongs to (ADR-0037).
         let mut sources: Vec<(String, String)> = self
             .programme_texts(context)
             .into_iter()
             .filter_map(|(name, role)| {
                 name.strip_prefix("sdd_ccf_source.")
-                    .map(|module| (module.to_string(), role))
+                    .map(|module| (knowledge::system_family(module).to_string(), role))
             })
             .collect();
         sources.sort_by(|a, b| {

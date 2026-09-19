@@ -199,6 +199,13 @@ impl KnowledgeStore {
         if let DimensionConstraint::OneOf { values } = &record.applicability.ecu_family {
             for value in values {
                 list(&mut self.by_ecu_family, value);
+                // A record scoped to a module's diagnostic system is listed
+                // under the module as well (ADR-0037), so that a query naming
+                // the module reaches it.
+                let family = crate::applicability::system_family(value);
+                if family != value {
+                    list(&mut self.by_ecu_family, family);
+                }
             }
         }
         if record.entity.kind == EntityKind::DiagnosticImplementation {
@@ -461,7 +468,8 @@ fn matches_entity_filters(record: &KnowledgeRecord, query: &KnowledgeQuery) -> b
     if let Some(expected) = &query.ecu_family {
         let entity_match =
             record.entity.kind == EntityKind::EcuFamily && record.entity.id == *expected;
-        if !entity_match && !record.applicability.ecu_family.mentions(expected) {
+        // A module's diagnostic system is the module's (ADR-0037).
+        if !entity_match && !record.applicability.ecu_family.mentions_module(expected) {
             return false;
         }
     }
@@ -622,7 +630,7 @@ mod tests {
     fn narrowing_by_name_returns_exactly_what_a_walk_of_everything_would() {
         let mut store = KnowledgeStore::new();
         store.register_source(documented_source("s-a")).unwrap();
-        for id in ["e-1", "e-2", "e-3", "e-4", "e-5", "e-6"] {
+        for id in ["e-1", "e-2", "e-3", "e-4", "e-5", "e-6", "e-7"] {
             store.add_evidence(evidence(id, "s-a")).unwrap();
         }
         let one_of = |value: &str| DimensionConstraint::one_of(vec![value.to_owned()]).unwrap();
@@ -686,6 +694,18 @@ mod tests {
                 "ECU-A",
                 one_of("ECU-B"),
                 one_of("IMPL-B"),
+            ))
+            .unwrap();
+        // Scoped to one of ECU-A's diagnostic systems, the way SDD's
+        // configuration documents scope a block address (ADR-0037).
+        store
+            .add_record(record_for(
+                "r-7",
+                "e-7",
+                EntityKind::IdentifierParameter,
+                "DID-CCF",
+                one_of("ECU-A_SYSTEM_A"),
+                DimensionConstraint::Any,
             ))
             .unwrap();
 
@@ -783,6 +803,38 @@ mod tests {
             .collect();
         assert!(united.contains(&"r-1"), "found by its module: {united:?}");
         assert!(united.contains(&"r-3"), "found by its entity: {united:?}");
+
+        // A module's diagnostic system is the module's (ADR-0037): the record
+        // scoped to ECU-A_SYSTEM_A answers a query naming ECU-A, applicable,
+        // and not a query naming ECU-B.
+        // The context names the module too, as a read of that module does.
+        let of_module = |family: &str| VehicleContext {
+            ecu_family: Some(family.into()),
+            ..context.clone()
+        };
+        let of_a = store.query(
+            &KnowledgeQuery::for_vehicle(of_module("ECU-A"))
+                .with_ecu_family("ECU-A")
+                .include_indeterminate(true),
+        );
+        let system_scoped = of_a
+            .records
+            .iter()
+            .find(|resolved| resolved.record.id == "r-7")
+            .expect("the system-scoped record is the module's");
+        assert_eq!(
+            system_scoped.applicability_resolution,
+            ApplicabilityResolution::Applicable
+        );
+        let of_b = store.query(
+            &KnowledgeQuery::for_vehicle(of_module("ECU-B"))
+                .with_ecu_family("ECU-B")
+                .include_indeterminate(true),
+        );
+        assert!(of_b
+            .records
+            .iter()
+            .all(|resolved| resolved.record.id != "r-7"));
 
         // The whole point: a name is answered without reading the store.
         assert!(store

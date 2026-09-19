@@ -17,7 +17,7 @@
 	<ccf>
 		<sync status="0">SYNTHMOD</sync>
 		<source status="0">SYNTHMOD</source>
-		<source status="0">OTHERMOD</source>
+		<source status="0">OTHERMOD_SYSTEM_A</source>
 		<source status="0">AS_BUILT</source>
 		<source status="0">OTHER</source>
 	</ccf>
@@ -26,7 +26,7 @@
 		<address module="SYNTHMOD" t_ccf="SYNTH_CCF.vbf" parameterId="0xF106" parameterIdOffset="0x0" start_address="0x0000C000" stop_address="0x0000C007" merge="false">
 			<qualifier model="SYNTHA" year="MY10"/>
 		</address>
-		<address module="OTHERMOD" t_ccf="" parameterId="0xF106" parameterIdOffset="0x0" start_address="0x0000C000" stop_address="0x0000C007" merge="false">
+		<address module="OTHERMOD_SYSTEM_A" t_ccf="" parameterId="0xF106" parameterIdOffset="0x0" start_address="0x0000C000" stop_address="0x0000C007" merge="false">
 			<qualifier model="SYNTHA" year="MY10">
 				<qual type="Type" value="SYNTHENGINE"/>
 			</qualifier>
@@ -137,7 +137,7 @@
 			<qualifier model="SYNTHA" year="MY10"/>
 		</address>
 		<!-- Stamped with a neighbouring year, as SDD's X250 document of 2013 stamps its reserved block. -->
-		<address module="OTHERMOD" t_ccf="" parameterId="0xF105" parameterIdOffset="0x4" start_address="0x0000C014" stop_address="0x0000C015" merge="false">
+		<address module="OTHERMOD_SYSTEM_A" t_ccf="" parameterId="0xF105" parameterIdOffset="0x4" start_address="0x0000C014" stop_address="0x0000C015" merge="false">
 			<qualifier model="SYNTHA" year="MY12"/>
 		</address>
 		<group start="0" stop="1" name="GROUP_SYNTH_RES">

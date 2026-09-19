@@ -130,8 +130,11 @@ fn every_readable_block_is_an_identifier_of_its_module_and_nothing_else_is() {
         rows,
         vec![
             // An address stamped with a neighbouring year keeps that year.
+            // The holder is named as SDD names it, by its diagnostic system;
+            // the ingest keeps that name, and reading it as the module's is
+            // the library's rule, not the ingest's (ADR-0037).
             row(
-                "OTHERMOD",
+                "OTHERMOD_SYSTEM_A",
                 "0xF105",
                 "ccf=RES;offset=4;length=2",
                 None,
@@ -139,7 +142,7 @@ fn every_readable_block_is_an_identifier_of_its_module_and_nothing_else_is() {
             ),
             // The copy's address is narrowed by the engine it states.
             row(
-                "OTHERMOD",
+                "OTHERMOD_SYSTEM_A",
                 "0xF106",
                 "ccf=CCF;offset=0;length=8",
                 Some("SYNTHENGINE"),
@@ -222,7 +225,7 @@ fn the_header_says_who_keeps_the_configuration_and_the_scheme_says_how_it_is_rea
         "sync".to_string()
     )));
     assert!(programme.contains(&(
-        format!("{CCF_SOURCE_CLAIM_PREFIX}OTHERMOD"),
+        format!("{CCF_SOURCE_CLAIM_PREFIX}OTHERMOD_SYSTEM_A"),
         "copy".to_string()
     )));
     // AS_BUILT and OTHER are not modules.

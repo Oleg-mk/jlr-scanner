@@ -790,8 +790,14 @@ fn record_is_related(record: &ResolvedKnowledge, target: &DiagnosticTarget) -> b
 }
 
 fn record_mentions_ecu(record: &ResolvedKnowledge, expected: &str) -> bool {
+    // A module's diagnostic system is the module's (ADR-0037): the same rule
+    // the store applies, so the two cannot disagree about a record.
     (record.record.entity.kind == EntityKind::EcuFamily && record.record.entity.id == expected)
-        || dimension_mentions(&record.record.applicability.ecu_family, expected)
+        || record
+            .record
+            .applicability
+            .ecu_family
+            .mentions_module(expected)
 }
 
 fn record_mentions_implementation(record: &ResolvedKnowledge, expected: &str) -> bool {

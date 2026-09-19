@@ -20,7 +20,8 @@ mod source;
 mod store;
 
 pub use applicability::{
-    Applicability, ApplicabilityResolution, DimensionConstraint, VehicleContext, YearConstraint,
+    system_family, Applicability, ApplicabilityResolution, DimensionConstraint, VehicleContext,
+    YearConstraint,
 };
 pub use battery::{battery_role, is_headline as is_headline_battery_parameter, BatteryRole};
 pub use error::KnowledgeError;
