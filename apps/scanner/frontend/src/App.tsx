@@ -76,7 +76,7 @@ import { useModuleReadController } from "./useModuleReadController";
 import { useNetworkCheckController } from "./useNetworkCheckController";
 import { useSessionReportController } from "./useSessionReportController";
 import { ConfirmDialog } from "./components/ConfirmDialog";
-import { defaultServiceClient, type ServiceClient } from "./serviceMode";
+import { defaultServiceClient, type DtcClearSnapshot, type ServiceClient } from "./serviceMode";
 import { useServiceModeController } from "./useServiceModeController";
 import "./styles.css";
 
@@ -197,14 +197,6 @@ export function App({
   const ccf = useCcfController(ccfClient, library.vehicle);
   const battery = useBatteryController(batteryClient, library.vehicle);
   const session = useSessionReportController(sessionReportClient);
-  // The service mode (ADR-0036): the session's own switch, behind one
-  // consent; the shell keeps the truth of it in the session snapshot.
-  const service = useServiceModeController(
-    serviceClient,
-    library.vehicle,
-    session.snapshot.serviceMode,
-    session.refresh,
-  );
   // The bench (ADR-0020): a virtual vehicle behind a stand-in adapter. The
   // whole screen says so, and the session is bench-only or real-only.
   const bench = isBench(controller.snapshot);
@@ -281,6 +273,28 @@ export function App({
     if (snapshot.ecuFamily === "") return;
     setResults((previous) => ({ ...previous, [snapshot.ecuFamily]: snapshot }));
   }, []);
+  // A clear that read the module again says what the module holds now; the
+  // list of what the car answered follows it, so a cleared module leaves
+  // the list and one whose codes returned at once stays on it. The read
+  // that found the codes is in the report, whole, under the clear.
+  const applyClear = useCallback((cleared: DtcClearSnapshot) => {
+    if (cleared.codesAfter === null) return;
+    const dtcs = cleared.codesAfter;
+    setResults((previous) => {
+      const known = previous[cleared.ecuFamily];
+      if (known === undefined) return previous;
+      return { ...previous, [cleared.ecuFamily]: { ...known, dtcs } };
+    });
+  }, []);
+  // The service mode (ADR-0036): the session's own switch, behind one
+  // consent; the shell keeps the truth of it in the session snapshot.
+  const service = useServiceModeController(
+    serviceClient,
+    library.vehicle,
+    session.snapshot.serviceMode,
+    session.refresh,
+    applyClear,
+  );
   const check = useNetworkCheckController(moduleReadClient, library.vehicle, recordResult);
   const [selectedModule, setSelectedModule] = useState<string | null>(null);
   const setModuleReadTarget = moduleRead.setEcuFamily;
@@ -664,6 +678,12 @@ export function App({
                       results={results}
                       modules={surveyModules}
                       onSelect={selectModule}
+                      serviceMode={service.on}
+                      adapterReady={adapterReady}
+                      clearing={service.clearing}
+                      sequence={service.sequence}
+                      batteryNotice={batteryNotice}
+                      onClearAll={(families) => void service.clearMany(families)}
                     />
                     <ModuleDetails
                       module={selected}

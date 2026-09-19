@@ -4,6 +4,8 @@ import { codeText, dataText, t, useLanguage } from "../i18n";
 import { useHelpLanguage } from "../helpLanguage";
 import { FAULT_CODE_OPERATIONS, type ModuleReadSnapshot } from "../moduleRead";
 import type { ModuleSurveyEntry } from "../library";
+import type { ClearSequence } from "../useServiceModeController";
+import { ConfirmDialog } from "./ConfirmDialog";
 import { StatusBadge } from "./StatusBadge";
 
 interface FaultSummaryProps {
@@ -13,6 +15,19 @@ interface FaultSummaryProps {
   modules: ModuleSurveyEntry[];
   /** Jump to a module's own panel. */
   onSelect: (ecuFamily: string) => void;
+  /**
+   * The service mode (ADR-0036): while it is on, the one collective clear
+   * is offered here, over every module on the list, after one question
+   * that names them all.
+   */
+  serviceMode?: boolean;
+  adapterReady?: boolean;
+  clearing?: boolean;
+  /** The collective clear as it runs, and what it came to. */
+  sequence?: ClearSequence | null;
+  /** The low-battery line, repeated inside the question (ADR-0030). */
+  batteryNotice?: string | null;
+  onClearAll?: (families: string[]) => void;
 }
 
 /**
@@ -30,10 +45,22 @@ interface FaultSummaryProps {
  * of what answered clean, so that "nothing found" is said rather than left
  * to be inferred from an empty screen.
  */
-export function FaultSummary({ results, modules, onSelect }: FaultSummaryProps) {
+export function FaultSummary({
+  results,
+  modules,
+  onSelect,
+  serviceMode = false,
+  adapterReady = false,
+  clearing = false,
+  sequence = null,
+  batteryNotice = null,
+  onClearAll,
+}: FaultSummaryProps) {
   const language = useLanguage();
   const [helpLanguage] = useHelpLanguage(language);
   const [open, setOpen] = useState(true);
+  // The one question before the collective clear (ADR-0036, decision 3).
+  const [confirmAll, setConfirmAll] = useState(false);
 
   // Every fault-code read this session made, whether the module answered or
   // not: `isFaultCodesRead` keeps only the successes, and a module that did
@@ -91,6 +118,99 @@ export function FaultSummary({ results, modules, onSelect }: FaultSummaryProps) 
           failed,
         })}
       </p>
+
+      {serviceMode && onClearAll !== undefined && codes > 0 ? (
+        <div className="mode-operation">
+          <button
+            className="button button--service"
+            type="button"
+            disabled={clearing || !adapterReady}
+            onClick={() => setConfirmAll(true)}
+          >
+            {t("Clear the codes of all {count} modules", { count: withCodes.length })}
+          </button>
+          <span className="button-hint">
+            {t("SERVICE_ROUTINE · one question, then each module in turn; every answer is recorded.")}
+          </span>
+        </div>
+      ) : null}
+      {sequence !== null && sequence.current !== null ? (
+        <p className="survey-summary clear-sequence" role="status">
+          {t("Clearing {module} — {done} of {total}…", {
+            module: sequence.current,
+            done: sequence.outcomes.length + 1,
+            total: sequence.families.length,
+          })}
+        </p>
+      ) : null}
+      {sequence !== null && sequence.current === null ? (
+        <div className="clear-sequence" role="status">
+          <p className="survey-summary">
+            {t("Cleared in turn: {cleared} accepted, {refused} refused, {failed} not made.", {
+              cleared: sequence.outcomes.filter((outcome) => outcome.state === "CLEARED").length,
+              refused: sequence.outcomes.filter((outcome) => outcome.state === "REFUSED").length,
+              failed: sequence.outcomes.filter(
+                (outcome) => outcome.state !== "CLEARED" && outcome.state !== "REFUSED",
+              ).length,
+            })}
+          </p>
+          {sequence.outcomes.some((outcome) => outcome.state !== "CLEARED") ? (
+            <ul className="clear-outcome-codes">
+              {sequence.outcomes
+                .filter((outcome) => outcome.state !== "CLEARED")
+                .map((outcome) => (
+                  <li key={outcome.ecuFamily}>
+                    {outcome.state === "REFUSED"
+                      ? t("{module} refused: {refusal}", {
+                          module: outcome.ecuFamily,
+                          refusal: outcome.refusal ?? "—",
+                        })
+                      : t("{module}: not made — {message}", {
+                          module: outcome.ecuFamily,
+                          message: outcome.error !== null ? t(outcome.error.message) : "—",
+                        })}
+                  </li>
+                ))}
+            </ul>
+          ) : null}
+        </div>
+      ) : null}
+      {confirmAll ? (
+        <ConfirmDialog
+          title={t("Clear the fault codes of {count} modules", { count: withCodes.length })}
+          confirmLabel={t("Clear the codes of {count} modules", { count: withCodes.length })}
+          cancelLabel={t("Cancel")}
+          onConfirm={() => {
+            setConfirmAll(false);
+            onClearAll?.(withCodes.map((outcome) => outcome.ecuFamily));
+          }}
+          onCancel={() => setConfirmAll(false)}
+        >
+          <p>{t("Operation: clear the fault codes · class SERVICE_ROUTINE")}</p>
+          <ul className="clear-outcome-codes">
+            {withCodes.map((outcome) => {
+              const name = nameOf(outcome.ecuFamily);
+              return (
+                <li key={outcome.ecuFamily}>
+                  <strong>{outcome.ecuFamily}</strong>
+                  {name !== null ? ` — ${name}` : ""}
+                  {" · "}
+                  {t("{count} code(s)", { count: outcome.dtcs.length })}
+                </li>
+              );
+            })}
+          </ul>
+          <p>
+            {t(
+              "{codes} code(s) will be erased from {modules} module(s), one module after another; each answer is recorded. They stay in this session's report.",
+              { codes, modules: withCodes.length },
+            )}
+          </p>
+          {batteryNotice !== null ? <p className="battery-precondition">{batteryNotice}</p> : null}
+          <p>{t("The car stands still, the ignition is on, the engine is off.")}</p>
+          <p>{t("After a positive answer each module's codes are read again at once.")}</p>
+        </ConfirmDialog>
+      ) : null}
 
       {codes > 0 && open
         ? withCodes.map((outcome) => {

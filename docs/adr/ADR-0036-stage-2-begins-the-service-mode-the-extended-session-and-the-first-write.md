@@ -310,3 +310,31 @@ and what the code does met in these places:
 
 The version turns 1.2.0 with the owner's word, and the installer goes to him
 alone (decision 8).
+
+## Amendment, 2026-09-19: the collective clear, and step 1 accepted at the screen
+
+- The owner walked the service mode and the clear in the running window and
+  accepted the flow he had judged illogical the evening before: «ми
+  виправили всі мої зауваження, все тепер логічно». Then, on his word
+  («роби»), the one thing the built note had left for a later commit.
+- **The collective confirmation (decision 3) is built.** Under the list of
+  what the car answered — the modules the check found codes in — the mode
+  offers "Clear the codes of all *n* modules". The one question lists every
+  module it will ask with its name and its count of codes, says how many
+  codes will be erased from how many modules, repeats the low-battery line
+  where there is one (`ADR-0030`), and the confirming control names the
+  operation and the count. Then each module is asked in turn, in the order
+  of the list, and each answer is its own record — the shell knows no
+  sequence, only clears, and `dtc_clears` grows by one per module. A
+  refusal or a failure of one module does not stop the rest; what each came
+  to is said under the list when the sequence ends, and a module whose codes
+  returned at once stays on the list, because the list follows the read
+  made after the clear. Tested in the interface over two modules; on the
+  bench the end-to-end test is the per-module path, and every clear of a
+  sequence is that path once more — the synthetic fixture reaches one
+  module, so a two-module sequence on the bench waits for a second
+  reachable module in the fixture.
+- Nothing else of the step moves: the per-module clear, the session, the
+  guard and the record are as the amendment of 2026-09-18 says; the K-line
+  path stays proved at the crate level; no operation has met a car. The
+  version turns 1.2.0 with the owner's word.

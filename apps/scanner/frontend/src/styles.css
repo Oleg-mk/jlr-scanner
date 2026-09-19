@@ -5971,3 +5971,13 @@ table.live-read-identifiers label {
 .stable-label__off {
   visibility: hidden;
 }
+
+/* The collective clear as it runs and what it came to (ADR-0036, decision
+   3; 2026-09-19): one line under the list, its figures tabular. */
+.fault-summary .clear-sequence {
+  font-variant-numeric: tabular-nums;
+}
+
+.fault-summary .mode-operation {
+  margin: 0.5rem 0 0.75rem;
+}

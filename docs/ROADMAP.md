@@ -601,11 +601,13 @@ Judged illogical by the owner at the screen on 2026-09-18, reworked over
 two days with his list, and accepted by him in the running window on
 2026-09-19: «все тепер логічно».
 
-Not yet in this step: the one collective confirmation, "clear the codes of
-every surveyed module", which the decision allows and a later commit of the
-step adds. What outranks all of it is unchanged: no operation has met a car,
-and the first write on one is the owner's, after a real read session has
-been reported.
+The one collective confirmation, "clear the codes of all *n* modules", was
+built the same day (`ADR-0036`, amendment of 2026-09-19): one question that
+lists the modules, each asked in turn, each answer its own record. The step
+is complete on the bench; the K-line path is proved at the crate level.
+What outranks all of it is unchanged: no operation has met a car, and the
+first write on one is the owner's, after a real read session has been
+reported.
 
 ### F14 — K-line transport for the legacy buses (brought forward 2026-09-12, `ADR-0029`)
 

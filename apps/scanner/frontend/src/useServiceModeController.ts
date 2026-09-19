@@ -7,6 +7,18 @@ import {
 } from "./serviceMode";
 
 /**
+ * The one collective clear as it runs (ADR-0036, decision 3): the modules
+ * it was confirmed for, in the order they are asked, the one being asked
+ * now, and every answer so far. Null while none has been started.
+ */
+export interface ClearSequence {
+  families: string[];
+  /** The module being asked now; null once every one has answered. */
+  current: string | null;
+  outcomes: DtcClearSnapshot[];
+}
+
+/**
  * The service mode (ADR-0036): the switch, the consent that stands before
  * it, and the first operation behind it. The mode's truth is the shell's -
  * the session snapshot says whether it is on - and this controller asks the
@@ -17,6 +29,8 @@ export function useServiceModeController(
   vehicle: VehicleDescription,
   serviceMode: boolean,
   onModeChanged: () => void | Promise<void>,
+  /** Every clear that answered, as it answered: what the module holds now. */
+  onCleared?: (clear: DtcClearSnapshot) => void,
 ) {
   // The consent is shown once, before the mode goes on; nothing goes on
   // until the person accepts it.
@@ -24,6 +38,7 @@ export function useServiceModeController(
   const [switching, setSwitching] = useState(false);
   const [clear, setClear] = useState<DtcClearSnapshot>(createDtcClearSnapshot);
   const [clearing, setClearing] = useState(false);
+  const [sequence, setSequence] = useState<ClearSequence | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -71,7 +86,9 @@ export function useServiceModeController(
       setClearing(true);
       setError(null);
       try {
-        setClear(await client.clearDtcs({ ecuFamily, context: vehicle }));
+        const answered = await client.clearDtcs({ ecuFamily, context: vehicle });
+        setClear(answered);
+        onCleared?.(answered);
         await onModeChanged();
       } catch (caught) {
         setError(caught instanceof Error ? caught.message : String(caught));
@@ -79,7 +96,50 @@ export function useServiceModeController(
         setClearing(false);
       }
     },
-    [client, onModeChanged, serviceMode, vehicle],
+    [client, onCleared, onModeChanged, serviceMode, vehicle],
+  );
+
+  /**
+   * The one collective clear (ADR-0036, decision 3): after the one question
+   * that listed them, every module is asked in turn and every answer is
+   * recorded on its own - the shell knows no sequence, only clears. A
+   * refusal or a failure of one module does not stop the rest.
+   */
+  const clearMany = useCallback(
+    async (families: string[]) => {
+      if (!serviceMode || families.length === 0) return;
+      setClearing(true);
+      setError(null);
+      const outcomes: DtcClearSnapshot[] = [];
+      try {
+        for (const ecuFamily of families) {
+          setSequence({ families, current: ecuFamily, outcomes: [...outcomes] });
+          try {
+            const answered = await client.clearDtcs({ ecuFamily, context: vehicle });
+            outcomes.push(answered);
+            setClear(answered);
+            onCleared?.(answered);
+          } catch (caught) {
+            outcomes.push({
+              ...createDtcClearSnapshot(),
+              state: "FAILED",
+              ecuFamily,
+              error: {
+                category: "ADAPTER",
+                message: caught instanceof Error ? caught.message : String(caught),
+                technicalDetails: null,
+                stage: "EXECUTION",
+              },
+            });
+          }
+        }
+        setSequence({ families, current: null, outcomes });
+        await onModeChanged();
+      } finally {
+        setClearing(false);
+      }
+    },
+    [client, onCleared, onModeChanged, serviceMode, vehicle],
   );
 
   return {
@@ -93,6 +153,8 @@ export function useServiceModeController(
     clear,
     clearing,
     clearCodes,
+    clearMany,
+    sequence,
     error,
   };
 }

@@ -489,6 +489,20 @@ const uk: Record<string, string> = {
   "Clearing…": "Стираю…",
   "Clear the fault codes of {module}": "Стерти коди несправностей {module}",
   "Clear the codes of {module}": "Стерти коди {module}",
+  "Clear the codes of all {count} modules": "Стерти коди всіх модулів ({count})",
+  "Clear the fault codes of {count} modules": "Стерти коди несправностей {count} модулів",
+  "Clear the codes of {count} modules": "Стерти коди {count} модулів",
+  "SERVICE_ROUTINE · one question, then each module in turn; every answer is recorded.":
+    "SERVICE_ROUTINE · одне запитання, далі кожен модуль по черзі; кожна відповідь записується.",
+  "{codes} code(s) will be erased from {modules} module(s), one module after another; each answer is recorded. They stay in this session's report.":
+    "Буде стерто кодів: {codes}, у модулях: {modules} — модуль за модулем; кожна відповідь записується. Вони лишаються у звіті цієї сесії.",
+  "After a positive answer each module's codes are read again at once.":
+    "Після позитивної відповіді коди кожного модуля одразу читаються знову.",
+  "Clearing {module} — {done} of {total}…": "Стираю {module} — {done} з {total}…",
+  "Cleared in turn: {cleared} accepted, {refused} refused, {failed} not made.":
+    "Стерто по черзі: прийняли {cleared}, відмовили {refused}, не виконано {failed}.",
+  "{module} refused: {refusal}": "{module} відмовив: {refusal}",
+  "{module}: not made — {message}": "{module}: не виконано — {message}",
   "Operation: clear the fault codes · class SERVICE_ROUTINE": "Операція: стирання кодів несправностей · клас SERVICE_ROUTINE",
   "{count} code(s) will be erased from the module. They stay in this session's report.":
     "З модуля буде стерто кодів: {count}. Вони лишаються у звіті цієї сесії.",
@@ -1746,6 +1760,20 @@ const ru: Record<string, string> = {
   "Clearing…": "Стираю…",
   "Clear the fault codes of {module}": "Стереть коды неисправностей {module}",
   "Clear the codes of {module}": "Стереть коды {module}",
+  "Clear the codes of all {count} modules": "Стереть коды всех модулей ({count})",
+  "Clear the fault codes of {count} modules": "Стереть коды неисправностей {count} модулей",
+  "Clear the codes of {count} modules": "Стереть коды {count} модулей",
+  "SERVICE_ROUTINE · one question, then each module in turn; every answer is recorded.":
+    "SERVICE_ROUTINE · один вопрос, затем каждый модуль по очереди; каждый ответ записывается.",
+  "{codes} code(s) will be erased from {modules} module(s), one module after another; each answer is recorded. They stay in this session's report.":
+    "Будет стёрто кодов: {codes}, в модулях: {modules} — модуль за модулем; каждый ответ записывается. Они остаются в отчёте этой сессии.",
+  "After a positive answer each module's codes are read again at once.":
+    "После положительного ответа коды каждого модуля сразу читаются снова.",
+  "Clearing {module} — {done} of {total}…": "Стираю {module} — {done} из {total}…",
+  "Cleared in turn: {cleared} accepted, {refused} refused, {failed} not made.":
+    "Стёрто по очереди: приняли {cleared}, отказали {refused}, не выполнено {failed}.",
+  "{module} refused: {refusal}": "{module} отказал: {refusal}",
+  "{module}: not made — {message}": "{module}: не выполнено — {message}",
   "Operation: clear the fault codes · class SERVICE_ROUTINE": "Операция: стирание кодов неисправностей · класс SERVICE_ROUTINE",
   "{count} code(s) will be erased from the module. They stay in this session's report.":
     "Из модуля будет стёрто кодов: {count}. Они остаются в отчёте этой сессии.",

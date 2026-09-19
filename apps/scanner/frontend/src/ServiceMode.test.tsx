@@ -95,7 +95,19 @@ const surveyed: ModuleSurveyEntry[] = [
   },
 ];
 
+/** A second module with codes of its own, for the collective clear. */
+const twoSurveyed: ModuleSurveyEntry[] = [
+  surveyed[0],
+  {
+    ...surveyed[0],
+    ecuFamily: "TCM",
+    requestId: "0x7E1",
+    responseId: "0x7E9",
+  },
+];
+
 class SurveyingLibraryClient implements LibraryClient {
+  constructor(private readonly modules: ModuleSurveyEntry[] = surveyed) {}
   getLibrary(): Promise<LibrarySnapshot> {
     return Promise.resolve({ ...createLibrarySnapshot(), state: "LOADED" });
   }
@@ -121,11 +133,11 @@ class SurveyingLibraryClient implements LibraryClient {
   surveyVehicle(vehicle: VehicleDescription): Promise<VehicleSurveySnapshot> {
     return Promise.resolve({
       context: vehicle,
-      modules: surveyed,
-      reachable: 1,
+      modules: this.modules,
+      reachable: this.modules.length,
       hypothesis: 0,
       unreachable: 0,
-      message: "1 module known: 1 reachable over the adapter.",
+      message: `${this.modules.length} module(s) known: ${this.modules.length} reachable over the adapter.`,
     });
   }
 }
@@ -276,12 +288,13 @@ function renderApp(
   session: RecordingSessionClient,
   reads: TwoCodesClient,
   battery?: BatteryClient,
+  modules: ModuleSurveyEntry[] = surveyed,
 ) {
   return render(
     <App
       client={new BenchAdapterClient()}
       diagnosticClient={new IdleDiagnosticClient()}
-      libraryClient={new SurveyingLibraryClient()}
+      libraryClient={new SurveyingLibraryClient(modules)}
       moduleReadClient={reads}
       serviceClient={service}
       sessionReportClient={session}
@@ -379,6 +392,51 @@ describe("the service mode (ADR-0036)", () => {
     expect(await screen.findByText("The module accepted the clear.")).toBeVisible();
     expect(screen.getByText(/in session 0x03/)).toBeVisible();
     expect(screen.getByText("Read again: no codes reported.")).toBeVisible();
+  });
+
+  /**
+   * The one collective clear (ADR-0036, decision 3; built 2026-09-19): over
+   * every module the check found codes in, after one question that lists
+   * them, each module asked in turn and each answer recorded on its own;
+   * the list of what the car answered follows the clears.
+   */
+  it("clears every module that answered with codes after one question, in turn", async () => {
+    const session = new RecordingSessionClient();
+    const service = new RecordingServiceClient(session);
+    const reads = new TwoCodesClient();
+    renderApp(service, session, reads, undefined, twoSurveyed);
+    await screen.findByRole("button", { name: "Service mode" });
+
+    // Survey both, check them all: four codes in two modules on the list.
+    fireEvent.change(screen.getByLabelText("Programme"), { target: { value: "L405" } });
+    fireEvent.click(screen.getByRole("button", { name: "Survey modules" }));
+    fireEvent.click(await screen.findByRole("button", { name: /^Check all modules/ }));
+    await screen.findByRole("heading", { name: "4 fault code(s) in 2 module(s)" });
+    // Nothing collective while the mode is off.
+    expect(screen.queryByRole("button", { name: /^Clear the codes of all/ })).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "Service mode" }));
+    fireEvent.click(screen.getByRole("button", { name: "Turn the service mode on" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Clear the codes of all 2 modules" }));
+
+    // One question, listing the modules it will ask and what will be erased.
+    const question = screen.getByRole("dialog", { name: "Clear the fault codes of 2 modules" });
+    expect(within(question).getByText("PCM")).toBeVisible();
+    expect(within(question).getByText("TCM")).toBeVisible();
+    expect(
+      within(question).getByText(/4 code\(s\) will be erased from 2 module\(s\), one module after another/),
+    ).toBeVisible();
+    fireEvent.click(within(question).getByRole("button", { name: "Clear the codes of 2 modules" }));
+
+    // Each module in turn, each answer its own clear.
+    await waitFor(() => expect(service.clears).toHaveLength(2));
+    expect(service.clears.map((clear) => clear.ecuFamily)).toEqual(["PCM", "TCM"]);
+    expect(
+      await screen.findByText("Cleared in turn: 2 accepted, 0 refused, 0 not made."),
+    ).toBeVisible();
+    // Read again, both empty: the list says so, and offers no second clear.
+    expect(await screen.findByRole("heading", { name: "No fault codes" })).toBeVisible();
+    expect(screen.queryByRole("button", { name: /^Clear the codes of all/ })).toBeNull();
   });
 
   it("repeats the low-battery line in the clear's confirmation (ADR-0030, 2026-09-19)", async () => {
