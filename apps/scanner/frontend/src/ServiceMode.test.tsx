@@ -1,4 +1,5 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { createBatterySnapshot, type BatteryClient, type BatteryReadSnapshot } from "./battery";
 import { afterEach, describe, expect, it } from "vitest";
 import { App } from "./App";
 import { LANGUAGE_STORAGE_KEY, setCurrentLanguage } from "./i18n";
@@ -220,10 +221,61 @@ class RecordingServiceClient implements ServiceClient {
   }
 }
 
+/** A battery that always answers the same reading, for the precondition. */
+class FixedBatteryClient implements BatteryClient {
+  constructor(private readonly fixed: BatteryReadSnapshot) {}
+  getState() {
+    return Promise.resolve(this.fixed);
+  }
+  start() {
+    return Promise.resolve(this.fixed);
+  }
+  step() {
+    return Promise.resolve(this.fixed);
+  }
+  finish() {
+    return Promise.resolve(this.fixed);
+  }
+}
+
+/** A last battery read in SDD's low band: 11.2 V under the 11.6 V edge. */
+function lowBatteryRead(): BatteryReadSnapshot {
+  return {
+    ...createBatterySnapshot(),
+    state: "FINISHED",
+    planned: 1,
+    asked: 1,
+    answered: 1,
+    modules: 1,
+    routeValidation: "SYNTHETIC",
+    readUnixMs: Date.now(),
+    sddLowVoltageMaxMv: 11_600,
+    readings: [
+      {
+        ecuFamily: "BCM",
+        identifier: "0x402A",
+        parameter: "Vehicle Battery Voltage",
+        role: "VOLTAGE",
+        headline: true,
+        state: "SUCCEEDED",
+        value: "11.2",
+        unit: "V",
+        routeId: "hs-can",
+        routeValidation: "SYNTHETIC",
+        rawResponseHex: "62 40 2A 68",
+        negativeResponse: null,
+        note: null,
+        reason: null,
+      },
+    ],
+  };
+}
+
 function renderApp(
   service: RecordingServiceClient,
   session: RecordingSessionClient,
   reads: TwoCodesClient,
+  battery?: BatteryClient,
 ) {
   return render(
     <App
@@ -233,6 +285,7 @@ function renderApp(
       moduleReadClient={reads}
       serviceClient={service}
       sessionReportClient={session}
+      batteryClient={battery}
       pollIntervalMs={60_000}
     />,
   );
@@ -326,5 +379,31 @@ describe("the service mode (ADR-0036)", () => {
     expect(await screen.findByText("The module accepted the clear.")).toBeVisible();
     expect(screen.getByText(/in session 0x03/)).toBeVisible();
     expect(screen.getByText("Read again: no codes reported.")).toBeVisible();
+  });
+
+  it("repeats the low-battery line in the clear's confirmation (ADR-0030, 2026-09-19)", async () => {
+    const session = new RecordingSessionClient();
+    const service = new RecordingServiceClient(session);
+    renderApp(service, session, new TwoCodesClient(), new FixedBatteryClient(lowBatteryRead()));
+    await screen.findByRole("button", { name: "Service mode" });
+    // The line stands under the header as soon as the reading is known.
+    expect(await screen.findByText(/Connect an external power supply/)).toBeVisible();
+
+    fireEvent.change(screen.getByLabelText("Programme"), { target: { value: "L405" } });
+    fireEvent.click(screen.getByRole("button", { name: "Survey modules" }));
+    fireEvent.click(await screen.findByRole("button", { name: "PCM: Reachable" }));
+    await screen.findByRole("heading", { name: "PCM" });
+    fireEvent.click(screen.getByRole("button", { name: "Read" }));
+    expect((await screen.findAllByText("P0300")).length).toBeGreaterThan(0);
+    fireEvent.click(screen.getByRole("button", { name: "Service mode" }));
+    fireEvent.click(screen.getByRole("button", { name: "Turn the service mode on" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Clear the fault codes" }));
+
+    // And again inside the question, before anything is sent, beside the
+    // other preconditions; the person still decides.
+    const question = screen.getByRole("dialog", { name: "Clear the fault codes of PCM" });
+    expect(within(question).getByText(/11\.2 V/)).toBeVisible();
+    expect(within(question).getByText(/Connect an external power supply/)).toBeVisible();
+    expect(within(question).getByRole("button", { name: "Clear the codes of PCM" })).toBeEnabled();
   });
 });

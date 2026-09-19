@@ -86,6 +86,16 @@ const OBD_CURRENT_DATA: &[(u8, &[u8])] = &[
     (0x5C, &[0x5A]),
     (0x5E, &[0x00, 0x64]),
 ];
+/// PID `0x42`, the control module's voltage: the one legislated value that
+/// follows the battery.
+const OBD_CONTROL_MODULE_VOLTAGE: u8 = 0x42;
+/// What the rail reads on a scenario ending in nine, everywhere the bench
+/// answers it: the battery read's `0x402A`, PID `0x42`, and a live read of
+/// a module's supply. One rail, one number, as on a car (`ADR-0030`,
+/// amendment of 2026-09-19, later).
+const LOW_BATTERY_VOLTS: f64 = 11.2;
+/// The same 11.2 V as PID `0x42` writes it: 11 200 mV.
+const OBD_LOW_BATTERY_VOLTAGE: &[u8] = &[0x2B, 0xC0];
 /// The scenario on which every module is healthy and reports nothing.
 pub const SCENARIO_HEALTHY: u32 = 0;
 /// The scenario a session starts on, when nobody chose another.
@@ -115,6 +125,10 @@ const FAULT_STATUS: u8 = 0x09;
 
 struct ModuleResponder {
     family: String,
+    /// The scenario put the battery in SDD's low band (`ADR-0030`,
+    /// amendment of 2026-09-19), so the interface's precondition line can be
+    /// run in without a car.
+    low_battery: bool,
     route: BenchRoute,
     request_id: u32,
     response_id: u32,
@@ -225,6 +239,7 @@ impl BenchVehicle {
                 .collect();
             modules.push(ModuleResponder {
                 family: entry.ecu_family.clone(),
+                low_battery: low_battery_scenario(scenario),
                 protocol: entry.protocol.clone().unwrap_or_default(),
                 route,
                 request_id: request,
@@ -288,7 +303,9 @@ impl BenchVehicle {
                             payload.extend_from_slice(
                                 synthetic_text(&module.family, identifier).as_bytes(),
                             );
-                        } else if let Some(bytes) = synthetic_battery(identifier, *length) {
+                        } else if let Some(bytes) =
+                            synthetic_battery(identifier, *length, module.low_battery)
+                        {
                             // A battery the card can draw, and every row of
                             // it marked SYNTHETIC (ADR-0030, ADR-0020).
                             payload.extend_from_slice(&bytes);
@@ -306,6 +323,7 @@ impl BenchVehicle {
                                     parameters,
                                     *length,
                                     module.answered,
+                                    module.low_battery,
                                 )
                             });
                             match reading {
@@ -428,10 +446,7 @@ impl BenchVehicle {
                     .unwrap_or_else(|| vec![0, 0]),
             );
         }
-        OBD_CURRENT_DATA
-            .iter()
-            .find(|(known, _)| *known == pid)
-            .map(|(_, bytes)| bytes.to_vec())
+        obd_current_data(pid, module.low_battery)
     }
 
     /// The legislated services at a standard address; a refusal with the
@@ -995,12 +1010,33 @@ fn synthetic_text(family: &str, identifier: u16) -> String {
     )
 }
 
+/// Whether a scenario puts the bench's battery in SDD's low band: every
+/// scenario ending in nine, so that both states are a number away and the
+/// precondition line of `ADR-0030` (2026-09-19) is run in on every commit.
+/// Scenario 0 stays the vehicle in good order, in every respect.
+pub fn low_battery_scenario(scenario: u32) -> bool {
+    scenario != SCENARIO_HEALTHY && scenario % 10 == 9
+}
+
+/// A PID's standing-engine value from the table - except the control
+/// module's voltage on a low-battery scenario, which reads the rail the
+/// battery read reads, so the two agree as they would on a car.
+fn obd_current_data(pid: u8, low_battery: bool) -> Option<Vec<u8>> {
+    if low_battery && pid == OBD_CONTROL_MODULE_VOLTAGE {
+        return Some(OBD_LOW_BATTERY_VOLTAGE.to_vec());
+    }
+    OBD_CURRENT_DATA
+        .iter()
+        .find(|(known, _)| *known == pid)
+        .map(|(_, bytes)| bytes.to_vec())
+}
+
 /// A believable battery for the bench (ADR-0030): the readings whose bytes
 /// the loaded data describes, written the way the decoder reads them, so the
 /// card has something to draw before any car has been met. Every value is a
 /// bench value and every row that carries it says `SYNTHETIC`; nothing here
 /// is a measurement and nothing is a claim about a real battery.
-fn synthetic_battery(identifier: u16, length: usize) -> Option<Vec<u8>> {
+fn synthetic_battery(identifier: u16, length: usize, low_battery: bool) -> Option<Vec<u8>> {
     // The raw number as the module would hold it, before the data own
     // scale and offset turn it back into a reading.
     let raw: u64 = match identifier {
@@ -1014,8 +1050,15 @@ fn synthetic_battery(identifier: u16, length: usize) -> Option<Vec<u8>> {
         0x4090 | 0x402B => 8192 - 24,
         // 12.6 V: the data reads (raw + 120) x 0.05. Written as 202 counts
         // under a comment saying 1/16 of a volt, the card read 16.1 V
-        // (2026-09-17).
-        0x402A => 132,
+        // (2026-09-17). On a low-battery scenario 104 counts, 11.2 V: inside
+        // SDD's own low band, so the precondition line has something to say.
+        0x402A => {
+            if low_battery {
+                104
+            } else {
+                132
+            }
+        }
         // 14.4 V at 1/2048 of a volt.
         0x0304 => 29_491,
         // 10.9 V of estimated cold cranking, at 1/16 of a volt.
@@ -1060,11 +1103,15 @@ fn synthetic_bytes(family: &str, identifier: u16, length: usize, tick: u32) -> V
 /// wandering across its band with the request count, so a chart has a line
 /// to draw. A named state is one of the first two the catalogue names. None
 /// where the catalogue places nothing; the caller then draws plain bytes.
+/// On a low-battery scenario a supply sits at 11.2 V, the rail the battery
+/// read answers with; a sensor channel, fed from a regulated 5 V, keeps its
+/// band.
 fn synthetic_reading(
     family: &str,
     parameters: &[ReadableParameter],
     length: usize,
     tick: u32,
+    low_battery: bool,
 ) -> Option<Vec<u8>> {
     let mut placed: Vec<(usize, usize, Encoding, &ReadableParameter)> = parameters
         .iter()
@@ -1096,7 +1143,7 @@ fn synthetic_reading(
         {
             let offset = encoding.offset.unwrap_or(0.0);
             let top = converted(capacity as f64, scale, offset, encoding.offset_first);
-            match band_for(parameter.unit.as_deref(), scale, top) {
+            match band_for(parameter.unit.as_deref(), scale, top, low_battery) {
                 Some((low, high)) => {
                     let value = low + wander(&parameter.name, family, tick, high - low);
                     let counts = if encoding.offset_first {
@@ -1158,11 +1205,13 @@ fn is_adc_step(scale: f64) -> bool {
 /// fitted under what the bytes can hold. Bench numbers, not knowledge: a
 /// standing car with the engine running. None for a count or a unit the
 /// bench does not know.
-fn band_for(unit: Option<&str>, scale: f64, top: f64) -> Option<(f64, f64)> {
+fn band_for(unit: Option<&str>, scale: f64, top: f64, low_battery: bool) -> Option<(f64, f64)> {
     let (low, high): (f64, f64) = match unit? {
         // A sensor channel inside 0...5 V; a field that cannot hold 6.5 V is
-        // a channel too. Anything else is a supply.
+        // a channel too. Anything else is a supply, and a supply reads the
+        // battery: flat at 11.2 V on a scenario ending in nine.
         "V" if is_adc_step(scale) || top <= 6.5 => (0.5, 4.5),
+        "V" if low_battery => (LOW_BATTERY_VOLTS, LOW_BATTERY_VOLTS),
         "V" => (12.0, 14.5),
         "degC" => (20.0, 95.0),
         "pct" => (15.0, 85.0),
@@ -1399,7 +1448,7 @@ mod tests {
             "V",
         )];
         for tick in [1, 17, 40, 63] {
-            let bytes = synthetic_reading("PCM", &channel, 2, tick).unwrap();
+            let bytes = synthetic_reading("PCM", &channel, 2, tick, false).unwrap();
             let volts = number(&channel, &bytes);
             assert!((0.5..=4.5).contains(&volts), "tick {tick}: {volts} V");
             assert!(decode_parameters(&channel, &bytes)[0].raw.unwrap() <= 1023);
@@ -1410,7 +1459,10 @@ mod tests {
             "bytes=0..3;size=4;mask=all;scale=0.001;offset=0;offset_first=true",
             "V",
         )];
-        let volts = number(&supply, &synthetic_reading("PCM", &supply, 4, 5).unwrap());
+        let volts = number(
+            &supply,
+            &synthetic_reading("PCM", &supply, 4, 5, false).unwrap(),
+        );
         assert!((12.0..=14.5).contains(&volts), "{volts} V");
         // A lambda-sensor channel that cannot hold 6 V: 0.005 V a count.
         let lambda = [placed(
@@ -1418,7 +1470,10 @@ mod tests {
             "bytes=0..0;size=1;mask=0xff;scale=0.005;offset=0;offset_first=true",
             "V",
         )];
-        let volts = number(&lambda, &synthetic_reading("PCM", &lambda, 1, 5).unwrap());
+        let volts = number(
+            &lambda,
+            &synthetic_reading("PCM", &lambda, 1, 5, false).unwrap(),
+        );
         assert!((0.0..=1.275).contains(&volts), "{volts} V");
         // A temperature with the offset first: (raw - 40) x 1.
         let heat = [placed(
@@ -1426,7 +1481,10 @@ mod tests {
             "size=1;mask=0xff;scale=1;offset=-40;offset_first=true",
             "degC",
         )];
-        let degrees = number(&heat, &synthetic_reading("PCM", &heat, 1, 9).unwrap());
+        let degrees = number(
+            &heat,
+            &synthetic_reading("PCM", &heat, 1, 9, false).unwrap(),
+        );
         assert!((20.0..=95.0).contains(&degrees), "{degrees} degC");
         // An estimated oil temperature, 0.625 a count over two bytes.
         let oil = [placed(
@@ -1434,7 +1492,7 @@ mod tests {
             "bytes=0..1;size=2;mask=0xffff;scale=0.625;offset=-64;offset_first=true",
             "degC",
         )];
-        let degrees = number(&oil, &synthetic_reading("PCM", &oil, 2, 30).unwrap());
+        let degrees = number(&oil, &synthetic_reading("PCM", &oil, 2, 30, false).unwrap());
         assert!((20.0..=95.0).contains(&degrees), "{degrees} degC");
         // A percentage in one byte, and a percentage with a signed offset.
         let duty = [placed(
@@ -1442,14 +1500,20 @@ mod tests {
             "size=1;mask=0xff;scale=1;offset=0;offset_first=true",
             "pct",
         )];
-        let percent = number(&duty, &synthetic_reading("TCCM", &duty, 1, 2).unwrap());
+        let percent = number(
+            &duty,
+            &synthetic_reading("TCCM", &duty, 1, 2, false).unwrap(),
+        );
         assert!((15.0..=85.0).contains(&percent), "{percent} pct");
         let trim = [placed(
             "Fuel trim",
             "bytes=0..0;size=1;mask=0xff;scale=0.78125;offset=-128;offset_first=true",
             "pct",
         )];
-        let percent = number(&trim, &synthetic_reading("PCM", &trim, 1, 2).unwrap());
+        let percent = number(
+            &trim,
+            &synthetic_reading("PCM", &trim, 1, 2, false).unwrap(),
+        );
         assert!((15.0..=85.0).contains(&percent), "{percent} pct");
         // A state is one the catalogue names, never a count outside them.
         let state = [placed(
@@ -1457,7 +1521,10 @@ mod tests {
             "bytes=0..0;size=1;mask=all;scale=1;offset=0;offset_first=true;states=0..0=Off|1..1=On|2..255=Not used",
             "int",
         )];
-        let decoded = decode_parameters(&state, &synthetic_reading("BCM", &state, 1, 1).unwrap());
+        let decoded = decode_parameters(
+            &state,
+            &synthetic_reading("BCM", &state, 1, 1, false).unwrap(),
+        );
         assert!(
             matches!(decoded[0].state.as_deref(), Some("Off") | Some("On")),
             "{decoded:?}"
@@ -1468,7 +1535,10 @@ mod tests {
             "bytes=0..1;size=2;mask=0xffff;scale=1;offset=0;offset_first=true",
             "int",
         )];
-        let counts = number(&count, &synthetic_reading("GWM", &count, 2, 1).unwrap());
+        let counts = number(
+            &count,
+            &synthetic_reading("GWM", &count, 2, 1, false).unwrap(),
+        );
         assert!((3.0..=40.0).contains(&counts), "{counts}");
     }
 
@@ -1483,7 +1553,12 @@ mod tests {
             "bytes=0..1;size=2;mask=0xffff;scale=0.1;offset=-400;offset_first=true",
             "degC",
         )];
-        let at = |tick| number(&heat, &synthetic_reading("PCM", &heat, 2, tick).unwrap());
+        let at = |tick| {
+            number(
+                &heat,
+                &synthetic_reading("PCM", &heat, 2, tick, false).unwrap(),
+            )
+        };
         assert_ne!(at(0), at(16));
         assert_eq!(at(0), at(64), "a full period");
 
@@ -1499,7 +1574,10 @@ mod tests {
                 "V",
             ),
         ];
-        let decoded = decode_parameters(&both, &synthetic_reading("PCM", &both, 4, 3).unwrap());
+        let decoded = decode_parameters(
+            &both,
+            &synthetic_reading("PCM", &both, 4, 3, false).unwrap(),
+        );
         let wide: f64 = decoded[0].value.as_deref().unwrap().parse().unwrap();
         assert!((12.0..=14.5).contains(&wide), "{wide} V");
         assert_eq!(
@@ -1509,10 +1587,10 @@ mod tests {
         );
 
         assert_eq!(
-            synthetic_reading("PCM", &[placed("Part", "text=ascii", "")], 4, 0),
+            synthetic_reading("PCM", &[placed("Part", "text=ascii", "")], 4, 0, false),
             None
         );
-        assert_eq!(synthetic_reading("PCM", &[], 4, 0), None);
+        assert_eq!(synthetic_reading("PCM", &[], 4, 0, false), None);
     }
 
     /// The battery table reads as the library converts it: 0x402A is
@@ -1524,8 +1602,69 @@ mod tests {
             "size=1;mask=0xff;converter=CVT_N_VOLT_OFF_6_RES_0PT05;scale=0.05;offset=120;offset_first=true",
             "V",
         )];
-        let volts = number(&voltage, &synthetic_battery(0x402A, 1).unwrap());
+        let volts = number(&voltage, &synthetic_battery(0x402A, 1, false).unwrap());
         assert!((volts - 12.6).abs() < 1e-9, "{volts} V");
+    }
+
+    /// A scenario ending in nine puts the battery in SDD's low band: 104
+    /// counts is 11.2 V, under the 11.6 V edge (`ADR-0030`, 2026-09-19).
+    #[test]
+    fn a_scenario_ending_in_nine_has_a_low_battery() {
+        let voltage = [placed(
+            "Vehicle battery voltage",
+            "size=1;mask=0xff;converter=CVT_N_VOLT_OFF_6_RES_0PT05;scale=0.05;offset=120;offset_first=true",
+            "V",
+        )];
+        let volts = number(&voltage, &synthetic_battery(0x402A, 1, true).unwrap());
+        assert!((volts - 11.2).abs() < 1e-9, "{volts} V");
+        assert!(low_battery_scenario(9));
+        assert!(low_battery_scenario(19));
+        assert!(!low_battery_scenario(0));
+        assert!(!low_battery_scenario(1));
+        assert!(!low_battery_scenario(10));
+    }
+
+    /// The same scenario puts the whole rail in the low band, not the
+    /// battery monitor alone (`ADR-0030`, 2026-09-19, later): the control
+    /// module's voltage over the legislated read and a module's supply on a
+    /// live read both say 11.2 V, so the interface's freshest-of-three has
+    /// the same answer whichever read it stands on; a sensor channel, fed
+    /// from a regulated 5 V, keeps its band, and every other PID its value.
+    #[test]
+    fn a_low_battery_is_on_every_rail_the_bench_answers() {
+        assert_eq!(
+            obd_current_data(0x42, false),
+            Some(vec![0x36, 0xB0]),
+            "14.0 V"
+        );
+        assert_eq!(
+            obd_current_data(0x42, true),
+            Some(vec![0x2B, 0xC0]),
+            "11.2 V"
+        );
+        assert_eq!(obd_current_data(0x0C, true), obd_current_data(0x0C, false));
+        let supply = [placed(
+            "Control module voltage",
+            "bytes=0..3;size=4;mask=all;scale=0.001;offset=0;offset_first=true",
+            "V",
+        )];
+        for tick in [1, 17, 40, 63] {
+            let volts = number(
+                &supply,
+                &synthetic_reading("PCM", &supply, 4, tick, true).unwrap(),
+            );
+            assert!((volts - 11.2).abs() < 1e-6, "tick {tick}: {volts} V");
+        }
+        let channel = [placed(
+            "Air conditioning high pressure sensor voltage",
+            "bytes=0..1;size=2;mask=0xffff;converter=X;scale=0.0048828125;offset=0;offset_first=true",
+            "V",
+        )];
+        let volts = number(
+            &channel,
+            &synthetic_reading("PCM", &channel, 2, 5, true).unwrap(),
+        );
+        assert!((0.5..=4.5).contains(&volts), "{volts} V");
     }
 
     #[test]

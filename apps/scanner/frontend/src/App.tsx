@@ -28,6 +28,9 @@ import { LiveReadPanel } from "./components/LiveReadPanel";
 import { MileagePanel } from "./components/MileagePanel";
 import { PassportPanel } from "./components/PassportPanel";
 import { BatteryCard } from "./components/BatteryCard";
+import { BatteryPrecondition } from "./components/BatteryPrecondition";
+import { batteryPreconditionText } from "./batteryFormat";
+import { latestVoltage } from "./voltage";
 import { BatteryPanel } from "./components/BatteryPanel";
 import { CcfPanel } from "./components/CcfPanel";
 import { StandardObdPanel } from "./components/StandardObdPanel";
@@ -327,6 +330,22 @@ export function App({
   // to a quiet green: reading, and only reading. The third state is red and
   // steady, for when something may be sent rather than asked: the service
   // mode of ADR-0036, while it is on.
+  // The rail's voltage, from whichever read last brought one (ADR-0030,
+  // 2026-09-19): the key on the plate shows it, and the precondition line
+  // stands on it.
+  const voltage = latestVoltage({
+    battery: battery.snapshot,
+    obdValues: standardObd.values,
+    obdAtMs: standardObd.valuesAtMs,
+    obdRouteValidation: standardObd.snapshot.routeValidation,
+    live: liveRead.snapshot,
+    liveStartedAtMs: liveRead.startedAtMs,
+  });
+  const batteryNotice = batteryPreconditionText(
+    voltage,
+    battery.snapshot.sddLowVoltageMaxMv,
+    Date.now(),
+  );
   const lamp: "waiting" | "live" | "sending" = service.on
     ? "sending"
     : adapterReady && library.vehicle.vehicleProgram.trim() !== ""
@@ -428,6 +447,7 @@ export function App({
             onRead={() => void battery.start()}
             onStop={() => void battery.stop()}
             disabledReason={batteryDisabledReason}
+            volts={voltage}
           />
           {adapterPill}
           {libraryPill}
@@ -480,6 +500,9 @@ export function App({
           </div>
         </div>
       </header>
+      {/* The session's precondition, when the last battery read is in
+          SDD's low band (ADR-0030, 2026-09-19). One sentence, no block. */}
+      <BatteryPrecondition reading={voltage} sddLowVoltageMaxMv={battery.snapshot.sddLowVoltageMaxMv} />
       {service.consentOpen ? (
         <ConfirmDialog
           title={t("Service mode")}
@@ -656,6 +679,7 @@ export function App({
                       onRead={() => void moduleRead.read()}
                       onSaveReport={() => void moduleRead.saveReport()}
                       serviceMode={service.on}
+                      batteryNotice={batteryNotice}
                       clear={service.clear}
                       clearing={service.clearing}
                       onClearCodes={(ecuFamily) => void service.clearCodes(ecuFamily)}

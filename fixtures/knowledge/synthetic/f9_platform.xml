@@ -173,6 +173,9 @@
 		<did id="0x4028" name="batt_state_of_chrg" service_id="0x22" format="10">
 			<tm>Vehicle Battery Estimated State of Charge</tm>
 		</did>
+		<did id="0x402A" name="batt_voltage" service_id="0x22" format="10">
+			<tm>Vehicle Battery Voltage</tm>
+		</did>
 		<did id="0x4025" name="batt_q_cur_low" service_id="0x22" format="10">
 			<tm>Average Vehicle Quiesent Current - Previous 24 Hours (mA)</tm>
 		</did>

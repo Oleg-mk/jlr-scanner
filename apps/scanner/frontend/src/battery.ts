@@ -77,6 +77,13 @@ export interface BatteryReadSnapshot {
   routeValidation: string;
   /** When the run began, so an old reading is not mistaken for a fresh one. */
   readUnixMs: number | null;
+  /**
+   * The upper edge of SDD's own low voltage band, in millivolts, from its
+   * battery monitor's configuration (ADR-0030, 2026-09-19). The shell
+   * carries it so that the interface holds no number of its own; zero means
+   * no band is known and nothing is said.
+   */
+  sddLowVoltageMaxMv: number;
   refused: BatteryRefusal[];
   error: DiagnosticError | null;
   reportAvailable: boolean;
@@ -98,6 +105,7 @@ export const createBatterySnapshot = (): BatteryReadSnapshot => ({
   modules: 0,
   routeValidation: "",
   readUnixMs: null,
+  sddLowVoltageMaxMv: 0,
   refused: [],
   error: null,
   reportAvailable: false,

@@ -58,6 +58,8 @@ function merge(current: StandardObdValue[], incoming: StandardObdValue[]): Stand
 export function useStandardObdController(client: StandardObdClient, vehicle: VehicleDescription) {
   const [snapshot, setSnapshot] = useState<StandardObdSnapshot>(createStandardObdSnapshot);
   const [values, setValues] = useState<StandardObdValue[]>([]);
+  /** When the current values landed, so a voltage among them has an age (ADR-0030, 2026-09-19). */
+  const [valuesAtMs, setValuesAtMs] = useState<number | null>(null);
   const [frameValues, setFrameValues] = useState<StandardObdValue[]>([]);
   const [monitors, setMonitors] = useState<StandardObdMonitor[]>([]);
   const [information, setInformation] = useState<LabelledValue[]>([]);
@@ -143,6 +145,7 @@ export function useStandardObdController(client: StandardObdClient, vehicle: Veh
     () =>
       run(async () => {
         setValues([]);
+        setValuesAtMs(null);
         const supported = await walk("CURRENT_DATA", LAST_PID_MAP);
         if (supported === null) return;
         for (let start = 0; start < supported.length; start += ITEMS_PER_REQUEST) {
@@ -150,6 +153,7 @@ export function useStandardObdController(client: StandardObdClient, vehicle: Veh
           setSnapshot(answer);
           if (answer.state !== "SUCCEEDED") break;
           setValues((current) => merge(current, answer.values));
+          setValuesAtMs(Date.now());
         }
       }),
     [request, run, walk],
@@ -220,6 +224,7 @@ export function useStandardObdController(client: StandardObdClient, vehicle: Veh
   return {
     snapshot,
     values,
+    valuesAtMs,
     frameValues,
     monitors,
     information,

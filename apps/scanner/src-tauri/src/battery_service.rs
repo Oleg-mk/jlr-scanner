@@ -468,6 +468,7 @@ impl Run {
                     .unwrap_or_default()
             },
             read_unix_ms: u64::try_from(self.started_unix_ms).ok(),
+            sdd_low_voltage_max_mv: diagnostic_session::SDD_VOLTAGE_LOW_MAX_MV,
             refused: self.refused.clone(),
             error: self.error.clone(),
             report_available,
@@ -528,6 +529,7 @@ fn idle(report_available: bool) -> BatteryReadSnapshot {
         modules: 0,
         route_validation: String::new(),
         read_unix_ms: None,
+        sdd_low_voltage_max_mv: diagnostic_session::SDD_VOLTAGE_LOW_MAX_MV,
         refused: Vec::new(),
         error: None,
         report_available,

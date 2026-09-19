@@ -88,6 +88,15 @@ fn library() -> KnowledgeLibrary {
         Some("size=1;mask=0xff;converter=CVT_N_PCT_OFF_0_RES_1;scale=1;offset=0;offset_first=true"),
         Some("pct"),
     );
+    // The headline voltage, read the way the library converts it: (raw + 120)
+    // x 0.05 V. The bench answers 132 counts, 12.6 V, and 104 on a scenario
+    // ending in nine, 11.2 V (ADR-0030, 2026-09-19).
+    battery_formatting.insert(
+        0x402A,
+        "Vehicle Battery Voltage",
+        Some("size=1;mask=0xff;converter=CVT_N_VOLT_OFF_6_RES_0PT05;scale=0.05;offset=120;offset_first=true"),
+        Some("V"),
+    );
     let platform = PlatformAdapter::new(synthetic_source("bench-plat", PLATFORM))
         .unwrap()
         .with_timeline(timeline.clone())
@@ -310,94 +319,96 @@ fn the_bench_refuses_at_once_while_the_session_is_busy_rather_than_waiting_for_i
     assert!(bench.lock().unwrap().describe().contains("SYNTHA"));
 }
 
-/// A stopwatch on the real library, for the question "where do the seconds
-/// go". Ignored by default and pointed at a library folder with
-/// `PROWLONE_LIBRARY`; it reads and measures, and writes nothing.
+/// The bench's two voltages, through the whole stack (ADR-0030, amendment
+/// of 2026-09-19): a scenario ending in nine reads 11.2 V for the headline
+/// voltage, inside SDD's low band, and the snapshot carries SDD's own edge;
+/// the default scenario reads 12.6 V. This is the read the precondition
+/// line stands on, so the line is provable without a car.
 #[test]
-#[ignore]
-fn measure_where_the_seconds_go() {
-    let Ok(directory) = std::env::var("PROWLONE_LIBRARY") else {
-        panic!("set PROWLONE_LIBRARY to a library folder");
-    };
-    let context = VehicleContextInput {
-        vehicle_program: std::env::var("PROWLONE_PROGRAM").unwrap_or_else(|_| "X250".into()),
-        model_year: Some(2008),
-        powertrain: Some(std::env::var("PROWLONE_ENGINE").unwrap_or_else(|_| "V6NA".into())),
-        variant: None,
-        market: None,
-        year_breakpoint: Some(std::env::var("PROWLONE_MARKER").unwrap_or_else(|_| "MY08".into())),
-    };
+fn a_scenario_ending_in_nine_reads_a_low_battery_through_the_whole_stack() {
+    fn headline_voltage(scenario: u32) -> (String, Option<String>, u32, f64) {
+        let bench = share_bus(Box::new(EmptyBench));
+        let mut adapter = AdapterService::new(SystemAdapterBackend::new(bench.clone()));
+        let mut session = SessionService::with_library(library());
+        let survey = session.survey(&vehicle());
+        let built = BenchBuild(Mutex::new(None));
+        assert!(refresh_bench(&bench, &built, &session, scenario));
+        let connected = adapter.connect_bench(scenario);
+        assert_eq!(connected.state, AdapterState::Connected, "{connected:?}");
+        let info = adapter.connected_adapter().expect("the bench is connected");
+        let families: Vec<String> = survey
+            .modules
+            .iter()
+            .map(|module| module.ecu_family.clone())
+            .collect();
+        let mut battery = BatteryService::new();
+        let started = battery.start(session.library(), Some(&info), &vehicle(), &families);
+        assert_eq!(started.state, BatteryReadState::Running, "{started:?}");
+        while let Some(due) = battery.next_due() {
+            let result = adapter
+                .execute_uds_read(&due.transaction, BATTERY_READ_TIMEOUT)
+                .expect("the bench is connected")
+                .map_err(map_live_error);
+            battery.record(due.index, result);
+            battery.mark_synthetic();
+        }
+        let read = battery.snapshot();
+        assert_eq!(read.state, BatteryReadState::Finished);
+        let voltage = read
+            .readings
+            .iter()
+            .find(|row| row.role == "VOLTAGE" && row.headline && row.value.is_some())
+            .expect("the headline voltage is read");
+        assert_eq!(voltage.identifier, "0x402A");
+        assert_eq!(voltage.route_validation, "SYNTHETIC");
+        // The legislated read of the same rail, PID 0x42, through the
+        // standard's own service: the interface stands on whichever of the
+        // two is fresher, so the bench has to give them one answer.
+        let legislated = StandardObdRequest {
+            kind: StandardObdReadKind::CurrentData,
+            responder: 0,
+            items: vec!["0x42".into()],
+            context: vehicle(),
+        };
+        let prepared = StandardObdService::prepare(&legislated).expect("the standard prepares it");
+        let result = adapter
+            .execute_j1979_read(&prepared.transaction, STANDARD_OBD_TIMEOUT)
+            .expect("the bench is connected")
+            .map_err(map_live_error);
+        let mut standard = StandardObdService::new();
+        let rail = standard.finish(
+            &legislated,
+            Some(&prepared),
+            Some(&info),
+            Some(session.library()),
+            result,
+        );
+        assert_eq!(rail.state, ModuleReadState::Succeeded, "{rail:?}");
+        assert_eq!(rail.values[0].unit, "V", "{:?}", rail.values[0]);
+        let over_obd = rail.values[0].number.expect("a number");
+        (
+            voltage.value.clone().unwrap(),
+            voltage.unit.clone(),
+            read.sdd_low_voltage_max_mv,
+            over_obd,
+        )
+    }
 
-    let mut session = SessionService::new();
-    let started = std::time::Instant::now();
-    let snapshot = session.load_directory(&directory);
-    println!(
-        "load_directory: {:?} -> {:?}",
-        started.elapsed(),
-        snapshot.state
+    // The decoder writes the converter's own step, two decimals for 0.05 V;
+    // the number is what matters here.
+    let (volts, unit, edge, over_obd) = headline_voltage(9);
+    let low: f64 = volts.parse().expect("a number");
+    assert!((low - 11.2).abs() < 1e-9, "{volts} V");
+    assert_eq!(unit.as_deref(), Some("V"));
+    assert_eq!(edge, 11_600, "SDD's own edge travels with the snapshot");
+    assert!(
+        (over_obd - 11.2).abs() < 1e-9,
+        "the legislated read says the same rail: {over_obd} V"
     );
-
-    let started = std::time::Instant::now();
-    let survey = session.survey(&context);
-    let survey_took = started.elapsed();
-    println!(
-        "survey: {survey_took:?} for {} modules",
-        survey.modules.len()
-    );
-
-    let bench = share_bus(Box::new(EmptyBench));
-    let built = BenchBuild(Mutex::new(None));
-    let started = std::time::Instant::now();
-    assert!(refresh_bench(&bench, &built, &session, 1));
-    println!("bench build (first): {:?}", started.elapsed());
-
-    let started = std::time::Instant::now();
-    assert!(!refresh_bench(&bench, &built, &session, 1));
-    println!("bench build (again, same vehicle): {:?}", started.elapsed());
-
-    let started = std::time::Instant::now();
-    assert!(refresh_bench(&bench, &built, &session, 2));
-    println!("bench build (another scenario): {:?}", started.elapsed());
-
-    // Where inside one module's resolution the time goes.
-    let library = session.library();
-    let store = library.store();
-    println!("records in the store: {}", store.record_count());
-    let family = survey.modules[0].ecu_family.clone();
-    let mut knowledge_context = knowledge::VehicleContext {
-        vehicle_program: Some(context.vehicle_program.clone()),
-        model_year: context.model_year,
-        architecture_generation: None,
-        ecu_family: None,
-        powertrain: context.powertrain.clone(),
-        variant: None,
-        market: None,
-        diagnostic_implementation: None,
-        other: std::collections::BTreeMap::new(),
-    };
-    knowledge_context.ecu_family = Some(family.clone());
-
-    let started = std::time::Instant::now();
-    let narrowed = store.query(
-        &knowledge::KnowledgeQuery::for_vehicle(knowledge_context.clone())
-            .with_ecu_family(&family)
-            .include_indeterminate(true),
-    );
-    println!(
-        "one query named {family}: {:?} -> {} records kept",
-        started.elapsed(),
-        narrowed.records.len()
-    );
-
-    let started = std::time::Instant::now();
-    let wide = store.query(
-        &knowledge::KnowledgeQuery::for_vehicle(knowledge_context).include_indeterminate(true),
-    );
-    println!(
-        "one query naming no module: {:?} -> {} records kept",
-        started.elapsed(),
-        wide.records.len()
-    );
+    let (volts, _, _, over_obd) = headline_voltage(bench_vehicle::SCENARIO_DEFAULT);
+    let healthy: f64 = volts.parse().expect("a number");
+    assert!((healthy - 12.6).abs() < 1e-9, "{volts} V");
+    assert!((over_obd - 14.0).abs() < 1e-9, "{over_obd} V");
 }
 
 #[test]
@@ -940,6 +951,27 @@ fn the_bench_connects_without_a_port_reads_the_surveyed_vehicle_and_marks_everyt
         started.planned, 2,
         "0xF106 and 0xF105 of SYNTHMOD: {started:?}"
     );
+    // The copy's holder is named OTHERMOD_SYSTEM_A in the data, as SDD names
+    // a holder, and is read as OTHERMOD (ADR-0037): the library answers its
+    // sources by module and finds the system's blocks under the module, so
+    // the read is planned for OTHERMOD and refused for OTHERMOD's own reason,
+    // its route, never for lacking blocks.
+    let resolved = diagnostic_session::vehicle_context(&vehicle());
+    assert!(
+        session
+            .library()
+            .ccf_sources(&resolved)
+            .contains(&("OTHERMOD".to_string(), "copy".to_string())),
+        "{:?}",
+        session.library().ccf_sources(&resolved)
+    );
+    assert!(
+        !session
+            .library()
+            .ccf_blocks(&resolved, "OTHERMOD")
+            .is_empty(),
+        "the blocks scoped to OTHERMOD_SYSTEM_A are OTHERMOD's"
+    );
     while let Some(due) = ccf.next_due() {
         let result = adapter
             .execute_uds_read(&due.transaction, CCF_READ_TIMEOUT)
@@ -986,6 +1018,14 @@ fn the_bench_connects_without_a_port_reads_the_surveyed_vehicle_and_marks_everyt
         ccf_json.contains("OTHERMOD"),
         "the refused copy is listed: {ccf_json}"
     );
+    assert!(
+        !ccf_json.contains("_SYSTEM_"),
+        "the report names the module and never its system (ADR-0037): {ccf_json}"
+    );
+    assert!(
+        !ccf_json.contains("declares no readable block"),
+        "the copy was refused for its route, not for lacking blocks: {ccf_json}"
+    );
     for verdict in ["corrupt", "wrong", "should be", "invalid"] {
         assert!(
             !ccf_json.to_lowercase().contains(verdict),
@@ -1007,8 +1047,8 @@ fn the_bench_connects_without_a_port_reads_the_surveyed_vehicle_and_marks_everyt
     let started = battery.start(session.library(), Some(&info), &vehicle(), &families);
     assert_eq!(started.state, BatteryReadState::Running, "{started:?}");
     assert_eq!(
-        started.planned, 4,
-        "the four battery identifiers SYNTHMOD declares: {started:?}"
+        started.planned, 5,
+        "the five battery identifiers SYNTHMOD declares: {started:?}"
     );
     // OTHERMOD declares the same set, so the data says it serves them too;
     // its route cannot be planned, and it is listed with that reason rather
@@ -1031,7 +1071,7 @@ fn the_bench_connects_without_a_port_reads_the_surveyed_vehicle_and_marks_everyt
     }
     let charged = battery.snapshot();
     assert_eq!(charged.state, BatteryReadState::Finished);
-    assert_eq!(charged.answered, 4, "{:?}", charged.readings);
+    assert_eq!(charged.answered, 5, "{:?}", charged.readings);
     let charge = charged
         .readings
         .iter()

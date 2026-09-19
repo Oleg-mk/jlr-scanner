@@ -224,8 +224,8 @@ fn the_survey_shows_reachable_and_unreachable_modules_with_reasons() {
     assert_eq!(
         identifiers,
         vec![
-            "0x0347", "0x1945", "0x4020", "0x4025", "0x4028", "0x4090", "0xDD01", "0xF111",
-            "0xF188", "0xF18C", "0xF190", "0xF1A0"
+            "0x0347", "0x1945", "0x4020", "0x4025", "0x4028", "0x402A", "0x4090", "0xDD01",
+            "0xF111", "0xF188", "0xF18C", "0xF190", "0xF1A0"
         ]
     );
 
@@ -333,7 +333,7 @@ fn the_survey_shows_reachable_and_unreachable_modules_with_reasons() {
         .collect();
     assert_eq!(
         declared,
-        vec!["0x4020", "0x4025", "0x4028", "0xF111", "0xF188", "0xF190", "0xF1A0"]
+        vec!["0x4020", "0x4025", "0x4028", "0x402A", "0xF111", "0xF188", "0xF190", "0xF1A0"]
     );
 
     // LEGACYMOD has a physical address and no CAN identifiers: seen, placed on

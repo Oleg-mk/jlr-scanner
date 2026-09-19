@@ -12,6 +12,11 @@ import { BatteryPanel } from "./components/BatteryPanel";
 import { LANGUAGE_STORAGE_KEY, setCurrentLanguage } from "./i18n";
 import { createVehicleDescription } from "./library";
 import { useBatteryController } from "./useBatteryController";
+import { BatteryPrecondition } from "./components/BatteryPrecondition";
+import { batteryPreconditionText } from "./batteryFormat";
+import { createLiveReadSnapshot } from "./liveRead";
+import type { StandardObdValue } from "./standardObd";
+import { latestVoltage, type VoltageInputs } from "./voltage";
 
 /**
  * The battery (ADR-0030): the level a person reads at a glance, the three
@@ -93,6 +98,18 @@ class ScriptedClient implements BatteryClient {
   }
 }
 
+/** The key's voltage the way the application derives it: from the battery read alone here. */
+function voltsOf(snapshot: BatteryReadSnapshot) {
+  return latestVoltage({
+    battery: snapshot,
+    obdValues: [],
+    obdAtMs: null,
+    obdRouteValidation: "",
+    live: createLiveReadSnapshot(),
+    liveStartedAtMs: null,
+  });
+}
+
 afterEach(() => {
   window.localStorage.removeItem(LANGUAGE_STORAGE_KEY);
   setCurrentLanguage("en");
@@ -141,11 +158,24 @@ describe("battery", () => {
         running={false}
         onRead={() => undefined}
         onStop={() => undefined}
+        volts={voltsOf(
+          snapshot({
+            readings: [
+              reading({
+                identifier: "0x402A",
+                parameter: "Vehicle Battery Voltage",
+                role: "VOLTAGE",
+                value: "12.6",
+                unit: "V",
+              }),
+            ],
+          }),
+        )}
         disabledReason={null}
       />,
     );
 
-    // The voltage stands beside the cell; the level is the cell's own fill
+    // The voltage is on the cell, in bold; the level is the cell's own fill
     // and the figure it carries for a reader who cannot see it.
     const cell = screen.getByLabelText("State of charge: 78%");
     expect(screen.getByText("12.6 V")).toBeVisible();
@@ -292,5 +322,113 @@ describe("battery", () => {
     expect(screen.getByText("the module answered nothing")).toBeVisible();
     // And the groups are here, under our own short headings.
     expect(screen.getByRole("heading", { name: "Declared" })).toBeVisible();
+  });
+});
+
+/**
+ * A low battery is a precondition of the session (ADR-0030, amendments of
+ * 2026-09-19): said in SDD's own terms, with the number the shell carries
+ * across from the data layer, from whichever read last brought a voltage,
+ * and never when there is nothing to say.
+ */
+describe("the low-battery precondition (ADR-0030, 2026-09-19)", () => {
+  const voltage = (value: string) =>
+    reading({
+      role: "VOLTAGE",
+      identifier: "0x402A",
+      parameter: "Vehicle Battery Voltage",
+      value,
+      unit: "V",
+    });
+  const inputs = (battery: BatteryReadSnapshot, extra: Partial<VoltageInputs> = {}): VoltageInputs => ({
+    battery,
+    obdValues: [],
+    obdAtMs: null,
+    obdRouteValidation: "",
+    live: createLiveReadSnapshot(),
+    liveStartedAtMs: null,
+    ...extra,
+  });
+
+  it("says so when the battery read is under SDD's low band, in SDD's number", () => {
+    const low = snapshot({ readings: [voltage("11.2")], sddLowVoltageMaxMv: 11_600 });
+    const read = latestVoltage(inputs(low));
+    expect(read).toMatchObject({ volts: 11.2, text: "11.2", source: "battery", module: "BCM" });
+    const text = batteryPreconditionText(read, 11_600, Date.now());
+    expect(text).toMatch(/11\.2 V/);
+    expect(text).toMatch(/11\.6 V/);
+    expect(text).toMatch(/from the battery monitor/);
+    expect(text).toMatch(/external power supply/);
+    expect(text).toMatch(/read just now/);
+    render(<BatteryPrecondition reading={read} sddLowVoltageMaxMv={11_600} />);
+    expect(screen.getByRole("status")).toHaveTextContent(/Connect an external power supply/);
+  });
+
+  it("says nothing for a healthy reading, for no reading, and for no band", () => {
+    const healthy = latestVoltage(inputs(snapshot({ readings: [voltage("12.6")], sddLowVoltageMaxMv: 11_600 })));
+    expect(batteryPreconditionText(healthy, 11_600, Date.now())).toBeNull();
+    expect(latestVoltage(inputs(snapshot({ readings: [], sddLowVoltageMaxMv: 11_600 })))).toBeNull();
+    // No band known: the interface holds no number of its own to fall back on.
+    const low = latestVoltage(inputs(snapshot({ readings: [voltage("11.2")] })));
+    expect(batteryPreconditionText(low, 0, Date.now())).toBeNull();
+    const { container } = render(<BatteryPrecondition reading={healthy} sddLowVoltageMaxMv={11_600} />);
+    expect(container.querySelector(".battery-precondition")).toBeNull();
+  });
+
+  it("takes the freshest of the three reads, and names where it came from", () => {
+    // A car whose battery monitor reports no voltage at all, like the
+    // owner's X250: the OBD read and the live read are what there is.
+    const none = snapshot({ readings: [], sddLowVoltageMaxMv: 11_600 });
+    const obd: StandardObdValue = {
+      pid: "0x42",
+      name: "control module voltage",
+      unit: "V",
+      value: "11.4",
+      number: 11.4,
+      rawHex: "2C 88",
+      kind: "number",
+    };
+    const live = {
+      ...createLiveReadSnapshot(),
+      values: [
+        {
+          ecuFamily: "PCM",
+          identifier: "0xDD02",
+          name: "Control module voltage",
+          value: "13.50",
+          unit: "V",
+          state: null,
+          note: null,
+          raw: 270,
+          minimum: 13.5,
+          maximum: 13.5,
+          samples: 1,
+          atMs: 2_000,
+        },
+      ],
+    };
+    // The OBD read is the later one: it is the voltage, and it is low.
+    const later = latestVoltage(
+      inputs(none, { obdValues: [obd], obdAtMs: 10_000, obdRouteValidation: "SOURCE_BACKED", live, liveStartedAtMs: 1_000 }),
+    );
+    expect(later).toMatchObject({ volts: 11.4, source: "obd" });
+    expect(batteryPreconditionText(later, 11_600, 10_000)).toMatch(/from the OBD read/);
+    // The live read is the later one: it is the voltage, healthy, and named.
+    const live_later = latestVoltage(
+      inputs(none, { obdValues: [obd], obdAtMs: 1_000, obdRouteValidation: "SOURCE_BACKED", live, liveStartedAtMs: 10_000 }),
+    );
+    expect(live_later).toMatchObject({ volts: 13.5, source: "live", module: "PCM", atMs: 12_000 });
+    expect(batteryPreconditionText(live_later, 11_600, 12_000)).toBeNull();
+    // A reading with no known time never outranks one with a time.
+    const timeless = latestVoltage(inputs(none, { obdValues: [obd], obdAtMs: null, obdRouteValidation: "", live, liveStartedAtMs: 5_000 }));
+    expect(timeless?.source).toBe("live");
+  });
+
+  it("marks a bench reading as synthetic, like everything else the bench answers", () => {
+    const low = latestVoltage(
+      inputs(snapshot({ readings: [voltage("11.2")], sddLowVoltageMaxMv: 11_600, routeValidation: "SYNTHETIC" })),
+    );
+    expect(low?.synthetic).toBe(true);
+    expect(batteryPreconditionText(low, 11_600, Date.now())).toMatch(/bench, synthetic/);
   });
 });

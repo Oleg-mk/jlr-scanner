@@ -48,6 +48,8 @@ export function useLiveReadController(
   const [snapshot, setSnapshot] = useState<LiveReadSnapshot>(createLiveReadSnapshot);
   const [set, setSet] = useState<LiveReadEntryRequest[]>([]);
   const [busy, setBusy] = useState(false);
+  /** The wall clock when the run began: a sample's own time is an offset from it (ADR-0030, 2026-09-19). */
+  const [startedAtMs, setStartedAtMs] = useState<number | null>(null);
   /** Where the last export went, or why it did not. */
   const [saved, setSaved] = useState<{ path?: string; error?: string } | null>(null);
   const timer = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -127,6 +129,7 @@ export function useLiveReadController(
     clearTimer();
     try {
       const started = await client.start({ entries: set, context: vehicle });
+      setStartedAtMs(Date.now());
       setSnapshot(started);
       if (started.state !== "RUNNING") return;
       timer.current = setInterval(() => {
@@ -176,6 +179,7 @@ export function useLiveReadController(
     snapshot,
     set,
     busy,
+    startedAtMs,
     running: snapshot.state === "RUNNING",
     toggle,
     choose,

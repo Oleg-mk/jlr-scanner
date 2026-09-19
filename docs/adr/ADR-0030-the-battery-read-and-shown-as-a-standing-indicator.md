@@ -223,3 +223,185 @@ pass.
 
 See `CURRENT_STATE.md` for the state and `F9_SDD_KNOWLEDGE_INGESTION.md` for
 the ingest slice's real-source numbers.
+
+## Amendment, 2026-09-19: a low battery is a precondition of the session
+
+- Status: **Accepted, 2026-09-19** — drafted on the owner's question of the
+  same morning ("чи повинні ми виводити попередження при напрузі
+  акумулятора менше порогової і пропозицію підʼєднати зовнішній блок
+  живлення, так як робе це СДД") and accepted on his word the same hour
+  («ок, потім за потреби поправимо візуальні рішення»): the mechanism is
+  decided here, the look is his to adjust once seen.
+
+### What changes
+
+Decision 5 stands: the card judges nothing, the battery is never called
+good or bad, nothing is coloured red for its health. What this amendment
+adds is a sentence about the **session**, not about the battery — the same
+kind of sentence as *the car stands still, the ignition is on and the engine
+is off* in the consent of `ADR-0036`. A reading of the rail is also a fact
+about whether the next read or write is safe to make, and SDD says so
+before it starts a session; this product says it in the same place and for
+the same reason.
+
+1. **The line.** When the voltage the battery card holds — the headline
+   `VOLTAGE` reading of the last `BATTERY_STATE` run, the one the card
+   already shows and dates — lies in SDD's own *low* band, one line stands
+   under the card: the voltage, the band named as SDD's, how old the reading
+   is, and the request to connect an external supply before reading modules.
+   In the reader's own interface language; the number and the band are
+   SDD's.
+
+2. **The number is SDD's, and it is already here.** The band is the one
+   this record measured on 2026-09-12 from SDD's `BatteryMonitor.ini` and
+   `knowledge::battery` has carried as a constant since:
+   `SDD_VOLTAGE_LOW_MAX_MV`, 11.6 V. This product still invents no
+   threshold. (On 2026-09-18 the assistant proposed the threshold as "ours,
+   marked ours", not having reread this record; the record already held the
+   right source, and the proposal is corrected here.) Only the low band is
+   used: the medium and high bands and their overlaps are SDD's own and are
+   not drawn as a scale.
+
+3. **The same line stands in every stage-2 confirmation** while the
+   condition holds. `ADR-0036`, decision 3, already puts the preconditions
+   of an operation in front of the person before anything is sent, in SDD's
+   own words where the data has them; this one joins them, sourced from
+   SDD's configuration rather than from the module's data, because a clear
+   or a routine on a sagging rail can leave a module halfway.
+
+4. **Nothing is blocked.** The person decides, as SDD lets them decide.
+   Failing closed is for procedures this product does not know
+   (`DEVELOPMENT_PRINCIPLES.md`), not for a car whose battery is low. The
+   line goes when a fresh reading is above the band, and says nothing while
+   there is no reading at all: no reading is not a low reading.
+
+5. **On the bench** the line appears when the synthetic reading is below the
+   band, marked synthetic like everything else the bench answers, so the
+   mechanism is run in without a car. The bench's voltage is chosen by its
+   scenario, so both states are shown on every commit.
+
+6. **The record needs nothing new.** `battery_reads` already carries the
+   reading and the time it was taken, so a report already says at what
+   voltage a session's reads were made; the line is the interface's and is
+   not written anywhere.
+
+### What this does not decide
+
+- Joining the legislated `0x42` control-module voltage, or the live read's
+  battery voltage, to this line: those keep their own rule — the person's
+  limits of `ADR-0022` and F15 — and the question of one voltage for the
+  whole screen stays where the record above left it.
+- Any automatic re-read of the battery to keep the line current: a
+  reading's age is shown, and refreshing it is the person's click, as
+  before.
+- Anything SDD does beyond the warning — it does not stop a session either.
+
+### To build, on acceptance
+
+The interface: one line under the battery card, and the same line in the
+clear's confirmation (`ModuleDetails`), both from the card's own reading
+and the constant the knowledge crate exports; three languages. The bench:
+a scenario whose voltage is in the low band. Tests: the line with a low
+reading, no line with a healthy one, no line with no reading, and the
+confirmation carrying it. `SAFETY_BOUNDARIES.md` gains nothing: no
+operation is added. `CURRENT_STATE.md` records it as built.
+
+### Built, 2026-09-19 — `IMPLEMENTED / FIXTURE_TESTED`
+
+Built the hour it was accepted; nothing has met a car.
+
+- *The number.* `BatteryReadSnapshot` carries `sdd_low_voltage_max_mv`,
+  filled by the shell from `SDD_VOLTAGE_LOW_MAX_MV` through
+  `diagnostic-session`, which re-exports it: the interface holds no
+  number of its own, and a snapshot without one says nothing.
+- *The line.* `batteryPreconditionText` beside the rest of the battery's
+  formatting; `BatteryPrecondition` under the header; the same text handed
+  to the module panel and shown in the clear's confirmation beside the
+  other preconditions. Amber, one sentence, three languages; a bench
+  reading says *synthetic* on the end. Nothing is disabled by it.
+- *The bench.* Every scenario ending in nine answers 11.2 V for `0x402A`,
+  inside SDD's low band; every other scenario keeps 12.6 V. Scenario 0
+  stays the vehicle in good order.
+- *Tests.* The line with a low reading, none with a healthy one, none with
+  no reading, none with no band; the synthetic mark; the clear's
+  confirmation carrying it with the confirming control still enabled; the
+  bench's two voltages (4 interface tests, 1 bench test).
+
+## Amendment, 2026-09-19, later: the voltage comes from whatever read it
+
+- Status: **Accepted, 2026-09-19** — on the owner's word («роби»), after the
+  morning's amendment met his own car.
+
+### What the car said
+
+The precondition line above stands on the battery read's headline
+voltage, `0x402A`. Asked on 2026-09-19, the owner's library declares
+thirteen battery parameters for the X250's `RSJB` and `0x402A` is not
+among them: the car's battery monitor, as SDD documents it, does not
+report the rail's voltage. So on the owner's own car the card never showed
+a voltage and the line could never appear, on the bench or on a road. The
+synthetic fixture had the same gap, which is why the bench never noticed;
+it now declares the voltage, and the bench's two voltages, 12.60 V and
+11.20 V on a scenario ending in nine, are read through the whole stack in
+a test.
+
+What the X250 does answer with a voltage: the legislated OBD read, PID
+`0x42` *control module voltage* (`ADR-0022` §7), and the live read of a
+module's supply voltage, which the owner read himself the day before —
+`PCM 0xDD02`, 13.50 V.
+
+### What changes
+
+1. **The voltage is the freshest of three readings**, each with the time
+   it was taken: the battery read's headline voltage; the legislated
+   `0x42`; and a live-read value in volts whose name is the battery's or a
+   control module's voltage, the same words the live limits' starter
+   suggestion recognises (F15). A reading without a known time is older
+   than any reading with one. The adapter itself measures nothing: the
+   Mongoose stack has no such read, and this record does not invent one.
+
+2. **The precondition line stands on that reading**, in SDD's low band as
+   before, and says which read it came from and how old it is.
+
+3. **The battery key on the plate shows that reading** once there is one —
+   "13.50 V" beside the cell — the owner's own words the same morning: «і
+   виводити напругу на значок акумулятора після зчитування». Which read it
+   came from is on the key's tooltip and in the line; the key itself keeps
+   to the number. It judges nothing, as decision 5 says.
+
+4. **Nothing else moves.** The card's state of charge still comes from the
+   battery read alone; the live tiles keep the person's limits; the report
+   already carries every one of the three reads with its time, so the
+   line writes nothing.
+
+### What this does not decide
+
+- A voltage measured by the adapter at the connector: not available in
+  this stack today. If the firmware is found to offer one, it joins as a
+  fourth source, first in freshness because it is always current.
+- Any automatic re-read to keep the line current: the person's click, as
+  before, for all three.
+
+### Built, 2026-09-19, the same day — `IMPLEMENTED / FIXTURE_TESTED`
+
+- *The three sources.* `voltage.ts` chooses the freshest of the battery
+  read's headline, the legislated `0x42` and a live supply voltage, each
+  with its time; the OBD and live controllers keep the time of their last
+  answer; the line and the key stand on the choice. Unit-tested on the
+  three, on the tie and on the reading without a time.
+- *The bench's rail follows the scenario on every read, not on the battery
+  read alone.* On a scenario ending in nine PID `0x42` answers 11.2 V and a
+  live read of a module's supply answers 11.2 V, as `0x402A` does: one rail,
+  one number, so the line appears on the bench for a car whose battery
+  monitor declares no voltage of its own — the owner's X250 among them,
+  which is what the amendment was written for. A sensor channel keeps its
+  band; every other PID its value. Tested in the bench crate on the three
+  reads, and through the whole stack in the shell: `0x402A` and `0x42` on
+  scenario 9 and on the default, 11.2 against 12.6 and 14.0 V.
+- *Decision 3, amended at the screen the same afternoon* («перенести в
+  батарейку, жирним шрифтом і при наведені мишкою на батарейку міняти на
+  прочитать»): the voltage is carried on the cell, in bold, not beside it,
+  and gives way to the cell's word — *Read*, or *Stop* while a read runs —
+  while the pointer is over the cell or the focus is on it, so the key
+  still says what it does. A cell that cannot read keeps the voltage.
+  Where the reading came from stays on the cell's tooltip.

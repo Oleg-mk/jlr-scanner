@@ -1248,6 +1248,13 @@ pub struct BatteryReadSnapshot {
     /// When the run began, so a reading taken minutes ago is not mistaken
     /// for a fresh one. Milliseconds since the epoch.
     pub read_unix_ms: Option<u64>,
+    /// The upper edge of SDD's own *low* voltage band, in millivolts, from
+    /// its battery monitor's configuration (`ADR-0030`, amendment of
+    /// 2026-09-19). Carried here so that the interface can say a reading
+    /// is low in SDD's terms without holding a number of its own. Zero
+    /// means no band is known and nothing is said.
+    #[serde(default)]
+    pub sdd_low_voltage_max_mv: u32,
     /// Modules asked for but not planned, each with the resolver's reason.
     pub refused: Vec<ModuleRefusal>,
     pub error: Option<DiagnosticError>,
