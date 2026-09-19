@@ -462,12 +462,12 @@ const uk: Record<string, string> = {
   "Reading the modules…": "Читаю модулі…",
   "the run so far": "прогін дотепер",
   "the run, every marked parameter over time": "прогін: кожен позначений параметр у часі",
-  "A tile colours itself only against limits you set; SDD records no normal range, so none is drawn for you.":
-    "Плитка фарбується лише за межами, які задали ви; норми SDD не тримає, тому за вас їх ніхто не малює.",
-  "Mark a row in the table to see it as a tile or on the chart.":
-    "Позначте рядок у таблиці, щоб побачити його плиткою або на графіку.",
+  "A cell of the table colours itself only against limits you set; SDD records no normal range, so none is drawn for you.":
+    "Комірка таблиці фарбується лише за межами, які задали ви; норми SDD не тримає, тому за вас їх ніхто не малює.",
+  "Mark a row to see it in the table above or on the chart.":
+    "Позначте рядок, щоб побачити його в таблиці вгорі або на графіку.",
   Show: "Показати",
-  Tile: "Плитка",
+  Table: "Таблиця",
   Chart: "Графік",
   "over the run {low} … {high}": "за прогін {low} … {high}",
   "Mark all for the chart": "Усі на графік",
@@ -523,6 +523,11 @@ const uk: Record<string, string> = {
   "rpm × 1000": "об/хв × 1000",
   "Vehicle speed": "Швидкість",
   "Engine speed": "Оберти двигуна",
+  "in the set": "у наборі",
+  "Read on every round; click to leave it out.": "Читається щораунду; клацніть, щоб вилучити з набору.",
+  "Not read; click to read it on every round.": "Не читається; клацніть, щоб читати щораунду.",
+  Odometer: "Пробіг",
+  Gearbox: "АКПП",
   "Nothing is being read yet.": "Поки нічого не читається.",
   "limits {low} … {high}": "межі {low} … {high}",
   "our suggestion": "наша підказка",
@@ -536,11 +541,16 @@ const uk: Record<string, string> = {
   Quantities: "Величини",
   Everything: "Усе",
   "Which parameters": "Які параметри",
-  "Those the catalogue reads as a number with a unit.": "Ті, що каталог читає як число з одиницею.",
-  "Everything the module declares, raw counts and texts included.":
-    "Усе, що оголошує модуль, разом із сирими лічильниками й текстами.",
+  "Numbers with a unit — engine speed, road speed, temperatures, voltages, pressures, counters of time and distance. Addresses: {count}, in modules: {modules}.":
+    "Числа з одиницею — оберти, швидкість, температури, напруги, тиски, лічильники часу й відстані. Адрес: {count}, у модулях: {modules}.",
+  "Every address a module declares readable, states, raw counts, texts and blocks included. Addresses: {count}, in modules: {modules}.":
+    "Кожна адреса, яку модуль оголошує читабельною, разом зі станами, сирими лічильниками, текстами й блоками. Адрес: {count}, у модулях: {modules}.",
   "Choose these": "Обрати ці",
-  "{count} offered": "пропонується {count}",
+  "Choose all": "Обрати все",
+  "The set is full: {max} addresses.": "Набір повний: {max} адрес.",
+  "Already in the set.": "Уже в наборі.",
+  "{left} more here than the set can take: it holds {max}; tick the rest by hand.":
+    "Ще {left} сюди не вміститься: набір тримає {max}, решту — галочками.",
   "Nothing was connected: a session is either on the bench or on a car, and this one already holds records. Start a new session to change over.":
     "Нічого не підключено: сесія буває або на стенді, або на авто, а ця вже має записи. Щоб перейти, почніть нову сесію.",
   "This session already holds records, and the question about starting a new one could not be asked.":
@@ -1709,12 +1719,12 @@ const ru: Record<string, string> = {
   "Reading the modules…": "Читаю модули…",
   "the run so far": "прогон до сих пор",
   "the run, every marked parameter over time": "прогон: каждый отмеченный параметр во времени",
-  "A tile colours itself only against limits you set; SDD records no normal range, so none is drawn for you.":
-    "Плитка окрашивается только по пределам, которые задали вы; нормы SDD не хранит, поэтому за вас их никто не рисует.",
-  "Mark a row in the table to see it as a tile or on the chart.":
-    "Отметьте строку в таблице, чтобы увидеть её плиткой или на графике.",
+  "A cell of the table colours itself only against limits you set; SDD records no normal range, so none is drawn for you.":
+    "Ячейка таблицы окрашивается только по пределам, которые задали вы; нормы SDD не хранит, поэтому за вас их никто не рисует.",
+  "Mark a row to see it in the table above or on the chart.":
+    "Отметьте строку, чтобы увидеть её в таблице выше или на графике.",
   Show: "Показать",
-  Tile: "Плитка",
+  Table: "Таблица",
   Chart: "График",
   "over the run {low} … {high}": "за прогон {low} … {high}",
   "Mark all for the chart": "Все на график",
@@ -1770,6 +1780,11 @@ const ru: Record<string, string> = {
   "rpm × 1000": "об/мин × 1000",
   "Vehicle speed": "Скорость",
   "Engine speed": "Обороты двигателя",
+  "in the set": "в наборе",
+  "Read on every round; click to leave it out.": "Читается каждый раунд; щёлкните, чтобы убрать из набора.",
+  "Not read; click to read it on every round.": "Не читается; щёлкните, чтобы читать каждый раунд.",
+  Odometer: "Пробег",
+  Gearbox: "АКПП",
   "Nothing is being read yet.": "Пока ничего не читается.",
   "limits {low} … {high}": "пределы {low} … {high}",
   "our suggestion": "наша подсказка",
@@ -1783,11 +1798,16 @@ const ru: Record<string, string> = {
   Quantities: "Величины",
   Everything: "Всё",
   "Which parameters": "Какие параметры",
-  "Those the catalogue reads as a number with a unit.": "Те, что каталог читает как число с единицей.",
-  "Everything the module declares, raw counts and texts included.":
-    "Всё, что объявляет модуль, вместе с сырыми счётчиками и текстами.",
+  "Numbers with a unit — engine speed, road speed, temperatures, voltages, pressures, counters of time and distance. Addresses: {count}, in modules: {modules}.":
+    "Числа с единицей — обороты, скорость, температуры, напряжения, давления, счётчики времени и расстояния. Адресов: {count}, в модулях: {modules}.",
+  "Every address a module declares readable, states, raw counts, texts and blocks included. Addresses: {count}, in modules: {modules}.":
+    "Каждый адрес, который модуль объявляет читаемым, вместе с состояниями, сырыми счётчиками, текстами и блоками. Адресов: {count}, в модулях: {modules}.",
   "Choose these": "Выбрать эти",
-  "{count} offered": "предлагается {count}",
+  "Choose all": "Выбрать все",
+  "The set is full: {max} addresses.": "Набор полон: {max} адресов.",
+  "Already in the set.": "Уже в наборе.",
+  "{left} more here than the set can take: it holds {max}; tick the rest by hand.":
+    "Ещё {left} сюда не поместится: набор держит {max}, остальное — галочками.",
   "Nothing was connected: a session is either on the bench or on a car, and this one already holds records. Start a new session to change over.":
     "Ничего не подключено: сессия бывает либо на стенде, либо на авто, а эта уже содержит записи. Чтобы перейти, начните новую сессию.",
   "This session already holds records, and the question about starting a new one could not be asked.":

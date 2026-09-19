@@ -298,3 +298,38 @@ things the operation's screen holds to from now on.
 No new operation, no new safety class. What outranks the visual layer is
 unchanged: the first real tester report, because the read path under it has
 never met a vehicle.
+
+## Amendment, 2026-09-19: the instrument panel's two parameters read themselves
+
+- Status: **Accepted, 2026-09-19** — on the owner's word («так, ти маєш
+  рацію»), at the screen, after the panel gained its needles.
+
+### What changes
+
+1. **The run of the two dials starts without a click.** Once the survey
+   names the vehicle speed and the engine speed — exactly those words, the
+   engine controller's own first — and the adapter is connected, whichever
+   comes later, a run of those two starts by itself and the panel shows.
+   Once per survey: a run the person stopped stays stopped, and the time
+   cap of decision 3 ends it as it ends any run; nothing starts it again but
+   the person, from the caption or from *Start*.
+
+2. **The caption under a dial is its switch.** Released, the parameter
+   leaves the set; pressed, it joins. During a run a click stops the run and
+   starts it again with the set as it now is — the shell's own rule already:
+   a new run replaces the previous one, and the previous one is recorded.
+
+3. **Nothing else moves.** The floor, the cap, the per-request lock of
+   decision 4 and the report of decision 5 are as they were; the run
+   interleaves with any other operation on the bus one request at a time,
+   as decision 4 allows. That interleaving has met no car: on a car it is
+   twice the traffic, the run's ten requests a second beside the operation's,
+   and if the testers report trouble the fallback is a pause of the run for
+   the operation's duration, which this amendment does not build.
+
+### Built, 2026-09-19 — `IMPLEMENTED / FIXTURE_TESTED`
+
+In the live read panel, with the dials' entries resolved by
+`dialEntries` in the controller module; tested in the interface — the seed,
+the start on the adapter's arrival, once per survey, the switch during a
+run — and nowhere on hardware.

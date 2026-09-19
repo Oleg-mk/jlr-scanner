@@ -9,8 +9,9 @@ import {
   type LiveReadClient,
   type LiveReadRequest,
   type LiveReadSnapshot,
+  type LiveReadEntryRequest,
 } from "./liveRead";
-import { liveCandidates, useLiveReadController } from "./useLiveReadController";
+import { dialEntries, liveCandidates, useLiveReadController } from "./useLiveReadController";
 
 /**
  * Live reading (ADR-0022): the interface owns the timer and nothing else. It
@@ -93,6 +94,21 @@ function module(ecuFamily: string, identifiers: string[]): ModuleSurveyEntry {
       parameters: [`parameter ${identifier}`],
     })),
     selfTests: [],
+  };
+}
+
+/** A module whose identifiers carry the library's own parameter names, every one a quantity. */
+function namedModule(ecuFamily: string, entries: Array<[string, string]>): ModuleSurveyEntry {
+  return {
+    ...module(
+      ecuFamily,
+      entries.map(([identifier]) => identifier),
+    ),
+    readableIdentifiers: entries.map(([identifier, name]) => ({
+      identifier,
+      parameters: [name],
+      quantity: true,
+    })),
   };
 }
 
@@ -199,6 +215,250 @@ describe("live reading", () => {
     expect(result.current.set).toHaveLength(16);
     act(() => result.current.clearSet());
     expect(result.current.set).toEqual([]);
+  });
+
+  /**
+   * The chooser (the owner, 2026-09-19): two buttons, each with its own
+   * words and counts beside it, and a module's button that counts what its
+   * press will actually add - the set holds sixteen - rather than what the
+   * module offers, which is what hid the engine speed behind fifteen lower
+   * addresses on his car.
+   */
+  it("says what each choice holds, and a module's button counts what its press will add", () => {
+    const marked = (ecuFamily: string, entries: Array<[string, boolean]>): ModuleSurveyEntry => ({
+      ...module(
+        ecuFamily,
+        entries.map(([identifier]) => identifier),
+      ),
+      readableIdentifiers: entries.map(([identifier, quantity]) => ({
+        identifier,
+        parameters: [`parameter ${identifier}`],
+        quantity,
+      })),
+    });
+    const modules = [
+      marked("PCM", [
+        ["0x01", true],
+        ["0x02", false],
+        ["0x03", true],
+      ]),
+      marked("TCM", [
+        ["0x04", false],
+        ["0x05", false],
+      ]),
+    ];
+    const held = (count: number) =>
+      Array.from({ length: count }, (_, index) => ({ ecuFamily: "BCM", identifier: `0x${index + 10}` }));
+    const { rerender } = render(
+      <LiveReadPanel
+        snapshot={createLiveReadSnapshot()}
+        set={held(15)}
+        modules={modules}
+        running={false}
+        busy={false}
+        adapterReady
+        {...idleHandlers}
+      />,
+    );
+    // No frame round the pair; each button carries its sentence, counted for this car.
+    expect(document.querySelector(".live-read-filter-choice")).toBeNull();
+    expect(screen.getByText(/^Numbers with a unit .* Addresses: 2, in modules: 1\.$/)).toBeInTheDocument();
+    expect(
+      screen.getByText(/^Every address a module declares readable.* Addresses: 5, in modules: 2\.$/),
+    ).toBeInTheDocument();
+    // Quantities first: the PCM lists two, the set has room for one, and the
+    // button says one - with the rest named beside it. The TCM lists none.
+    let buttons = screen.getAllByRole("button", { name: /^Choose these/ });
+    expect(buttons.map((button) => button.textContent)).toEqual(["Choose these 1", "Choose these 0"]);
+    expect(buttons[0]).toBeEnabled();
+    expect(buttons[1]).toBeDisabled();
+    expect(
+      screen.getByText("1 more here than the set can take: it holds 16; tick the rest by hand."),
+    ).toBeInTheDocument();
+    // Everything: the button says so, and counts the same way.
+    fireEvent.click(screen.getByRole("button", { name: "Everything" }));
+    buttons = screen.getAllByRole("button", { name: /^Choose all/ });
+    expect(buttons.map((button) => button.textContent)).toEqual(["Choose all 1", "Choose all 1"]);
+    expect(
+      screen.getByText("2 more here than the set can take: it holds 16; tick the rest by hand."),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/offered/)).toBeNull();
+    // A full set: nothing to add, and the button says why.
+    rerender(
+      <LiveReadPanel
+        snapshot={createLiveReadSnapshot()}
+        set={held(16)}
+        modules={modules}
+        running={false}
+        busy={false}
+        adapterReady
+        {...idleHandlers}
+      />,
+    );
+    buttons = screen.getAllByRole("button", { name: /^Choose all/ });
+    expect(buttons[0]).toBeDisabled();
+    expect(buttons[0]).toHaveAttribute("title", "The set is full: 16 addresses.");
+    expect(buttons[0].textContent).toBe("Choose all 0");
+  });
+
+  /**
+   * The two dials read by default (the owner, 2026-09-19): the speed and the
+   * engine speed join the set as soon as the survey names them, the caption
+   * under each dial takes it out or puts it back, their needles rest at zero
+   * while nothing is read, and the windows carry the odometer the mileage
+   * read found and what the gearbox says.
+   */
+  it("reads the two dials by default, switches each from its caption, and rests the needles at zero", () => {
+    const modules = [
+      namedModule("ABS", [
+        ["0xD9E0", "Vehicle speed from ABS"],
+        ["0xDA02", "Vehicle speed"],
+      ]),
+      namedModule("PCM", [
+        ["0xDA02", "Vehicle speed"],
+        ["0xDA48", "Engine speed"],
+      ]),
+    ];
+    const speed = { ecuFamily: "PCM", identifier: "0xDA02" };
+    const engine = { ecuFamily: "PCM", identifier: "0xDA48" };
+    // The engine controller's own first; none where the survey names none.
+    expect(dialEntries(modules)).toEqual({ speed, engine });
+    expect(dialEntries([module("PCM", ["0x01"])])).toEqual({ speed: null, engine: null });
+
+    window.localStorage.setItem("prowlone.liveDashboard", "on");
+    const onChoose = vi.fn();
+    const onToggle = vi.fn();
+    const onStop = vi.fn();
+    const { rerender } = render(
+      <LiveReadPanel
+        snapshot={createLiveReadSnapshot()}
+        set={[]}
+        modules={modules}
+        running={false}
+        busy={false}
+        adapterReady
+        {...idleHandlers}
+        onChoose={onChoose}
+        onToggle={onToggle}
+        onStop={onStop}
+      />,
+    );
+    // Seeded as soon as the survey names them.
+    expect(onChoose).toHaveBeenCalledWith([speed, engine]);
+    // In the set, before a run: the needles are there, at rest, and each dial
+    // says its parameter waits in the set. The mileage read's highest total
+    // sits in the speedometer's window.
+    rerender(
+      <LiveReadPanel
+        snapshot={createLiveReadSnapshot()}
+        set={[speed, engine]}
+        modules={modules}
+        running={false}
+        busy={false}
+        adapterReady
+        {...idleHandlers}
+        onChoose={onChoose}
+        onToggle={onToggle}
+        onStop={onStop}
+        odometer={{ value: 123456, unit: "km" }}
+      />,
+    );
+    expect(document.querySelectorAll(".live-dash-needle")).toHaveLength(2);
+    expect(screen.getAllByText("in the set")).toHaveLength(2);
+    expect(screen.getByText(/^123.456 km$/)).toBeInTheDocument();
+    const caption = screen.getByRole("button", { name: "Vehicle speed" });
+    expect(caption).toHaveAttribute("aria-pressed", "true");
+    fireEvent.click(caption);
+    expect(onToggle).toHaveBeenCalledWith(speed);
+    // A run that reads the gearbox puts what it says in the tachometer's window.
+    rerender(
+      <LiveReadPanel
+        snapshot={{
+          ...createLiveReadSnapshot(),
+          state: "RUNNING",
+          values: [
+            {
+              ecuFamily: "TCM",
+              identifier: "0x1E1F",
+              name: "Transmission current gear",
+              value: null,
+              unit: null,
+              state: "D3",
+              note: null,
+              raw: 3,
+              minimum: null,
+              maximum: null,
+              samples: 1,
+              atMs: 100,
+              series: [],
+            },
+          ],
+        }}
+        set={[speed, engine]}
+        modules={modules}
+        running
+        busy={false}
+        adapterReady
+        {...idleHandlers}
+        onChoose={onChoose}
+        onToggle={onToggle}
+        onStop={onStop}
+      />,
+    );
+    expect(document.querySelector(".live-dash-window text")?.textContent).toBe("D3");
+    // During a run the switch still works: the run stops, to start again
+    // with the set as it now is.
+    fireEvent.click(screen.getByRole("button", { name: "Engine speed" }));
+    expect(onToggle).toHaveBeenLastCalledWith(engine);
+    expect(onStop).toHaveBeenCalledTimes(1);
+    window.localStorage.removeItem("prowlone.liveDashboard");
+  });
+
+  /**
+   * The dials read themselves (ADR-0022, amendment of 2026-09-19): once the
+   * survey names the two parameters and the adapter is there, whichever
+   * comes later, the run starts without a click and the panel shows - once
+   * per survey, so a run the person stopped stays stopped.
+   */
+  it("starts the dials' run by itself once the survey names them and the adapter is there", () => {
+    const modules = [
+      namedModule("PCM", [
+        ["0xDA02", "Vehicle speed"],
+        ["0xDA48", "Engine speed"],
+      ]),
+    ];
+    const speed = { ecuFamily: "PCM", identifier: "0xDA02" };
+    const engine = { ecuFamily: "PCM", identifier: "0xDA48" };
+    const onChoose = vi.fn();
+    const onStart = vi.fn();
+    const view = (set: LiveReadEntryRequest[], adapterReady: boolean, running = false) => (
+      <LiveReadPanel
+        snapshot={createLiveReadSnapshot()}
+        set={set}
+        modules={modules}
+        running={running}
+        busy={false}
+        adapterReady={adapterReady}
+        {...idleHandlers}
+        onChoose={onChoose}
+        onStart={onStart}
+      />
+    );
+    const { rerender } = render(view([], false));
+    expect(onChoose).toHaveBeenCalledWith([speed, engine]);
+    // In the set, no adapter yet: nothing starts and no panel shows.
+    rerender(view([speed, engine], false));
+    expect(onStart).not.toHaveBeenCalled();
+    expect(document.querySelector(".live-dash")).toBeNull();
+    // The adapter arrives: the run starts by itself, and the panel with it.
+    rerender(view([speed, engine], true));
+    expect(onStart).toHaveBeenCalledTimes(1);
+    expect(document.querySelector(".live-dash")).not.toBeNull();
+    // Once: a run the person stopped is not started again.
+    rerender(view([speed, engine], true, true));
+    rerender(view([speed, engine], true, false));
+    expect(onStart).toHaveBeenCalledTimes(1);
+    window.localStorage.removeItem("prowlone.liveDashboard");
   });
 
   it("shows the values with what the run has seen, the achieved round, and why an entry was dropped", async () => {
@@ -344,11 +604,11 @@ describe("live reading", () => {
     // Nothing marked: the table alone, and a line saying how to get more.
     expect(screen.queryByRole("img", { name: "the run, every marked parameter over time" })).toBeNull();
     expect(screen.queryAllByRole("article")).toHaveLength(0);
-    expect(screen.getByText("Mark a row in the table to see it as a tile or on the chart.")).toBeInTheDocument();
+    expect(screen.getByText("Mark a row to see it in the table above or on the chart.")).toBeInTheDocument();
 
     // Mark engine speed for the chart and battery voltage for a tile.
     const chartMarks = screen.getAllByRole("button", { name: "Chart" });
-    const tileMarks = screen.getAllByRole("button", { name: "Tile" });
+    const tileMarks = screen.getAllByRole("button", { name: "Table" });
     fireEvent.click(chartMarks[0]);
     fireEvent.click(tileMarks[1]);
     const chart = screen.getByRole("img", { name: "the run, every marked parameter over time" });

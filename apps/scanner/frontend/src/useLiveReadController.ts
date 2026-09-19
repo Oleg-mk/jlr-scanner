@@ -31,6 +31,40 @@ function failed(error: unknown): LiveReadSnapshot {
 }
 
 /** Every module-and-identifier pair the survey offers, in the survey's order. */
+/** The two dials' parameters as the survey names them: exactly these words, any module. */
+export const DIAL_PARAMETERS = {
+  speed: /^(vehicle|road) speed$/i,
+  engine: /^engine speed$/i,
+} as const;
+
+export interface DialEntries {
+  speed: LiveReadEntryRequest | null;
+  engine: LiveReadEntryRequest | null;
+}
+
+/**
+ * The identifiers behind the instrument panel's two dials (the owner,
+ * 2026-09-19): the vehicle speed and the engine speed, read on every round
+ * unless the person takes one out. The engine controller's own first, then
+ * any module that declares the parameter under exactly that name; null
+ * where the survey names none.
+ */
+export function dialEntries(modules: ModuleSurveyEntry[]): DialEntries {
+  const ordered = [...modules].sort(
+    (a, b) => Number(b.ecuFamily === "PCM") - Number(a.ecuFamily === "PCM"),
+  );
+  const find = (pattern: RegExp): LiveReadEntryRequest | null => {
+    for (const module of ordered) {
+      const entry = module.readableIdentifiers.find((identifier) =>
+        identifier.parameters.some((name) => pattern.test(name)),
+      );
+      if (entry !== undefined) return { ecuFamily: module.ecuFamily, identifier: entry.identifier };
+    }
+    return null;
+  };
+  return { speed: find(DIAL_PARAMETERS.speed), engine: find(DIAL_PARAMETERS.engine) };
+}
+
 export function liveCandidates(modules: ModuleSurveyEntry[]): LiveReadEntryRequest[] {
   return modules.flatMap((module) =>
     module.readableIdentifiers.map((entry) => ({

@@ -738,6 +738,11 @@ export function App({
                     onStop={() => void liveRead.stop()}
                     onSaveCsv={() => void liveRead.saveCsv()}
                     saved={liveRead.saved}
+                    odometer={
+                      mileage.snapshot.highest === null
+                        ? null
+                        : { value: mileage.snapshot.highest, unit: mileage.snapshot.unit }
+                    }
                   />
                 ) : null}
                 {section.id === "listen" ? (

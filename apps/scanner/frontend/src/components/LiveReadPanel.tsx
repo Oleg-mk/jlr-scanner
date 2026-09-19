@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { SwapLabel } from "./StableLabel";
+import { useEffect, useRef, useState } from "react";
 import { dataText, decimalText, liveReadReason, parameterNote, t, useLanguage } from "../i18n";
 import { readLimits, writeLimits, type LiveLimits } from "../liveLimits";
 import { parameterName } from "../parameterNames";
@@ -14,7 +15,8 @@ import { chartColour } from "../liveChartColours";
 import { decimalsOf, withDecimals } from "../liveFormat";
 import { withUnit } from "../units";
 import { LiveChart } from "./LiveChart";
-import { LiveDashboard } from "./LiveDashboard";
+import { LiveDashboard, type DialControl, type Odometer } from "./LiveDashboard";
+import { dialEntries } from "../useLiveReadController";
 import { LiveTiles } from "./LiveTiles";
 import { StatusBadge } from "./StatusBadge";
 
@@ -38,6 +40,8 @@ interface LiveReadPanelProps {
   saved: { path?: string; error?: string } | null;
   /** On the bench (ADR-0020): every sample is synthetic. */
   bench?: boolean;
+  /** The highest running total the mileage read found: the speedometer's window. */
+  odometer?: Odometer | null;
 }
 
 function badge(snapshot: LiveReadSnapshot, running: boolean, bench: boolean) {
@@ -96,22 +100,94 @@ export function LiveReadPanel({
   onSaveCsv,
   saved,
   bench = false,
+  odometer = null,
 }: LiveReadPanelProps) {
   const language = useLanguage();
   const chosen = new Set(set.map(entryKey));
+  // The two dials read themselves (ADR-0022, amendment of 2026-09-19): as
+  // soon as the survey names the speed and the engine speed they join the
+  // set, and once the adapter is there too the run starts without a click
+  // and the panel shows - once per survey, so a run the person stopped
+  // stays stopped. The caption under a dial is its switch; during a run a
+  // click stops the run and starts it again with the set as it now is.
+  const dials = dialEntries(modules);
+  const dialList = [dials.speed, dials.engine].filter(
+    (entry): entry is LiveReadEntryRequest => entry !== null,
+  );
+  const dialsChosen = dialList.length > 0 && dialList.every((entry) => chosen.has(entryKey(entry)));
+  const seededFor = useRef<ModuleSurveyEntry[] | null>(null);
+  const startedFor = useRef<ModuleSurveyEntry[] | null>(null);
+  const restartPending = useRef(false);
+  useEffect(() => {
+    if (seededFor.current !== modules) {
+      // A survey: seed the set, and let the next render see it.
+      seededFor.current = modules;
+      startedFor.current = null;
+      const wanted = dialList.filter((entry) => !chosen.has(entryKey(entry)));
+      if (wanted.length > 0 && !running) onChoose(wanted);
+      return;
+    }
+    if (startedFor.current !== modules && dialsChosen && adapterReady && !running && !busy) {
+      startedFor.current = modules;
+      showDashboard();
+      onStart();
+      return;
+    }
+    if (restartPending.current && !running && !busy) {
+      restartPending.current = false;
+      if (set.length > 0) onStart();
+    }
+  });
+  const switchDial = (entry: LiveReadEntryRequest) => {
+    onToggle(entry);
+    if (running) {
+      restartPending.current = true;
+      onStop();
+    }
+  };
+  const dialControl = (entry: LiveReadEntryRequest | null): DialControl | null =>
+    entry === null
+      ? null
+      : { reading: chosen.has(entryKey(entry)), disabled: busy, onToggle: () => switchDial(entry) };
   const offered = modules.filter((module) => module.readableIdentifiers.length > 0);
   const full = set.length >= LIVE_READ_MAX_ENTRIES;
   // Which identifiers the chooser offers. Quantities — what the catalogue
-  // reads as a number with a unit — come first, because that is what a
-  // person watches; "everything" hides nothing. A library that marks none
-  // offers everything rather than an empty list.
+  // reads as a number with a real unit — come first, because that is what
+  // a person watches; "everything" hides nothing. A library that marks
+  // none offers everything rather than an empty list. Each choice says
+  // what it holds for this car, counted (the owner, 2026-09-19).
   const [onlyQuantities, setOnlyQuantities] = useState(true);
-  const anyQuantities = offered.some((module) =>
-    module.readableIdentifiers.some((identifier) => identifier.quantity === true),
+  const isQuantity = (identifier: { quantity?: boolean }) => identifier.quantity === true;
+  const quantityModules = offered.filter((module) =>
+    module.readableIdentifiers.some(isQuantity),
+  ).length;
+  const quantityCount = offered.reduce(
+    (total, module) => total + module.readableIdentifiers.filter(isQuantity).length,
+    0,
   );
+  const allCount = offered.reduce((total, module) => total + module.readableIdentifiers.length, 0);
+  const anyQuantities = quantityModules > 0;
   const filtering = onlyQuantities && anyQuantities;
   const listed = (module: ModuleSurveyEntry) =>
-    module.readableIdentifiers.filter((identifier) => !filtering || identifier.quantity === true);
+    module.readableIdentifiers.filter((identifier) => !filtering || isQuantity(identifier));
+  // What a module's button will actually put in: the listed addresses
+  // not yet chosen, as many as the set has room for. The button says
+  // that number, not the module's - on the owner's X250 the PCM offers
+  // 81 and the set holds 16, which is what hid the engine speed behind
+  // fifteen lower addresses (2026-09-19).
+  const room = Math.max(0, LIVE_READ_MAX_ENTRIES - set.length);
+  const fresh = (module: ModuleSurveyEntry) =>
+    listed(module).filter(
+      (identifier) =>
+        !chosen.has(entryKey({ ecuFamily: module.ecuFamily, identifier: identifier.identifier })),
+    );
+  const taking = (module: ModuleSurveyEntry) => Math.min(fresh(module).length, room);
+  const chooseReason = (module: ModuleSurveyEntry): string | undefined => {
+    if (running) return undefined;
+    if (full) return t("The set is full: {max} addresses.", { max: LIVE_READ_MAX_ENTRIES });
+    if (listed(module).length > 0 && fresh(module).length === 0) return t("Already in the set.");
+    return undefined;
+  };
   // What the person marked in the table: which rows become tiles, which
   // rows go on the chart. The table is the one list; these are picks from
   // it, so nothing is shown twice.
@@ -147,6 +223,17 @@ export function LiveReadPanel({
       return false;
     }
   });
+  const showDashboard = () =>
+    setDashboard((current) => {
+      if (!current) {
+        try {
+          window.localStorage.setItem(DASHBOARD_KEY, "on");
+        } catch {
+          // A browser that refuses storage forgets the choice; nothing else.
+        }
+      }
+      return true;
+    });
   const toggleDashboard = () =>
     setDashboard((current) => {
       const next = !current;
@@ -186,8 +273,8 @@ export function LiveReadPanel({
       </p>
 
       {offered.length > 0 && anyQuantities ? (
-        <div className="live-read-filter">
-          <div className="live-read-filter-choice" role="group" aria-label={t("Which parameters")}>
+        <div className="live-read-filter" role="group" aria-label={t("Which parameters")}>
+          <span className="live-read-filter__choice">
             <button
               className={`button button--quiet${onlyQuantities ? " is-current" : ""}`}
               type="button"
@@ -196,6 +283,14 @@ export function LiveReadPanel({
             >
               {t("Quantities")}
             </button>
+            <span className="button-hint">
+              {t(
+                "Numbers with a unit — engine speed, road speed, temperatures, voltages, pressures, counters of time and distance. Addresses: {count}, in modules: {modules}.",
+                { count: quantityCount, modules: quantityModules },
+              )}
+            </span>
+          </span>
+          <span className="live-read-filter__choice">
             <button
               className={`button button--quiet${onlyQuantities ? "" : " is-current"}`}
               type="button"
@@ -204,11 +299,12 @@ export function LiveReadPanel({
             >
               {t("Everything")}
             </button>
-          </div>
-          <span className="button-hint">
-            {onlyQuantities
-              ? t("Those the catalogue reads as a number with a unit.")
-              : t("Everything the module declares, raw counts and texts included.")}
+            <span className="button-hint">
+              {t(
+                "Every address a module declares readable, states, raw counts, texts and blocks included. Addresses: {count}, in modules: {modules}.",
+                { count: allCount, modules: offered.length },
+              )}
+            </span>
           </span>
         </div>
       ) : null}
@@ -229,19 +325,28 @@ export function LiveReadPanel({
                 <button
                   className="button button--quiet"
                   type="button"
-                  disabled={running || full || listed(module).length === 0}
+                  disabled={running || taking(module) === 0}
+                  title={chooseReason(module)}
                   onClick={() =>
                     onChoose(
-                      listed(module).map((identifier) => ({
+                      fresh(module).map((identifier) => ({
                         ecuFamily: module.ecuFamily,
                         identifier: identifier.identifier,
                       })),
                     )
                   }
                 >
-                  {t("Choose these")}
+                  {filtering ? t("Choose these") : t("Choose all")}{" "}
+                  <span className="count-mark">{taking(module)}</span>
                 </button>
-                <span className="button-hint">{t("{count} offered", { count: listed(module).length })}</span>
+                {fresh(module).length > taking(module) ? (
+                  <span className="button-hint">
+                    {t(
+                      "{left} more here than the set can take: it holds {max}; tick the rest by hand.",
+                      { left: fresh(module).length - taking(module), max: LIVE_READ_MAX_ENTRIES },
+                    )}
+                  </span>
+                ) : null}
               </div>
               <table className="live-read-identifiers">
                 <thead>
@@ -354,7 +459,7 @@ export function LiveReadPanel({
 
       {snapshot.values.length > 0 && pinnedValues.length === 0 && plottedValues.length === 0 ? (
         <p className="button-hint">
-          {t("Mark a row in the table to see it as a tile or on the chart.")}
+          {t("Mark a row to see it in the table above or on the chart.")}
         </p>
       ) : null}
 
@@ -366,7 +471,7 @@ export function LiveReadPanel({
             aria-pressed={showAll}
             onClick={() => setShowAll((current) => !current)}
           >
-            {showAll ? t("Only informative") : t("Show all")}
+            <SwapLabel on={showAll} whenOn={t("Only informative")} whenOff={t("Show all")} />
           </button>
           {!showAll && hiddenCount > 0 ? (
             <span className="button-hint">{t("{count} rows at zero hidden", { count: hiddenCount })}</span>
@@ -401,8 +506,13 @@ export function LiveReadPanel({
         </div>
       ) : null}
 
-      {dashboard && snapshot.values.length > 0 ? (
-        <LiveDashboard values={snapshot.values} limits={limits} />
+      {dashboard && (snapshot.values.length > 0 || dials.speed !== null || dials.engine !== null) ? (
+        <LiveDashboard
+          values={snapshot.values}
+          limits={limits}
+          dials={{ speed: dialControl(dials.speed), engine: dialControl(dials.engine) }}
+          odometer={odometer}
+        />
       ) : null}
 
       {pinnedValues.length > 0 ? (
@@ -410,14 +520,14 @@ export function LiveReadPanel({
           <LiveTiles values={pinnedValues} limits={limits} onLimits={changeLimits} />
           <p className="button-hint">
             {t(
-              "A tile colours itself only against limits you set; SDD records no normal range, so none is drawn for you.",
+              "A cell of the table colours itself only against limits you set; SDD records no normal range, so none is drawn for you.",
             )}
           </p>
         </>
       ) : null}
       {plottedValues.length > 0 ? <LiveChart values={plottedValues} /> : null}
       {snapshot.values.length > 0 ? (
-        <table className="module-table">
+        <table className="module-table live-values">
           <thead>
             <tr>
               <th scope="col">{t("Parameter")}</th>
@@ -471,7 +581,7 @@ export function LiveReadPanel({
                       disabled={!onTile && pinned.length >= 8}
                       onClick={() => setPinned((current) => flip(current, key))}
                     >
-                      {t("Tile")}
+                      {t("Table")}
                     </button>
                     <button
                       type="button"
