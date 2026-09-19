@@ -38,7 +38,7 @@ use app_contracts::{
 };
 use diagnostic_environment::{
     DiagnosticEnvironmentPlan, DiagnosticEnvironmentResolution, DiagnosticEnvironmentResolver,
-    EnvironmentField, PartialDiagnosticEnvironment, QueryError,
+    EnvironmentField, PartialDiagnosticEnvironment, QueryError, ReadableParameter,
 };
 use knowledge::{
     manifest_file, ApplicabilityResolution, ClaimKey, DimensionConstraint, EntityKind,
@@ -1468,19 +1468,7 @@ pub fn survey_vehicle(
                 .into_iter()
                 .map(|identifier| ReadableIdentifierSummary {
                     identifier: format!("0x{:04X}", identifier.identifier),
-                    // A quantity when the catalogue gives any parameter of
-                    // it a unit and a scaling: what reads as a number rather
-                    // than as a count of something unstated.
-                    quantity: identifier.parameters.iter().any(|parameter| {
-                        parameter
-                            .unit
-                            .as_deref()
-                            .is_some_and(|unit| !unit.is_empty())
-                            && parameter
-                                .encoding
-                                .as_deref()
-                                .is_some_and(|encoding| encoding.contains("scale="))
-                    }),
+                    quantity: reads_as_quantity(&identifier.parameters),
                     parameters: identifier
                         .parameters
                         .into_iter()
@@ -2134,6 +2122,25 @@ pub fn validation_label(state: diagnostic_environment::ValidationState) -> &'sta
         ValidationState::Contradicted => "CONTRADICTED",
         ValidationState::Deprecated => "DEPRECATED",
     }
+}
+
+/// Whether the catalogue reads an identifier as a quantity - a number a
+/// person watches, as engine speed or a voltage is: any parameter of it
+/// with a real unit, a scaling, and no enumerated states. `int` is the
+/// unit SDD gives a switch and a counter, so it is no unit here; a map
+/// without a scaling is not read as a number; and a parameter with states
+/// reads as a state however it is scaled. On the owner's X250
+/// (2026-09-19) the PCM's 81 quantities by unit and scaling alone held 42
+/// switches, flags and codes among them; by this rule it has 39 numbers.
+pub fn reads_as_quantity(parameters: &[ReadableParameter]) -> bool {
+    parameters.iter().any(|parameter| {
+        let unit = parameter.unit.as_deref().unwrap_or("");
+        let encoding = parameter.encoding.as_deref().unwrap_or("");
+        !unit.is_empty()
+            && unit != "int"
+            && encoding.contains("scale=")
+            && !encoding.contains("states=")
+    })
 }
 
 fn fill_from_plan(entry: &mut ModuleSurveyEntry, plan: &DiagnosticEnvironmentPlan) {

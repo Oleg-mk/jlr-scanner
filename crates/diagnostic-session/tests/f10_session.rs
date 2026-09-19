@@ -765,3 +765,57 @@ fn a_vin_is_decoded_with_the_tables_the_library_holds() {
         .message
         .contains("no VIN tables"));
 }
+
+/// The live read chooser's "quantities" (the owner's X250, 2026-09-19): a
+/// real unit, a scaling, and no enumerated states. A switch reading
+/// Inactive/Active with the unit `int` is a state, a counter in `int` is a
+/// count, and a map without a scaling is not a number the catalogue reads.
+#[test]
+fn a_quantity_is_a_number_with_a_real_unit_and_a_scaling() {
+    use diagnostic_environment::ReadableParameter;
+    use diagnostic_session::reads_as_quantity;
+    let parameter = |name: &str, encoding: &str, unit: &str| ReadableParameter {
+        name: name.into(),
+        encoding: (!encoding.is_empty()).then(|| encoding.to_string()),
+        unit: (!unit.is_empty()).then(|| unit.to_string()),
+    };
+    assert!(reads_as_quantity(&[parameter(
+        "Engine speed",
+        "bytes=0..3;size=4;mask=all;converter=CVT_BFP_RPM;scale=0.001;offset=0;offset_first=true",
+        "rpm",
+    )]));
+    assert!(!reads_as_quantity(&[parameter(
+        "Input/output status - brake switch 1",
+        "size=2;mask=0x1;converter=CVT_S_BMP_INACTIVE_ACTIVE;scale=1;offset=0;offset_first=true;states=0..0=Inactive|1..1=Active",
+        "int",
+    )]));
+    assert!(!reads_as_quantity(&[parameter(
+        "Glow plug coil duty cycle",
+        "size=1;mask=0xff;scale=1;offset=0;offset_first=true",
+        "int",
+    )]));
+    assert!(!reads_as_quantity(&[parameter(
+        "Particulate filter differential pressure",
+        "size=1;mask=0xff;converter=CVT_KPA_OFF_0_RES_1000_SGN;map=0:0|127:127000|128:-128000|255:-1000",
+        "Pa",
+    )]));
+    assert!(!reads_as_quantity(&[parameter(
+        "Part number",
+        "text=ascii",
+        ""
+    )]));
+    assert!(!reads_as_quantity(&[]));
+    // One number among states is enough: the address reads as a quantity.
+    assert!(reads_as_quantity(&[
+        parameter(
+            "Engine status - engine running",
+            "size=1;mask=0x1;scale=1;offset=0;offset_first=true;states=0..0=Off|1..1=On",
+            "int",
+        ),
+        parameter(
+            "Main engine control module voltage supply",
+            "bytes=1..2;size=2;mask=0xffff;scale=0.001;offset=0;offset_first=true",
+            "V",
+        ),
+    ]));
+}

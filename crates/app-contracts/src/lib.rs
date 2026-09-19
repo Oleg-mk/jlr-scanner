@@ -364,8 +364,10 @@ pub struct ReadableIdentifierSummary {
     pub identifier: String,
     pub parameters: Vec<String>,
     /// Whether the catalogue reads this identifier as a quantity: a parameter
-    /// with a unit and a scaling. Those are what a person watches first; raw
-    /// counts, texts and blocks are shown too, but under "everything".
+    /// with a real unit (not `int`), a scaling, and no enumerated states - a
+    /// number a person watches, as engine speed or a voltage is, where a
+    /// switch reading Inactive/Active is a state. States, raw counts, texts
+    /// and blocks are offered too, under "everything" (2026-09-19).
     #[serde(default)]
     pub quantity: bool,
 }

@@ -74,7 +74,7 @@ export interface RouteSummary {
 export interface ReadableIdentifierSummary {
   identifier: string;
   parameters: string[];
-  /** The catalogue reads this one as a number with a unit. */
+  /** The catalogue reads this one as a number with a real unit: not a state, not a raw count. */
   quantity?: boolean;
 }
 
