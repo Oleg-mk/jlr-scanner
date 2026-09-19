@@ -343,3 +343,98 @@ alone (decision 8).
   operation has met a car. With this the step is on the bench end to end,
   which decision 1 asks of a step before the next begins; the version
   turns 1.2.0 with the owner's word, given the same day.
+
+## Amendment, 2026-09-19, evening: step 2 begins — the on-demand self test
+
+- Status: **Accepted, 2026-09-19** — on the owner's word («робимо за твоїм
+  порядком, це буде 1.2.1»), after step 1 was accepted at the screen and
+  released as 1.2.0. Written before the code, as decision 10 asks.
+
+### What the data holds
+
+Across the 22 programmes of the owner's library, one context each: 491
+modules declare routine `0x0202` in their index, and 391 carry the
+on-demand self test's screens from the ODST pack (`ADR-0032`) — SDD's own
+instructions, the time the test runs and the longest SDD waits for it. The
+owner's X250 has 19 and 23 of them. Every `0x0202` the index declares
+requires `session_03`; none names a security level. The index and the
+pack say nothing of a routine option record and nothing of what the
+result bytes mean (`ADR-0032` left the results pack undecided).
+
+### What changes — decision 10, detailed
+
+1. **What is run.** Routine `0x0202`, the on-demand self test, and no
+   other routine in this slice. It is offered on a module only where two
+   records agree: the module's index declares `0x0202` (with its session,
+   and no security level), and the ODST pack gives this car a screen for
+   the test, with its time and its timeout. A test the index declares
+   without a screen, or a screen without the index, is listed as before
+   and not run: the product does not know how long it runs. `0x0404` VIN
+   learn, the routines that name a security level and the routines that
+   open a gateway are not run, as the outline said.
+
+2. **How it is run: opened, held, asked once, left.** The extended session
+   is opened with `0x10 03` first — the data requires it for every
+   `0x0202` — then `0x31 01 02 02` starts the test with no option record,
+   because the data names none; a module that refuses the length says so
+   by name and that refusal is the record. The session is then held with
+   `0x3E 80` while the test runs, one keep-alive per step and a step at
+   most every two seconds, the standard's five-second server timer being
+   what it is. When the data's time has run, `0x31 03 02 02` asks for the
+   result once. The run ends with `0x10 01` — on the result, on a refusal,
+   on the person's stop (`0x31 02 02 02` first), on the data's timeout, or
+   on an adapter error — and a session is never left open, as decision 4
+   says. Each step is one request and one answer over the adapter, taken
+   and released as the live read takes it (`ADR-0022`, decision 4), so a
+   stop or a disconnect gets through between two of them.
+
+3. **The result is bytes.** What the module answers to the request for
+   results is shown as the bytes it is, with the session it came in and
+   the plain statement that this library does not describe them. Nothing
+   is inferred from them: not "passed", not "failed". A negative answer is
+   shown by its name and recorded.
+
+4. **The confirmation.** One question per test, naming the module and
+   the test, carrying SDD's own instructions for this car in the help
+   language, the class `SERVICE_ROUTINE`, how long the test runs and the
+   longest the tool waits, and the low-battery line where there is one
+   (`ADR-0030`). The confirming control names the operation — "Run the
+   test {name} on {module}" — and never holds the focus by default. The
+   interface offers it inside the service mode only.
+
+5. **The record.** `routine_runs` / `prowlone.routine-run` / `ROUTINE_RUN`,
+   class `SERVICE_ROUTINE`: the module, the routine and the test's
+   identifier and name, the session, every exchange in order — the opening,
+   the start, each keep-alive, the request for results, the way back — the
+   answer to each by name, the result bytes, how long the run took, and
+   how it ended: completed, refused, stopped, timed out, or failed.
+   `report-intake` accepts the kind and takes nothing from it as evidence
+   about a route: a run is an action. The readable report's "Service
+   operations" lists it.
+
+6. **The guard, loosened for exactly this.** `uds` gains the one
+   constructor `routine_control`, and `uds-execution` the one intent
+   `RoutineControl`, whose routine is a closed type with one value,
+   `0x0202`; the rules that forbade the word become rules that require the
+   constructor, the intent and the closed set, and the intent count the
+   guard checks goes from one to two. The keep-alive is the executor's,
+   inside the service sequence, as the session opening already is: the
+   read path still may not open a session or send a keep-alive, and
+   `uds-execution` still may not name either. `SecurityAccess`,
+   `RequestDownload`, `TransferData`, `InputOutputControl` and `EcuReset`
+   stay forbidden everywhere.
+
+7. **The bench.** `SYNTHMOD` declares `0x0202` in the synthetic index and
+   has its screen in the synthetic ODST. The bench answers the start in
+   the extended session and refuses it in the default one; answers the
+   request for results with a fixed status record; answers the stop; and
+   takes the keep-alive as it does. The whole-stack test runs the test on
+   the bench end to end and finds the record.
+
+8. **Not in this slice.** Any other routine identifier; running several
+   tests in one go; a meaning for the result bytes; the self tests of
+   K-line modules, which the data declares as no routine. Step 3 and step
+   4 remain the outline of decision 10.
+
+The version turns 1.2.1 with the owner's word, once the slice is on the
+bench end to end.
