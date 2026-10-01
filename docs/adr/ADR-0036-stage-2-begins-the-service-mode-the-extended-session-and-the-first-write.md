@@ -484,4 +484,6 @@ bench end to end.
   test found"; `report-intake` takes the two reads as reads. The
   whole-stack test reads again on the bench and finds both reads in the
   record.
-- Nothing has met a car. The version turns 1.2.1 on the owner's word.
+- Nothing has met a car. The version turned 1.2.1 on 2026-10-01, when the
+  owner asked for both builds made anew («роби обидві збірки, оновлюй
+  їх»).

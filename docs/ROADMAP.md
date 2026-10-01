@@ -43,6 +43,11 @@ first build after the visual layer of F15 closed the last open row.
 service mode, the clear of the codes, the collective clear — complete on the
 bench end to end. Its installers go to the owner alone (decision 8); the
 testers stay on `release-1.1`.
+1.2.1 (2026-10-01) is the second: step 2 of `ADR-0036` — the on-demand
+self test, with the module's codes read again once it has ended — the
+MOST modules of the L319, L320 and L322 of MY10 by their own address
+(`ADR-0039`), and a Mac that shows one adapter instead of its two port
+names. To the owner alone, as 1.2.0.
 
 ## Scope, decided 2026-09-01
 
