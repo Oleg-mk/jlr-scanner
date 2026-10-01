@@ -125,8 +125,11 @@ Builds after 0.9.6 ignore such files; this note is for 0.9.6 and earlier.
 
 The MongoosePro JLR appears on a Mac as a USB modem port with no driver
 to install; a clone with a different chip may need its maker's driver.
-Nobody has run the Mac build yet: if you are the first, say so in your
-notes, and tell us the macOS version and whether the adapter was found.
+An Intel MacBook found it on 2026-10-01. macOS gives one adapter two
+port names, `/dev/cu.usbmodem…` and `/dev/tty.usbmodem…`, and builds up
+to 1.2.0 list both as if they were two adapters: choose the one that
+begins `/dev/cu.`. Builds after 1.2.0 show the adapter once. Tell us in
+your notes the macOS version and whether the adapter connected and read.
 
 ## First launch
 

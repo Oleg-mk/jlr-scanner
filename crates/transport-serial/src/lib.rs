@@ -74,21 +74,48 @@ impl SerialDeviceEnumerator for SystemSerialDeviceEnumerator {
         {
             let ports = serialport::available_ports()
                 .map_err(|error| DiscoveryError::Enumeration(error.to_string()))?;
-            Ok(ports
-                .into_iter()
-                .filter_map(|port| match port.port_type {
-                    SerialPortType::UsbPort(info) => Some(SerialDevice {
-                        port_name: port.port_name,
-                        usb_vid: info.vid,
-                        usb_pid: info.pid,
-                        usb_serial_number: info.serial_number,
-                        driver_service: None,
-                    }),
-                    _ => None,
-                })
-                .collect())
+            Ok(without_dial_in_twins(
+                ports
+                    .into_iter()
+                    .filter_map(|port| match port.port_type {
+                        SerialPortType::UsbPort(info) => Some(SerialDevice {
+                            port_name: port.port_name,
+                            usb_vid: info.vid,
+                            usb_pid: info.pid,
+                            usb_serial_number: info.serial_number,
+                            driver_service: None,
+                        }),
+                        _ => None,
+                    })
+                    .collect(),
+            ))
         }
     }
+}
+
+/// macOS names every USB serial device twice: the call-out device
+/// `/dev/cu.<name>` and its dial-in twin `/dev/tty.<name>`, and the
+/// enumeration returns both. They are one adapter, and a program that
+/// starts the conversation uses the call-out name. The twin is dropped, so
+/// a person is shown one adapter and is not asked to choose between two
+/// names of it - which is what the owner's Intel Mac showed him on
+/// 2026-10-01. A dial-in name with no call-out beside it is kept: nothing
+/// is hidden on a guess. Linux and Windows names carry neither prefix.
+pub fn without_dial_in_twins(devices: Vec<SerialDevice>) -> Vec<SerialDevice> {
+    const CALL_OUT: &str = "/dev/cu.";
+    const DIAL_IN: &str = "/dev/tty.";
+    let call_outs: Vec<String> = devices
+        .iter()
+        .filter_map(|device| device.port_name.strip_prefix(CALL_OUT))
+        .map(str::to_string)
+        .collect();
+    devices
+        .into_iter()
+        .filter(|device| match device.port_name.strip_prefix(DIAL_IN) {
+            Some(name) => !call_outs.iter().any(|call_out| call_out == name),
+            None => true,
+        })
+        .collect()
 }
 
 pub fn matching_devices<E: SerialDeviceEnumerator>(
@@ -257,5 +284,61 @@ mod tests {
             }
             _ => panic!("expected ambiguity"),
         }
+    }
+
+    fn names(devices: &[SerialDevice]) -> Vec<&str> {
+        devices
+            .iter()
+            .map(|device| device.port_name.as_str())
+            .collect()
+    }
+
+    #[test]
+    fn a_mac_shows_one_adapter_not_its_two_names() {
+        // macOS returns the call-out and the dial-in device of one adapter.
+        let devices = without_dial_in_twins(vec![
+            device("/dev/cu.usbmodem14101", 0x18E1, 0x0104),
+            device("/dev/tty.usbmodem14101", 0x18E1, 0x0104),
+        ]);
+        assert_eq!(names(&devices), ["/dev/cu.usbmodem14101"]);
+        // The order the system lists them in does not matter.
+        let devices = without_dial_in_twins(vec![
+            device("/dev/tty.usbmodem14101", 0x18E1, 0x0104),
+            device("/dev/cu.usbmodem14101", 0x18E1, 0x0104),
+        ]);
+        assert_eq!(names(&devices), ["/dev/cu.usbmodem14101"]);
+        // So discovery finds the adapter instead of stopping on an ambiguity.
+        let found = discover_unique(&FixedEnumerator(devices), 0x18E1, 0x0104).unwrap();
+        assert_eq!(found.port_name, "/dev/cu.usbmodem14101");
+    }
+
+    #[test]
+    fn two_real_adapters_and_other_systems_names_are_left_alone() {
+        // Two adapters on a Mac: each keeps its call-out name, and the choice
+        // between them stays the person's.
+        let devices = without_dial_in_twins(vec![
+            device("/dev/cu.usbmodem14101", 0x18E1, 0x0104),
+            device("/dev/tty.usbmodem14101", 0x18E1, 0x0104),
+            device("/dev/cu.usbmodem14201", 0x18E1, 0x0104),
+            device("/dev/tty.usbmodem14201", 0x18E1, 0x0104),
+        ]);
+        assert_eq!(
+            names(&devices),
+            ["/dev/cu.usbmodem14101", "/dev/cu.usbmodem14201"]
+        );
+        assert!(matches!(
+            discover_unique(&FixedEnumerator(devices), 0x18E1, 0x0104),
+            Err(DiscoveryError::AmbiguousDevices(_))
+        ));
+        // A dial-in name with no call-out beside it is kept: nothing is hidden
+        // on a guess.
+        let alone = without_dial_in_twins(vec![device("/dev/tty.usbmodem9", 0x18E1, 0x0104)]);
+        assert_eq!(names(&alone), ["/dev/tty.usbmodem9"]);
+        // Linux and Windows names carry neither prefix.
+        let others = without_dial_in_twins(vec![
+            device("/dev/ttyACM0", 0x18E1, 0x0104),
+            device("COM7", 0x18E1, 0x0104),
+        ]);
+        assert_eq!(names(&others), ["/dev/ttyACM0", "COM7"]);
     }
 }
