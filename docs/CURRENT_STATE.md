@@ -64,6 +64,17 @@ bootloader jump and board-info exchange work through macOS's driver, or
 that anything is read. He reported that it is found; the rest is the next
 thing to try on that Mac.
 
+Build 1.2.1 carries it, with step 2 of `ADR-0036` and `ADR-0039`: commit
+7d07430, tag v1.2.1, run 36829683461, all four jobs green. macOS
+ProwlOne_1.2.1_universal.dmg, 15.1 MB, SHA-256
+84150e1b98ae5866bd16798b9045b4007553a08ad20cbd17890f2cb1973c8f65; Windows
+ProwlOne_1.2.1_x64-setup.exe, 5.6 MB, SHA-256
+909733a254103c5164447489fae12a93d84b36138c17891a8ccc67eb5a134742; both in
+`Desktop\ProwlOne-1.2.1` beside the owner's library zip `4994-9DFB`, which
+the release code loads as issued (517,927 records, stamp matches). To the
+owner alone, per decision 8 of `ADR-0036`. Neither installer has been
+opened by a person yet.
+
 ## 2026-09-19 — the owner's car in the library: a system belongs to its module, and the rail on the bench
 
 The day was the owner's again, item by item at the running window, with the
