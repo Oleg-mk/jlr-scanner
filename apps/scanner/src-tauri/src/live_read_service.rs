@@ -342,10 +342,12 @@ impl LiveReadService {
                                         .into_iter()
                                         .map(|value| DecodedParameterSummary {
                                             name: value.name,
+                                            name_texts: value.name_texts,
                                             raw: value.raw,
                                             value: value.value,
                                             unit: value.unit,
                                             state: value.state,
+                                            state_texts: value.state_texts,
                                             note: value.note,
                                         })
                                         .collect();
@@ -614,6 +616,7 @@ impl Run {
                     kept.value = value.value;
                     kept.unit = value.unit;
                     kept.state = value.state;
+                    kept.state_texts = value.state_texts;
                     kept.note = value.note;
                     kept.raw = value.raw;
                     kept.samples += 1;
@@ -635,9 +638,11 @@ impl Run {
                     ecu_family: ecu_family.to_string(),
                     identifier: identifier.to_string(),
                     name: value.name,
+                    name_texts: value.name_texts,
                     value: value.value,
                     unit: value.unit,
                     state: value.state,
+                    state_texts: value.state_texts,
                     note: value.note,
                     raw: value.raw,
                     minimum: number,

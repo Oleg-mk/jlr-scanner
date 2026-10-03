@@ -78,6 +78,27 @@ impl ConverterCatalogue {
         self.entries.get(id)
     }
 
+    /// Whether the state names are mostly Cyrillic: `Some(true)` for the
+    /// converters of a Russian pack, `Some(false)` for an English one,
+    /// `None` when no converter names a state (`ADR-0034`, amended
+    /// 2026-10-03). The converter files declare no language, so the words
+    /// are what says which pack this is.
+    pub fn states_mostly_cyrillic(&self) -> Option<bool> {
+        let names: Vec<&str> = self
+            .entries
+            .values()
+            .flat_map(|info| info.states.iter().map(|state| state.name.as_str()))
+            .collect();
+        if names.is_empty() {
+            return None;
+        }
+        let cyrillic = names
+            .iter()
+            .filter(|name| name.chars().any(|c| ('\u{0400}'..='\u{04FF}').contains(&c)))
+            .count();
+        Some(cyrillic * 2 >= names.len())
+    }
+
     /// Parse one converter document and add it to the catalogue.
     ///
     /// Repeating an identical definition is accepted; a genuine redefinition is

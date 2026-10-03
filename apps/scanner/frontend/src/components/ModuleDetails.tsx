@@ -10,7 +10,7 @@ import type { DtcClearSnapshot } from "../serviceMode";
 import { SELF_TEST_IDS, SELF_TEST_ROUTINE, type RoutineRunSnapshot } from "../routineRun";
 import { RoutineOutcome } from "./RoutineOutcome";
 import { moduleReasons, moduleRoute, nodeStatus, routeText } from "../networkMap";
-import { parameterName } from "../parameterNames";
+import { parameterName, parameterTexts, stateName } from "../parameterNames";
 import { withUnit } from "../units";
 import { StatusBadge } from "./StatusBadge";
 
@@ -293,7 +293,10 @@ export function ModuleDetails({
                   <option value="">{t("Choose a value")}</option>
                   {module.readableIdentifiers.map((entry) => (
                     <option key={entry.identifier} value={entry.identifier}>
-                      {entry.identifier} — {entry.parameters.map(parameterName).join(", ")}
+                      {entry.identifier} —{" "}
+                      {entry.parameters
+                        .map((name, index) => parameterName(name, parameterTexts(entry, index)))
+                        .join(", ")}
                     </option>
                   ))}
                 </select>
@@ -366,11 +369,11 @@ export function ModuleDetails({
               <tbody>
                 {outcome.parameters.map((parameter) => (
                   <tr key={parameter.name}>
-                    <td>{parameterName(parameter.name)}</td>
+                    <td>{parameterName(parameter.name, parameter.nameTexts)}</td>
                     <td>
                       {parameter.state !== null ? (
                         <>
-                          <strong>{parameter.state}</strong>
+                          <strong>{stateName(parameter.state, parameter.stateTexts)}</strong>
                           <div className="module-validation">
                             {parameter.value === null ? "—" : withUnit(parameter.value, parameter.unit)}
                           </div>

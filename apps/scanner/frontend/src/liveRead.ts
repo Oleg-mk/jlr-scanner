@@ -40,9 +40,13 @@ export interface LiveReadValue {
   ecuFamily: string;
   identifier: string;
   name: string;
+  /** The name in SDD's other languages, by SDD's code (ADR-0034, amended). */
+  nameTexts?: Record<string, string>;
   value: string | null;
   unit: string | null;
   state: string | null;
+  /** The same state named in SDD's other languages (ADR-0034, amended). */
+  stateTexts?: Record<string, string>;
   note: string | null;
   raw: number | null;
   minimum: number | null;

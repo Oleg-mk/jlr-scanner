@@ -35,6 +35,11 @@ struct Corpus {
     platforms: Vec<Found>,
     converters: Vec<Found>,
     snapshots: Vec<Found>,
+    /// The same converters and formatting files from the Russian pack
+    /// (`ADR-0034`, amended 2026-10-03): the parameter and state names in
+    /// Russian, joined to the English by structure.
+    converters_rus: Vec<Found>,
+    snapshots_rus: Vec<Found>,
     dtc_help: Vec<Found>,
     /// The same help documents from the Russian pack (`ADR-0034`): text
     /// only, the selections come from the English ones.
@@ -148,6 +153,10 @@ fn walk(root: &Path, dir: &Path, corpus: &mut Corpus) -> std::io::Result<()> {
                 "dtcDescriptions.xml" | "dtcModuleDescriptions.xml"
             ) {
                 corpus.dtc_index_rus.push(found);
+            } else if parent == "Converters" {
+                corpus.converters_rus.push(found);
+            } else if parent == "Snapshot" {
+                corpus.snapshots_rus.push(found);
             }
             continue;
         }
@@ -430,11 +439,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         walk(root, root, &mut corpus)?;
     }
     println!(
-        "found: {} platform, {} module index, {} converter, {} DID snapshot, {} DTC help, {} DTC help (rus), {} DTC index, {} DTC index (rus), {} ODST, {} ODST (rus), {} IVS, {} link monitor, {} VIN decode, {} module text, {} CCF, {} other text items",
+        "found: {} platform, {} module index, {} converter, {} converter (rus), {} DID snapshot, {} DID snapshot (rus), {} DTC help, {} DTC help (rus), {} DTC index, {} DTC index (rus), {} ODST, {} ODST (rus), {} IVS, {} link monitor, {} VIN decode, {} module text, {} CCF, {} other text items",
         corpus.platforms.len(),
         corpus.mdx.len(),
         corpus.converters.len(),
+        corpus.converters_rus.len(),
         corpus.snapshots.len(),
+        corpus.snapshots_rus.len(),
         corpus.dtc_help.len(),
         corpus.dtc_help_rus.len(),
         corpus.dtc_index.len(),
@@ -452,6 +463,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut converters = ConverterCatalogue::new();
     for found in &corpus.converters {
         let _ = converters.insert_from_xml(&read(found)?);
+    }
+    // The same converters from the Russian pack: the same ids and ranges,
+    // the states named in Russian (`ADR-0034`, amended 2026-10-03).
+    let mut converters_rus = ConverterCatalogue::new();
+    for found in &corpus.converters_rus {
+        let _ = converters_rus.insert_from_xml(&read(found)?);
     }
 
     // Pass one: observe every breakpoint marker the platform and DID
@@ -593,6 +610,25 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             &adapter,
             &text,
             "did",
+            &mut rejections,
+        )?;
+    }
+    // The same catalogue in Russian (`ADR-0034`, amended 2026-10-03): the
+    // names beside the English, joined by structure, and nothing else.
+    for found in &corpus.snapshots_rus {
+        let text = read(found)?;
+        let adapter = DidFormattingAdapter::new(
+            source_in(found, &text, Some(DTC_HELP_LANGUAGE_RUSSIAN))?,
+            converters_rus.clone(),
+        )?
+        .with_timeline(timeline.clone())
+        .with_language(DTC_HELP_LANGUAGE_RUSSIAN)?;
+        export(
+            &mut store,
+            &mut bundle,
+            &adapter,
+            &text,
+            "did-rus",
             &mut rejections,
         )?;
     }

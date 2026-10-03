@@ -1440,6 +1440,8 @@ mod tests {
             name: name.into(),
             encoding: Some(encoding.into()),
             unit: (!unit.is_empty()).then(|| unit.to_string()),
+            name_texts: Default::default(),
+            encoding_texts: Default::default(),
         }
     }
 

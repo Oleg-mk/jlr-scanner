@@ -48,10 +48,14 @@ export interface DtcSummary {
 
 export interface DecodedParameterSummary {
   name: string;
+  /** The name in SDD's other languages, by SDD's code (`rus`), from the same catalogue in that language (ADR-0034, amended). */
+  nameTexts?: Record<string, string>;
   raw: number | null;
   value: string | null;
   unit: string | null;
   state: string | null;
+  /** The same state named in SDD's other languages (ADR-0034, amended). */
+  stateTexts?: Record<string, string>;
   note: string | null;
 }
 

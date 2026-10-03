@@ -1,12 +1,15 @@
 import { render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 import { MileagePanel } from "./components/MileagePanel";
+import { resetHelpLanguage, setHelpLanguage } from "./helpLanguage";
 import { LANGUAGE_STORAGE_KEY, setCurrentLanguage } from "./i18n";
 import { createMileageSnapshot, type MileageReading } from "./mileage";
 import {
   loadParameterNames,
   parameterName,
+  parameterTexts,
   resetParameterNames,
+  stateName,
   type ParameterNameClient,
 } from "./parameterNames";
 
@@ -81,8 +84,35 @@ function eventReading(): MileageReading {
 describe("the parameter names", () => {
   afterEach(() => {
     resetParameterNames();
+    resetHelpLanguage();
     setCurrentLanguage("en");
     window.localStorage.removeItem(LANGUAGE_STORAGE_KEY);
+  });
+
+  it("shows SDD's own Russian name where we have no word, under the choice for SDD's text (ADR-0034, amended)", async () => {
+    const table = new Table();
+    setCurrentLanguage("uk");
+    await loadParameterNames("uk", table);
+    setHelpLanguage("rus");
+    // Ours first where we have one.
+    expect(parameterName("Total distance", { rus: "Общий пробег SDD" })).toBe("Загальний пробіг");
+    // Otherwise SDD's Russian, unchanged.
+    expect(parameterName("Odometer store", { rus: "Хранилище одометра" })).toBe("Хранилище одометра");
+    // A name the pack lacks stays English rather than becoming another word.
+    expect(parameterName("Odometer store", {})).toBe("Odometer store");
+    // English chosen for SDD's text: SDD's English.
+    setHelpLanguage("eng");
+    expect(parameterName("Odometer store", { rus: "Хранилище одометра" })).toBe("Odometer store");
+    // A decoded state follows the same choice.
+    setHelpLanguage("rus");
+    expect(stateName("On", { rus: "Вкл" })).toBe("Вкл");
+    expect(stateName("On", {})).toBe("On");
+    expect(stateName(null, { rus: "Вкл" })).toBeNull();
+    // The survey's per-language lists give one parameter its texts by position.
+    expect(
+      parameterTexts({ parameterTexts: { rus: ["Один", "Два"] } }, 1),
+    ).toEqual({ rus: "Два" });
+    expect(parameterTexts({}, 0)).toEqual({});
   });
 
   it("says a name in the interface's language and leaves an unknown one in English", async () => {

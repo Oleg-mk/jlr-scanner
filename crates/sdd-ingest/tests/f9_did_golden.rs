@@ -17,6 +17,10 @@ const FORMATTING: &str =
 const CONVERTER: &str = include_str!("../../../fixtures/knowledge/synthetic/f9_converter.xml");
 const CONVERTER_KM: &str =
     include_str!("../../../fixtures/knowledge/synthetic/f9_converter_km.xml");
+const FORMATTING_RUS: &str =
+    include_str!("../../../fixtures/knowledge/synthetic/f9_did_formatting_rus.xml");
+const CONVERTER_RUS: &str =
+    include_str!("../../../fixtures/knowledge/synthetic/f9_converter_rus.xml");
 
 fn converters() -> ConverterCatalogue {
     let mut catalogue = ConverterCatalogue::new();
@@ -233,4 +237,104 @@ fn every_parameter_is_recorded_and_ingestion_is_idempotent() {
 
     let all = store.query(&KnowledgeQuery::default().include_indeterminate(true));
     assert_eq!(all.records.len(), 7);
+}
+
+/// ADR-0034, amended 2026-10-03: the same catalogue in Russian writes the
+/// names beside the English, under the record id both packs build from the
+/// same KeyedData and ReadParameter ids; the English record is untouched. A
+/// pack read under the wrong language is refused by the document's own
+/// langcode, and a catalogue whose states are in the wrong script by its words.
+#[test]
+fn a_russian_pack_writes_the_names_beside_the_english_joined_by_structure() {
+    use knowledge::ClaimKey;
+    use sdd_ingest::PARAMETER_TEXT_NAMESPACE;
+
+    let mut store = ingest(SourceType::Documented);
+    let mut russian = ConverterCatalogue::new();
+    russian.insert_from_xml(CONVERTER_RUS).unwrap();
+    let mut source_rus = source(SourceType::Documented);
+    source_rus.id = SourceId::new("f9-did-rus").unwrap();
+    source_rus.content_fingerprint =
+        Some(ContentFingerprint::sha256(sha256_bytes(FORMATTING_RUS.as_bytes())).unwrap());
+    let adapter = DidFormattingAdapter::new(source_rus.clone(), russian.clone())
+        .unwrap()
+        .with_language("rus")
+        .unwrap();
+    store.ingest(&adapter, FORMATTING_RUS).unwrap();
+
+    let english = store.get_record("f9-did.did.did-0x0301.p1").unwrap();
+    let russian_record = store
+        .get_record("f9-did-rus.did.did-0x0301.p1")
+        .expect("the Russian record, under the same id tail");
+    assert_eq!(russian_record.entity, english.entity);
+    assert_eq!(
+        russian_record.key,
+        ClaimKey::IdentifierDefinition {
+            namespace: format!("{PARAMETER_TEXT_NAMESPACE}.rus"),
+        }
+    );
+    let KnowledgeValue::IdentifierDefinition {
+        identifier,
+        encoding,
+        unit,
+    } = &russian_record.value
+    else {
+        panic!("expected an identifier definition");
+    };
+    assert_eq!(identifier, "0x0301");
+    assert_eq!(*unit, None);
+    let encoding = encoding.as_deref().unwrap();
+    assert!(
+        encoding.starts_with("name=Синтетическое показание давления;"),
+        "{encoding}"
+    );
+    assert!(
+        encoding.contains(
+            "states=65535..65535=Короткое замыкание датчика%3B значение%3Dнедействительно"
+        ),
+        "{encoding}"
+    );
+    // The English record is what it always was.
+    assert_eq!(
+        english.key,
+        ClaimKey::ParameterDefinition {
+            parameter: "Synthetic pressure reading".into()
+        }
+    );
+    // Every parameter has its Russian twin, by id.
+    for tail in [
+        "did.did-0x0343.p1",
+        "did.did-0x0343.p2",
+        "did.did-0x1945-synthmod.p1",
+    ] {
+        assert!(
+            store.get_record(&format!("f9-did.{tail}")).is_some(),
+            "{tail}"
+        );
+        assert!(
+            store.get_record(&format!("f9-did-rus.{tail}")).is_some(),
+            "{tail}"
+        );
+    }
+
+    // A Russian file read as English is refused by its own langcode.
+    let as_english = DidFormattingAdapter::new(source_rus.clone(), russian).unwrap();
+    assert!(KnowledgeStore::new()
+        .ingest(&as_english, FORMATTING_RUS)
+        .is_err());
+    // An English catalogue cannot serve a pack read as Russian.
+    let wrong_catalogue = DidFormattingAdapter::new(source_rus, converters())
+        .unwrap()
+        .with_language("rus")
+        .unwrap();
+    assert!(KnowledgeStore::new()
+        .ingest(&wrong_catalogue, FORMATTING_RUS)
+        .is_err());
+    // And a language SDD has no pack for here is not a language.
+    assert!(
+        DidFormattingAdapter::new(source(SourceType::Documented), converters())
+            .unwrap()
+            .with_language("deu")
+            .is_err()
+    );
 }

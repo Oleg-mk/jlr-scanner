@@ -44,6 +44,11 @@ use transport_api::{BenchBus, BenchRoute, CanFrame, EmptyBench};
 const PLATFORM: &str = include_str!("../../../../fixtures/knowledge/synthetic/f9_platform.xml");
 const DIDS: &str = include_str!("../../../../fixtures/knowledge/synthetic/f9_did_formatting.xml");
 const CONVERTER: &str = include_str!("../../../../fixtures/knowledge/synthetic/f9_converter.xml");
+/// The Russian twins (ADR-0034, amended 2026-10-03).
+const DIDS_RUS: &str =
+    include_str!("../../../../fixtures/knowledge/synthetic/f9_did_formatting_rus.xml");
+const CONVERTER_RUS: &str =
+    include_str!("../../../../fixtures/knowledge/synthetic/f9_converter_rus.xml");
 const CONVERTER_KM: &str =
     include_str!("../../../../fixtures/knowledge/synthetic/f9_converter_km.xml");
 const MODULE_TEXT: &str =
@@ -117,9 +122,21 @@ fn library() -> KnowledgeLibrary {
     converters.insert_from_xml(CONVERTER_KM).unwrap();
     let dids = DidFormattingAdapter::new(synthetic_source("bench-did", DIDS), converters)
         .unwrap()
-        .with_timeline(timeline);
+        .with_timeline(timeline.clone());
     let platform_batch = platform.parse(PLATFORM).unwrap();
     let did_batch = dids.parse(DIDS).unwrap();
+    let mut russian_converters = ConverterCatalogue::new();
+    russian_converters.insert_from_xml(CONVERTER_RUS).unwrap();
+    let did_rus_batch = DidFormattingAdapter::new(
+        synthetic_source("bench-did-rus", DIDS_RUS),
+        russian_converters,
+    )
+    .unwrap()
+    .with_timeline(timeline)
+    .with_language("rus")
+    .unwrap()
+    .parse(DIDS_RUS)
+    .unwrap();
     let ccf_batch = ccf_adapter.parse(CCF).unwrap();
     let text_batch = ModuleTextAdapter::new(synthetic_source("bench-text", MODULE_TEXT))
         .unwrap()
@@ -147,6 +164,7 @@ fn library() -> KnowledgeLibrary {
             "bundle.json".to_string(),
             serde_json::to_string(&vec![
                 did_batch,
+                did_rus_batch,
                 text_batch,
                 vin_batch,
                 ccf_batch,
@@ -572,6 +590,24 @@ fn the_bench_connects_without_a_port_reads_the_surveyed_vehicle_and_marks_everyt
         result,
     );
     assert_eq!(read.state, ModuleReadState::Succeeded, "{read:?}");
+    // The name in SDD's Russian beside the English (ADR-0034, amended
+    // 2026-10-03), from the Russian twin of the catalogue, joined by
+    // structure: every decoded parameter carries it, and it is not the
+    // English repeated.
+    assert!(!read.parameters.is_empty(), "{read:?}");
+    for parameter in &read.parameters {
+        let russian = parameter
+            .name_texts
+            .get("rus")
+            .unwrap_or_else(|| panic!("no Russian name for {parameter:?} of {live_identifier}"));
+        assert_ne!(russian, &parameter.name, "{parameter:?}");
+        assert!(
+            russian
+                .chars()
+                .any(|c| ('\u{0400}'..='\u{04FF}').contains(&c)),
+            "{russian}"
+        );
+    }
     assert_ne!(read.route_validation, "SYNTHETIC");
     assert_eq!(reads.mark_synthetic().route_validation, "SYNTHETIC");
     let read_json = reads.report_json().unwrap();

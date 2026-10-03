@@ -74,6 +74,12 @@ export interface RouteSummary {
 export interface ReadableIdentifierSummary {
   identifier: string;
   parameters: string[];
+  /**
+   * The same names in SDD's other languages, by SDD's code (`rus`): each list
+   * the length and order of `parameters`, English where the pack lacks a name
+   * (ADR-0034, amended).
+   */
+  parameterTexts?: Record<string, string[]>;
   /** The catalogue reads this one as a number with a real unit: not a state, not a raw count. */
   quantity?: boolean;
 }

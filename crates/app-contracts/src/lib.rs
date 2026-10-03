@@ -363,6 +363,11 @@ pub struct RouteSummary {
 pub struct ReadableIdentifierSummary {
     pub identifier: String,
     pub parameters: Vec<String>,
+    /// The same names in SDD's other languages, by SDD's code (`rus`): each
+    /// list the length and order of `parameters`, English where the pack
+    /// lacks a name (`ADR-0034`, amended 2026-10-03).
+    #[serde(default)]
+    pub parameter_texts: BTreeMap<String, Vec<String>>,
     /// Whether the catalogue reads this identifier as a quantity: a parameter
     /// with a real unit (not `int`), a scaling, and no enumerated states - a
     /// number a person watches, as engine speed or a voltage is, where a
@@ -754,11 +759,19 @@ pub struct DtcSummary {
 #[serde(rename_all = "camelCase")]
 pub struct DecodedParameterSummary {
     pub name: String,
+    /// The name in SDD's other languages, by SDD's code (`ADR-0034`,
+    /// amended 2026-10-03).
+    #[serde(default)]
+    pub name_texts: BTreeMap<String, String>,
     pub raw: Option<u64>,
     pub value: Option<String>,
     pub unit: Option<String>,
     /// SDD's name for the raw-count range, when the catalogue names it.
     pub state: Option<String>,
+    /// The same state named in SDD's other languages (`ADR-0034`, amended
+    /// 2026-10-03).
+    #[serde(default)]
+    pub state_texts: BTreeMap<String, String>,
     pub note: Option<String>,
 }
 
@@ -1131,10 +1144,14 @@ pub struct LiveReadValue {
     pub ecu_family: String,
     pub identifier: String,
     pub name: String,
+    #[serde(default)]
+    pub name_texts: BTreeMap<String, String>,
     pub value: Option<String>,
     pub unit: Option<String>,
     /// SDD's name for the raw-count range, when the catalogue names it.
     pub state: Option<String>,
+    #[serde(default)]
+    pub state_texts: BTreeMap<String, String>,
     pub note: Option<String>,
     pub raw: Option<u64>,
     pub minimum: Option<f64>,

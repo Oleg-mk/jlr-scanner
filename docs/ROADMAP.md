@@ -679,6 +679,22 @@ its evidence path is a capture of a genuine SDD session, or the owner's
 decision on SDD's program binaries), the `enhanced` layout, NGI. Nothing
 has met a car.
 
+### F26 — the parameter and state names in SDD's Russian (built 2026-10-03, `ADR-0034` amended)
+
+The one data layer still English only — the names of identifiers,
+parameters and decoded states — now comes in SDD's own Russian beside the
+English, from the owner's extraction of `COMMON_SDD_DATA_SNAPSHOT_LANG_RU`.
+Because the English name is the parameter's own claim key, the Russian
+joins by structure, not by text: the same `KeyedData` and `ReadParameter`
+ids, the same converters and state ranges. Shown under the switch the help
+follows — our own wording first, SDD's Russian, then SDD's English — with
+no new control. The library doubled its DID catalogue (30,562 records) and
+was re-issued (`2AFF-199F`, 533,208 records). Fixture-tested from the golden
+to the bench.
+
+Not in this slice: the passport, mileage and battery rows; the browser
+demo; any language other than English and Russian for this layer.
+
 ### F14 — K-line transport for the legacy buses (brought forward 2026-09-12, `ADR-0029`)
 
 ISO 9141 / ISO 14230 over J1962 pins 7 and 8, which the MongoosePro JLR variant

@@ -208,10 +208,12 @@ impl ModuleReadService {
                             .into_iter()
                             .map(|decoded| DecodedParameterSummary {
                                 name: decoded.name,
+                                name_texts: decoded.name_texts,
                                 raw: decoded.raw,
                                 value: decoded.value,
                                 unit: decoded.unit,
                                 state: decoded.state,
+                                state_texts: decoded.state_texts,
                                 note: decoded.note,
                             })
                             .collect();

@@ -2,7 +2,7 @@ import { SwapLabel } from "./StableLabel";
 import { useEffect, useRef, useState } from "react";
 import { dataText, decimalText, liveReadReason, parameterNote, t, useLanguage } from "../i18n";
 import { readLimits, writeLimits, type LiveLimits } from "../liveLimits";
-import { parameterName } from "../parameterNames";
+import { parameterName, parameterTexts, stateName } from "../parameterNames";
 import type { ModuleSurveyEntry } from "../library";
 import {
   LIVE_READ_MAX_ENTRIES,
@@ -81,7 +81,8 @@ function reading(value: LiveReadValue): string {
   if (value.value !== null) {
     return withUnit(decimalText(value.value), value.unit);
   }
-  if (value.state !== null) return value.state;
+  const state = stateName(value.state, value.stateTexts);
+  if (state !== null) return state;
   if (value.raw !== null) return String(value.raw);
   return "—";
 }
@@ -394,7 +395,9 @@ export function LiveReadPanel({
                         </td>
                         <td>
                           <label htmlFor={id}>
-                            {identifier.parameters.map(parameterName).join(", ")}
+                            {identifier.parameters
+                              .map((name, index) => parameterName(name, parameterTexts(identifier, index)))
+                              .join(", ")}
                           </label>
                         </td>
                       </tr>
@@ -563,7 +566,7 @@ export function LiveReadPanel({
                       aria-hidden="true"
                     />
                   ) : null}
-                  {parameterName(value.name)}
+                  {parameterName(value.name, value.nameTexts)}
                   {value.note !== null ? (
                     <div className="module-validation">{parameterNote(value.note)}</div>
                   ) : null}

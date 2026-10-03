@@ -35,7 +35,10 @@ pub use ccf::{
     CCF_SCHEME_CLAIM, CCF_SOURCE_CLAIM_PREFIX,
 };
 pub use converters::{ConverterCatalogue, ConverterInfo, ConverterKind};
-pub use did::{DidFormattingAdapter, DID_FORMATTING_PARSER_ID, YEAR_BREAKPOINT_DIMENSION};
+pub use did::{
+    DidFormattingAdapter, DID_FORMATTING_PARSER_ID, PARAMETER_TEXT_NAMESPACE,
+    YEAR_BREAKPOINT_DIMENSION,
+};
 pub use dtc::{
     DtcHelpAdapter, DTC_FAULT_TYPE_DIMENSION, DTC_HELP_CLAIM, DTC_HELP_ITEM_SEPARATOR,
     DTC_HELP_LANGUAGE_RUSSIAN, DTC_HELP_PARSER_ID, DTC_HELP_SCREEN_CLAIM_PREFIX,

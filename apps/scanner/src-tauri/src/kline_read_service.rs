@@ -278,10 +278,12 @@ fn fill(
             snapshot.data_hex = Some(hex(bytes));
             snapshot.parameters = vec![DecodedParameterSummary {
                 name: "Identification".into(),
+                name_texts: Default::default(),
                 raw: None,
                 value: Some(text.clone()),
                 unit: None,
                 state: None,
+                state_texts: Default::default(),
                 note: (!text.chars().any(|c| c.is_alphanumeric()))
                     .then(|| "the module's answer holds no printable text".to_string()),
             }];
@@ -294,10 +296,12 @@ fn fill(
             snapshot.data_hex = Some(hex(bytes));
             snapshot.parameters = vec![DecodedParameterSummary {
                 name: format!("Identification 0x{option:02X}"),
+                name_texts: Default::default(),
                 raw: None,
                 value: Some(text.clone()),
                 unit: None,
                 state: None,
+                state_texts: Default::default(),
                 note: None,
             }];
         }

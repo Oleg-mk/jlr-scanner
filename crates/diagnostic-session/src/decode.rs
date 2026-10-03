@@ -17,10 +17,14 @@
 //! ranges is not interpreted.
 
 use diagnostic_environment::ReadableParameter;
+use std::collections::BTreeMap;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct DecodedParameter {
     pub name: String,
+    /// The name in SDD's other languages, by SDD's code (`rus`), as the
+    /// catalogue carries it (ADR-0034, amended 2026-10-03).
+    pub name_texts: BTreeMap<String, String>,
     /// The masked integer read from the response, when its bytes were there.
     pub raw: Option<u64>,
     /// The scaled value as text, when the catalogue recorded how to scale it.
@@ -29,6 +33,9 @@ pub struct DecodedParameter {
     /// The name SDD shows for the raw counts, when the catalogue names the
     /// range they fall in ("Variant not programmed", "UK", …).
     pub state: Option<String>,
+    /// The same state named in SDD's other languages, from that pack's own
+    /// states under the same range (ADR-0034, amended 2026-10-03).
+    pub state_texts: BTreeMap<String, String>,
     /// Why there is no value, or a caveat about the one shown.
     pub note: Option<String>,
 }
@@ -164,10 +171,12 @@ pub fn decode_parameters(parameters: &[ReadableParameter], data: &[u8]) -> Vec<D
 fn decode_one(parameter: &ReadableParameter, data: &[u8]) -> DecodedParameter {
     let mut decoded = DecodedParameter {
         name: parameter.name.clone(),
+        name_texts: parameter.name_texts.clone(),
         raw: None,
         value: None,
         unit: parameter.unit.clone(),
         state: None,
+        state_texts: BTreeMap::new(),
         note: None,
     };
     let Some(text) = parameter.encoding.as_deref() else {
@@ -249,6 +258,17 @@ fn decode_one(parameter: &ReadableParameter, data: &[u8]) -> DecodedParameter {
         .iter()
         .find(|(low, high, _)| raw >= *low && raw <= *high)
         .map(|(_, _, name)| name.clone());
+    // The same state named in another language, from that pack's own
+    // states, by the raw count (ADR-0034, amended 2026-10-03).
+    for (language, text) in &parameter.encoding_texts {
+        if let Some((_, _, name)) = parse_encoding(text)
+            .states
+            .iter()
+            .find(|(low, high, _)| raw >= *low && raw <= *high)
+        {
+            decoded.state_texts.insert(language.clone(), name.clone());
+        }
+    }
 
     if encoding.has_map {
         decoded.value = Some(raw.to_string());
@@ -336,7 +356,35 @@ mod tests {
             name: name.into(),
             encoding: Some(encoding.into()),
             unit: unit.map(str::to_string),
+            name_texts: BTreeMap::new(),
+            encoding_texts: BTreeMap::new(),
         }
+    }
+
+    #[test]
+    fn a_state_is_named_in_the_other_pack_language_too() {
+        let mut switch = parameter(
+            "Switch",
+            "bytes=0..0;mask=all;scale=1;offset=0;offset_first=true;states=0..0=Off|1..1=On",
+            None,
+        );
+        switch
+            .name_texts
+            .insert("rus".into(), "Переключатель".into());
+        switch.encoding_texts.insert(
+            "rus".into(),
+            "name=Переключатель;bytes=0..0;states=0..0=Выкл|1..1=Вкл".into(),
+        );
+        let decoded = decode_parameters(&[switch], &[1]);
+        assert_eq!(decoded[0].state.as_deref(), Some("On"));
+        assert_eq!(
+            decoded[0].state_texts.get("rus").map(String::as_str),
+            Some("Вкл")
+        );
+        assert_eq!(
+            decoded[0].name_texts.get("rus").map(String::as_str),
+            Some("Переключатель")
+        );
     }
 
     #[test]
@@ -491,6 +539,8 @@ mod tests {
                 name: "Opaque".into(),
                 encoding: None,
                 unit: None,
+                name_texts: BTreeMap::new(),
+                encoding_texts: BTreeMap::new(),
             }],
             &[1, 2, 3],
         );

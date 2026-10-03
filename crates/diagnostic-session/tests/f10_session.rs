@@ -26,6 +26,12 @@ use std::collections::BTreeMap;
 const PLATFORM: &str = include_str!("../../../fixtures/knowledge/synthetic/f9_platform.xml");
 const DIDS: &str = include_str!("../../../fixtures/knowledge/synthetic/f9_did_formatting.xml");
 const CONVERTER: &str = include_str!("../../../fixtures/knowledge/synthetic/f9_converter.xml");
+/// The Russian twins of the DID catalogue and its converter (ADR-0034,
+/// amended 2026-10-03): the names beside the English, joined by structure.
+const DIDS_RUS: &str =
+    include_str!("../../../fixtures/knowledge/synthetic/f9_did_formatting_rus.xml");
+const CONVERTER_RUS: &str =
+    include_str!("../../../fixtures/knowledge/synthetic/f9_converter_rus.xml");
 const CONVERTER_KM: &str =
     include_str!("../../../fixtures/knowledge/synthetic/f9_converter_km.xml");
 const MODULE_TEXT: &str = include_str!("../../../fixtures/knowledge/synthetic/f9_module_text.xml");
@@ -78,6 +84,18 @@ fn exported_manifests() -> Vec<(String, String)> {
 
     let platform_batch = platform.parse(PLATFORM).unwrap();
     let did_batch = dids.parse(DIDS).unwrap();
+    let mut russian_converters = ConverterCatalogue::new();
+    russian_converters.insert_from_xml(CONVERTER_RUS).unwrap();
+    let did_rus_batch = DidFormattingAdapter::new(
+        synthetic_source("f10-session-did-rus", DIDS_RUS),
+        russian_converters,
+    )
+    .unwrap()
+    .with_timeline(timeline())
+    .with_language("rus")
+    .unwrap()
+    .parse(DIDS_RUS)
+    .unwrap();
     let text_batch = ModuleTextAdapter::new(synthetic_source("f10-session-text", MODULE_TEXT))
         .unwrap()
         .parse(MODULE_TEXT)
@@ -102,7 +120,12 @@ fn exported_manifests() -> Vec<(String, String)> {
         (
             "bundle.json".to_string(),
             serde_json::to_string(&vec![
-                did_batch, text_batch, vin_batch, odst_batch, ivs_batch,
+                did_batch,
+                did_rus_batch,
+                text_batch,
+                vin_batch,
+                odst_batch,
+                ivs_batch,
             ])
             .unwrap(),
         ),
@@ -154,13 +177,13 @@ fn exported_manifests_and_bundles_load_and_are_counted_honestly() {
     let library = library();
     let snapshot = library.snapshot();
     assert_eq!(snapshot.state, LibraryState::Loaded);
-    // Seven built-in plus one manifest, one bundle of five and the test-side
+    // Seven built-in plus one manifest, one bundle of six and the test-side
     // binding of the synthetic sub-network.
-    assert_eq!(snapshot.manifests_loaded, 14);
+    assert_eq!(snapshot.manifests_loaded, 15);
     assert_eq!(snapshot.manifests_failed, 0);
-    assert_eq!(snapshot.sources, 14);
+    assert_eq!(snapshot.sources, 15);
     assert!(snapshot.records > 20);
-    assert!(snapshot.message.starts_with("Loaded 7 manifests"));
+    assert!(snapshot.message.starts_with("Loaded 8 manifests"));
 }
 
 #[test]
@@ -187,8 +210,8 @@ fn a_broken_manifest_is_reported_and_the_rest_still_load() {
     assert_eq!(files, vec!["broken.json", "wrong-shape.json"]);
     assert!(snapshot.failures[0].message.contains("not valid JSON"));
     // The good data is still there: seven built-in, one manifest, one bundle
-    // of five, and this test loads no test-side binding.
-    assert_eq!(snapshot.sources, 13);
+    // of six, and this test loads no test-side binding.
+    assert_eq!(snapshot.sources, 14);
 }
 
 #[test]
@@ -791,6 +814,8 @@ fn a_quantity_is_a_number_with_a_real_unit_and_a_scaling() {
         name: name.into(),
         encoding: (!encoding.is_empty()).then(|| encoding.to_string()),
         unit: (!unit.is_empty()).then(|| unit.to_string()),
+        name_texts: Default::default(),
+        encoding_texts: Default::default(),
     };
     assert!(reads_as_quantity(&[parameter(
         "Engine speed",
@@ -896,4 +921,39 @@ fn a_module_behind_a_network_addressed_gateway_is_a_hypothesis_on_its_main_bus()
         .reasons
         .iter()
         .any(|reason| reason.contains("ADR-0039")));
+}
+
+/// ADR-0034, amended 2026-10-03: the parameter names come in SDD's Russian
+/// beside the English, joined by the structure both packs share, one list
+/// per language in the parameters' order.
+#[test]
+fn the_parameter_names_come_in_sdds_russian_beside_the_english() {
+    let survey = library().survey(&vehicle());
+    let synthmod = survey
+        .modules
+        .iter()
+        .find(|module| module.ecu_family == "SYNTHMOD")
+        .unwrap();
+    let scoped = synthmod
+        .readable_identifiers
+        .iter()
+        .find(|entry| entry.identifier == "0x1945")
+        .expect("the module-scoped identifier");
+    assert_eq!(scoped.parameters, vec!["Synthetic module-scoped value"]);
+    assert_eq!(
+        scoped.parameter_texts.get("rus").cloned(),
+        Some(vec!["Синтетическое значение в области модуля".to_string()])
+    );
+    let distance = synthmod
+        .readable_identifiers
+        .iter()
+        .find(|entry| entry.identifier == "0xDD01")
+        .expect("the distance identifier");
+    assert_eq!(
+        distance.parameter_texts.get("rus").cloned(),
+        Some(vec![
+            "Общий пробег".to_string(),
+            "Пробег с момента включения индикатора неисправности".to_string(),
+        ])
+    );
 }

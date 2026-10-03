@@ -1189,6 +1189,12 @@ pub struct ReadableParameter {
     pub name: String,
     pub encoding: Option<String>,
     pub unit: Option<String>,
+    /// The name in SDD's other languages, by SDD's code (`rus`), from the
+    /// same catalogue in that language (ADR-0034, amended 2026-10-03).
+    pub name_texts: BTreeMap<String, String>,
+    /// That pack's own encoding text, by language: the converter's states
+    /// named in that language, under the same ranges, for the decoder.
+    pub encoding_texts: BTreeMap<String, String>,
 }
 
 /// An identifier the knowledge base states is readable from a module.
@@ -1252,6 +1258,40 @@ impl DiagnosticEnvironmentResolver {
                 .include_indeterminate(true),
         );
 
+        // Another language's names for these parameters (ADR-0034, amended
+        // 2026-10-03): written by the same adapter from the same documents in
+        // that language, under `sdd_parameter.<lang>`, with the same record
+        // id tail - the join is the structure both packs share.
+        let mut texts: BTreeMap<String, BTreeMap<String, String>> = BTreeMap::new();
+        for entry in &result.records {
+            if entry.applicability_resolution != ApplicabilityResolution::Applicable
+                || entry.record.entity.kind != knowledge::EntityKind::IdentifierParameter
+                || !record_mentions_ecu(entry, ecu_family)
+            {
+                continue;
+            }
+            let (
+                ClaimKey::IdentifierDefinition { namespace },
+                KnowledgeValue::IdentifierDefinition {
+                    encoding: Some(encoding),
+                    ..
+                },
+            ) = (&entry.record.key, &entry.record.value)
+            else {
+                continue;
+            };
+            let Some(language) = namespace.strip_prefix(PARAMETER_TEXT_NAMESPACE_PREFIX) else {
+                continue;
+            };
+            let Some(tail) = record_tail(&entry.record.id) else {
+                continue;
+            };
+            texts
+                .entry(tail.to_string())
+                .or_default()
+                .insert(language.to_string(), encoding.clone());
+        }
+
         let mut found: BTreeMap<u16, ReadableIdentifier> = BTreeMap::new();
         for entry in &result.records {
             if entry.applicability_resolution != ApplicabilityResolution::Applicable
@@ -1282,10 +1322,23 @@ impl DiagnosticEnvironmentResolver {
                 evidence: Vec::new(),
                 validation_state: entry.record.validation_state,
             });
+            let mut name_texts = BTreeMap::new();
+            let mut encoding_texts = BTreeMap::new();
+            if let Some(languages) = record_tail(&entry.record.id).and_then(|tail| texts.get(tail))
+            {
+                for (language, text) in languages {
+                    if let Some(name) = descriptor_field(text, "name") {
+                        name_texts.insert(language.clone(), name);
+                    }
+                    encoding_texts.insert(language.clone(), text.clone());
+                }
+            }
             item.parameters.push(ReadableParameter {
                 name: parameter.clone(),
                 encoding: encoding.clone(),
                 unit: unit.clone(),
+                name_texts,
+                encoding_texts,
             });
             item.evidence.extend(traces(std::slice::from_ref(entry)));
             item.validation_state =
@@ -1293,6 +1346,33 @@ impl DiagnosticEnvironmentResolver {
         }
         found.into_values().collect()
     }
+}
+
+/// The claim namespace prefix `sdd-ingest` writes a language pack's parameter
+/// text under (ADR-0034, amended 2026-10-03): `sdd_parameter.rus`.
+const PARAMETER_TEXT_NAMESPACE_PREFIX: &str = "sdd_parameter.";
+
+/// A DID record's id without its source - `did.<keyed>.p<n>` - the part both
+/// language packs build identically, so one language's record finds the
+/// other's.
+fn record_tail(id: &str) -> Option<&str> {
+    id.find(".did.").map(|at| &id[at + 1..])
+}
+
+/// One `key=value` field of an encoding descriptor, the four escapes of the
+/// catalogue export reversed.
+fn descriptor_field(text: &str, key: &str) -> Option<String> {
+    text.split(';').find_map(|part| {
+        let (name, value) = part.split_once('=')?;
+        (name.trim() == key).then(|| {
+            value
+                .trim()
+                .replace("%3D", "=")
+                .replace("%7C", "|")
+                .replace("%3B", ";")
+                .replace("%25", "%")
+        })
+    })
 }
 
 /// Buses the family's own applicable claims place it on, deduplicated.

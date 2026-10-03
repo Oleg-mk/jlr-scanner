@@ -1480,14 +1480,44 @@ pub fn survey_vehicle(
         entry.readable_identifiers =
             DiagnosticEnvironmentResolver::readable_identifiers(store, &context, family)
                 .into_iter()
-                .map(|identifier| ReadableIdentifierSummary {
-                    identifier: format!("0x{:04X}", identifier.identifier),
-                    quantity: reads_as_quantity(&identifier.parameters),
-                    parameters: identifier
+                .map(|identifier| {
+                    // The names in SDD's other languages, one list per language
+                    // in the parameters' order, English where a name is missing
+                    // (ADR-0034, amended 2026-10-03).
+                    let languages: BTreeSet<&String> = identifier
                         .parameters
+                        .iter()
+                        .flat_map(|parameter| parameter.name_texts.keys())
+                        .collect();
+                    let parameter_texts = languages
                         .into_iter()
-                        .map(|parameter| parameter.name)
-                        .collect(),
+                        .map(|language| {
+                            (
+                                language.clone(),
+                                identifier
+                                    .parameters
+                                    .iter()
+                                    .map(|parameter| {
+                                        parameter
+                                            .name_texts
+                                            .get(language)
+                                            .cloned()
+                                            .unwrap_or_else(|| parameter.name.clone())
+                                    })
+                                    .collect(),
+                            )
+                        })
+                        .collect();
+                    ReadableIdentifierSummary {
+                        identifier: format!("0x{:04X}", identifier.identifier),
+                        quantity: reads_as_quantity(&identifier.parameters),
+                        parameter_texts,
+                        parameters: identifier
+                            .parameters
+                            .into_iter()
+                            .map(|parameter| parameter.name)
+                            .collect(),
+                    }
                 })
                 .collect();
         modules.push(entry);

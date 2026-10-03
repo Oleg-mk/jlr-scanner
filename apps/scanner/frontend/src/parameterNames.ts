@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { hasTauriRuntime } from "./files";
+import { helpLanguageFor } from "./helpLanguage";
 import { currentLanguage, productLanguage, type Language } from "./i18n";
 
 /**
@@ -69,10 +70,48 @@ export async function loadParameterNames(
   return true;
 }
 
-/** Our word for a parameter, or SDD's English when we have none. */
-export function parameterName(english: string): string {
-  if (loaded !== currentLanguage()) return english;
-  return names[english] ?? english;
+/**
+ * Our word for a parameter where we have one; otherwise SDD's own name in
+ * the language chosen for SDD's text, when the loaded data carries it
+ * (ADR-0034, amended 2026-10-03); otherwise SDD's English. The same order
+ * the fault-code wording follows.
+ */
+export function parameterName(english: string, sddTexts?: Record<string, string>): string {
+  const ours = loaded === currentLanguage() ? names[english] : undefined;
+  if (ours !== undefined) return ours;
+  const choice = helpLanguageFor(currentLanguage());
+  if (choice !== "eng") {
+    const theirs = sddTexts?.[choice];
+    if (theirs !== undefined) return theirs;
+  }
+  return english;
+}
+
+/**
+ * A decoded state's name under the same choice: SDD's other language where
+ * that pack names the state, otherwise as decoded.
+ */
+export function stateName(state: string | null, sddTexts?: Record<string, string>): string | null {
+  if (state === null) return null;
+  const choice = helpLanguageFor(currentLanguage());
+  if (choice !== "eng") {
+    const theirs = sddTexts?.[choice];
+    if (theirs !== undefined) return theirs;
+  }
+  return state;
+}
+
+/** The texts of one parameter of a readable identifier, by language, from the survey's per-language lists. */
+export function parameterTexts(
+  summary: { parameterTexts?: Record<string, string[]> },
+  index: number,
+): Record<string, string> {
+  const texts: Record<string, string> = {};
+  for (const [language, list] of Object.entries(summary.parameterTexts ?? {})) {
+    const name = list[index];
+    if (name !== undefined) texts[language] = name;
+  }
+  return texts;
 }
 
 /** For tests: forget what was loaded. */

@@ -267,6 +267,7 @@ cargo run --release -q -p sdd-ingest --example export_manifests -- <куди> ^
   Downloads\SDD169_DECRYPTED\CURRENT_JLR_VIN_DECODE_XML ^
   Downloads\SDD169_DECRYPTED\COMMON_JLR_SMPACK_XML ^
   Downloads\SDD169_EXTRACTED\SDD_XML_PAYLOAD\COMMON_SDD_DATA_SNAPSHOT_LANG_EN ^
+  "<твої скрипти>\SDD_SNAPSHOT_RU\original\COMMON_SDD_DATA_SNAPSHOT_LANG_RU" ^
   Downloads\SDD169_EXTRACTED\SDD_XML_PAYLOAD\COMMON_SDD_DATA_DTC_HELP_LANG_EN ^
   "<твої скрипти>\SDD_original_help\RU\COMMON_SDD_DATA_DTC_HELP_LANG_RU" ^
   Downloads\SDD169_EXTRACTED\SDD_XML_PAYLOAD\COMMON_SDD_DATA_ODST_LANG_EN ^
@@ -277,8 +278,25 @@ cargo run --release -q -p sdd-ingest --example export_manifests -- <куди> ^
 
   Саме `SDD_XML_PAYLOAD`, не `Payload`: у `Payload` імена файлів зіпсовані,
   і експорт з нього дає 166 840 записів замість 517 927 — так і сталося
-  з першої спроби. Очікуваний підсумок: `store: … 517927 records`,
+  з першої спроби. Очікуваний підсумок: `store: … 533208 records` (з 2026-10-03, з дванадцятим коренем — російським пакетом назв параметрів; до того 517 927),
   `rejected: 0`. Далі штамп як завжди:
   `powershell -File scripts\stamp-library.ps1 -IssuedTo "Oleg" -Days 365
   -Library "<куди>"`. Експорт, штамп, preflight і збірка застосунку ділять
   `target\` — по одному за раз.
+
+## 12. Бібліотека з російськими назвами параметрів (2026-10-03)
+
+- **Твоя копія перевидана**: код `2AFF-199F`, чинна до 2027-10-03, папка
+  `Desktop\prowlone-library-Oleg-2AFF-199F` (zip поруч у
+  `Downloads\prowlone-issued\prowlone-library-Oleg.zip`). Вибери її в
+  застосунку замість `4994-9DFB`; та лишається чинною до 2027-09-19, але
+  без російських назв.
+- Що нового (`ADR-0034`, поправка 2026-10-03): назви параметрів у живому
+  читанні й у читанні модуля, а також назви станів, показуються власною
+  російською SDD під тим самим перемикачем «англійська/російська», що й
+  допомога — спершу наше слово, якщо воно є, далі російська SDD, далі
+  англійська SDD. Паспорт, пробіг і акумулятор поки лишаються як були.
+- Корінь експорту: твій пакет `SDD_SNAPSHOT_RU\original\COMMON_SDD_DATA_SNAPSHOT_LANG_RU`,
+  той самий архів, де лежать російська допомога і самотести; у команді
+  розділу 11 він уже вписаний. Каталог DID подвоївся: 30 562 записи,
+  усього 533 208, відхилено 0.

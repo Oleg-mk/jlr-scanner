@@ -1,3 +1,4 @@
+use crate::dtc::iso_code_for;
 use crate::{
     child_element, child_text, evidence_class_for, qualified_applicability, require_attribute,
     slugify, validation_state_for, ConverterCatalogue, ConverterInfo, ModelYearTimeline,
@@ -22,6 +23,14 @@ const DID_FORMATTING_PARSER_VERSION: &str = "1.0.0";
 /// breakpoint semantics is a separate evidence question.
 pub const YEAR_BREAKPOINT_DIMENSION: &str = "sdd_year_breakpoint";
 
+/// The namespace of a language pack's parameter text (`ADR-0034`, amended
+/// 2026-10-03): `sdd_parameter.<lang>`, the language last as the text
+/// database names it. Such a record carries, as its encoding, `name=<the
+/// parameter's name in that language>` and the converter's states named in
+/// that language; it joins the English record by its id, which both packs
+/// build from the same `KeyedData` and `ReadParameter` ids.
+pub const PARAMETER_TEXT_NAMESPACE: &str = "sdd_parameter";
+
 /// Adapter for the SDD DID formatting catalogues under `gradex/Snapshot`.
 ///
 /// Every parameter in these files is a `ReadParameter`, so the corpus is
@@ -32,6 +41,10 @@ pub struct DidFormattingAdapter {
     source: SourceRecord,
     converters: ConverterCatalogue,
     timeline: Option<ModelYearTimeline>,
+    /// `None` for the English catalogue; a language code for the same
+    /// catalogue in another language, of which only the names are written
+    /// (`ADR-0034`, amended 2026-10-03).
+    language: Option<String>,
 }
 
 impl DidFormattingAdapter {
@@ -44,7 +57,22 @@ impl DidFormattingAdapter {
             source,
             converters,
             timeline: None,
+            language: None,
         })
+    }
+
+    /// Read this pack as the same catalogue in another language (`ADR-0034`,
+    /// amended 2026-10-03): only the names are written, beside the English
+    /// records they join by structure, and the document must declare that
+    /// language itself.
+    pub fn with_language(mut self, language: &str) -> Result<Self, KnowledgeError> {
+        if iso_code_for(language).is_none() {
+            return Err(KnowledgeError::Parse(format!(
+                "no DID formatting pack is known for language code {language:?}"
+            )));
+        }
+        self.language = Some(language.to_string());
+        Ok(self)
     }
 
     /// Opt in to deriving calendar year ranges from breakpoints.
@@ -75,6 +103,31 @@ impl IngestionAdapter for DidFormattingAdapter {
                 "expected a <COMPONENT> root, found <{}>",
                 component.tag_name().name()
             )));
+        }
+
+        // The document names its own language; a pack mounted under the
+        // wrong name must not write one language under the other's claim.
+        let expected = match self.language.as_deref() {
+            Some(language) => iso_code_for(language).unwrap_or("en"),
+            None => "en",
+        };
+        if let Some(declared) = component.attribute("langcode") {
+            if declared != expected {
+                return Err(KnowledgeError::Parse(format!(
+                    "the document declares langcode {declared:?}, this pack is read as {expected:?}"
+                )));
+            }
+        }
+        // The converters name their states in the pack's language too, and
+        // declare no language: the words are checked instead.
+        if let Some(cyrillic) = self.converters.states_mostly_cyrillic() {
+            let expect_cyrillic = self.language.as_deref() == Some("rus");
+            if cyrillic != expect_cyrillic {
+                return Err(KnowledgeError::Parse(format!(
+                    "the converter catalogue names its states {} in Cyrillic, which does not fit a pack read as {expected:?}",
+                    if cyrillic { "mostly" } else { "not" }
+                )));
+            }
         }
 
         let mut evidence = BTreeMap::new();
@@ -218,20 +271,41 @@ impl DidFormattingAdapter {
                 },
                 "evidence",
             )?;
+            // The English catalogue is the parameter's record: its name is the
+            // claim, its layout the value. Another language's pack writes,
+            // under the same record id, only the name and the states in that
+            // language, as the encoding's text: the join is the id both packs
+            // build from the same KeyedData and ReadParameter ids.
+            let (key, value) = match &self.language {
+                None => (
+                    ClaimKey::ParameterDefinition {
+                        parameter: name.to_string(),
+                    },
+                    KnowledgeValue::IdentifierDefinition {
+                        identifier: identifier.clone(),
+                        encoding: Some(encoding),
+                        unit,
+                    },
+                ),
+                Some(language) => (
+                    ClaimKey::IdentifierDefinition {
+                        namespace: format!("{PARAMETER_TEXT_NAMESPACE}.{language}"),
+                    },
+                    KnowledgeValue::IdentifierDefinition {
+                        identifier: identifier.clone(),
+                        encoding: Some(format!("name={};{encoding}", escape_state_name(name))),
+                        unit: None,
+                    },
+                ),
+            };
             insert_unique(
                 records,
                 record_id.clone(),
                 KnowledgeRecord {
                     id: record_id,
                     entity: entity.clone(),
-                    key: ClaimKey::ParameterDefinition {
-                        parameter: name.to_string(),
-                    },
-                    value: KnowledgeValue::IdentifierDefinition {
-                        identifier: identifier.clone(),
-                        encoding: Some(encoding),
-                        unit,
-                    },
+                    key,
+                    value,
                     applicability: applicability.clone(),
                     evidence_ids: vec![EvidenceId::new(evidence_id)?],
                     // Overwritten once the source type is known.

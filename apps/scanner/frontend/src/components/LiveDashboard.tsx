@@ -9,7 +9,7 @@ import {
   type LiveLimits,
 } from "../liveLimits";
 import type { LiveReadValue } from "../liveRead";
-import { parameterName } from "../parameterNames";
+import { parameterName, stateName } from "../parameterNames";
 import { unitLabel, withUnit } from "../units";
 
 /**
@@ -112,13 +112,15 @@ function gaugeValue(values: LiveReadValue[], unit: string, pattern: RegExp): Liv
 /** The reading as the table shows it: the number with its unit, a named state, or the raw count. */
 function reading(value: LiveReadValue): string {
   if (value.value !== null) return withUnit(decimalText(value.value), value.unit);
-  if (value.state !== null) return value.state;
+  const state = stateName(value.state, value.stateTexts);
+  if (state !== null) return state;
   return value.raw !== null ? String(value.raw) : "—";
 }
 
 /** The reading without its unit: what fits a dial's window. */
 function short(value: LiveReadValue): string {
-  if (value.state !== null) return value.state;
+  const state = stateName(value.state, value.stateTexts);
+  if (state !== null) return state;
   if (value.value !== null) return decimalText(value.value);
   return value.raw !== null ? String(value.raw) : "—";
 }
@@ -342,7 +344,7 @@ export function LiveDashboard({
   return (
     <section className="live-dash" aria-label={t("Instrument panel")}>
       <Dial
-        name={speed === null ? t("Vehicle speed") : parameterName(speed.name)}
+        name={speed === null ? t("Vehicle speed") : parameterName(speed.name, speed.nameTexts)}
         value={speed}
         max={260}
         numeralStep={20}
@@ -360,7 +362,7 @@ export function LiveDashboard({
           <dl className="live-dash-cells">
             {cells.map(({ value, tone }) => (
               <div className={`live-dash-cell live-dash-cell--${tone}`} key={limitKey(value)}>
-                <dt>{parameterName(value.name)}</dt>
+                <dt>{parameterName(value.name, value.nameTexts)}</dt>
                 <dd>{reading(value)}</dd>
               </div>
             ))}
@@ -370,7 +372,7 @@ export function LiveDashboard({
         )}
       </div>
       <Dial
-        name={engine === null ? t("Engine speed") : parameterName(engine.name)}
+        name={engine === null ? t("Engine speed") : parameterName(engine.name, engine.nameTexts)}
         value={engine}
         max={7000}
         numeralStep={1000}

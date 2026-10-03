@@ -217,3 +217,34 @@ Russian twin; the library is re-exported with the Russian snapshot root and
 re-issued. Not in this amendment: the assistant itself (its own ADR, when
 the owner calls it), and any language of this layer other than English and
 Russian.
+
+Built, 2026-10-03, the same day — on the owner's word («так»):
+
+- *Decision 1.* `DidFormattingAdapter::with_language` writes, under the same
+  record id the English catalogue builds from the `KeyedData` and
+  `ReadParameter` ids, one record per parameter keyed `sdd_parameter.rus`,
+  whose encoding text carries `name=<the Russian name>` and the converter's
+  states named in Russian; the file's `langcode` and
+  `ConverterCatalogue::states_mostly_cyrillic` are the two checks of
+  decision 2. The resolver joins the two by the id's tail, the decoder
+  names the state in Russian by the same raw count, and the survey's
+  identifier lists, the module read and the live read carry the Russian
+  beside the English; the interface chooses by the switch for SDD's text —
+  our own wording first, then SDD's Russian, then SDD's English — and draws
+  nothing new.
+- *The library.* Re-exported with the Russian snapshot root: 1,854
+  converters and 6 formatting files read in Russian; the DID catalogue
+  doubled from 15,281 to 30,562 records, one Russian twin per parameter;
+  533,208 records in all, nothing rejected. Re-issued to the owner as
+  `2AFF-199F`, valid to 2027-10-03.
+- *Tested.* The platform golden derives the twin by id and refuses a
+  Russian file read as English and an English catalogue read as Russian;
+  the session test surveys `SYNTHMOD`'s identifiers with their Russian
+  names in the parameters' order; the decoder test names a state in both
+  languages; the whole-stack bench test reads an identifier and finds a
+  Russian name on every decoded parameter.
+- *Not yet.* The passport, mileage and battery rows still name their
+  parameters in English or our own wording: their rows do not carry the
+  Russian text, and the battery parameters come from the platform
+  document's own formatting, which has no Russian twin. The browser demo
+  carries no Russian names. Nothing has met a car.
