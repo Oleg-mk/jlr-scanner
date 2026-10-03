@@ -53,9 +53,11 @@ edit("apps/scanner/src-tauri/tauri.conf.json", /("version": ")[^"]+(")/, `$1${ve
   console.log(`Cargo.lock: ${changed} workspace package(s) set to ${version}`);
 }
 
+// The one tag by name: `--tags` pushes every local tag, and on 2026-10-03 it
+// carried a stray `abandoned/...` tag to the public repository.
 console.log(`
 next:
   git commit -am "release: ${version}"
   git tag v${version}
-  git push origin main --tags
+  git push origin main v${version}
 `);
