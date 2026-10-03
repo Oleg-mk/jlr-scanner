@@ -107,6 +107,18 @@ The platform golden, the session test, the bench and the three panels'
 tests cover it; `IMPLEMENTED`, `FIXTURE_TESTED`. Not in this slice: the
 browser demo. Nothing has met a car.
 
+Evening — the lamp beats as his car does. The owner judged the header
+lamp's `waiting` beat a flicker («просто мерехтить») and filmed his X250's
+Start/Stop button at 240 frames a second. Seven cycles folded and averaged,
+the LED's own ~93 Hz PWM smoothed out: 1.395 s a cycle — 43 a minute, not
+the brochure's 72 — a first beat rising over about 0.12 s and falling to a
+quarter by 0.375 s, a second as fast to the full peak at 0.525 s, and then
+no rest but a fade, still at a fifth of the peak when the next beat starts.
+The keyframe carries those stops over that period now, and the lamp's red
+is a shade brighter at his word. He judged it at the screen: «ідеально,
+назва миготить аналогічно кнопці». A detail of style, no ADR; the plate
+keeps its three forms (`ADR-0038`).
+
 Build 1.2.2 carries it, with the Mac fix of 2026-10-01: commit 4ce518e,
 tag v1.2.2, run 37089692403, all four jobs green. macOS
 ProwlOne_1.2.2_universal.dmg, 15.2 MB, SHA-256

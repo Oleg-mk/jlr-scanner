@@ -3965,7 +3965,9 @@ table.live-read-identifiers label {
 /* ===================================================================== */
 
 .app-shell .app-header h1[data-lamp] {
-  --lamp: 197 27 22;
+  /* A shade brighter and purer than the plate's red, at the owner's word
+     after he had seen the beat (2026-10-03): about twelve percent more. */
+  --lamp: 221 24 19;
   background: linear-gradient(
     0deg,
     rgb(var(--lamp) / 100%) 0%,
