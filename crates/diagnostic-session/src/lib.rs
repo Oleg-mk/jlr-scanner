@@ -187,12 +187,39 @@ pub struct BatteryParameter {
     pub identifier: u16,
     /// SDD's own name for it.
     pub parameter: String,
+    /// The same name in SDD's other languages, by SDD's code (ADR-0034,
+    /// amended 2026-10-03); empty where the loaded data has none.
+    pub name_texts: BTreeMap<String, String>,
     /// What it is for; the card groups by this.
     pub role: knowledge::BatteryRole,
     /// Whether it belongs on the card's face.
     pub headline: bool,
     /// The unit the data states, never one inferred from a name.
     pub unit: Option<String>,
+}
+
+/// One identification identifier a module can be asked for (ADR-0027).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct IdentificationIdentifier {
+    pub identifier: u16,
+    /// SDD's own name for it, in English: the row's identity.
+    pub parameter: String,
+    /// The same name in SDD's other languages (ADR-0034, amended
+    /// 2026-10-03), where the loaded data carries one for this identifier
+    /// under this very name; empty otherwise.
+    pub name_texts: BTreeMap<String, String>,
+}
+
+/// One mileage a module can be asked for (ADR-0024).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct MileageIdentifier {
+    pub identifier: u16,
+    /// SDD's own name for the parameter.
+    pub parameter: String,
+    pub kind: mileage::MileageKind,
+    /// The same name in SDD's other languages (ADR-0034, amended
+    /// 2026-10-03); empty where the loaded data has none.
+    pub name_texts: BTreeMap<String, String>,
 }
 
 /// SDD's wording for a fault code and its failure type byte, as far as the
@@ -696,14 +723,19 @@ impl KnowledgeLibrary {
         &self,
         context: &VehicleContext,
         ecu_family: &str,
-    ) -> Vec<(u16, String, mileage::MileageKind)> {
+    ) -> Vec<MileageIdentifier> {
         let mut found = Vec::new();
         for identifier in
             DiagnosticEnvironmentResolver::readable_identifiers(self.store(), context, ecu_family)
         {
             for parameter in &identifier.parameters {
                 if let Some(kind) = mileage::mileage_kind(&parameter.name) {
-                    found.push((identifier.identifier, parameter.name.clone(), kind));
+                    found.push(MileageIdentifier {
+                        identifier: identifier.identifier,
+                        parameter: parameter.name.clone(),
+                        kind,
+                        name_texts: parameter.name_texts.clone(),
+                    });
                 }
             }
         }
@@ -751,6 +783,7 @@ impl KnowledgeLibrary {
                 found.push(BatteryParameter {
                     identifier: identifier.identifier,
                     parameter: parameter.name.clone(),
+                    name_texts: parameter.name_texts.clone(),
                     role,
                     headline: knowledge::is_headline_battery_parameter(identifier.identifier),
                     unit: parameter.unit.clone(),
@@ -765,8 +798,16 @@ impl KnowledgeLibrary {
                 .then_with(|| left.identifier.cmp(&right.identifier))
                 .then_with(|| left.parameter.cmp(&right.parameter))
         });
-        found.dedup_by(|left, right| {
-            left.identifier == right.identifier && left.parameter == right.parameter
+        found.dedup_by(|later, kept| {
+            if later.identifier != kept.identifier || later.parameter != kept.parameter {
+                return false;
+            }
+            // One parameter from two records: whichever of them carries a
+            // name in another language, the one kept does too.
+            for (language, name) in std::mem::take(&mut later.name_texts) {
+                kept.name_texts.entry(language).or_insert(name);
+            }
+            true
         });
         found
     }
@@ -779,7 +820,7 @@ impl KnowledgeLibrary {
         &self,
         context: &VehicleContext,
         ecu_family: &str,
-    ) -> Vec<(u16, String)> {
+    ) -> Vec<IdentificationIdentifier> {
         let mut found = Vec::new();
         for identifier in
             DiagnosticEnvironmentResolver::readable_identifiers(self.store(), context, ecu_family)
@@ -792,7 +833,27 @@ impl KnowledgeLibrary {
                 .first()
                 .map(|parameter| parameter.name.clone())
                 .unwrap_or_else(|| format!("0x{:04X}", identifier.identifier));
-            found.push((identifier.identifier, name));
+            // The name in SDD's other languages, from any record of this
+            // identifier under this very name (ADR-0034, amended
+            // 2026-10-03): the same parameter from another document, never
+            // another parameter's name borrowed for it.
+            let mut name_texts = BTreeMap::new();
+            for parameter in identifier
+                .parameters
+                .iter()
+                .filter(|parameter| parameter.name == name)
+            {
+                for (language, text) in &parameter.name_texts {
+                    name_texts
+                        .entry(language.clone())
+                        .or_insert_with(|| text.clone());
+                }
+            }
+            found.push(IdentificationIdentifier {
+                identifier: identifier.identifier,
+                parameter: name,
+                name_texts,
+            });
         }
         found
     }

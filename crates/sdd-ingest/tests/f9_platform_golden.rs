@@ -12,6 +12,7 @@ use knowledge::{
 };
 use sdd_ingest::{
     BatteryFormatting, ModelYearTimeline, PlatformAdapter, GATEWAY_CLAIM, NETWORK_CLAIM,
+    PARAMETER_TEXT_NAMESPACE,
 };
 
 const FIXTURE: &str = include_str!("../../../fixtures/knowledge/synthetic/f9_platform.xml");
@@ -1046,19 +1047,36 @@ fn the_battery_monitors_identifiers_are_recorded_for_the_module_that_serves_them
 #[test]
 fn the_byte_description_joins_the_module_that_serves_the_parameter() {
     let mut formatting = BatteryFormatting::new();
-    formatting.insert(
+    let kept = formatting.insert(
         0x4028,
         "Vehicle battery state of charge  -  Estimated",
         Some("size=1;mask=0xff;converter=CVT_N_PCT_OFF_0_RES_1;scale=1;offset=0;offset_first=true"),
         Some("pct"),
     );
+    assert_eq!(kept, Some(0));
+    // The same name in SDD's Russian, found by identifier and index — the
+    // structure both packs share — never by text (ADR-0034, amended
+    // 2026-10-03). A row that is not there, or a language this product
+    // knows no pack of, takes nothing.
+    assert!(formatting.insert_text(
+        0x4028,
+        0,
+        "rus",
+        "Расчетная степень заряженности аккумулятора"
+    ));
+    assert!(!formatting.insert_text(0x4028, 1, "rus", "Нет такой строки"));
+    assert!(!formatting.insert_text(0x4028, 0, "deu", "Ladezustand"));
+    assert_eq!(formatting.named_in("rus"), 1);
     // A parameter the rule does not recognise is not kept, whatever the
     // formatting document says about it.
-    formatting.insert(
-        0xDE05,
-        "Turbocharger valve offset values",
-        Some("size=2"),
-        None,
+    assert_eq!(
+        formatting.insert(
+            0xDE05,
+            "Turbocharger valve offset values",
+            Some("size=2"),
+            None,
+        ),
+        None
     );
     assert_eq!(formatting.identifiers(), 1);
 
@@ -1088,6 +1106,32 @@ fn the_byte_description_joins_the_module_that_serves_the_parameter() {
             unit: Some("pct".into()),
         }
     );
+    // The twin (ADR-0034, amended 2026-10-03): the Russian name under the
+    // English record's id with the language appended, keyed as the
+    // catalogue's own twins are, the same identifier on the same module.
+    let twin = store
+        .get_record("f9-plat.module.SYNTHMOD.battery.0x4028.0.rus")
+        .expect("the Russian name is recorded beside the English");
+    assert_eq!(twin.entity, charge.entity);
+    assert_eq!(
+        twin.key,
+        ClaimKey::IdentifierDefinition {
+            namespace: format!("{PARAMETER_TEXT_NAMESPACE}.rus"),
+        }
+    );
+    assert_eq!(
+        twin.value,
+        KnowledgeValue::IdentifierDefinition {
+            identifier: "0x4028".into(),
+            encoding: Some("name=Расчетная степень заряженности аккумулятора".into()),
+            unit: None,
+        }
+    );
+    assert_eq!(twin.applicability, charge.applicability);
+    // A row the Russian pack does not name has no twin.
+    assert!(store
+        .get_record("f9-plat.module.SYNTHMOD.battery.0x4020.0.rus")
+        .is_none());
     // The ones the formatting document says nothing about keep the
     // platform's own name and no encoding.
     let resets = store

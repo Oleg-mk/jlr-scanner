@@ -266,6 +266,35 @@ describe("the module passport", () => {
     }
   });
 
+  it("names an identifier in SDD's own Russian where we have no label and SDD has the name (ADR-0034, amended)", () => {
+    setCurrentLanguage("ru");
+    expect(passportLabel("0xF1A0")).toBeNull();
+    render(
+      <PassportPanel
+        snapshot={{
+          ...createPassportSnapshot(),
+          state: "FINISHED",
+          planned: 1,
+          asked: 1,
+          answered: 1,
+          modules: 1,
+          readings: [
+            reading({
+              identifier: "0xF1A0",
+              parameter: "Synthetic text",
+              parameterTexts: { rus: "Синтетический текст" },
+              value: "ABC",
+            }),
+          ],
+        }}
+        running={false}
+        adapterReady
+        surveyed
+      />,
+    );
+    expect(screen.getByText("Синтетический текст")).toBeVisible();
+  });
+
   it("labels the identifiers in the interface's language and says what to do first", () => {
     setCurrentLanguage("uk");
     expect(passportLabel("0xF111")).toBe("Номер деталі основного вузла");

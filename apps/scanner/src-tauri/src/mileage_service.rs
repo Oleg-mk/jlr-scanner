@@ -43,11 +43,20 @@ pub struct MileageDue {
     pub transaction: PreparedUdsTransaction,
 }
 
+/// One of an identifier's parameters that is a mileage.
+struct Wanted {
+    /// SDD's own name for it.
+    parameter: String,
+    kind: MileageKind,
+    /// The same name in SDD's other languages (ADR-0034, amended 2026-10-03).
+    parameter_texts: std::collections::BTreeMap<String, String>,
+}
+
 struct Entry {
     ecu_family: String,
     identifier: u16,
     /// Which of the identifier's parameters are mileages, by SDD's name.
-    wanted: Vec<(String, MileageKind)>,
+    wanted: Vec<Wanted>,
     route_id: String,
     route_validation: String,
     transaction: PreparedUdsTransaction,
@@ -121,19 +130,23 @@ impl MileageService {
             }
             // One read per identifier, however many of its parameters are
             // mileages.
-            let mut by_identifier: std::collections::BTreeMap<u16, Vec<(String, MileageKind)>> =
+            let mut by_identifier: std::collections::BTreeMap<u16, Vec<Wanted>> =
                 std::collections::BTreeMap::new();
-            for (identifier, parameter, kind) in wanted {
+            for found in wanted {
                 // The library's kind and the contract's are the same idea on
                 // two sides of a boundary; the crossing is spelled out.
-                let kind = match kind {
+                let kind = match found.kind {
                     mileage::MileageKind::Current => MileageKind::Current,
                     mileage::MileageKind::Event => MileageKind::Event,
                 };
                 by_identifier
-                    .entry(identifier)
+                    .entry(found.identifier)
                     .or_default()
-                    .push((parameter, kind));
+                    .push(Wanted {
+                        parameter: found.parameter,
+                        kind,
+                        parameter_texts: found.name_texts,
+                    });
             }
             for (identifier, parameters) in by_identifier {
                 let request = ModuleReadRequest {
@@ -271,7 +284,7 @@ impl Entry {
     fn new(
         family: &str,
         identifier: u16,
-        wanted: Vec<(String, MileageKind)>,
+        wanted: Vec<Wanted>,
         prepared: PreparedModuleRead,
     ) -> Self {
         Self {
@@ -313,11 +326,12 @@ impl Run {
         let mut rows: Vec<MileageReading> = entry
             .wanted
             .iter()
-            .map(|(parameter, kind)| MileageReading {
+            .map(|wanted| MileageReading {
                 ecu_family: entry.ecu_family.clone(),
                 identifier: identifier.clone(),
-                parameter: parameter.clone(),
-                kind: *kind,
+                parameter: wanted.parameter.clone(),
+                parameter_texts: wanted.parameter_texts.clone(),
+                kind: wanted.kind,
                 state: ModuleReadState::Failed,
                 value: None,
                 unit: None,

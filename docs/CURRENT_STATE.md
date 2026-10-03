@@ -4,7 +4,7 @@ This file records what is done. `ROADMAP.md` records what is next and why in tha
 order, including the owner-only gates. Keep both current; neither may live only
 in a chat session.
 
-Status: **2026-10-03 — the parameter and state names come in SDD's own Russian beside the English (`ADR-0034`, amended before the code), joined by the structure both language packs share, and the library is re-issued for it: `2AFF-199F`, 533,208 records.** Under the switch the help already follows, a Ukrainian or Russian reader sees SDD's own Russian name for a parameter and a decoded state where we have no wording of our own; nothing new is drawn. The passport, mileage and battery rows wait for their turn. The Mac fix of 2026-10-01 and this await one build. Earlier — **2026-10-01 — the macOS build found the MongoosePro on the owner's Intel Mac, and listed it twice.** macOS gives one USB serial adapter two port names, the call-out `/dev/cu.…` and the dial-in `/dev/tty.…`; the serial library returns both and the enumeration passed both on, so the adapter panel asked him to choose between two names of one adapter. The dial-in twin is dropped now and a Mac shows one adapter. What he reported is discovery: that the adapter connects and reads on a Mac is not yet reported. Build 1.2.1 carries the fix, with step 2 of `ADR-0036` and `ADR-0039` — the second build of stage 2, to the owner alone.
+Status: **2026-10-03 — the parameter and state names come in SDD's own Russian beside the English (`ADR-0034`, amended before the code), joined by the structure both language packs share, and the library is re-issued for it: `2AFF-199F`, 533,208 records.** Under the switch the help already follows, a Ukrainian or Russian reader sees SDD's own Russian name for a parameter and a decoded state where we have no wording of our own; nothing new is drawn. Later the same day the passport, mileage and battery rows followed: the mileage from the catalogue's twins; the battery through a twin the platform adapter writes from the Russian name the exporter joins to the formatting row by structure, since the platform document has no Russian of its own; the passport with none to show, because SDD names the identification identifiers in the platform document alone, in English — our own wording stands there, and nothing is invented. The library is re-issued again: `0807-B35C`, 533,775 records, 38 battery rows named in Russian. The Mac fix of 2026-10-01 and all of this await one build. Earlier — **2026-10-01 — the macOS build found the MongoosePro on the owner's Intel Mac, and listed it twice.** macOS gives one USB serial adapter two port names, the call-out `/dev/cu.…` and the dial-in `/dev/tty.…`; the serial library returns both and the enumeration passed both on, so the adapter panel asked him to choose between two names of one adapter. The dial-in twin is dropped now and a Mac shows one adapter. What he reported is discovery: that the adapter connects and reads on a Mac is not yet reported. Build 1.2.1 carries the fix, with step 2 of `ADR-0036` and `ADR-0039` — the second build of stage 2, to the owner alone.
 
 Earlier — **2026-09-19, night — the MOST modules of the L319, L320 and L322 of MY10 are reachable on paper: `ADR-0039`, proposed and built the same night. SDD's data reaches their MOST ring through the ACM by each module's own address, with no routine, so a built-in hypothesis binds the sub-network to the medium-speed pair for exactly those three programme-years — twenty-eight module rows, unverified until one answers — while the older 29-bit `enhanced` layout stays `UNKNOWN` with its five numbers recorded verbatim, the X250's routine-opened gateway stays where it was, and every gatewayed module now says from the data which gateway fronts it and why it waits. At the screen the owner's L322 moved nothing, and rightly twice: the one he described is of the DS2 era, whose ring is the `enhanced` layout; and the L322 of 2010 had not moved either, because the MY10 documents give a MOST module only a physical address in the 11-bit range and no identifier pair — so decision 6 derives the request from that address and the response eight above it, the convention all 1,528 declared pairs in the corpus follow, as a hypothesis on the exporter's request, and the library is re-exported and re-issued for it. Before that, the same day — the interface met the owner's own car through his library, and two things gave way. SDD names the holders of the car configuration by their diagnostic system (`RSJB_SYSTEM_A`), so the X250's configuration read planned nothing until `ADR-0037` taught the library that a system belongs to its module; and the X250's battery monitor declares no voltage, so the low-battery precondition of `ADR-0030` — amended twice today: SDD's own band, under 11.6 V, as a precondition of the session, and the voltage from whichever of three reads is freshest — could never have appeared on his car. Both are built and fixture-tested; the bench's rail follows the scenario on every read it answers, and the owner saw the line, the voltage on the cell and the headings that hold the top of the screen in the running window («все так як і планувалося»). Yesterday's two debts are closed: the operations' names are SDD's English and a caption says so, and the stopwatch is gone. The afternoon rebuilt the live read at the screen: the chooser says what each choice holds and a module's key counts what its press will add — the cap of sixteen, not the bench and not the rule, was what hid the engine speed on his car; the two dials read themselves once the survey names them and the adapter is there (`ADR-0022`, amended); the panel lost its dark screen and its grid and gained needles that rest at zero, the odometer and the gearbox in the dials' windows; and every control on the plate has one of three forms — a key, a latch, a lens (`ADR-0038`), the owner's own sketch, judged by him at the screen: «все ідеально». And at the end of the day he walked the service mode and the clear — the flow he had judged illogical the evening before — and accepted it: «ми виправили всі мої зауваження, все тепер логічно». Then, on his word, the collective clear was built and tested, the K-line clear joined the whole-stack bench test, and stage 2, step 1 is complete on the bench end to end: **1.2.0**, declared by him the same evening — the first build of stage 2, its installers his alone (`ADR-0036`, decision 8). Step 2 began the same evening, on the amendment written before its code: the on-demand self test, routine `0x0202`, runs on the bench end to end — the extended session opened and held, the result shown as the bytes it is — and is offered in the interface under a test the module's index and the ODST pack agree on; the guard was loosened for exactly that, one constructor, one intent, one routine in a closed type. 1.2.1 waits on his word. No operation has met a car.**
 
@@ -71,11 +71,42 @@ the DID catalogue doubled from 15,281 to 30,562 records, one twin per
 parameter, 533,208 records in all, nothing rejected; the owner's copy is
 `2AFF-199F`, valid to 2027-10-03, at `Desktop\prowlone-library-Oleg-2AFF-199F`.
 The platform golden, the session test, a decoder test and the whole-stack
-bench test cover it; `IMPLEMENTED`, `FIXTURE_TESTED`. Not in this slice:
-the passport, mileage and battery rows, which still name their parameters
-in English or our own wording (the battery's come from the platform
-document's own formatting, which has no Russian twin), and the browser
-demo. The build that carries it is the next one. Nothing has met a car.
+bench test cover it; `IMPLEMENTED`, `FIXTURE_TESTED`.
+
+Later the same day, on the owner's question whether the three rows that
+still named their parameters in English or our own wording — the passport,
+the mileage, the battery — could follow before the push («можливо це
+зробити а вже потім пушити»), they did. Each row carries SDD's name in its
+other languages beside its English identity and the three panels show it by
+the rule above; no new control. The mileage rows take the name from the
+catalogue's twins, as the live read does. The battery rows could not: their
+parameters come from the platform document, which exists in no Russian. So
+the exporter, which already joins the formatting document's byte
+description to the platform's row (`ADR-0030`), joins the Russian pack's
+name to the same row by the record id's tail — by structure, as the
+amendment's first decision — and the platform adapter records it as a twin
+under the English record's id with the language appended, keyed as the
+catalogue's twins are, on the same module; the resolver joins it by the id
+it already joins by. In SDD 169 that names 38 battery rows of 18
+identifiers in Russian — the ones the catalogue describes at all, in
+`Unqualified DID Formatting.xml` and nowhere else. Probed on the real
+library for the L322 and the X250 of MY10: the BCM declares fourteen battery
+identifiers, the catalogue describes two (`0x4028` the state of charge,
+`0x4027` the time in service) and those two carry the Russian name; the
+other twelve SDD describes nowhere, in either language, so they stay bytes
+under their English name as before (`ADR-0030`); every mileage row of both
+cars carries its Russian name («Общее расстояние»), and no passport row
+does. The passport rows carry the name only where a module-scoped
+catalogue record of the same identifier bears the same English name, and
+that is nowhere: SDD names the identification identifiers in the platform
+document alone, in English, so those rows keep our own wording
+(`ADR-0027`, decision 5) or SDD's English, and no Russian is invented for
+them. The library is re-exported and re-issued: `0807-B35C`, valid to
+2027-10-03, 533,775 records, at `Desktop\prowlone-library-Oleg-0807-B35C`.
+The platform golden, the session test, the bench and the three panels'
+tests cover it; `IMPLEMENTED`, `FIXTURE_TESTED`. Not in this slice: the
+browser demo. The build that carries it, with the Mac fix of 2026-10-01, is
+the next one. Nothing has met a car.
 
 ## 2026-10-01 — the Mac meets the adapter: one adapter under two names
 

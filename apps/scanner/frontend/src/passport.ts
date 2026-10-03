@@ -21,6 +21,8 @@ export interface PassportReading {
   identifier: string;
   /** SDD's own name for the identifier, in its own English: the row's identity. */
   parameter: string;
+  /** The same name in SDD's other languages, by SDD's code (ADR-0034, amended). */
+  parameterTexts?: Record<string, string>;
   state: ModuleReadState;
   /** The text the module holds, padding trimmed; bytes when not text. */
   value: string | null;

@@ -243,8 +243,39 @@ Built, 2026-10-03, the same day — on the owner's word («так»):
   names in the parameters' order; the decoder test names a state in both
   languages; the whole-stack bench test reads an identifier and finds a
   Russian name on every decoded parameter.
-- *Not yet.* The passport, mileage and battery rows still name their
-  parameters in English or our own wording: their rows do not carry the
-  Russian text, and the battery parameters come from the platform
-  document's own formatting, which has no Russian twin. The browser demo
-  carries no Russian names. Nothing has met a car.
+- *Later the same day — the passport, mileage and battery rows*, on the
+  owner's question whether they could follow before the push. Each row of
+  the three carries `parameter_texts`, SDD's name in its other languages
+  beside the English identity, and the three panels show it by the same
+  rule; no new control. The mileage rows take it from the catalogue's
+  twins, as the live read does. The battery rows could not: their
+  parameters come from the platform document, which exists in no Russian.
+  So the exporter, which already joins the formatting document's byte
+  description to the platform's row (`ADR-0030`), joins the Russian pack's
+  name to the same row by the record id's tail — by structure, as decision
+  1 — and the platform adapter records it as a twin under the English
+  record's id with the language appended, keyed `sdd_parameter.rus` on the
+  same module; the resolver joins it by the id it already joins the
+  catalogue's twins by. In SDD 169 that names 38 battery rows of 18
+  identifiers — the ones the catalogue describes at all: on the L322 and the
+  X250 of MY10 the BCM declares fourteen, the catalogue describes two
+  (`0x4028`, `0x4027`) and those two carry the Russian name; the other
+  twelve SDD describes nowhere, in either language, so they stay bytes
+  under their English name as before (`ADR-0030`). The mileage rows of
+  both cars carry it, every one. The
+  passport rows carry the name only where a module-scoped catalogue record
+  of the same identifier bears the same English name, and that is nowhere
+  in SDD 169: SDD names the identification identifiers in the platform
+  document alone, in English, so those rows keep our own wording
+  (`ADR-0027`, decision 5) or SDD's English, and no Russian is invented
+  for them. The library is re-exported and re-issued as `0807-B35C`:
+  533,775 records, the 567 battery twins among them.
+- *Tested, later the same day.* The platform golden derives the battery
+  twin by id and refuses a row that is not there and a language with no
+  pack; the session test hands back the Russian name of a battery
+  parameter and of a mileage, and none for an identification identifier;
+  the whole-stack bench reads the battery voltage and the mileage with
+  their Russian names and the passport without one; the three panels' tests
+  show the Russian under the switch.
+- *Not yet.* The browser demo carries no Russian names. Nothing has met a
+  car.

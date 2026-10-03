@@ -28,7 +28,8 @@ use app_contracts::{
 };
 use diagnostic_session::decode::decode_parameters;
 use diagnostic_session::{
-    catalogue_comparisons, vehicle_context, CatalogueAssembly, KnowledgeLibrary,
+    catalogue_comparisons, vehicle_context, CatalogueAssembly, IdentificationIdentifier,
+    KnowledgeLibrary,
 };
 use mongoose_jlr::MongooseUdsReadResult;
 use serde_json::{json, Value};
@@ -56,6 +57,8 @@ struct Entry {
     identifier: u16,
     /// SDD's own name for the identifier.
     parameter: String,
+    /// The same name in SDD's other languages (ADR-0034, amended 2026-10-03).
+    parameter_texts: BTreeMap<String, String>,
     route_id: String,
     route_validation: String,
     transaction: PreparedUdsTransaction,
@@ -134,17 +137,15 @@ impl PassportService {
             if !known.is_empty() {
                 catalogue.insert(family.clone(), known);
             }
-            for (identifier, parameter) in library.identification_identifiers(&resolved, family) {
+            for identification in library.identification_identifiers(&resolved, family) {
                 let request = ModuleReadRequest {
                     ecu_family: family.clone(),
                     kind: ModuleReadKind::Identifier,
-                    identifier: Some(format!("0x{identifier:04X}")),
+                    identifier: Some(format!("0x{:04X}", identification.identifier)),
                     context: context.clone(),
                 };
                 match ModuleReadService::prepare(library, &request) {
-                    Ok(prepared) => {
-                        entries.push(Entry::new(family, identifier, parameter, prepared))
-                    }
+                    Ok(prepared) => entries.push(Entry::new(family, identification, prepared)),
                     Err(error) => {
                         let reason = error.technical_details.unwrap_or(error.message);
                         // One line per module, not one per identifier.
@@ -275,11 +276,16 @@ impl PassportService {
 }
 
 impl Entry {
-    fn new(family: &str, identifier: u16, parameter: String, prepared: PreparedModuleRead) -> Self {
+    fn new(
+        family: &str,
+        identification: IdentificationIdentifier,
+        prepared: PreparedModuleRead,
+    ) -> Self {
         Self {
             ecu_family: family.to_string(),
-            identifier,
-            parameter,
+            identifier: identification.identifier,
+            parameter: identification.parameter,
+            parameter_texts: identification.name_texts,
             route_id: prepared.transaction.backend_route().to_string(),
             route_validation: prepared.route_validation,
             transaction: prepared.transaction,
@@ -316,6 +322,7 @@ impl Run {
             ecu_family: entry.ecu_family.clone(),
             identifier: format!("0x{:04X}", entry.identifier),
             parameter: entry.parameter.clone(),
+            parameter_texts: entry.parameter_texts.clone(),
             state: ModuleReadState::Failed,
             value: None,
             route_id: entry.route_id.clone(),

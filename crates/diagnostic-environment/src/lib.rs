@@ -1259,9 +1259,9 @@ impl DiagnosticEnvironmentResolver {
         );
 
         // Another language's names for these parameters (ADR-0034, amended
-        // 2026-10-03): written by the same adapter from the same documents in
-        // that language, under `sdd_parameter.<lang>`, with the same record
-        // id tail - the join is the structure both packs share.
+        // 2026-10-03): written by the same adapters from the same documents
+        // in that language, under `sdd_parameter.<lang>`, with the same
+        // record id tail - the join is the structure both packs share.
         let mut texts: BTreeMap<String, BTreeMap<String, String>> = BTreeMap::new();
         for entry in &result.records {
             if entry.applicability_resolution != ApplicabilityResolution::Applicable
@@ -1286,6 +1286,10 @@ impl DiagnosticEnvironmentResolver {
             let Some(tail) = record_tail(&entry.record.id) else {
                 continue;
             };
+            // The catalogue's twins share the English record's id; the
+            // platform document's battery twins carry it with the language
+            // appended (ADR-0034, amended 2026-10-03).
+            let tail = tail.strip_suffix(&format!(".{language}")).unwrap_or(tail);
             texts
                 .entry(tail.to_string())
                 .or_default()
@@ -1352,11 +1356,15 @@ impl DiagnosticEnvironmentResolver {
 /// text under (ADR-0034, amended 2026-10-03): `sdd_parameter.rus`.
 const PARAMETER_TEXT_NAMESPACE_PREFIX: &str = "sdd_parameter.";
 
-/// A DID record's id without its source - `did.<keyed>.p<n>` - the part both
-/// language packs build identically, so one language's record finds the
-/// other's.
+/// A record's id without its source - `did.<keyed>.p<n>` for the catalogue,
+/// `module.<segment>.…` for the platform document - the part both language
+/// packs build identically, so one language's record finds the other's.
 fn record_tail(id: &str) -> Option<&str> {
-    id.find(".did.").map(|at| &id[at + 1..])
+    let at = [".did.", ".module."]
+        .iter()
+        .filter_map(|marker| id.find(marker))
+        .min()?;
+    Some(&id[at + 1..])
 }
 
 /// One `key=value` field of an encoding descriptor, the four escapes of the

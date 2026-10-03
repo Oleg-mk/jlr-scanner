@@ -32,7 +32,7 @@ function badge(snapshot: ModulePassportSnapshot, running: boolean, bench: boolea
  * stays underneath either way, because it is the row's identity in the report.
  */
 function label(row: PassportReading): string {
-  return passportLabel(row.identifier) ?? parameterName(row.parameter);
+  return passportLabel(row.identifier) ?? parameterName(row.parameter, row.parameterTexts);
 }
 
 /**

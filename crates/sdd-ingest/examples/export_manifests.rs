@@ -24,7 +24,7 @@ use sdd_ingest::{
     DidFormattingAdapter, DtcDescriptionAdapter, DtcFaultTypeAdapter, DtcHelpAdapter,
     IvsLineageAdapter, ModelYearTimeline, ModuleAccessAdapter, ModuleTextAdapter, OdstInfoAdapter,
     PlatformAdapter, TextLookup, VinDecodeAdapter, DTC_HELP_LANGUAGE_RUSSIAN,
-    YEAR_BREAKPOINT_DIMENSION,
+    PARAMETER_TEXT_NAMESPACE, YEAR_BREAKPOINT_DIMENSION,
 };
 use std::collections::{BTreeMap, BTreeSet};
 use std::io::Write;
@@ -418,6 +418,28 @@ fn export(
     }
 }
 
+/// A DID record's id without its source — `did.<keyed>.p<n>` — the part both
+/// language packs build identically (`ADR-0034`, amended 2026-10-03).
+fn record_tail(id: &str) -> Option<&str> {
+    id.find(".did.").map(|at| &id[at + 1..])
+}
+
+/// One `key=value` field of an encoding descriptor, the catalogue export's
+/// four escapes reversed.
+fn descriptor_field(text: &str, key: &str) -> Option<String> {
+    text.split(';').find_map(|part| {
+        let (name, value) = part.split_once('=')?;
+        (name.trim() == key).then(|| {
+            value
+                .trim()
+                .replace("%3D", "=")
+                .replace("%7C", "|")
+                .replace("%3B", ";")
+                .replace("%25", "%")
+        })
+    })
+}
+
 fn read(found: &Found) -> std::io::Result<String> {
     std::fs::read_to_string(&found.path)
 }
@@ -501,6 +523,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // module, so its rows reach nothing on their own; joined to the platform
     // document, which names the module, they make a readable parameter.
     let mut battery_formatting = BatteryFormatting::new();
+    // Which kept row each catalogue record became, by the record id's tail
+    // — the part both language packs build identically — and which files
+    // held them, so that the Russian pack's names find their rows by
+    // structure (`ADR-0034`, amended 2026-10-03) and only its twins of
+    // those files are read for it.
+    let mut battery_rows: BTreeMap<String, (u16, usize)> = BTreeMap::new();
+    let mut battery_files: BTreeSet<std::ffi::OsString> = BTreeSet::new();
     for found in &corpus.snapshots {
         let text = read(found)?;
         if let Ok(batch) =
@@ -525,15 +554,74 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 else {
                     continue;
                 };
-                battery_formatting.insert(number, parameter, encoding.as_deref(), unit.as_deref());
+                let Some(index) = battery_formatting.insert(
+                    number,
+                    parameter,
+                    encoding.as_deref(),
+                    unit.as_deref(),
+                ) else {
+                    continue;
+                };
+                if let Some(tail) = record_tail(&record.id) {
+                    battery_rows.insert(tail.to_string(), (number, index));
+                }
+                if let Some(name) = found.path.file_name() {
+                    battery_files.insert(name.to_os_string());
+                }
             }
             observe(&batch)?;
         }
     }
+    for found in &corpus.snapshots_rus {
+        if !found
+            .path
+            .file_name()
+            .is_some_and(|name| battery_files.contains(name))
+        {
+            continue;
+        }
+        let text = read(found)?;
+        let adapter = DidFormattingAdapter::new(
+            source_in(found, &text, Some(DTC_HELP_LANGUAGE_RUSSIAN))?,
+            converters_rus.clone(),
+        )?
+        .with_language(DTC_HELP_LANGUAGE_RUSSIAN)?;
+        let Ok(batch) = adapter.parse(&text) else {
+            continue;
+        };
+        let namespace = format!("{PARAMETER_TEXT_NAMESPACE}.{DTC_HELP_LANGUAGE_RUSSIAN}");
+        for record in &batch.records {
+            let (
+                knowledge::ClaimKey::IdentifierDefinition {
+                    namespace: written_under,
+                },
+                knowledge::KnowledgeValue::IdentifierDefinition {
+                    encoding: Some(encoding),
+                    ..
+                },
+            ) = (&record.key, &record.value)
+            else {
+                continue;
+            };
+            if written_under != &namespace {
+                continue;
+            }
+            let Some(&(identifier, index)) =
+                record_tail(&record.id).and_then(|tail| battery_rows.get(tail))
+            else {
+                continue;
+            };
+            if let Some(name) = descriptor_field(encoding, "name") {
+                battery_formatting.insert_text(identifier, index, DTC_HELP_LANGUAGE_RUSSIAN, &name);
+            }
+        }
+    }
     let battery_formatting = std::sync::Arc::new(battery_formatting);
     println!(
-        "battery: {} identifiers described byte by byte",
-        battery_formatting.identifiers()
+        "battery: {} identifiers described byte by byte, {} rows named in {}",
+        battery_formatting.identifiers(),
+        battery_formatting.named_in(DTC_HELP_LANGUAGE_RUSSIAN),
+        DTC_HELP_LANGUAGE_RUSSIAN
     );
     println!(
         "timeline: {} programmes with a breakpoint sequence",

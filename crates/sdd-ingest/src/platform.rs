@@ -1,6 +1,7 @@
 use crate::{
     child_element, child_text, evidence_class_for, preferred_segment, qualified_applicability,
-    require_attribute, validation_state_for, ModelYearTimeline, YEAR_BREAKPOINT_DIMENSION,
+    require_attribute, validation_state_for, ModelYearTimeline, PARAMETER_TEXT_NAMESPACE,
+    YEAR_BREAKPOINT_DIMENSION,
 };
 use knowledge::{
     Applicability, CanIdFormat, ClaimKey, DimensionConstraint, EntityKind, EvidenceId,
@@ -138,6 +139,9 @@ pub struct BatteryFormattingRow {
     pub parameter: String,
     pub encoding: Option<String>,
     pub unit: Option<String>,
+    /// The name in SDD's other languages, by SDD's code (`rus`), from the
+    /// same document in that language (ADR-0034, amended 2026-10-03).
+    pub name_texts: BTreeMap<String, String>,
 }
 
 /// The byte descriptions of the battery identifiers, by identifier
@@ -154,26 +158,69 @@ impl BatteryFormatting {
     }
 
     /// Record one description. A parameter the battery rule does not
-    /// recognise is not a battery parameter and is not kept.
+    /// recognise is not a battery parameter and is not kept. What comes back
+    /// is the row's index under its identifier — the same index again for a
+    /// name already kept — so that a name in another language can find the
+    /// row by structure.
     pub fn insert(
         &mut self,
         identifier: u16,
         parameter: &str,
         encoding: Option<&str>,
         unit: Option<&str>,
-    ) {
-        if knowledge::battery_role(identifier, parameter).is_none() {
-            return;
-        }
+    ) -> Option<usize> {
+        knowledge::battery_role(identifier, parameter)?;
         let rows = self.rows.entry(identifier).or_default();
-        if rows.iter().any(|row| row.parameter == parameter) {
-            return;
+        if let Some(index) = rows.iter().position(|row| row.parameter == parameter) {
+            return Some(index);
         }
         rows.push(BatteryFormattingRow {
             parameter: parameter.to_string(),
             encoding: encoding.map(str::to_string),
             unit: unit.map(str::to_string),
+            name_texts: BTreeMap::new(),
         });
+        Some(rows.len() - 1)
+    }
+
+    /// The name of one kept row in another of SDD's languages (ADR-0034,
+    /// amended 2026-10-03), from the same document in that language. The
+    /// row is found by identifier and index — the structure both language
+    /// packs share — never by text. A row that is not there, a language
+    /// this product knows no pack of, or an empty name takes nothing, and
+    /// the answer says whether anything was kept.
+    pub fn insert_text(
+        &mut self,
+        identifier: u16,
+        index: usize,
+        language: &str,
+        name: &str,
+    ) -> bool {
+        let name = name.trim();
+        if crate::dtc::iso_code_for(language).is_none() || name.is_empty() {
+            return false;
+        }
+        match self
+            .rows
+            .get_mut(&identifier)
+            .and_then(|rows| rows.get_mut(index))
+        {
+            Some(row) => {
+                row.name_texts
+                    .insert(language.to_string(), name.to_string());
+                true
+            }
+            None => false,
+        }
+    }
+
+    /// How many kept rows carry a name in this language.
+    pub fn named_in(&self, language: &str) -> usize {
+        self.rows
+            .values()
+            .flatten()
+            .filter(|row| row.name_texts.contains_key(language))
+            .count()
     }
 
     pub fn rows_for(&self, identifier: u16) -> &[BatteryFormattingRow] {
@@ -1163,7 +1210,10 @@ impl PlatformAdapter {
     /// The bytes come from SDD's DID formatting document where the exporter
     /// has given the adapter its descriptions — that document names no
     /// module, so on its own it reaches nothing — and where it has none the
-    /// platform's own name stands alone and the value is shown as bytes.
+    /// platform's own name stands alone and the value is shown as bytes. A
+    /// name the exporter has joined from the same document in another
+    /// language is recorded beside the English one, the way the catalogue's
+    /// own twins are (ADR-0034, amended 2026-10-03).
     #[allow(clippy::too_many_arguments)]
     fn add_battery(
         &self,
@@ -1221,6 +1271,7 @@ impl PlatformAdapter {
                         parameter: member.name.clone(),
                         encoding: None,
                         unit: None,
+                        name_texts: BTreeMap::new(),
                     }]
                 } else {
                     described
@@ -1241,11 +1292,12 @@ impl PlatformAdapter {
                     } else {
                         "; bytes not described by the loaded data"
                     };
+                    let locator = format!(
+                        "module_fitment/module[module_code_name/@acronym='{acronym}']/data_identifier_set[@type='{kind}']; data_identifier_set[@id='{set_name}']/did[@id='{identifier}']"
+                    );
                     self.push(
-                        record_id,
-                        format!(
-                            "module_fitment/module[module_code_name/@acronym='{acronym}']/data_identifier_set[@type='{kind}']; data_identifier_set[@id='{set_name}']/did[@id='{identifier}']"
-                        ),
+                        record_id.clone(),
+                        locator.clone(),
                         format!(
                             "{program} {acronym} battery {} {identifier} {} service 0x22{bytes_note}{qualifier_note}",
                             role.as_str().to_ascii_lowercase(),
@@ -1267,6 +1319,39 @@ impl PlatformAdapter {
                         evidence,
                         records,
                     )?;
+                    // The same name in SDD's other languages (ADR-0034,
+                    // amended 2026-10-03), as the DID formatting document in
+                    // that language gives it: one record per language under
+                    // the English record's id with the language appended,
+                    // keyed as the catalogue's own twins are, on the same
+                    // module, so the resolver joins it by the id it already
+                    // joins the catalogue's twins by.
+                    for (language, name) in &row.name_texts {
+                        self.push(
+                            format!("{record_id}.{language}"),
+                            locator.clone(),
+                            format!(
+                                "{program} {acronym} battery {} {identifier} {} named in {language} as the DID formatting document in that language names it: {name}{qualifier_note}",
+                                role.as_str().to_ascii_lowercase(),
+                                row.parameter
+                            ),
+                            KnowledgeEntity {
+                                kind: EntityKind::IdentifierParameter,
+                                id: format!("DID-{identifier}"),
+                            },
+                            ClaimKey::IdentifierDefinition {
+                                namespace: format!("{PARAMETER_TEXT_NAMESPACE}.{language}"),
+                            },
+                            KnowledgeValue::IdentifierDefinition {
+                                identifier: identifier.clone(),
+                                encoding: Some(format!("name={}", escape_field(name))),
+                                unit: None,
+                            },
+                            applicability.clone(),
+                            evidence,
+                            records,
+                        )?;
+                    }
                 }
             }
         }

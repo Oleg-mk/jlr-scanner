@@ -47,6 +47,8 @@ export interface BatteryReading {
   identifier: string;
   /** SDD's own name for the parameter: the row's identity. */
   parameter: string;
+  /** The same name in SDD's other languages, by SDD's code (ADR-0034, amended). */
+  parameterTexts?: Record<string, string>;
   role: BatteryRole;
   /** Whether the reading belongs on the card's face. */
   headline: boolean;

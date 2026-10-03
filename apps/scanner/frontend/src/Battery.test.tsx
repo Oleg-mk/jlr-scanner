@@ -295,6 +295,32 @@ describe("battery", () => {
     expect(screen.getByLabelText("Рівень заряду: 78%")).toBeVisible();
   });
 
+  it("names a row in SDD's own Russian where we have no word for it (ADR-0034, amended)", () => {
+    setCurrentLanguage("ru");
+    render(
+      <BatteryPanel
+        snapshot={snapshot({
+          readings: [
+            reading({
+              identifier: "0x402A",
+              parameter: "Vehicle battery voltage",
+              parameterTexts: { rus: "Напряжение аккумуляторной батареи" },
+              role: "VOLTAGE",
+              value: "12.6",
+              unit: "V",
+            }),
+          ],
+        })}
+        running={false}
+        adapterReady
+        surveyed
+      />,
+    );
+    expect(screen.getByText("Напряжение аккумуляторной батареи")).toBeVisible();
+    // SDD's English stays the row's identity in the report; it is not drawn twice.
+    expect(screen.queryByText("Vehicle battery voltage")).toBeNull();
+  });
+
   it("offers every row in the panel, including the ones that answered nothing", () => {
     render(
       <BatteryPanel

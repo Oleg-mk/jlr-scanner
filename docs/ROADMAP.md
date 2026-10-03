@@ -692,8 +692,16 @@ no new control. The library doubled its DID catalogue (30,562 records) and
 was re-issued (`2AFF-199F`, 533,208 records). Fixture-tested from the golden
 to the bench.
 
-Not in this slice: the passport, mileage and battery rows; the browser
-demo; any language other than English and Russian for this layer.
+Later the same day the passport, mileage and battery rows followed: the
+mileage from the catalogue's twins; the battery through a twin the platform
+adapter writes from the Russian name the exporter joins to the formatting
+row by structure, the platform document having no Russian of its own; the
+passport with none to show, since SDD names the identification identifiers
+in the platform document alone, in English. Re-issued `0807-B35C`,
+533,775 records.
+
+Not in this slice: the browser demo; any language other than English and
+Russian for this layer.
 
 ### F14 — K-line transport for the legacy buses (brought forward 2026-09-12, `ADR-0029`)
 

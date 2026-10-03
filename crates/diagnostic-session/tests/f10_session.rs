@@ -18,8 +18,8 @@ use knowledge::{
     SourceRecord, SourceType,
 };
 use sdd_ingest::{
-    ConverterCatalogue, DidFormattingAdapter, IvsLineageAdapter, ModelYearTimeline,
-    ModuleTextAdapter, OdstInfoAdapter, PlatformAdapter, VinDecodeAdapter,
+    BatteryFormatting, ConverterCatalogue, DidFormattingAdapter, IvsLineageAdapter,
+    ModelYearTimeline, ModuleTextAdapter, OdstInfoAdapter, PlatformAdapter, VinDecodeAdapter,
 };
 use std::collections::BTreeMap;
 
@@ -432,6 +432,7 @@ fn reading(family: &str, identifier: &str, value: Option<&str>) -> PassportReadi
         ecu_family: family.into(),
         identifier: identifier.into(),
         parameter: identifier.into(),
+        parameter_texts: Default::default(),
         state: ModuleReadState::Succeeded,
         value: value.map(str::to_string),
         route_id: "hs-can".into(),
@@ -956,4 +957,88 @@ fn the_parameter_names_come_in_sdds_russian_beside_the_english() {
             "Пробег с момента включения индикатора неисправности".to_string(),
         ])
     );
+}
+
+/// ADR-0034, amended 2026-10-03, later the same day: the three rows that
+/// name a parameter outside the live read. A mileage comes from the
+/// catalogue, so its Russian twin is beside it already. A battery parameter
+/// comes from the platform document, which has no Russian; the exporter joins
+/// the Russian catalogue's name to the formatting row by structure and the
+/// platform adapter records it as a twin, so the library hands both names
+/// back. An identification identifier SDD names in the platform document
+/// only - in English, and nothing is invented for it.
+#[test]
+fn the_passport_mileage_and_battery_names_come_in_sdds_russian_where_sdd_has_them() {
+    let mut formatting = BatteryFormatting::new();
+    let kept = formatting
+        .insert(
+            0x4028,
+            "Vehicle Battery Estimated State of Charge",
+            Some("size=1;mask=0xff;converter=CVT_N_PCT_OFF_0_RES_1;scale=1;offset=0;offset_first=true"),
+            Some("pct"),
+        )
+        .expect("the state of charge is a battery parameter");
+    assert!(formatting.insert_text(
+        0x4028,
+        kept,
+        "rus",
+        "Расчетная степень заряженности аккумулятора"
+    ));
+    let platform = PlatformAdapter::new(synthetic_source("f10-session-plat", PLATFORM))
+        .unwrap()
+        .with_timeline(timeline())
+        .with_battery_formatting(std::sync::Arc::new(formatting));
+    let mut manifests = exported_manifests();
+    assert_eq!(manifests[0].0, "platform.json");
+    manifests[0].1 = serde_json::to_string(&platform.parse(PLATFORM).unwrap()).unwrap();
+    manifests.push((
+        "sub_network_route.json".to_string(),
+        SUB_NETWORK_ROUTE.to_string(),
+    ));
+    let library = KnowledgeLibrary::from_manifests(
+        manifests
+            .iter()
+            .map(|(name, text)| (name.as_str(), text.as_str())),
+    );
+    let context = vehicle_context(&vehicle());
+
+    let charge = library
+        .battery_parameters(&context, "SYNTHMOD")
+        .into_iter()
+        .find(|parameter| parameter.identifier == 0x4028)
+        .expect("the state of charge is read from the module that serves it");
+    assert_eq!(
+        charge.parameter,
+        "Vehicle Battery Estimated State of Charge"
+    );
+    assert_eq!(
+        charge.name_texts.get("rus").map(String::as_str),
+        Some("Расчетная степень заряженности аккумулятора")
+    );
+    // A battery row the Russian pack does not name has no Russian name.
+    let resets = library
+        .battery_parameters(&context, "SYNTHMOD")
+        .into_iter()
+        .find(|parameter| parameter.identifier == 0x4020)
+        .expect("the reset counter is a battery parameter");
+    assert!(resets.name_texts.is_empty(), "{:?}", resets.name_texts);
+
+    let distance = library
+        .mileage_identifiers(&context, "SYNTHMOD")
+        .into_iter()
+        .find(|found| found.identifier == 0xDD01)
+        .expect("the running total is a mileage");
+    assert_eq!(distance.parameter, "Total distance");
+    assert_eq!(
+        distance.name_texts.get("rus").map(String::as_str),
+        Some("Общий пробег")
+    );
+
+    let core = library
+        .identification_identifiers(&context, "SYNTHMOD")
+        .into_iter()
+        .find(|found| found.identifier == 0xF111)
+        .expect("the core assembly number is identification");
+    assert_eq!(core.parameter, "ECU Core Assembly Number");
+    assert!(core.name_texts.is_empty(), "{:?}", core.name_texts);
 }

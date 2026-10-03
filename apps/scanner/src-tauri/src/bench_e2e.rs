@@ -110,6 +110,9 @@ fn library() -> KnowledgeLibrary {
         Some("size=1;mask=0xff;converter=CVT_N_VOLT_OFF_6_RES_0PT05;scale=0.05;offset=120;offset_first=true"),
         Some("V"),
     );
+    // The same name in SDD's Russian, as the exporter joins it from the
+    // Russian catalogue by structure (ADR-0034, amended 2026-10-03).
+    assert!(battery_formatting.insert_text(0x402A, 0, "rus", "Напряжение аккумуляторной батареи"));
     let platform = PlatformAdapter::new(synthetic_source("bench-plat", PLATFORM))
         .unwrap()
         .with_timeline(timeline.clone())
@@ -396,6 +399,12 @@ fn a_scenario_ending_in_nine_reads_a_low_battery_through_the_whole_stack() {
             .expect("the headline voltage is read");
         assert_eq!(voltage.identifier, "0x402A");
         assert_eq!(voltage.route_validation, "SYNTHETIC");
+        // The platform's own row, named in SDD's Russian through the twin
+        // the platform adapter records (ADR-0034, amended 2026-10-03).
+        assert_eq!(
+            voltage.parameter_texts.get("rus").map(String::as_str),
+            Some("Напряжение аккумуляторной батареи")
+        );
         // The legislated read of the same rail, PID 0x42, through the
         // standard's own service: the interface stands on whichever of the
         // two is fresher, so the bench has to give them one answer.
@@ -933,6 +942,11 @@ fn the_bench_connects_without_a_port_reads_the_surveyed_vehicle_and_marks_everyt
     );
     let row = &surveyed.readings[0];
     assert_eq!(row.parameter, "Total distance");
+    // Named in SDD's Russian beside the English (ADR-0034, amended).
+    assert_eq!(
+        row.parameter_texts.get("rus").map(String::as_str),
+        Some("Общий пробег")
+    );
     assert_eq!(row.kind, MileageKind::Current);
     assert_eq!(row.unit.as_deref(), Some("km"));
     assert_eq!(row.route_validation, "SYNTHETIC");
@@ -1022,6 +1036,13 @@ fn the_bench_connects_without_a_port_reads_the_surveyed_vehicle_and_marks_everyt
         .find(|row| row.identifier == "0xF111")
         .unwrap();
     assert_eq!(core.parameter, "ECU Core Assembly Number");
+    // SDD names the identification identifiers in the platform document, in
+    // English only; no Russian is invented for them.
+    assert!(
+        core.parameter_texts.is_empty(),
+        "{:?}",
+        core.parameter_texts
+    );
     let passport_json = passport.report_json().expect("a finished run is a report");
     assert!(passport_json.contains("prowlone.module-passport"));
     assert!(passport_json.contains("\"safety_class\": \"READ_ONLY\""));

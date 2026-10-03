@@ -87,7 +87,9 @@ export function MileagePanel({
             <div className="module-validation">{parameterNote(row.note)}</div>
           ) : null}
           {row.kind === "EVENT" ? (
-            <div className="module-validation">{parameterName(row.parameter)}</div>
+            <div className="module-validation">
+              {parameterName(row.parameter, row.parameterTexts)}
+            </div>
           ) : null}
         </td>
         <td className="mileage-difference">{difference(row)}</td>

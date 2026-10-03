@@ -27,7 +27,7 @@ use diagnostic_session::decode::decode_parameters;
 use diagnostic_session::{vehicle_context, KnowledgeLibrary};
 use mongoose_jlr::MongooseUdsReadResult;
 use serde_json::{json, Value};
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use uds_execution::{decode_response, PreparedUdsTransaction, UdsReadOutcome};
@@ -51,6 +51,8 @@ pub struct BatteryDue {
 struct ParameterRow {
     /// SDD's own name for the parameter.
     parameter: String,
+    /// The same name in SDD's other languages (ADR-0034, amended 2026-10-03).
+    parameter_texts: BTreeMap<String, String>,
     role: String,
     headline: bool,
     unit: Option<String>,
@@ -285,6 +287,7 @@ impl ParameterRow {
     fn new(parameter: &diagnostic_session::BatteryParameter) -> Self {
         Self {
             parameter: parameter.parameter.clone(),
+            parameter_texts: parameter.name_texts.clone(),
             role: parameter.role.as_str().to_string(),
             headline: parameter.headline,
             unit: parameter.unit.clone(),
@@ -382,6 +385,7 @@ impl Run {
                 ecu_family: entry.ecu_family.clone(),
                 identifier: format!("0x{:04X}", entry.identifier),
                 parameter: parameter.parameter.clone(),
+                parameter_texts: parameter.parameter_texts.clone(),
                 role: parameter.role.clone(),
                 headline: parameter.headline,
                 state: ModuleReadState::Failed,

@@ -1242,6 +1242,10 @@ pub struct PassportReading {
     pub identifier: String,
     /// SDD's own name for the identifier, in English: the row's identity.
     pub parameter: String,
+    /// The same name in SDD's other languages, by SDD's code (`ADR-0034`,
+    /// amended 2026-10-03); empty where the loaded data has none.
+    #[serde(default)]
+    pub parameter_texts: BTreeMap<String, String>,
     pub state: ModuleReadState,
     /// The text the module holds, padding trimmed; bytes when not text.
     pub value: Option<String>,
@@ -1331,6 +1335,10 @@ pub struct BatteryReading {
     pub identifier: String,
     /// SDD's own name for the parameter, in English: the row's identity.
     pub parameter: String,
+    /// The same name in SDD's other languages, by SDD's code (`ADR-0034`,
+    /// amended 2026-10-03); empty where the loaded data has none.
+    #[serde(default)]
+    pub parameter_texts: BTreeMap<String, String>,
     /// What the parameter is for: `CHARGE`, `VOLTAGE`, `CURRENT`,
     /// `TEMPERATURE`, `DRAIN`, `HEALTH`, `HISTORY`, `CONFIGURATION`,
     /// `HYBRID` (`ADR-0030`).
@@ -1510,6 +1518,10 @@ pub struct MileageReading {
     pub identifier: String,
     /// SDD's own name for the parameter.
     pub parameter: String,
+    /// The same name in SDD's other languages, by SDD's code (`ADR-0034`,
+    /// amended 2026-10-03); empty where the loaded data has none.
+    #[serde(default)]
+    pub parameter_texts: BTreeMap<String, String>,
     pub kind: MileageKind,
     pub state: ModuleReadState,
     pub value: Option<String>,

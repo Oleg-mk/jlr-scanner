@@ -167,6 +167,36 @@ describe("the mileage survey", () => {
     }
   });
 
+  it("names an event's parameter in SDD's own Russian where we have no word for it (ADR-0034, amended)", () => {
+    setCurrentLanguage("ru");
+    render(
+      <MileagePanel
+        snapshot={{
+          ...createMileageSnapshot(),
+          state: "FINISHED",
+          planned: 1,
+          asked: 1,
+          answered: 1,
+          highest: 268_905,
+          highestModule: "ABS",
+          unit: "km",
+          readings: [
+            reading({
+              identifier: "0xDD02",
+              parameter: "Odometer at last fault",
+              parameterTexts: { rus: "Пробег при последней неисправности" },
+              kind: "EVENT",
+            }),
+          ],
+        }}
+        running={false}
+        adapterReady
+        surveyed
+      />,
+    );
+    expect(screen.getByText("Пробег при последней неисправности")).toBeVisible();
+  });
+
   it("says what to do first, and says it in the interface's language", () => {
     setCurrentLanguage("uk");
     render(

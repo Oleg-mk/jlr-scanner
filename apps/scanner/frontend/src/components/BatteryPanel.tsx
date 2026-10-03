@@ -167,7 +167,7 @@ export function BatteryPanel({
                 {rows.map((row) => (
                   <tr key={`${row.ecuFamily}-${row.identifier}-${row.parameter}`}>
                     <td>
-                      {parameterName(row.parameter)}
+                      {parameterName(row.parameter, row.parameterTexts)}
                       <div className="module-validation">{row.identifier}</div>
                     </td>
                     <td>
