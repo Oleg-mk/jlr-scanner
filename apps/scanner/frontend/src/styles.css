@@ -3978,7 +3978,7 @@ table.live-read-identifiers label {
 }
 
 .app-shell .app-header h1[data-lamp="waiting"] {
-  animation: lamp-heartbeat 0.83s linear infinite;
+  animation: lamp-heartbeat 1.395s linear infinite;
 }
 
 .app-shell .app-header h1[data-lamp="live"] {
@@ -3997,48 +3997,73 @@ table.live-read-identifiers label {
     drop-shadow(0 0 8px rgb(var(--lamp) / 46%));
 }
 
-/* One, a short pause, two, then the long rest. */
-/* The beat itself, timed rather than felt out: one turn of the cycle is
-   0.83 s, which is a heart at 72. The systole comes up hard but plastically
-   and holds the peak at 0.15 s; brightness then falls by about half by
-   0.30 s; the second, slightly lower beat peaks at 0.45 s; and from there
-   the light goes smoothly down to its standby glow by 0.65 s and simply
-   waits there until the next turn. The percentages are those seconds over
-   0.83, and each step carries its own easing, so the rise is not the fall. */
+/* One, a short pause, two, then the long fade. */
+/* The beat is the owner's own X250's, measured rather than assumed: the
+   Start/Stop button filmed at 240 frames a second on 2026-10-03, seven
+   cycles folded and averaged (the LED's own PWM flicker at ~93 Hz smoothed
+   out over 50 ms). One turn of the cycle is 1.395 s - 43 a minute, not the
+   72 of the brochure. The first beat rises over about 0.12 s to 0.97 of
+   the peak and falls to a quarter by 0.375 s; the second rises as fast to
+   the full peak at 0.525 s; and from there the light does not stop but
+   fades - to 0.72 at 0.675 s, 0.55 at 0.8 s, 0.38 at 1.0 s, 0.29 at 1.25 s
+   - and is still fading at 0.2 when the next beat begins. The percentages
+   are those seconds over 1.395; the opacity runs 0.45..1 so the name never
+   leaves, and the glow runs with it. The rises are S-shaped like the
+   measured ones; the fade is a chain of straight falls, which is what an
+   exponential looks like through nine stops. */
 @keyframes lamp-heartbeat {
-  /* 0.00 s — the standby glow the cycle starts and ends on */
+  /* 0.000 s - the end of the previous fade, the darkest the name gets */
   0% {
-    opacity: 0.5;
-    filter: drop-shadow(0 1px 0 rgb(255 255 255 / 70%)) drop-shadow(0 0 3px rgb(var(--lamp) / 8%));
-    animation-timing-function: cubic-bezier(0.25, 0.9, 0.3, 1);
+    opacity: 0.54;
+    filter: drop-shadow(0 1px 0 rgb(255 255 255 / 70%)) drop-shadow(0 0 3px rgb(var(--lamp) / 10%));
+    animation-timing-function: cubic-bezier(0.4, 0, 0.6, 1);
   }
-  /* 0.15 s — the first systolic surge, at full brightness */
-  18.07% {
+  /* 0.150 s - the first beat, a shade under the second */
+  10.75% {
+    opacity: 0.98;
+    filter: drop-shadow(0 1px 0 rgb(255 255 255 / 70%)) drop-shadow(0 0 10px rgb(var(--lamp) / 31%));
+    animation-timing-function: cubic-bezier(0.45, 0, 0.55, 1);
+  }
+  /* 0.375 s - the short fall between the beats, down to a quarter */
+  26.88% {
+    opacity: 0.58;
+    filter: drop-shadow(0 1px 0 rgb(255 255 255 / 70%)) drop-shadow(0 0 4px rgb(var(--lamp) / 12%));
+    animation-timing-function: cubic-bezier(0.4, 0, 0.6, 1);
+  }
+  /* 0.525 s - the second beat, the peak */
+  37.63% {
     opacity: 1;
-    filter: drop-shadow(0 1px 0 rgb(255 255 255 / 70%)) drop-shadow(0 0 10px rgb(var(--lamp) / 30%));
-    animation-timing-function: cubic-bezier(0.4, 0, 0.5, 1);
+    filter: drop-shadow(0 1px 0 rgb(255 255 255 / 70%)) drop-shadow(0 0 11px rgb(var(--lamp) / 32%));
+    animation-timing-function: linear;
   }
-  /* 0.30 s — the short fall between the two beats, about half of it */
-  36.14% {
-    opacity: 0.68;
-    filter: drop-shadow(0 1px 0 rgb(255 255 255 / 70%)) drop-shadow(0 0 5px rgb(var(--lamp) / 14%));
-    animation-timing-function: cubic-bezier(0.3, 0.85, 0.35, 1);
+  /* 0.675 s - the fade begins fast */
+  48.39% {
+    opacity: 0.85;
+    filter: drop-shadow(0 1px 0 rgb(255 255 255 / 70%)) drop-shadow(0 0 8px rgb(var(--lamp) / 25%));
+    animation-timing-function: linear;
   }
-  /* 0.45 s — the second beat, a shade under the first */
-  54.22% {
-    opacity: 0.92;
-    filter: drop-shadow(0 1px 0 rgb(255 255 255 / 70%)) drop-shadow(0 0 8px rgb(var(--lamp) / 24%));
-    animation-timing-function: cubic-bezier(0.35, 0, 0.5, 1);
+  /* 0.800 s */
+  57.35% {
+    opacity: 0.75;
+    filter: drop-shadow(0 1px 0 rgb(255 255 255 / 70%)) drop-shadow(0 0 7px rgb(var(--lamp) / 20%));
+    animation-timing-function: linear;
   }
-  /* 0.65 s — down to the standby glow */
-  78.31% {
-    opacity: 0.5;
-    filter: drop-shadow(0 1px 0 rgb(255 255 255 / 70%)) drop-shadow(0 0 3px rgb(var(--lamp) / 8%));
+  /* 1.000 s */
+  71.68% {
+    opacity: 0.66;
+    filter: drop-shadow(0 1px 0 rgb(255 255 255 / 70%)) drop-shadow(0 0 5px rgb(var(--lamp) / 16%));
+    animation-timing-function: linear;
   }
-  /* 0.83 s — and held there, which is the rest between beats */
+  /* 1.250 s - and slower */
+  89.61% {
+    opacity: 0.61;
+    filter: drop-shadow(0 1px 0 rgb(255 255 255 / 70%)) drop-shadow(0 0 4px rgb(var(--lamp) / 13%));
+    animation-timing-function: linear;
+  }
+  /* 1.395 s - still fading when the next beat starts */
   100% {
-    opacity: 0.5;
-    filter: drop-shadow(0 1px 0 rgb(255 255 255 / 70%)) drop-shadow(0 0 3px rgb(var(--lamp) / 8%));
+    opacity: 0.54;
+    filter: drop-shadow(0 1px 0 rgb(255 255 255 / 70%)) drop-shadow(0 0 3px rgb(var(--lamp) / 10%));
   }
 }
 
