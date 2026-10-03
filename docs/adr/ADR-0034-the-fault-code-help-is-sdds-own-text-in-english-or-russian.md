@@ -133,3 +133,87 @@ the same codes and modules with the words changed.
    English, with the English kept beside whenever something else is shown.
    The failure type's wording follows that same choice from this day;
    module names still follow the interface language, as before.
+
+## Amendment, 2026-10-03: the parameter and state names too
+
+The owner's idea for the assistant — speak Russian where there is no
+Ukrainian text, and the translation problem falls away — reaches the one
+data layer still shown in English only: the names of the identifiers and
+parameters in the live read, the module passport and the configuration,
+and the names of the decoded states beside them. SDD ships this layer in
+Russian too. The owner opened `COMMON_SDD_DATA_SNAPSHOT_LANG_RU` with his
+own scripts on 2026-10-01 (the project's code decrypts nothing); measured
+against the English pack it is the same 1,861 files, the same `Converters`
+and `Snapshot` folders, the same file names, with only the human text
+changed — 4,930 parameter names and 1,575 state names carried in Cyrillic,
+the rest being numbers, units and codes that are the same in both
+(`600 Hz`, `Value = 7`), exactly as the English pack leaves them.
+
+This layer is not the help layer, and the same move does not fit it. A
+help screen's Russian joined to its English by the mnemonic's name,
+because the name was a stable label beside the text. Here the English
+*name is itself the thing translated* — a parameter's record is keyed by
+its name (`ParameterDefinition { parameter }`), and a converter's state
+names live inside the encoding string — so a join by the English text
+would join a thing to its own translation and find nothing. What is stable
+across the two packs is the structure, and it is identical: the same
+`KeyedData` ids and `ReadParameter` ids (6,440 of them in the fully
+qualified file, the two id sets equal), the same converter files, the same
+state ranges — `lowValue`/`highValue` unchanged, only the state `<name>`
+different (`Unknown/invalid` -> `Неизвестный/недействительный`).
+
+1. **The Russian names are a channel beside the English, joined by
+   structure, not by text.** The DID-formatting adapter, told the language
+   (`DidFormattingAdapter::with_language`, as `DtcHelpAdapter` already is),
+   writes for each parameter a record carrying only the Russian name,
+   keyed by the same structural id the English record has
+   (`…did.<keyed_slug>.p<parameter_id>`), under a source id that names the
+   language. The English record — its key, its encoding, its applicability
+   — is untouched, so a library issued before this date reads exactly as it
+   does now. The converter catalogue, told the language, carries each
+   state's Russian name joined by converter id and the state's range, so
+   the decoded state can be shown in Russian without the English encoding
+   string changing.
+
+2. **The DID-formatting files carry their own language, and are checked.**
+   Each `Snapshot/*.xml` declares `langcode="ru"`; the adapter refuses a
+   file whose declared language is not the one it was told, as the help
+   adapter refuses a mismatched `<language isoCode>`. The converter files
+   declare no language, so — as with the description indexes of the
+   2026-09-13 amendment — a pack mounted as Russian must be mostly Cyrillic
+   and one mounted as English mostly not, and a converter root under the
+   wrong name is refused.
+
+3. **The name a car is shown follows the choice already there for SDD's
+   text.** A parameter name and a decoded state name are SDD's own data,
+   so they follow the English/Russian switch the help and the code
+   descriptions already follow (`description_data_texts`'s choice), not the
+   interface language: Russian when it is chosen and the pack has it,
+   English otherwise — a name the Russian pack lacks stays English on that
+   line rather than becoming a word about something else. Module names keep
+   following the interface language, as `ADR-0034` decision 3 left them.
+
+4. **Nothing is translated by this project, and Ukrainian is not written.**
+   As with the help: the words shown are SDD's own, in the language SDD
+   wrote them in; a Ukrainian reader sees Russian by default and can switch
+   to English. The 2026-09-12 machine-translation finding stands — the
+   reason this layer is worth having at all is that it lets the planned
+   assistant quote SDD's own Russian name for a parameter unchanged rather
+   than invent one.
+
+5. **Redistribution is unchanged.** The Russian names travel in the issued
+   library under `ADR-0019`'s stamp, restricted to the named tester, and
+   enter neither this repository nor any committed path; the extracted pack
+   stays in the owner's own archive. The synthetic fixtures carry invented
+   Russian parameter and state names, as they carry invented English.
+
+Consequences: `DidFormattingAdapter::with_language` and a language mode on
+the converter catalogue; the exporter recognises a `_LANG_RU` snapshot
+root and takes its `Converters` and `Snapshot` files under a language-named
+source; the survey and the live-read decode carry the Russian name beside
+the English and choose at display; the frontend shows the chosen language
+for parameter and state names; the synthetic snapshot fixture gains a
+Russian twin; the library is re-exported with the Russian snapshot root and
+re-issued. Not in this amendment: the assistant itself (its own ADR, when
+the owner calls it), and any language of this layer other than English and
+Russian.
