@@ -41,7 +41,8 @@ refutes it, and the report records either.
 - A MongoosePro JLR adapter, original or clone. If a clone does not appear
   in the application, say so: the USB identifiers from Device Manager
   (Hardware Ids, the `VID_` and `PID_` values) are what we need to add it.
-- The installer, received from the maintainer.
+- The installer, from the project's [Releases](https://github.com/Oleg-mk/jlr-scanner/releases) page on
+  GitHub or from the maintainer.
 - The data library, a folder received from the maintainer as an archive.
   It is derived from SDD's own diagnostic data and is not redistributed;
   keep it to yourself. Your copy is stamped with your name and a short

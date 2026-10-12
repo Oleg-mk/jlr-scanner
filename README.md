@@ -1,32 +1,50 @@
 # ProwlOne
 
-**Multi-platform vehicle diagnostics.** Independent, read-only diagnostics for Jaguar and Land Rover of the SDD era —
+**Multi-platform vehicle diagnostics.** Independent diagnostics for Jaguar and Land Rover of the SDD era —
 every module on every bus, manufacturer-specific identifiers and fault codes
 with the manufacturer's own wording — through a MongoosePro JLR adapter,
-without SDD's Windows 7, virtual machine and install misery.
+without SDD's Windows 7, virtual machine and install misery. It reads; in a
+service mode, turned on per session, it also clears fault codes and runs a
+module's on-demand self test.
 
 It is not a generic scanner: a cheap OBD-II dongle already covers that. It is
 not an SDD clone or frontend either. It replaces what SDD does for reading a
-car, on a modern stack: a Rust diagnostic core, a Tauri 2 shell, one React
-interface in English, Russian and Ukrainian, on Windows and macOS.
+car — and, one step at a time, its service functions — on a modern stack: a
+Rust diagnostic core, a Tauri 2 shell, one React interface in English,
+Russian and Ukrainian, on Windows and macOS.
 
 ## Status
 
-Stage 1, read-only. Honest validation states, per phase, are in
+Version 1.2: stage 1, read-only diagnostics, is built, and stage 2, the
+service functions, has begun. Honest validation states, per phase, are in
 [docs/CURRENT_STATE.md](docs/CURRENT_STATE.md); the short version:
 
 - the application, the vehicle survey, VIN decoding, module reads, bus
   capture and session reports are implemented and fixture-tested;
 - the adapter path — jump from the bootloader, HS-CAN and MS-CAN channel
   open, listen, close — is confirmed on real hardware on the bench;
-- nothing is `VEHICLE_CONFIRMED` yet. A community tester programme with a
-  handful of named testers is the validation route; see
-  [docs/TESTER_GUIDE.md](docs/TESTER_GUIDE.md) and
+- the first two steps of stage 2 — clearing a module's fault codes, one
+  module or every module that answered with codes, and running its
+  on-demand self test — run end to end on the bench, in a service mode
+  that is off on every start, asks for consent, and asks again before each
+  operation ([ADR-0036](docs/adr/ADR-0036-stage-2-begins-the-service-mode-the-extended-session-and-the-first-write.md)).
+  They are used at the user's own risk;
+- nothing is `VEHICLE_CONFIRMED` yet. A community tester programme is the
+  validation route; see [docs/TESTER_GUIDE.md](docs/TESTER_GUIDE.md) and
   [docs/ROADMAP.md](docs/ROADMAP.md).
 
-Stage 2 (the first write operations, starting with clearing fault codes) is
-future direction, each step behind its own safety class and decision record.
-See [docs/SAFETY_BOUNDARIES.md](docs/SAFETY_BOUNDARIES.md).
+Driving an actuator and changing an adaptation are the next steps of stage
+2, each behind its own safety class and decision record. See
+[docs/SAFETY_BOUNDARIES.md](docs/SAFETY_BOUNDARIES.md).
+
+## Download
+
+Installers for Windows 10/11 and macOS (Apple silicon and Intel) are on the
+[Releases](https://github.com/Oleg-mk/jlr-scanner/releases) page. They are not signed yet, so Windows and
+macOS warn before the first start; the
+[tester guide](docs/TESTER_GUIDE.md) says what you will see and what to do.
+The data library is not on that page: it is issued to each tester
+personally (see below).
 
 ## What is and is not in this repository
 

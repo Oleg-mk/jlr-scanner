@@ -50,9 +50,13 @@ second gate carried by the library's stamp, put to him, he declined.
 `ADR-0036` is amended (decision 8); `TESTER_GUIDE.md` and its Ukrainian twin
 describe the service mode instead of saying the application only reads (the
 Ukrainian twin also gained the MOST exception of `ADR-0039` it had lacked);
-the roadmap's version paragraph and stage table follow. Still open, and his:
-libraries for new testers — his rule of 2026-09-16 issues none until the
-club reports — and the message itself.
+the roadmap's version paragraph and stage table follow. The installers of
+1.2.3 are published as a pre-release on the repository's Releases page
+(https://github.com/Oleg-mk/jlr-scanner/releases/tag/v1.2.3), the first release
+there, so a tester needs no GitHub account and no message to get the
+build; the README and the repository's one-line description no longer say
+"read-only". Still open, and his: libraries for new testers — his rule of
+2026-09-16 issues none until the club reports — and the message itself.
 
 ## 2026-10-03 — the parameter and state names in SDD's own Russian
 

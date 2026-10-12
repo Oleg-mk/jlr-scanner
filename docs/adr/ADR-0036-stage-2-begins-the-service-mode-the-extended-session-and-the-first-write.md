@@ -533,3 +533,10 @@ owners' forum, the owner decided to give them the current line: «я даю 1.2.
 The first write of this product on a car will most likely be a tester's, on
 their own decision, and the session report will hold it. No operation has
 met a car yet.
+
+Beside it, two facts for the record. The installers are published on the
+public repository's Releases page from 1.2.3 on, the owner's word the same
+day; the library never is. And the version column of decision 1 was a plan:
+1.2.2 and 1.2.3 went out on 2026-10-03 carrying other work (SDD's Russian
+names in every row; the lamp beating as the owner's car's button does), so
+steps 3 and 4 take the numbers after them.
