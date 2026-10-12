@@ -41,8 +41,10 @@ testers' hands; stage 2, once it is authorised, will be 1.2.x, and stage 3
 first build after the visual layer of F15 closed the last open row.
 1.2.0 (2026-09-19) is the first build of stage 2: step 1 of `ADR-0036` — the
 service mode, the clear of the codes, the collective clear — complete on the
-bench end to end. Its installers go to the owner alone (decision 8); the
-testers stay on `release-1.1`.
+bench end to end. Its installers went to the owner alone (decision 8) and
+the testers stayed on `release-1.1` until 2026-10-12, when the owner made
+1.2.x the testers' line too, with his warning that a write to the car is at
+the tester's own risk (decision 8, amended).
 1.2.1 (2026-10-01) is the second: step 2 of `ADR-0036` — the on-demand
 self test, with the module's codes read again once it has ended — the
 MOST modules of the L319, L320 and L322 of MY10 by their own address
@@ -57,7 +59,7 @@ current work**, and none may be started early.
 | Stage | Contents | Status |
 | --- | --- | --- |
 | 1 | Full read-only diagnostics: all modules on all buses, DTC read, live data, ECU and software identification, CCF read | **CURRENT SCOPE** |
-| 2 | Service functions: service-interval reset, adaptations, actuator tests, DTC clear | **AUTHORISED 2026-09-18** — `ADR-0036`: four steps, one operation class at a time, versions 1.2.x, installers to the owner alone |
+| 2 | Service functions: service-interval reset, adaptations, actuator tests, DTC clear | **AUTHORISED 2026-09-18** — `ADR-0036`: four steps, one operation class at a time, versions 1.2.x; installers to the owner alone until 2026-10-12, to testers too since (decision 8, amended) |
 | 3 | Configuration and programming: CCF write, module configuration | future direction |
 
 Stage 1 keeps `SAFETY_BOUNDARIES.md` and `ADR-0005` unchanged. Every operation

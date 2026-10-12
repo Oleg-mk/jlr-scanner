@@ -10,21 +10,25 @@ era, built to reach what SDD reaches — every module on every bus — without
 SDD's Windows 7, virtual machines and install misery. It talks to the car
 through a MongoosePro JLR adapter, the same class of adapter SDD uses.
 
-At this stage the application only **reads**. It sends the diagnostic
-requests SDD sends to read fault codes, identification and live values, and
-it records what the car answers. It writes nothing to the car: no fault-code
-clearing, no adaptations, no coding, no programming. Those come later, as
-separate, explicitly confirmed steps. The capture function does not even
-send: it listens to the bus for a few seconds and records the traffic.
+Out of the box the application **reads**. It sends the diagnostic requests
+SDD sends to read fault codes, identification and live values, and it
+records what the car answers. The capture function does not even send: it
+listens to the bus for a few seconds and records the traffic.
+
+Since version 1.2 it can also do two things that change what a module
+holds — clear its fault codes, and run its on-demand self test — but only in
+the **service mode**, which is off every time the application starts; see
+"The service mode" below. Adaptations, coding and programming it does not
+do.
 
 One consequence you will see on the map: the modules on the MOST ring and
 other sub-networks — audio, telematics, navigation — show as "not
 reachable" on most cars. SDD reaches them through a gateway module that
-it opens with a routine command. A command is not a read, so this stage
-does not send it. Everything needed for those modules is already known —
-the gateway, the command, the addresses — and they come in stage 2, once
-the first non-read operation has its own safety rules. The map says so
-under the bus, naming the gateway. One exception: on a Discovery 3 or
+it opens with a routine command, and this version does not send that
+command. Everything needed for those modules is already known — the
+gateway, the command, the addresses — and they come in a later step, once
+that operation has its own safety rules. The map says so under the bus,
+naming the gateway. One exception: on a Discovery 3 or
 Range Rover Sport of 2010–2011 and a Range Rover of 2010–2012, SDD's data
 reaches the MOST ring by each module's own address with no command, so
 the map shows those modules as an unverified route on pins 3/11 and the
@@ -324,16 +328,54 @@ by, how long it takes, and what SDD tells whoever runs it, line by line — in
 English or in Russian, SDD's own text either way, by the same switch the
 fault-code help has.
 
-**This application does not run them, and this section has no button.** A
-self test is a routine, not a read; routines belong to a later stage with
-their own safety rules. The list is here because knowing what a module can
-be asked to do is worth having before anything can ask it — when you take
-the car somewhere else, you know the name of the test to ask for.
+**Outside the service mode this section has no button.** A self test is a
+routine, not a read: the module does something on itself. In the service
+mode a test that both the module's own index and SDD's self-test pack name
+gets one key, **Run the test**: one question naming the test and the
+module, then the run, stepped every second, with **Stop the test** beside
+it. The answer is shown as the bytes the module gave — this library does
+not describe them — and once the run has ended the module's codes are read
+again, so what the test logged is listed under it. For every other test,
+and outside the mode, the list is still worth having: when you take the
+car somewhere else, you know the name of the test to ask for.
 
 One caveat is printed above the list: the year markers are SDD's own and
 this version does not check them, so a test qualified for another year of
 the same model can appear. On an X250 the data declares one test for each of
 37 modules; on an X351, 43.
+
+## The service mode
+
+The **Service mode** key in the header turns it on. It asks first, in the
+language of the interface: what the mode lets the application do; that each
+operation will ask again, one at a time, and is written into the session
+report with what it changed; that the application undoes nothing by itself;
+that the car stands still, the ignition on and the engine off unless a
+procedure says otherwise — and that what follows is your decision for the
+car in front of you. While the mode is on, the key is red and the
+application's name in the header is red and still. The mode is off again on
+every start and every new session, and it is never remembered.
+
+In the mode:
+
+- **Clear the fault codes** is offered on a module whose codes were read in
+  this session, so they are in the report before they are erased. One
+  question; after a positive answer the module is read again at once, and a
+  code that returns at once is shown as present, not as missed. A module
+  that refuses says why.
+- **Clear the codes of all N modules** does the same for every module that
+  answered with codes, after one question, one module after another; each
+  answer is recorded.
+- **Run the test**, under a module's self tests, as described above.
+
+Every operation carries the class `SERVICE_ROUTINE` and leaves its record in
+the session report: what was asked, what the module answered, the codes
+before and after.
+
+**You use these operations at your own risk.** They are the newest part of
+the application and have not yet been used on a car; they were tried end
+to end on the bench. If you use one, say so in your message: which module,
+what it answered, and anything the car did that you did not expect.
 
 ## The K-line modules of the older cars
 
@@ -459,7 +501,10 @@ socket. Then, in order:
    fault codes and identification.
 5. **Save the session report** from the header. It is one file that holds
    everything above.
-6. For the next car, or to start over, click **New session** in the header:
+6. **The service mode** is optional. If you use it, do so after step 5, so
+   a report of the car as you found it is already saved, and save the
+   report again afterwards.
+7. For the next car, or to start over, click **New session** in the header:
    the report, survey and reads are dropped after you confirm; the adapter
    and the library stay.
 
@@ -499,7 +544,8 @@ The build you run is written at the foot of the window, for example `0.9.3 · a1
 The session report file, the capture file, and a few lines: the car
 (model, year, engine), the adapter (original or clone, and the clone's USB
 identifiers if it was not found), your Windows version, and what did or did
-not work. Send it through the channel you received the build from.
+not work — and, if you used the service mode, what you ran and what the car
+did. Send it through the channel you received the build from.
 
 The report contains the VIN, the adapter's serial number and what the
 modules answered. It contains no personal data beyond that; say so if you
@@ -520,5 +566,7 @@ would like the VIN masked in what we publish.
 - **Modules do not answer.** Expected on some cars at this stage: the
   addressing of many modules is derived from SDD's data and is marked
   `UNVERIFIED` until a car confirms it. Your report is what confirms it.
+- **A service operation was refused or not made.** The refusal is the
+  module's own answer and the report holds it; send the report.
 - **The application does not start.** Say which Windows version and what
   appeared, if anything.

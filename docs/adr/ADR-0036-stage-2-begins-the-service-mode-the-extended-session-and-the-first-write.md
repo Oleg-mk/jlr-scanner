@@ -26,7 +26,8 @@
   without, `uds-execution` gains a prepared **service** transaction beside
   the read-only one, the live path takes only that, the bench answers the
   new services, and the version turns 1.2.x — installers that go to the
-  owner alone.
+  owner alone (until 2026-10-12, when the owner made 1.2.x the testers'
+  line too; see the amendment of that date).
 
 ## Context
 
@@ -487,3 +488,47 @@ bench end to end.
 - Nothing has met a car. The version turned 1.2.1 on 2026-10-01, when the
   owner asked for both builds made anew («роби обидві збірки, оновлюй
   їх»).
+
+## Amendment, 2026-10-12: 1.2.x goes to testers
+
+Decision 8 kept the 1.2.x installers from testers: the first write on a car
+was to be the owner's, on a car of his choosing, after a read session on a
+real car had been reported, and the testers' line was `release-1.1`. Its
+premise did not hold. The owner's own car is not a test car — closed on
+2026-09-01 and not reopened — and no report has come from the club testers,
+who have held stamped libraries since September; so under decision 8 no
+operation of stage 2 would ever meet a car, and stage 1 itself has no read
+from one. On 2026-10-12, proposing to look for testers beyond the club on an
+owners' forum, the owner decided to give them the current line: «я даю 1.2.х
+і роблю відповідне попередження про роботу з запису в авто на свій страх і
+риск».
+
+1. **1.2.x is the testers' line.** `release-1.1` stays as it is and is no
+   longer built for testers. A tester receives the same installer as the
+   owner.
+2. **The warning is the owner's, given with the build.** A write to the car
+   is at the tester's own risk, and the owner says so in the message that
+   offers the build. Inside the application the service mode's consent
+   (decision 2) already says what the mode can change, that the application
+   undoes nothing by itself, and that what follows is the person's decision
+   for the car in front of them — in the three languages of the interface,
+   on every start and every new session, never remembered — and every
+   operation asks again and is written into the session report. The owner
+   judged that enough and asked for nothing more on the screen: «ми не в
+   дитсадку».
+3. **No second gate.** An unlock of the service mode per tester, carried by
+   the library's stamp, was put to him and declined: whoever means to speak
+   badly of the product can do so without connecting at all, and after a
+   warning any accusation is the accuser's own («любе звинувачення це як
+   розписування в своєму косякові»).
+4. **The tester guide says what the build does.** It no longer says the
+   application only reads; it describes the service mode and its
+   operations, that they are used at the tester's own risk, and that they
+   have not yet met a car.
+5. **Nothing else of this record moves.** The class `SERVICE_ROUTINE`, the
+   consent, the question per operation, the guard, and the wall around the
+   security levels (decision 7) stand as they were.
+
+The first write of this product on a car will most likely be a tester's, on
+their own decision, and the session report will hold it. No operation has
+met a car yet.
