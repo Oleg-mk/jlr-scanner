@@ -39,9 +39,10 @@ Capability validation states are recorded independently. `IMPLEMENTED`, `FIXTURE
 ## 2026-10-12 — 1.2.x goes to testers
 
 The club testers have held stamped libraries since September and no report
-has come; the owner's own car is not a test car (2026-09-01). So no read of
-this product has met a car, and under decision 8 of `ADR-0036` no write
-ever would. The owner proposed looking for testers on an English-language
+has come; the owner's own car is not a test car (2026-09-01). The club's
+copies were connected to cars, the owner says, but no report from one has
+reached the project, so nothing a car answered is on record; and under
+decision 8 of `ADR-0036` no write would ever meet a car. The owner proposed looking for testers on an English-language
 owners' forum and decided to give them the current line — 1.2.x, the
 service mode included — with his warning that a write to the car is at the
 tester's own risk. The application's own consent for the mode, in three

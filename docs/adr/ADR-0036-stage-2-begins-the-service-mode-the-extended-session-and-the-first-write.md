@@ -497,8 +497,9 @@ real car had been reported, and the testers' line was `release-1.1`. Its
 premise did not hold. The owner's own car is not a test car — closed on
 2026-09-01 and not reopened — and no report has come from the club testers,
 who have held stamped libraries since September; so under decision 8 no
-operation of stage 2 would ever meet a car, and stage 1 itself has no read
-from one. On 2026-10-12, proposing to look for testers beyond the club on an
+operation of stage 2 would ever meet a car, and stage 1 itself has no
+report from one: the club's copies were connected to cars, the owner says,
+but nothing they read has reached the project. On 2026-10-12, proposing to look for testers beyond the club on an
 owners' forum, the owner decided to give them the current line: «я даю 1.2.х
 і роблю відповідне попередження про роботу з запису в авто на свій страх і
 риск».
