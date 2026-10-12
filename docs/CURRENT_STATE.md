@@ -58,6 +58,17 @@ build; the README and the repository's one-line description no longer say
 "read-only". Still open, and his: libraries for new testers — his rule of
 2026-09-16 issues none until the club reports — and the message itself.
 
+The same day the issuing of libraries was decided for that road
+(`ADR-0019`, amended): beside the hand stamp, an issuing service that keeps
+one shared set of bundles in private storage on a hosting account of its
+own and gives each tester, for a personal code, a card signed with a key of
+the service's own — the owner's choice of a card over one shared set rather
+than a whole stamped copy per person, because a library for everyone is the
+step after the testers' feedback. Refused: an encrypted library beside the
+installers on the public Releases page. Nothing of it is built; the
+application's side, its first network request of its own, gets its own
+record first.
+
 ## 2026-10-03 — the parameter and state names in SDD's own Russian
 
 The owner's idea for the assistant — speak Russian where there is no
