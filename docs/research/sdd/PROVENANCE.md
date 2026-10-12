@@ -21,7 +21,7 @@ The knowledge this project derives from SDD traces to one artifact:
   base, and the repository is verified to hold zero `.vbf`, `.iso` or
   other firmware, with no crate depending on one (`ADR-0005`). The
   owner's own local research extraction does contain them — 371 `.vbf`
-  and 4 `.iso` across six `FLASH` components in `SDD169_EXTRACTED` —
+  and 4 `.iso` across six `FLASH` components —
   because a full `unshield` writes every component to disk. An earlier
   revision of this note claimed the extraction itself contained no
   `.vbf` and named a count of 479; that was wrong about the disk, and it
@@ -49,14 +49,14 @@ The knowledge this project derives from SDD traces to one artifact:
   bit layouts and 1,854 typed converters.
 - `COMMON_SDD_DATA_DTC_HELP_LANG_EN`: 6,171 fault-code help documents.
 - `COMMON_SDD_DATA_DTC_HELP_LANG_RU`: the same 6,171 documents in Russian,
-  opened from the installer by the owner's own scripts on 2026-09-13 (every
-  file checked against the cabinet's MD5, the installer's SHA-256 confirmed);
+  from the same installer (every file checked against the cabinet's MD5,
+  the installer's SHA-256 confirmed);
   read for the text of each help screen and, since the same day's
   amendment, for the two description indexes (`ADR-0034`).
 - `COMMON_SDD_DATA_ODST_LANG_EN`: 93 per-module test definitions.
-- `COMMON_SDD_DATA_ODST_LANG_RU`: the same 93 documents in Russian, opened
-  from the installer by the owner's own scripts on 2026-09-13; read for the
-  text of each help screen only (`ADR-0034`).
+- `COMMON_SDD_DATA_ODST_LANG_RU`: the same 93 documents in Russian, from
+  the same installer; read for the text of each help screen only
+  (`ADR-0034`).
 - `CURRENT_PAG_UTILS_RUNTIME/CANLinkMonitorData.xml`: addressing width per
   programme and year, and the global module-to-identifier map.
 - `PLATFORM_<PROGRAM>_<YEAR>.xml`: 110 platform documents with bus rates,

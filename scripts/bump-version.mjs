@@ -2,7 +2,7 @@
 // Set one version number in every file that carries it, then say what to
 // commit and tag. The number is the tester-facing build: the last digit is
 // the one testers quote ("build 1", "build 2"); it grows only when a build
-// is handed out. See docs/OWNER_GUIDE.uk.md, section 5.
+// is handed out. See the owner's guide, section 5 (kept outside the repository).
 //
 //   node scripts/bump-version.mjs 0.9.2
 import { readFileSync, writeFileSync } from "node:fs";

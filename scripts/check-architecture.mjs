@@ -701,6 +701,37 @@ for (const entry of tauriEntries) {
   }
 }
 
+// The public tree says that the library is derived from SDD's own data and
+// never how that data was obtained: no local corpus folder names, no account
+// of the owner's own tooling (2026-10-12, when both were found in the docs).
+async function documentFiles(directory) {
+  const entries = await readdir(directory, { withFileTypes: true });
+  const files = [];
+  for (const entry of entries) {
+    const path = join(directory, entry.name);
+    if (entry.isDirectory()) files.push(...(await documentFiles(path)));
+    else if (extname(entry.name) === ".md") files.push(path);
+  }
+  return files;
+}
+const publicDocuments = [
+  ...(await documentFiles(fileURLToPath(new URL("docs/", root)))),
+  fileURLToPath(new URL("README.md", root)),
+  fileURLToPath(new URL("CLAUDE.md", root)),
+];
+for (const path of publicDocuments) {
+  const text = await readFile(path, "utf8");
+  for (const forbidden of [
+    /SDD\d*_(DECRYPTED|EXTRACTED)/i,
+    /owner'?s (own )?scripts|his own scripts/i,
+    /сво(їми|ими) скриптами|твої скрипти/i,
+  ]) {
+    if (forbidden.test(text)) {
+      failures.push(`${path} says how the SDD corpus was obtained (${forbidden})`);
+    }
+  }
+}
+
 if (failures.length > 0) {
   console.error(failures.join("\n"));
   process.exitCode = 1;

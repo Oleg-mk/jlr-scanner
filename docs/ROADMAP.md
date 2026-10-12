@@ -685,7 +685,7 @@ has met a car.
 
 The one data layer still English only — the names of identifiers,
 parameters and decoded states — now comes in SDD's own Russian beside the
-English, from the owner's extraction of `COMMON_SDD_DATA_SNAPSHOT_LANG_RU`.
+English, from SDD's Russian pack, `COMMON_SDD_DATA_SNAPSHOT_LANG_RU`.
 Because the English name is the parameter's own claim key, the Russian
 joins by structure, not by text: the same `KeyedData` and `ReadParameter`
 ids, the same converters and state ranges. Shown under the switch the help

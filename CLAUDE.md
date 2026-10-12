@@ -98,6 +98,10 @@ Taken from `docs/DEVELOPMENT_PRINCIPLES.md`; these are not style preferences.
   as JLR evidence, and they cannot be promoted to real evidence.
 - Every physical milestone gets a reproducible fixture or test.
 - Fail closed. Unknown or unvalidated procedures are unavailable, not guessed.
+- The public tree says that the library is derived from SDD's own data, and
+  never how that data was obtained: no local corpus folder names, no account
+  of the owner's own tooling. `scripts/check-architecture.mjs` fails on the
+  known patterns. The owner's own guide is kept outside the repository.
 
 ## Safety boundaries
 

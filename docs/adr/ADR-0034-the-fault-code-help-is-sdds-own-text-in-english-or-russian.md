@@ -141,9 +141,8 @@ Ukrainian text, and the translation problem falls away — reaches the one
 data layer still shown in English only: the names of the identifiers and
 parameters in the live read, the module passport and the configuration,
 and the names of the decoded states beside them. SDD ships this layer in
-Russian too. The owner opened `COMMON_SDD_DATA_SNAPSHOT_LANG_RU` with his
-own scripts on 2026-10-01 (the project's code decrypts nothing); measured
-against the English pack it is the same 1,861 files, the same `Converters`
+Russian too: measured against the English pack, `COMMON_SDD_DATA_SNAPSHOT_LANG_RU`
+is the same 1,861 files, the same `Converters`
 and `Snapshot` folders, the same file names, with only the human text
 changed — 4,930 parameter names and 1,575 state names carried in Cyrillic,
 the rest being numbers, units and codes that are the same in both
