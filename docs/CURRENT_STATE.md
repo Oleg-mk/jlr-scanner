@@ -165,8 +165,13 @@ ProwlOne_1.2.3_x64-setup.exe, 5.6 MB, SHA-256
 6f49f2d0c31e8beb0a76b98ee5c30ae73f8edaf865063082ba452c44cb4ecafd; both in
 `Desktop\ProwlOne-1.2.3` beside the owner's library zip `0807-B35C`; the
 1.2.2 pair moved to `Downloads\prowlone-superseded\ProwlOne-1.2.2`. To the
-owner alone, per decision 8 of `ADR-0036`. Neither installer has been
-opened by a person yet.
+owner alone, per decision 8 of `ADR-0036` — until 2026-10-12, when that
+decision was amended. On 2026-10-12 the owner installed both from the
+Releases page as a tester would: on Windows the installer ran, the
+MongoosePro connected through a USB-A to USB-C adapter, the board link
+verified and the library loaded; on his Mac, in his words, «все ок, все
+працює». The release notes' file names became download links the same
+day, after he looked for them in the table.
 
 Build 1.2.2 carries it, with the Mac fix of 2026-10-01: commit 4ce518e,
 tag v1.2.2, run 37089692403, all four jobs green. macOS
