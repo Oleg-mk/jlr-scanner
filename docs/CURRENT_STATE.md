@@ -73,6 +73,18 @@ owner issues a hand-stamped copy on a tester's request, valid for a month,
 which replaces his rule of 2026-09-16 of issuing none («витрачати зараз і
 свій і твій час на те що може і не знадобиться — так собі ідея»).
 
+The message went out the same day: the owner posted it on jaginfo.org, in
+the XF section's General Discussion — the busiest part of that forum —
+with a note to the moderators that All Jaguars → Buying, Dealers and
+Servicing would be the other fitting home; one thread, no cross-posting.
+It introduces the application, says the service operations are used at
+one's own risk and that flashing and keys are not planned, offers the
+mileage cross-check without a verdict, links the repository, the Releases
+page and the tester guide, and asks owners with a MongoosePro JLR for one
+session's report each — the variety of real cars being what neither the
+bench nor any single car can give. A tester gets the library by private
+message, stamped for a month. Waiting for answers.
+
 ## 2026-10-03 — the parameter and state names in SDD's own Russian
 
 The owner's idea for the assistant — speak Russian where there is no
