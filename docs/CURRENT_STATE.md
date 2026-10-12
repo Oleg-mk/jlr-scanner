@@ -67,7 +67,10 @@ than a whole stamped copy per person, because a library for everyone is the
 step after the testers' feedback. Refused: an encrypted library beside the
 installers on the public Releases page. Nothing of it is built; the
 application's side, its first network request of its own, gets its own
-record first.
+record first. And it waits for demand: until testers come in numbers, the
+owner issues a hand-stamped copy on a tester's request, valid for a month,
+which replaces his rule of 2026-09-16 of issuing none («витрачати зараз і
+свій і твій час на те що може і не знадобиться — так собі ідея»).
 
 ## 2026-10-03 — the parameter and state names in SDD's own Russian
 
