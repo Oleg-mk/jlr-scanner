@@ -372,10 +372,10 @@ Every operation carries the class `SERVICE_ROUTINE` and leaves its record in
 the session report: what was asked, what the module answered, the codes
 before and after.
 
-**You use these operations at your own risk.** They are the newest part of
-the application and have not yet been used on a car; they were tried end
-to end on the bench. If you use one, say so in your message: which module,
-what it answered, and anything the car did that you did not expect.
+**You use these operations at your own risk.** On your car they run for
+the first time; they were tried end to end on the bench. If you use one,
+say so in your message: which module, what it answered, and anything the
+car did that you did not expect.
 
 ## The K-line modules of the older cars
 

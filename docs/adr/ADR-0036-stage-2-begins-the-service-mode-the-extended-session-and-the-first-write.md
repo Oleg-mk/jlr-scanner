@@ -523,8 +523,9 @@ owners' forum, the owner decided to give them the current line: «я даю 1.2.
    розписування в своєму косякові»).
 4. **The tester guide says what the build does.** It no longer says the
    application only reads; it describes the service mode and its
-   operations, that they are used at the tester's own risk, and that they
-   have not yet met a car.
+   operations, that they are used at the tester's own risk, and that on the
+   tester's car they run for the first time — not that they have met no
+   car, which the first tester would make untrue (the owner, the same day).
 5. **Nothing else of this record moves.** The class `SERVICE_ROUTINE`, the
    consent, the question per operation, the guard, and the wall around the
    security levels (decision 7) stand as they were.
