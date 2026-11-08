@@ -15,8 +15,12 @@ pub trait IngestionAdapter {
 }
 
 /// Serialises to exactly the JSON manifest shape `JsonManifestAdapter` reads,
-/// so a batch any adapter produced can be written out and loaded back.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+/// so a batch any adapter produced can be written out and loaded back — and
+/// read back as it is by a tool that rewrites a library (`ADR-0040`), which
+/// is why it deserialises too; the adapter's own parse stays the way in for
+/// the store, with its validation.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct IngestionBatch {
     pub schema_version: u32,
     pub source: SourceRecord,

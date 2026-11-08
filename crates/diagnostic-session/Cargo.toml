@@ -10,6 +10,7 @@ app-contracts.workspace = true
 diagnostic-environment.workspace = true
 ds2.workspace = true
 ed25519-dalek.workspace = true
+flate2.workspace = true
 knowledge.workspace = true
 kwp2000.workspace = true
 serde.workspace = true

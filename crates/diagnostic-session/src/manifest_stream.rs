@@ -19,7 +19,7 @@ use std::io::{self, BufRead, BufReader, Read};
 
 /// How much of a file's start is kept for the issue code; `issue` looks no
 /// further either.
-pub(crate) const HEAD_BYTES: usize = 16_384;
+pub const HEAD_BYTES: usize = 16_384;
 
 /// The bytes going by, hashed, with the first of them kept.
 struct Tee<R> {
@@ -54,7 +54,7 @@ impl<R: Read> Read for Tee<R> {
 
 /// What the first pass learns of one file.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub(crate) struct Scan {
+pub struct Scan {
     /// SHA-256 of the decompressed text, lowercase hex, as a stamp names it.
     pub sha256: String,
     /// The start of the text, where an issue code is looked for.
@@ -67,7 +67,7 @@ pub(crate) struct Scan {
 /// failure to read it — a packed file that is not gzip — is the caller's to
 /// record; a text that is not JSON is reported in the scan, and its every
 /// byte is hashed all the same.
-pub(crate) fn scan(reader: impl Read) -> io::Result<Scan> {
+pub fn scan(reader: impl Read) -> io::Result<Scan> {
     let mut buffered = BufReader::new(Tee::new(reader));
     let json_error = {
         let mut deserializer = serde_json::Deserializer::from_reader(&mut buffered);
@@ -91,7 +91,7 @@ pub(crate) fn scan(reader: impl Read) -> io::Result<Scan> {
 /// Each manifest of one file as its own JSON text, in order — every element
 /// of a bundle, one at a time, or the whole of a single manifest — and then
 /// how many there were and the SHA-256 of every byte read.
-pub(crate) fn for_each_manifest(
+pub fn for_each_manifest(
     reader: impl Read,
     mut each: impl FnMut(usize, &str),
 ) -> Result<(usize, String), String> {

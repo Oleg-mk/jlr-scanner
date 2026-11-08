@@ -14,7 +14,7 @@ pub mod ccf;
 pub mod decode;
 pub mod dtc_text;
 pub mod issue;
-mod manifest_stream;
+pub mod manifest_stream;
 pub mod mileage;
 pub mod parameter_text;
 pub mod vin;
