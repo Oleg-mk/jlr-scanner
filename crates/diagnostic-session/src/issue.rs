@@ -139,6 +139,29 @@ pub fn key_id(public_key_hex: &str) -> String {
         .to_ascii_lowercase()
 }
 
+/// One bundle as a stamp is checked against it: its name, the SHA-256 of
+/// its text, and the issue code written inside it, if any. Since `ADR-0040`
+/// the loader works these out as each file streams past and keeps no text.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct BundleDigest {
+    pub name: String,
+    /// Lowercase hex, as the stamp names it.
+    pub sha256: String,
+    pub embedded_code: Option<String>,
+}
+
+impl BundleDigest {
+    /// The digest of a bundle held as text.
+    pub fn of_text(name: &str, text: &str) -> Self {
+        use sha2::{Digest, Sha256};
+        Self {
+            name: name.to_string(),
+            sha256: format!("{:x}", Sha256::digest(text.as_bytes())),
+            embedded_code: embedded_issue_code(text),
+        }
+    }
+}
+
 /// Read the stamp against the bundles that were read: whose copy, whether
 /// the owner signed it, whether every bundle still hashes to what it names,
 /// and whether its date has passed. `today` is `YYYY-MM-DD`. Without a
@@ -149,11 +172,25 @@ pub fn verify(
     trusted_keys: &[&str],
     today: &str,
 ) -> Option<LibraryIssue> {
-    use sha2::{Digest, Sha256};
+    let bundles: Vec<BundleDigest> = texts
+        .iter()
+        .map(|(name, text)| BundleDigest::of_text(name, text))
+        .collect();
+    verify_digests(stamp, &bundles, trusted_keys, today)
+}
+
+/// [`verify`] over digests the caller worked out itself — the loader's
+/// path, which hashes each file as it streams past (`ADR-0040`).
+pub fn verify_digests(
+    stamp: Option<&Value>,
+    bundles: &[BundleDigest],
+    trusted_keys: &[&str],
+    today: &str,
+) -> Option<LibraryIssue> {
     let Some(stamp) = stamp else {
-        return texts
+        return bundles
             .iter()
-            .find_map(|(_, text)| embedded_issue_code(text))
+            .find_map(|bundle| bundle.embedded_code.clone())
             .map(|code| LibraryIssue {
                 issued_to: String::new(),
                 issued_on: String::new(),
@@ -173,10 +210,9 @@ pub fn verify(
     let key_id = stamp.get("key_id").and_then(Value::as_str).unwrap_or("");
     let days_left = days_between(today, &fields.valid_until);
 
-    let mut matches = fields.bundles.len() == texts.len();
-    for (name, text) in texts {
-        let actual = format!("{:x}", Sha256::digest(text.as_bytes()));
-        if fields.bundles.get(name) != Some(&actual) {
+    let mut matches = fields.bundles.len() == bundles.len();
+    for bundle in bundles {
+        if fields.bundles.get(&bundle.name) != Some(&bundle.sha256) {
             matches = false;
         }
     }

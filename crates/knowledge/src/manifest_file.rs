@@ -59,6 +59,22 @@ pub fn read(path: &Path) -> std::io::Result<String> {
     decompress(&packed)
 }
 
+/// Open one manifest as a stream of its JSON text, decompressing it as it is
+/// read when it is packed (ADR-0040): the loader reads a file once to hash
+/// it and once to ingest it, and holds the whole text at neither time.
+pub fn open(path: &Path) -> std::io::Result<Box<dyn Read>> {
+    let name = path
+        .file_name()
+        .and_then(|value| value.to_str())
+        .unwrap_or_default();
+    let file = std::io::BufReader::new(std::fs::File::open(path)?);
+    if is_compressed(name) {
+        Ok(Box::new(flate2::read::GzDecoder::new(file)))
+    } else {
+        Ok(Box::new(file))
+    }
+}
+
 /// Write one manifest, packing it when the name says so.
 pub fn write(path: &Path, text: &str) -> std::io::Result<()> {
     let name = path
@@ -112,6 +128,22 @@ mod tests {
             "gzip adds a header; it must not double the file"
         );
         assert_eq!(decompress(&packed).unwrap(), text);
+    }
+
+    #[test]
+    fn opening_a_manifest_streams_the_same_text_as_reading_it() {
+        let dir = std::env::temp_dir().join(format!("manifest-open-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let text = r#"[{"schema_version":1},{"schema_version":1}]"#;
+        for name in ["plain.json", "packed.json.gz"] {
+            let path = dir.join(name);
+            write(&path, text).unwrap();
+            let mut streamed = String::new();
+            open(&path).unwrap().read_to_string(&mut streamed).unwrap();
+            assert_eq!(streamed, text, "{name}");
+            assert_eq!(read(&path).unwrap(), text, "{name}");
+        }
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]

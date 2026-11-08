@@ -14,6 +14,7 @@ pub mod ccf;
 pub mod decode;
 pub mod dtc_text;
 pub mod issue;
+mod manifest_stream;
 pub mod mileage;
 pub mod parameter_text;
 pub mod vin;
@@ -398,6 +399,25 @@ impl KnowledgeLibrary {
         trusted_keys: &[&str],
         enforce_issue: bool,
     ) -> Self {
+        Self::load_directory_from(
+            directory,
+            today,
+            trusted_keys,
+            enforce_issue,
+            &manifest_file::open,
+        )
+    }
+
+    /// The loader with the way a file is opened supplied: a test opens a
+    /// file differently the second time, to show that a library changed
+    /// while it is read is discarded (ADR-0040).
+    pub(crate) fn load_directory_from(
+        directory: &Path,
+        today: &str,
+        trusted_keys: &[&str],
+        enforce_issue: bool,
+        open: &dyn Fn(&Path) -> std::io::Result<Box<dyn std::io::Read>>,
+    ) -> Self {
         let mut library = Self::built_in();
         library.snapshot.directory = Some(directory.display().to_string());
 
@@ -426,21 +446,31 @@ impl KnowledgeLibrary {
             .ok()
             .and_then(|text| serde_json::from_str::<serde_json::Value>(&text).ok());
 
-        let mut texts = Vec::new();
+        // First pass (ADR-0040): every file hashed as it streams past and
+        // checked to be JSON, and its text not kept. The stamp covers what a
+        // manifest says, not how it is packed, so a packed one is hashed as
+        // it is decompressed.
+        let mut scanned = Vec::new();
         for path in &files {
             let name = path
                 .file_name()
                 .and_then(|value| value.to_str())
                 .unwrap_or("manifest")
                 .to_string();
-            // The stamp covers what a manifest says, not how it is packed,
-            // so a packed one is decompressed before it is hashed or read.
-            match manifest_file::read(path) {
-                Ok(text) => texts.push((name, text)),
+            match open(path).and_then(manifest_stream::scan) {
+                Ok(scan) => scanned.push((name, path.as_path(), scan)),
                 Err(error) => library.record_failure(&name, &error.to_string()),
             }
         }
-        let mut verdict = issue::verify(stamp.as_ref(), &texts, trusted_keys, today);
+        let digests: Vec<issue::BundleDigest> = scanned
+            .iter()
+            .map(|(name, _, scan)| issue::BundleDigest {
+                name: name.clone(),
+                sha256: scan.sha256.clone(),
+                embedded_code: issue::embedded_issue_code(&scan.head),
+            })
+            .collect();
+        let mut verdict = issue::verify_digests(stamp.as_ref(), &digests, trusted_keys, today);
         if enforce_issue {
             let accepted = verdict
                 .as_ref()
@@ -461,11 +491,55 @@ impl KnowledgeLibrary {
                 return library;
             }
         }
-        for (name, text) in &texts {
-            library.ingest_text(name, text);
+        // Second pass: one manifest at a time, each handed to the ingest as
+        // it is read and dropped before the next; the bytes are hashed again,
+        // and a file that no longer matches its first reading discards the
+        // whole load rather than leave part of a changed copy in.
+        for (name, path, scan) in &scanned {
+            if let Some(error) = &scan.json_error {
+                library.record_failure(name, &format!("not valid JSON: {error}"));
+                continue;
+            }
+            let mut failures = Vec::new();
+            let read =
+                match open(path) {
+                    Ok(reader) => manifest_stream::for_each_manifest(reader, |index, text| {
+                        match library.store.ingest(&JsonManifestAdapter, text) {
+                            Ok(_) => library.snapshot.manifests_loaded += 1,
+                            Err(error) => failures.push((index, error.to_string())),
+                        }
+                    }),
+                    Err(error) => Err(error.to_string()),
+                };
+            match read {
+                Ok((count, sha256)) if sha256 == scan.sha256 => {
+                    library.record_manifest_failures(name, count, failures)
+                }
+                _ => return Self::changed_while_reading(directory, verdict),
+            }
         }
         library.snapshot.issue = verdict;
         library.finish_directory_load(files.len());
+        library
+    }
+
+    /// What a load becomes when a file changed between its two readings
+    /// (ADR-0040): nothing from the folder, as for a copy that no longer
+    /// matches its stamp.
+    fn changed_while_reading(directory: &Path, verdict: Option<LibraryIssue>) -> Self {
+        let mut library = Self::built_in();
+        library.snapshot.directory = Some(directory.display().to_string());
+        library.snapshot.state = LibraryState::Failed;
+        match verdict {
+            Some(mut issue) => {
+                issue.integrity = LibraryIssueIntegrity::Mismatch;
+                library.snapshot.message = refusal_message(&issue);
+                library.snapshot.issue = Some(issue);
+            }
+            None => {
+                library.snapshot.message = "A file changed while the library was being read; nothing from the folder was loaded. Load it again.".to_string();
+            }
+        }
         library
     }
 
@@ -1052,29 +1126,43 @@ impl KnowledgeLibrary {
     /// Ingest one manifest file's text. A bundle — a JSON array of manifests —
     /// is taken apart and each element ingested on its own, so one bad element
     /// costs only itself.
+    /// Ingest manifests held as text — the built-in ones, and tests' and
+    /// tools' — by the same path a directory takes: checked to be JSON
+    /// first, then one manifest at a time (ADR-0040).
     fn ingest_text(&mut self, name: &str, text: &str) {
-        let value: serde_json::Value = match serde_json::from_str(text) {
-            Ok(value) => value,
-            Err(error) => {
-                self.record_failure(name, &format!("not valid JSON: {error}"));
-                return;
-            }
-        };
-        let items = match value {
-            serde_json::Value::Array(items) => items,
-            other => vec![other],
-        };
-        let bundled = items.len() > 1;
-        for (index, item) in items.into_iter().enumerate() {
-            let label = if bundled {
+        if let Err(error) = serde_json::from_str::<serde::de::IgnoredAny>(text) {
+            self.record_failure(name, &format!("not valid JSON: {error}"));
+            return;
+        }
+        let mut failures = Vec::new();
+        let read =
+            manifest_stream::for_each_manifest(text.as_bytes(), |index, manifest| {
+                match self.store.ingest(&JsonManifestAdapter, manifest) {
+                    Ok(_) => self.snapshot.manifests_loaded += 1,
+                    Err(error) => failures.push((index, error.to_string())),
+                }
+            });
+        match read {
+            Ok((count, _)) => self.record_manifest_failures(name, count, failures),
+            Err(error) => self.record_failure(name, &format!("not valid JSON: {error}")),
+        }
+    }
+
+    /// The failures of one file's manifests, named as before: `file#index`
+    /// in a bundle of several, the file alone otherwise.
+    fn record_manifest_failures(
+        &mut self,
+        name: &str,
+        count: usize,
+        failures: Vec<(usize, String)>,
+    ) {
+        for (index, message) in failures {
+            let label = if count > 1 {
                 format!("{name}#{index}")
             } else {
                 name.to_string()
             };
-            match self.store.ingest(&JsonManifestAdapter, &item.to_string()) {
-                Ok(_) => self.snapshot.manifests_loaded += 1,
-                Err(error) => self.record_failure(&label, &error.to_string()),
-            }
+            self.record_failure(&label, &message);
         }
     }
 
@@ -2436,5 +2524,56 @@ fn refusal_message(issue: &LibraryIssue) -> String {
         LibraryIssueIntegrity::StampRemoved => format!("The stamp file is missing; the data carries copy {}. The library was not loaded; ask for a new copy.", issue.issue_code),
         LibraryIssueIntegrity::Expired => format!("This copy, issued to {} until {}, has expired. The library was not loaded; ask for a new copy.", issue.issued_to, issue.valid_until),
         LibraryIssueIntegrity::Matches => String::new(),
+    }
+}
+
+#[cfg(test)]
+mod streaming_load_tests {
+    use super::*;
+    use std::cell::Cell;
+
+    /// ADR-0040, decision 2: a file whose bytes change between the reading
+    /// that checked it and the reading that ingests it discards the whole
+    /// load, and nothing from the folder stays in.
+    #[test]
+    fn a_file_that_changes_between_its_two_readings_discards_the_load() {
+        let dir = std::env::temp_dir().join(format!("prowlone-stream-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let (_, text) = BUILT_IN_MANIFESTS[0];
+        std::fs::write(dir.join("one.json"), text).unwrap();
+
+        let readings = Cell::new(0);
+        let open = |path: &Path| -> std::io::Result<Box<dyn std::io::Read>> {
+            readings.set(readings.get() + 1);
+            let mut bytes = std::fs::read(path)?;
+            if readings.get() > 1 {
+                // Still well-formed JSON, but not the bytes first read.
+                bytes.extend_from_slice(b"\n");
+            }
+            Ok(Box::new(std::io::Cursor::new(bytes)))
+        };
+        let changed = KnowledgeLibrary::load_directory_from(&dir, "2026-11-08", &[], false, &open);
+        assert_eq!(readings.get(), 2);
+        assert_eq!(changed.snapshot().state, LibraryState::Failed);
+        assert!(
+            changed
+                .snapshot()
+                .message
+                .contains("changed while the library was being read"),
+            "{}",
+            changed.snapshot().message
+        );
+        assert_eq!(
+            changed.snapshot().records,
+            KnowledgeLibrary::built_in().snapshot().records
+        );
+
+        // The same folder read twice alike loads.
+        let steady = |path: &Path| -> std::io::Result<Box<dyn std::io::Read>> {
+            Ok(Box::new(std::io::Cursor::new(std::fs::read(path)?)))
+        };
+        let loaded = KnowledgeLibrary::load_directory_from(&dir, "2026-11-08", &[], false, &steady);
+        assert_ne!(loaded.snapshot().state, LibraryState::Failed);
+        let _ = std::fs::remove_dir_all(&dir);
     }
 }

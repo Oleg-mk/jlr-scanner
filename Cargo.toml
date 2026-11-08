@@ -58,7 +58,9 @@ report-intake = { path = "crates/report-intake" }
 sdd-ingest = { path = "crates/sdd-ingest" }
 serialport = { version = "4", default-features = false }
 serde = { version = "1", features = ["derive"] }
-serde_json = "1"
+# raw_value: a library is read one manifest at a time, each kept as its
+# own text and no longer (ADR-0040).
+serde_json = { version = "1", features = ["raw_value"] }
 sha2 = "0.10"
 tauri = { version = "2" }
 transport-api = { path = "crates/transport-api" }
