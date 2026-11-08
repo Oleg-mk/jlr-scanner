@@ -37,7 +37,8 @@ refutes it, and the report records either.
 
 ## What you need
 
-- A Windows 10 or Windows 11 PC, or a Mac (Apple silicon or Intel).
+- A 64-bit Windows 10 or Windows 11 PC, or a Mac (Apple silicon or Intel).
+  There is no 32-bit Windows build.
 - A MongoosePro JLR adapter, original or clone. If a clone does not appear
   in the application, say so: the USB identifiers from Device Manager
   (Hardware Ids, the `VID_` and `PID_` values) are what we need to add it.
@@ -550,7 +551,8 @@ did. Send it through the channel you received the build from.
 
 The report contains the VIN, the adapter's serial number and what the
 modules answered. It contains no personal data beyond that; say so if you
-would like the VIN masked in what we publish.
+would like the VIN masked in what we publish. If the car is not yours, send
+its report only with its owner's consent.
 
 ## If something goes wrong
 

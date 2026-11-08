@@ -36,7 +36,7 @@ deliberate choice.
   or J2534 software: Windows and macOS see the original cable with their
   own built-in drivers; some clones need their maker's driver. ELM327-type
   dongles cannot reach these modules and are not supported.
-- Windows 10 or 11, or a Mac with Apple silicon or Intel.
+- Windows 10 or 11, 64-bit, or a Mac with Apple silicon or Intel.
 - A Jaguar or Land Rover from about 2005 to 2016.
 - The data library. It is not in this repository and not on the Releases
   page: it is derived from SDD's own data and is issued to each tester
@@ -47,7 +47,7 @@ deliberate choice.
 ## Download
 
 Installers are on the [Releases](https://github.com/Oleg-mk/jlr-scanner/releases)
-page — one for Windows, one for any Mac. They are not signed yet, so Windows
+page — one for 64-bit Windows, one for any Mac. They are not signed yet, so Windows
 and macOS warn before the first start; the [tester guide](docs/TESTER_GUIDE.md)
 says what you will see and what to do. The application installs in seconds
 to a minute; the data library adds a couple of minutes to download, unpack
@@ -63,7 +63,8 @@ and nothing is confirmed on a car yet. Every report helps: the
 ## Contributing
 
 Issues and pull requests are welcome, in English or Ukrainian. Please do not
-send SDD files, or captures of vehicles you do not own. How the application
+send SDD files, nor the capture of a vehicle that is not yours without its
+owner's consent. How the application
 is built, and why, is in [docs/](docs/), starting with
 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
