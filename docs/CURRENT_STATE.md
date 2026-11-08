@@ -85,6 +85,22 @@ session's report each — the variety of real cars being what neither the
 bench nor any single car can give. A tester gets the library by private
 message, stamped for a month. Waiting for answers.
 
+## 2026-11-08 — the first tester from the forum
+
+The first answer came by private message the day after the post and was
+seen only now: the owner of a small JLR workshop who has used SDD for
+years, keen to test, asking whether the application runs only on 64-bit
+Windows. It does — the Windows installer is x64 and no 32-bit build has
+ever been made — and nothing said so; the README, both tester guides and
+the release notes now do. A workshop's cars are mostly its customers', so
+the rule against sending captures of a car that is not yours became "not
+without its owner's consent". At the owner's word, with an apology for the
+wait, the copy is stamped for three months rather than one; it loads as
+issued (533,775 records). Still unknown, and his report can answer it: how
+the application finds the cable on a PC that has the MongoosePro driver
+package installed — everything confirmed so far ran over the inbox
+`usbser` driver.
+
 ## 2026-10-03 — the parameter and state names in SDD's own Russian
 
 The owner's idea for the assistant — speak Russian where there is no
