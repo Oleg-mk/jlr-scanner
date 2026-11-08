@@ -112,6 +112,17 @@ with a library cut to the programmes he sees most was offered as the
 alternative, unmeasured. The same figure is a concern for 64-bit laptops
 with 4 GB, and the guides state no memory requirement yet.
 
+He has no 64-bit machine; the programmes he sees most are X250, X152, L319,
+L494, L405, L538 and L359. Cut to those, the library peaks at about 3.5 GB
+in both languages and 2.4 GB in English only — still at the 32-bit ceiling.
+The peak is mostly the loader's: it holds all 830 MB of decompressed text,
+then a generic JSON tree of the largest bundle, then a second parse of each
+manifest, beside the growing store. `ADR-0040` is proposed: check the stamp
+by streaming, ingest one manifest at a time, measure, cut a copy to named
+programmes, and build a 32-bit installer only once such a copy loads under
+1.5 GB in a 32-bit build. The owner took the task; the record waits for his
+acceptance before any code.
+
 ## 2026-10-03 — the parameter and state names in SDD's own Russian
 
 The owner's idea for the assistant — speak Russian where there is no
