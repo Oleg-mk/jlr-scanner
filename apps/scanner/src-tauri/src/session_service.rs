@@ -58,6 +58,12 @@ impl SessionService {
     /// so; the previous library is not kept, because a stale library shown as
     /// current would be a lie.
     pub fn load_directory(&mut self, directory: &str) -> LibrarySnapshot {
+        // The previous library goes before the next is read, not after: held
+        // through the load, it doubled the peak on a reload (ADR-0040), which
+        // a 32-bit machine cannot afford. Nothing of it is wanted anyway.
+        self.library = KnowledgeLibrary::built_in();
+        self.last_survey = None;
+        self.last_context = None;
         // The application's loader: a folder loads only under a valid,
         // signed, unexpired issue stamp (ADR-0019).
         self.library = KnowledgeLibrary::load_issued_directory(Path::new(directory.trim()));
