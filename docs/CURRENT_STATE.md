@@ -101,6 +101,17 @@ the application finds the cable on a PC that has the MongoosePro driver
 package installed — everything confirmed so far ran over the inbox
 `usbser` driver.
 
+His workshop laptop is a Panasonic Toughbook CF-19 that runs only 32-bit
+Windows 10, the classic SDD machine. A 32-bit build would not be enough:
+measured the same day, loading the full library (533,775 records, the
+`survey` example, which loads it as the application does) peaks at about
+5 GB of working set, and the running application was seen holding 2.6 to
+3.5 GB with it loaded, while a 32-bit program on 32-bit Windows gets at
+most 2 GB. He was asked for any 64-bit PC in the workshop; a 32-bit build
+with a library cut to the programmes he sees most was offered as the
+alternative, unmeasured. The same figure is a concern for 64-bit laptops
+with 4 GB, and the guides state no memory requirement yet.
+
 ## 2026-10-03 — the parameter and state names in SDD's own Russian
 
 The owner's idea for the assistant — speak Russian where there is no
