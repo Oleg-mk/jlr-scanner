@@ -37,8 +37,11 @@ refutes it, and the report records either.
 
 ## What you need
 
-- A 64-bit Windows 10 or Windows 11 PC, or a Mac (Apple silicon or Intel).
-  There is no 32-bit Windows build.
+- A 64-bit Windows 10 or Windows 11 PC, or a Mac (Apple silicon or Intel),
+  with 8 GB of memory to be comfortable: the full data library takes about
+  4 GB while it loads. A 32-bit Windows 10 PC works too, with 4 GB, but
+  only with a data library cut to one or a few models — ask for one and
+  say which models; the 32-bit installer is on the same Releases page.
 - A MongoosePro JLR adapter, original or clone. If a clone does not appear
   in the application, say so: the USB identifiers from Device Manager
   (Hardware Ids, the `VID_` and `PID_` values) are what we need to add it.

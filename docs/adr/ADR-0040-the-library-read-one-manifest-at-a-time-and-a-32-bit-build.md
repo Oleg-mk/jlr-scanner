@@ -1,8 +1,11 @@
 # ADR-0040: The library read one manifest at a time, and a 32-bit Windows build after it
 
-- Status: **Proposed, 2026-11-08** — on the owner's word to take the task
-  and begin with this record («так, беремо, починай з ADR»), after the
+- Status: **Accepted, 2026-11-08**, on the owner's word the same morning
+  («так, приймаю, починай»), proposed hours earlier on his word to take the
+  task and begin with this record («так, беремо, починай з ADR»), after the
   first tester from the forum turned out to have only a 32-bit laptop.
+  Decisions 1, 2 and 4 built and decision 5 measured the same day; see
+  the end.
 - Scope: how the application loads a library directory, a tool that cuts
   an exported library to named programmes, and a second Windows installer.
   The library's content, the stamp's format, the safety boundaries and the
@@ -103,3 +106,49 @@ touching can only be told after the loader stops dominating the peak.
   set a lower ceiling than the address space does.
 - Not decided here: sharing applicability in the store (decision 3), any
   Windows older than 10, and a 32-bit macOS, which does not exist.
+
+## Built, 2026-11-08, the same day
+
+- *Decisions 1 and 2.* `KnowledgeLibrary::load_directory_with` reads each
+  file twice and keeps neither reading: the first pass hashes the
+  decompressed text as it streams past, keeps 16 KB for the issue code and
+  checks the whole is JSON; the stamp is checked against those hashes by
+  `issue::verify_digests`, the rules of `ADR-0019` unchanged. The second
+  pass hands each manifest of a bundle to the ingest as its own text
+  (`serde_json`'s raw values over a streaming reader) and hashes the bytes
+  again; a file that differs from its first reading discards the load. The
+  built-in manifests, the tests and the tools take the same path, and the
+  survey over the full library is byte for byte what the old loader gave.
+- *Decision 3, measured.* Peak working set of the release `survey`
+  example, 64-bit: the full library 5.1 → 4.1 GB; the seven programmes in
+  both languages 3.5 → 2.7 GB; the same in English 2.4 → 1.9 GB. The load
+  alone of the full library peaks at 4.1 GB too: what remains is the store,
+  not the loader. Sharing the repeated applicability between records is the
+  next lever, as this record said, and is not built — the tester's case
+  did not need it.
+- *Decision 4.* `cut_library`, an example of `diagnostic-session`, cuts an
+  exported library to named programmes and, with `--english-only`, drops
+  the Russian packs' manifests; it reads each bundle through the loader's
+  stream and writes as it goes. The Discovery 4 alone, in English:
+  533,742 → 118,522 records in 4,307 manifests, 7.8 MB packed, 14 s. The
+  copy was stamped for the tester with its scope in the name,
+  «… — Discovery 4 (L319), English», for three months.
+- *Decision 5, measured.* The `i686-pc-windows-msvc` target builds the
+  workspace, the application and its NSIS installer unchanged. On that
+  copy, 32-bit: `stamp_library --check` peaks at 625 MB; a probe of the
+  phases shows the load peaking at 656 MB and settling at about 350 MB, a
+  survey of the car adding a transient of about 280 MB, the bench vehicle
+  the same, nothing above 660 MB. The application itself, run by the
+  owner with that copy, reached about 700 MB resident after the load and
+  about 1.05 GB with the survey and the panels open — under the 1.5 GB of
+  this decision, on a machine where the address space does not bind. A
+  reload of the library took the same run to a peak of 2.97 GB: the shell
+  held the old library through the load of the next. It now drops it
+  first. CI builds the x86 installer beside the x64 one, as a matrix of the
+  Windows job; the Releases page carries both from the next build.
+- *The tester guide* says what the measurements allow: 64-bit Windows or
+  macOS for the full library, with 8 GB to be comfortable; 32-bit Windows
+  10 only with a copy cut to one or a few programmes, 4 GB being enough
+  for one.
+- *Not done.* Decision 3's store work; any run on a real 32-bit machine —
+  the tester's CF-19 is the first, and his report is what confirms it.

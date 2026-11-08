@@ -120,8 +120,28 @@ then a generic JSON tree of the largest bundle, then a second parse of each
 manifest, beside the growing store. `ADR-0040` is proposed: check the stamp
 by streaming, ingest one manifest at a time, measure, cut a copy to named
 programmes, and build a 32-bit installer only once such a copy loads under
-1.5 GB in a 32-bit build. The owner took the task; the record waits for his
-acceptance before any code.
+1.5 GB in a 32-bit build. The owner accepted it the same morning and chose
+the scope the tester had asked for next — the Discovery 4 alone, in
+English («робимо далі, лише англійська та діско4»).
+
+Built the same day. The loader reads each file twice and keeps nothing:
+hashes streamed for the stamp, then one manifest at a time into the store;
+the survey over the full library is byte for byte what it was. Peaks, the
+release `survey` example, 64-bit: the full library 5.1 → 4.1 GB, the seven
+programmes in English 2.4 → 1.9 GB; what remains is the store, decision 3,
+not built. `cut_library` cuts an export to named programmes and to
+English: the Discovery 4 alone is 118,522 records, 7.8 MB packed, stamped
+for the tester as «… — Discovery 4 (L319), English» for three months
+(`29F4-5869`). The 32-bit target builds everything unchanged; on that copy
+the 32-bit tool peaks at 625 MB, the load at 656 MB settling near 350 MB,
+a survey or the bench adding a transient of about 280 MB. The owner ran
+the 32-bit application with the copy: about 700 MB resident after the
+load, 1.05 GB with the survey and panels — and 2.97 GB at a reload, since
+the shell held the old library through the load of the next; it drops it
+first now. CI builds an x86 installer beside the x64 one; the guides and
+the README say what the measurements allow — 8 GB for the full library,
+a 32-bit PC with 4 GB for a copy cut to a few models. Nothing has run on
+a real 32-bit machine yet; the tester's CF-19 will be the first.
 
 ## 2026-10-03 — the parameter and state names in SDD's own Russian
 
