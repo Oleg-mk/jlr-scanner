@@ -52,6 +52,11 @@ function Invoke-Step {
   if (-not $ok) { Write-Host "$Name FAILED" -ForegroundColor Red }
 }
 
+# The mark the pre-push hook looks for (scripts/pre-push.ps1): written only at
+# the end, only when every step passed; a run that fails leaves none.
+$mark = Join-Path $repo ".git/prowlone-preflight-ok"
+if (Test-Path $mark) { Remove-Item $mark -Force }
+
 Invoke-Step "architecture boundaries" { node (Join-Path $repo "scripts/check-architecture.mjs") }
 Invoke-Step "frontend lint"  { pnpm --filter ./apps/scanner/frontend lint }
 Invoke-Step "frontend tests" { pnpm --filter ./apps/scanner/frontend test }
@@ -78,5 +83,9 @@ if ($results | Where-Object { $_.Result -eq "FAILED" }) {
   Write-Host "Not ready to push." -ForegroundColor Red
   exit 1
 }
-if ($SkipShell) { Write-Host "Ready to push, but the shell crate was skipped." -ForegroundColor Yellow }
-else { Write-Host "Ready to push." -ForegroundColor Green }
+if ($SkipShell) {
+  Write-Host "Ready to push, but the shell crate was skipped - the pre-push hook will not accept this run." -ForegroundColor Yellow
+} else {
+  (git -C $repo rev-parse HEAD).Trim() | Set-Content -Path $mark -Encoding ascii
+  Write-Host "Ready to push." -ForegroundColor Green
+}

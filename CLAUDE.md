@@ -52,6 +52,14 @@ checks being whatever anyone remembered to type. Add a step to CI, add it
 here. `-SkipShell` leaves out the slow Tauri crate; use it only for a change
 that cannot reach the shell.
 
+The push itself waits for it. A full run that passes writes the commit it
+passed on to `.git/prowlone-preflight-ok`, and the pre-push hook refuses a
+push of any other commit — installed once per clone with
+`powershell -File scripts/install-hooks.ps1`. It exists because on
+2026-11-08 a release was pushed with Docker down and the Rust steps red:
+the push had been chained to the preflight by hand, and the hand did not
+look. Never chain `git push` after the preflight with `;`.
+
 The pieces, when one of them is all you need:
 
 ```bash
