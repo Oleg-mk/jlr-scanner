@@ -34,8 +34,12 @@ deliberate choice.
 
 - A MongoosePro JLR cable, original or a faithful clone. No extra drivers
   or J2534 software: Windows and macOS see the original cable with their
-  own built-in drivers; some clones need their maker's driver. ELM327-type
-  dongles cannot reach these modules and are not supported.
+  own built-in drivers; some clones need their maker's driver. On a PC that
+  also runs SDD the cable is usually held by SDD's own driver, and the
+  application does not see it there yet; the
+  [tester guide](docs/TESTER_GUIDE.md#if-something-goes-wrong) shows how to
+  hand the cable over and back. ELM327-type dongles cannot reach these
+  modules and are not supported.
 - Windows 10 or 11, or a Mac with Apple silicon or Intel. Windows 7 and 8
   are not supported: the application's window is Microsoft's WebView2, which
   exists for Windows 10 and 11 only. The full data library takes about 4 GB

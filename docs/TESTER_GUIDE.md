@@ -46,9 +46,17 @@ refutes it, and the report records either.
   window is Microsoft's WebView2, the engine of Edge, which exists for
   Windows 10 and 11 only, and the toolchain it is built with supports
   Windows 10 and later as well. On a PC that also runs SDD the application
-  does not get in SDD's way: it installs no driver and touches nothing of
-  SDD's — one folder and two shortcuts — and it sees the cable through
-  Windows's own serial driver while SDD keeps using its own.
+  installs no driver and touches nothing of SDD's — one folder and two
+  shortcuts. But the cable belongs to one driver at a time. SDD's own
+  package binds it to Drew Technologies' driver, which Device Manager
+  lists as "MongoosePro JLR J2534 Interface" under "Vehicle PassThru
+  Interfaces"; Windows's own serial driver lists it as "USB Serial Device
+  (COMx)" under "Ports (COM & LPT)". Today the application finds the cable
+  only on Windows's serial driver, and it does not yet read it through
+  SDD's. On a PC where SDD's driver holds the cable the application says
+  "Adapter not detected" until the cable is handed over — the steps are
+  under "If something goes wrong" — and SDD does not see the cable until
+  it is handed back the same way.
 - A MongoosePro JLR adapter, original or clone. If a clone does not appear
   in the application, say so: the USB identifiers from Device Manager
   (Hardware Ids, the `VID_` and `PID_` values) are what we need to add it.
@@ -566,10 +574,19 @@ its report only with its owner's consent.
 
 ## If something goes wrong
 
-- **The adapter is not found.** Check Device Manager for a COM port when
-  the adapter is plugged in. If there is none, the driver is missing; if
-  there is one and the application still does not list it, send us the
-  Hardware Ids.
+- **The adapter is not found.** Open Device Manager with the adapter
+  plugged in and look for it. If it is "MongoosePro JLR J2534 Interface"
+  under "Vehicle PassThru Interfaces", SDD's driver holds the cable and
+  the application cannot see it. To hand the cable to Windows's serial
+  driver: right-click it, "Update driver", "Browse my computer for
+  drivers", "Let me pick from a list of available drivers on my computer",
+  choose "USB Serial Device", "Next". It moves to "Ports (COM & LPT)" as
+  "USB Serial Device (COMx)"; press "Detect adapter" in the application.
+  SDD will not see the cable until you hand it back the same way, choosing
+  "MongoosePro JLR J2534 Interface". If the adapter is already a "USB
+  Serial Device (COMx)" and the application still does not list it, or if
+  it appears under any other name or as an unknown device, send us its
+  Hardware Ids (right-click, "Properties", "Details", "Hardware Ids").
 - **The library fails to load.** The panel lists which files failed and
   why; send the message.
 - **A capture or read fails with "device status" and some words.** The
