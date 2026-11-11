@@ -42,6 +42,13 @@ refutes it, and the report records either.
   4 GB while it loads. A 32-bit Windows 10 PC works too, with 4 GB, but
   only with a data library cut to one or a few models — ask for one and
   say which models; the 32-bit installer is on the same Releases page.
+  Windows 7 and 8 are not supported, 32-bit or 64-bit: the application's
+  window is Microsoft's WebView2, the engine of Edge, which exists for
+  Windows 10 and 11 only, and the toolchain it is built with supports
+  Windows 10 and later as well. On a PC that also runs SDD the application
+  does not get in SDD's way: it installs no driver and touches nothing of
+  SDD's — one folder and two shortcuts — and it sees the cable through
+  Windows's own serial driver while SDD keeps using its own.
 - A MongoosePro JLR adapter, original or clone. If a clone does not appear
   in the application, say so: the USB identifiers from Device Manager
   (Hardware Ids, the `VID_` and `PID_` values) are what we need to add it.
