@@ -163,6 +163,11 @@ passed on to `.git/prowlone-preflight-ok`, and a pre-push hook
 (`scripts/pre-push.ps1`, installed by `scripts/install-hooks.ps1`) refuses
 a push of any other commit.
 
+On 2026-11-11 the tester received the 32-bit installer's name, the
+Discovery 4 copy by a private link, the step to load it, and a request for
+whatever happens — a crash included, his being the first run of this
+product on a real 32-bit machine. Waiting for his report.
+
 ## 2026-10-03 — the parameter and state names in SDD's own Russian
 
 The owner's idea for the assistant — speak Russian where there is no
