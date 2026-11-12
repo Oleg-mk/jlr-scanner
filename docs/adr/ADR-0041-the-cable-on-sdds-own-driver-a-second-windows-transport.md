@@ -199,6 +199,9 @@ cable came up as "USB Serial Device (COM4)". The new build then listed it
 on Windows's serial driver, connected, and got `0x8109` back: the merged
 discovery is `HARDWARE_CONFIRMED` on the serial path. The path through
 `dtmonpro.sys` stays `IMPLEMENTED / FIXTURE_TESTED`, and its hardware check
-moves to a PC where the driver loads — the first tester's SDD laptop is
-the nearest — on the owner's word; the serial path stays beside it as the
-fallback either way.
+moves to a PC where the driver loads. The owner moved it the same day, in
+so many words («ворота на Geoff»): build 1.2.5 ships with this path
+`FIXTURE_TESTED`, and the first tester's run on his SDD laptop — the cable
+back on "MongoosePro JLR J2534 Interface", the application expected to
+list it there unaided — is its hardware check; the serial path stays
+beside it as the fallback either way.

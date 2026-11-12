@@ -233,8 +233,8 @@ PC with `pnputil /delete-driver oem90.inf /uninstall /force`, the replugged
 cable came up as "USB Serial Device (COM4)", and the new build listed it on
 Windows's serial driver, connected and got `0x8109` back — the merged
 discovery `HARDWARE_CONFIRMED` on the serial path, the path through
-`dtmonpro.sys` still `FIXTURE_TESTED`, its check moved to a PC where the
-driver loads (the ADR's "Built" note). At the owner's eye the narrow window
+`dtmonpro.sys` still `FIXTURE_TESTED`, its check moved at the owner's word
+to the first tester's SDD laptop (the ADR's "Built" note). At the owner's eye the narrow window
 was tidied twice more: the head of the plate in two rows — the name, the
 two actions and the language marks, then the three state capsules — and
 the steps four to a row in columns, so that 5 stands under 1.
