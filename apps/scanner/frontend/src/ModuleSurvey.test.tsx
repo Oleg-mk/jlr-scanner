@@ -374,6 +374,8 @@ describe("data library and module survey", () => {
             { name: "Engine", value: "3.0L V6 synthetic" },
           ],
           tableVersion: "SDD table version: issue 1",
+          suggestedPowertrain: "SYNTHENGINE",
+          suggestedVariant: null,
         });
       }
     }
@@ -395,6 +397,8 @@ describe("data library and module survey", () => {
     expect(screen.getByRole("combobox", { name: "Programme" })).toHaveValue("SYNTHA");
     // 2011 falls in the MY10 breakpoint's range.
     expect(screen.getByRole("combobox", { name: "Model years" })).toHaveValue("MY10");
+    // The engine the decoded words pointed at, pre-selected for confirmation.
+    expect(screen.getByRole("combobox", { name: "Engine" })).toHaveValue("SYNTHENGINE");
     expect(screen.getByRole("button", { name: "Survey modules" })).toBeEnabled();
   });
 });

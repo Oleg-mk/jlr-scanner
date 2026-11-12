@@ -209,7 +209,10 @@ export function useLibraryController(client: LibraryClient) {
           vehicleProgram: programme.program,
           yearBreakpoint: marker?.marker ?? null,
           modelYear: marker?.modelYearFrom ?? decoded.modelYear,
-          powertrain: null,
+          // Only what the words point at without doubt, for the person to
+          // confirm; otherwise the engine stays theirs to choose.
+          powertrain: decoded.suggestedPowertrain ?? null,
+          variant: decoded.suggestedVariant ?? null,
         }));
         setSurvey(null);
       }

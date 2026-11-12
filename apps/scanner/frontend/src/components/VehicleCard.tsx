@@ -30,6 +30,22 @@ function optionalText(value: string): string | null {
 }
 
 
+/**
+ * The variants to offer: those SDD's data pairs with the chosen engine, so
+ * the diesels' 2.7 and 3.0 are not offered under a Discovery 4's V8 (the
+ * first tester, 2026-11-12); every variant while no engine is chosen, or
+ * when the snapshot predates the pairing.
+ */
+function variantsFor(
+  programme: { variants: string[]; variantsByPowertrain?: { powertrain: string; variants: string[] }[] } | undefined,
+  powertrain: string | null,
+): string[] {
+  if (programme === undefined) return [];
+  const pairs = programme.variantsByPowertrain;
+  if (powertrain === null || pairs === undefined || pairs.length === 0) return programme.variants;
+  return pairs.find((pair) => pair.powertrain === powertrain)?.variants ?? [];
+}
+
 export function VehicleCard({
   vehicle,
   catalogue,
@@ -63,6 +79,7 @@ export function VehicleCard({
     return () => window.clearInterval(timer);
   }, [busy]);
   const programme = catalogue.programmes.find((entry) => entry.program === vehicle.vehicleProgram);
+  const variantOptions = variantsFor(programme, vehicle.powertrain);
   const hasCatalogue = catalogue.programmes.length > 0;
   const marker = programme?.markers.find((entry) => entry.marker === vehicle.yearBreakpoint);
 
@@ -142,7 +159,13 @@ export function VehicleCard({
           value={vehicle.powertrain ?? ""}
           disabled={programme === undefined}
           onChange={(event) =>
-            onVehicleChange({ ...vehicle, powertrain: optionalText(event.target.value) })
+            // Another engine has its own variants, or none: the one chosen
+            // for the old engine does not carry over.
+            onVehicleChange({
+              ...vehicle,
+              powertrain: optionalText(event.target.value),
+              variant: null,
+            })
           }
         >
           <option value="">{t("Not stated")}</option>
@@ -153,7 +176,7 @@ export function VehicleCard({
           ))}
         </select>
       </label>
-      {(programme?.variants ?? []).length > 0 ? (
+      {variantOptions.length > 0 ? (
         <label className="field">
           <span>{t("Engine variant")}</span>
           <select
@@ -165,7 +188,7 @@ export function VehicleCard({
             }
           >
             <option value="">{t("Not stated")}</option>
-            {(programme?.variants ?? []).map((entry) => (
+            {variantOptions.map((entry) => (
               <option key={entry} value={entry}>
                 {entry}
               </option>

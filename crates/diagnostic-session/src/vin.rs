@@ -157,6 +157,8 @@ impl VinTables {
             model_year: None,
             attributes: Vec::new(),
             table_version: None,
+            suggested_powertrain: None,
+            suggested_variant: None,
         };
         if let Some(issue) = format_issue(&vin) {
             snapshot.message = format!("Not a VIN: {issue}.");

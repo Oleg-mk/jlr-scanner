@@ -33,6 +33,18 @@ const catalogue: VehicleCatalogueSnapshot = {
       powertrains: ["V6"],
       variants: [],
     },
+    {
+      // A Discovery 4 as its data describes it: the diesels split by
+      // displacement, the V8 not split at all.
+      program: "PAIRED",
+      markers: [{ marker: "MY10", modelYearFrom: 2010, modelYearTo: 2013 }],
+      powertrains: ["V6DIESEL", "V8NA"],
+      variants: ["2.7L", "3L"],
+      variantsByPowertrain: [
+        { powertrain: "V6DIESEL", variants: ["2.7L", "3L"] },
+        { powertrain: "V8NA", variants: [] },
+      ],
+    },
   ],
 };
 
@@ -67,6 +79,69 @@ describe("the engine variant", () => {
       "4.2L",
       "5L",
     ]);
+  });
+
+  it("offers only the variants of the chosen engine, and none under an engine that is not split", async () => {
+    const { rerender } = card({ ...vehicle, vehicleProgram: "PAIRED" });
+    // No engine chosen yet: everything the programme splits.
+    let select = await screen.findByRole("combobox", { name: /Engine variant/i });
+    expect([...select.querySelectorAll("option")].map((option) => option.textContent)).toEqual([
+      "Not stated",
+      "2.7L",
+      "3L",
+    ]);
+    rerender(
+      <VehicleCard
+        vehicle={{ ...vehicle, vehicleProgram: "PAIRED", powertrain: "V6DIESEL" }}
+        catalogue={catalogue}
+        survey={null}
+        busy={false}
+        libraryReady
+        vin=""
+        vinDecode={null}
+        decodingVin={false}
+        onVinChange={() => {}}
+        onDecodeVin={() => {}}
+        onVehicleChange={() => {}}
+        onSurvey={() => {}}
+      />,
+    );
+    select = screen.getByRole("combobox", { name: /Engine variant/i });
+    expect([...select.querySelectorAll("option")].map((option) => option.textContent)).toEqual([
+      "Not stated",
+      "2.7L",
+      "3L",
+    ]);
+    rerender(
+      <VehicleCard
+        vehicle={{ ...vehicle, vehicleProgram: "PAIRED", powertrain: "V8NA" }}
+        catalogue={catalogue}
+        survey={null}
+        busy={false}
+        libraryReady
+        vin=""
+        vinDecode={null}
+        decodingVin={false}
+        onVinChange={() => {}}
+        onDecodeVin={() => {}}
+        onVehicleChange={() => {}}
+        onSurvey={() => {}}
+      />,
+    );
+    expect(screen.queryByRole("combobox", { name: /Engine variant/i })).toBeNull();
+  });
+
+  it("drops the variant when the engine changes", async () => {
+    const changes: VehicleDescription[] = [];
+    card({ ...vehicle, vehicleProgram: "PAIRED", powertrain: "V6DIESEL", variant: "3L" }, (next) =>
+      changes.push(next),
+    );
+    fireEvent.change(await screen.findByRole("combobox", { name: "Engine" }), {
+      target: { value: "V8NA" },
+    });
+    await waitFor(() => expect(changes).toHaveLength(1));
+    expect(changes[0].powertrain).toBe("V8NA");
+    expect(changes[0].variant).toBeNull();
   });
 
   it("is not offered where the data splits nothing", () => {

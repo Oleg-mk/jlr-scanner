@@ -701,6 +701,16 @@ fn the_catalogue_offers_the_programmes_markers_years_and_engines_the_data_is_qua
     assert_eq!(marker.model_year_to, Some(2011));
     // The DID catalogue qualifies one entry by engine.
     assert_eq!(programme.powertrains, vec!["SYNTHENGINE".to_string()]);
+    // One pairing per engine, empty where the data splits it into nothing.
+    assert_eq!(programme.variants_by_powertrain.len(), 1);
+    assert_eq!(
+        programme.variants_by_powertrain[0].powertrain,
+        "SYNTHENGINE"
+    );
+    assert_eq!(
+        programme.variants_by_powertrain[0].variants,
+        programme.variants
+    );
     // Built-in data alone describes no vehicle.
     assert!(KnowledgeLibrary::built_in()
         .catalogue()
@@ -777,6 +787,9 @@ fn a_vin_is_decoded_with_the_tables_the_library_holds() {
         .find(|attribute| attribute.name == "Engine")
         .expect("engine decoded");
     assert_eq!(engine.value, "3.0L V6 synthetic");
+    // "SYNTHENGINE" is no code SDD's words could point at: no suggestion.
+    assert_eq!(decoded.suggested_powertrain, None);
+    assert_eq!(decoded.suggested_variant, None);
     let model_name = decoded
         .attributes
         .iter()

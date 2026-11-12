@@ -13,6 +13,7 @@
 pub mod ccf;
 pub mod decode;
 pub mod dtc_text;
+pub mod engine_suggestion;
 pub mod issue;
 pub mod manifest_stream;
 pub mod mileage;
@@ -33,7 +34,7 @@ pub use knowledge::battery::SDD_VOLTAGE_LOW_MAX_MV;
 use app_contracts::{
     AcceptedOperationSummary, CatalogueComparison, GatewaySummary, LibraryIssue,
     LibraryIssueIntegrity, LibrarySnapshot, LibraryState, ManifestFailure, MarkerEntry,
-    ModuleApplicability, ModuleSurveyEntry, PassportReading, ProgrammeEntry,
+    ModuleApplicability, ModuleSurveyEntry, PassportReading, PowertrainVariants, ProgrammeEntry,
     ReadableIdentifierSummary, RouteStatus, RouteSummary, SelfTestSummary,
     VehicleCatalogueSnapshot, VehicleContextInput, VehicleSurveySnapshot, VinDecodeSnapshot,
 };
@@ -604,9 +605,41 @@ impl KnowledgeLibrary {
     }
 
     /// Decode a VIN with SDD's tables; the snapshot says what was and was
-    /// not established.
+    /// not established. Where the tables name the programme and its engine
+    /// in words, and those words fit exactly one engine code the loaded data
+    /// qualifies that programme by, the code is suggested for the person to
+    /// confirm — and its variant, where the data splits that engine by the
+    /// displacement the words carry.
     pub fn decode_vin(&self, vin: &str) -> VinDecodeSnapshot {
-        self.indexes.vin_tables.decode(vin)
+        let mut decoded = self.indexes.vin_tables.decode(vin);
+        let engine = decoded
+            .attributes
+            .iter()
+            .find(|attribute| attribute.name == "Engine")
+            .map(|attribute| attribute.value.clone());
+        if let (Some(program), Some(engine)) = (decoded.program.as_deref(), engine) {
+            if let Some(entry) = self
+                .indexes
+                .catalogue
+                .programmes
+                .iter()
+                .find(|entry| entry.program == program)
+            {
+                decoded.suggested_powertrain =
+                    engine_suggestion::suggest_powertrain(&entry.powertrains, &engine);
+                if let Some(code) = &decoded.suggested_powertrain {
+                    let variants = entry
+                        .variants_by_powertrain
+                        .iter()
+                        .find(|pair| &pair.powertrain == code)
+                        .map(|pair| pair.variants.as_slice())
+                        .unwrap_or(&[]);
+                    decoded.suggested_variant =
+                        engine_suggestion::suggest_variant(variants, &engine);
+                }
+            }
+        }
+        decoded
     }
 
     /// SDD's wording for a fault code as read from `module`: the module-scoped
@@ -1239,7 +1272,10 @@ fn base_mnemonic(mnemonic: &str) -> &str {
 /// their engines; and the fault-code wording a read will be joined to.
 fn build_indexes(store: &KnowledgeStore) -> Indexes {
     type Markers = BTreeMap<String, (Option<u16>, Option<u16>)>;
-    let mut programmes: BTreeMap<String, (Markers, BTreeSet<String>, BTreeSet<String>)> =
+    // Per programme: its markers, its engines, its variants, and which
+    // variants the records pair with which engine.
+    type Pairs = BTreeMap<String, BTreeSet<String>>;
+    let mut programmes: BTreeMap<String, (Markers, BTreeSet<String>, BTreeSet<String>, Pairs)> =
         BTreeMap::new();
     let mut dtc_index = DtcIndex::default();
     let mut module_names: BTreeMap<String, BTreeMap<String, String>> = BTreeMap::new();
@@ -1341,6 +1377,22 @@ fn build_indexes(store: &KnowledgeStore) -> Indexes {
                 }
                 if let DimensionConstraint::OneOf { values } = &record.applicability.variant {
                     slot.2.extend(values.iter().cloned());
+                }
+                if let (
+                    DimensionConstraint::OneOf {
+                        values: powertrains,
+                    },
+                    DimensionConstraint::OneOf { values: variants },
+                ) = (
+                    &record.applicability.powertrain,
+                    &record.applicability.variant,
+                ) {
+                    for powertrain in powertrains {
+                        slot.3
+                            .entry(powertrain.clone())
+                            .or_default()
+                            .extend(variants.iter().cloned());
+                    }
                 }
             }
             EntityKind::DiagnosticTroubleCode => {
@@ -1481,9 +1533,9 @@ fn build_indexes(store: &KnowledgeStore) -> Indexes {
     let catalogue = VehicleCatalogueSnapshot {
         programmes: programmes
             .into_iter()
-            .filter(|(_, (markers, _, _))| !markers.is_empty())
+            .filter(|(_, (markers, _, _, _))| !markers.is_empty())
             .map(
-                |(program, (markers, powertrains, variants))| ProgrammeEntry {
+                |(program, (markers, powertrains, variants, pairs))| ProgrammeEntry {
                     program,
                     markers: markers
                         .into_iter()
@@ -1491,6 +1543,16 @@ fn build_indexes(store: &KnowledgeStore) -> Indexes {
                             marker,
                             model_year_from: from,
                             model_year_to: to,
+                        })
+                        .collect(),
+                    variants_by_powertrain: powertrains
+                        .iter()
+                        .map(|powertrain| PowertrainVariants {
+                            powertrain: powertrain.clone(),
+                            variants: pairs
+                                .get(powertrain)
+                                .map(|variants| variants.iter().cloned().collect())
+                                .unwrap_or_default(),
                         })
                         .collect(),
                     powertrains: powertrains.into_iter().collect(),

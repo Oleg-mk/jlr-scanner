@@ -794,6 +794,21 @@ pub struct ProgrammeEntry {
     /// different addresses. Empty when the programme's data splits nothing.
     #[serde(default)]
     pub variants: Vec<String>,
+    /// The variants paired with each engine of the programme, so a card can
+    /// offer the halves of the chosen engine and not another's: the 2.7 and
+    /// 3.0 diesels of a Discovery 4 are no variants of its V8 (the first
+    /// tester, 2026-11-12). One entry per engine, empty where the data
+    /// splits that engine into nothing.
+    #[serde(default)]
+    pub variants_by_powertrain: Vec<PowertrainVariants>,
+}
+
+/// The variants SDD's data pairs with one engine of a programme.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PowertrainVariants {
+    pub powertrain: String,
+    pub variants: Vec<String>,
 }
 
 /// What one session has recorded so far and whether a report can be saved.
@@ -862,6 +877,15 @@ pub struct VinDecodeSnapshot {
     pub model_year: Option<u16>,
     pub attributes: Vec<DecodedAttribute>,
     pub table_version: Option<String>,
+    /// The programme's engine code the decoded engine text points at, when
+    /// it points at exactly one of them; the person confirms it on the card.
+    /// Never a choice between two.
+    #[serde(default)]
+    pub suggested_powertrain: Option<String>,
+    /// Likewise the variant, where the data splits that engine and the
+    /// text names the displacement.
+    #[serde(default)]
+    pub suggested_variant: Option<String>,
 }
 
 /// What the loaded library can describe: the programmes SDD knows, their

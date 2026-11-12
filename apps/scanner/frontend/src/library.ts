@@ -192,12 +192,24 @@ export interface MarkerEntry {
   modelYearTo: number | null;
 }
 
+/** The variants SDD's data pairs with one engine of a programme. */
+export interface PowertrainVariants {
+  powertrain: string;
+  variants: string[];
+}
+
 export interface ProgrammeEntry {
   program: string;
   markers: MarkerEntry[];
   powertrains: string[];
   /** What SDD splits an engine into, where it does; empty for most programmes. */
   variants: string[];
+  /**
+   * The same, per engine: the halves of the chosen engine and not another's.
+   * Absent from a snapshot of an older build, in which case every variant
+   * is offered as before.
+   */
+  variantsByPowertrain?: PowertrainVariants[];
 }
 
 export interface VehicleCatalogueSnapshot {
@@ -220,6 +232,10 @@ export interface VinDecodeSnapshot {
   modelYear: number | null;
   attributes: DecodedAttribute[];
   tableVersion: string | null;
+  /** The engine code the decoded words point at, when exactly one; confirmed by the person. */
+  suggestedPowertrain?: string | null;
+  /** Its variant, where the data splits that engine by the displacement the words carry. */
+  suggestedVariant?: string | null;
 }
 
 export interface LibraryClient {
