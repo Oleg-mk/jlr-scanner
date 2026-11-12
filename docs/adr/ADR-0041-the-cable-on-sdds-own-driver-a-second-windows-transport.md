@@ -205,3 +205,22 @@ so many words («ворота на Geoff»): build 1.2.5 ships with this path
 back on "MongoosePro JLR J2534 Interface", the application expected to
 list it there unaided — is its hardware check; the serial path stays
 beside it as the fallback either way.
+
+**`HARDWARE_CONFIRMED`, 2026-11-12, the same day.** The tester installed
+1.2.5 on his SDD laptop, put the cable back on "MongoosePro JLR J2534
+Interface", and the application found it there on its own: his session
+report, printed the same morning, names the adapter's port as the device
+interface path `\\?\usb#vid_18e1&pid_0104#…#{f99f6fce-…}`, the serial
+read from the instance id, backend `mongoose-jlr` — and a session only
+connects once the board has answered `0x8109`. Thirty-nine fault-code
+reads, a mileage survey and a live run then went out through that path
+to his Discovery 4. What the car answered is not yet known: the printed
+report of that build showed each read as a row of dashes (a reader
+defect, fixed the same day) and the mileage rows empty; the session file
+is awaited.
+
+Two guards were added the same day, after the owner's PC showed a path
+of this GUID for a cable that Windows's serial driver held: an interface
+is listed only when it is active and only when the device's bound
+service is `dtmonpro`, so the words "on SDD's driver" are never said of
+a cable that is not.

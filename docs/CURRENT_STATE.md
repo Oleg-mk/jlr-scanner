@@ -276,6 +276,29 @@ either way. Checked against his copy with three Discovery 4 VINs: the V8
 suggests V8NA and no variant, the 3.0 diesel V6DIESEL and 3L, the 2.7
 V6DIESEL and 2.7L. Not yet in a build.
 
+Then the tester's own report arrived, as a PDF of eleven pages: build
+1.2.5, his Discovery 4, saved that morning — and the adapter's port in it
+is the device interface path of `ADR-0041`: his laptop found the cable on
+SDD's driver by itself and connected through it. The ADR is
+`HARDWARE_CONFIRMED` on the machine it was written for, the day it was
+written. (The report's adapter serial equals the owner's own cable's,
+character for character, which first read as the owner's session: two
+clones of one batch carry one serial, so the serial is no identity.)
+What his car answered the document does not say, and that is the
+document's fault: its reader asked the module-read records for snake-case
+keys the shell's `ModuleReadReport` never writes, so all thirty-nine reads
+printed as dashes — module, answer, responder and time — with the test
+fixture carrying the same wrong keys and seeing nothing; and five blank
+pages followed the document, the hidden window's height still on the
+sheet. Both fixed: the reader takes the record as written and prints a
+read's error where it brought no answer, the printed page holds the
+document and nothing else, and the adapter block names the driver that
+held the cable. The mileage rows were empty and the live run read
+nothing, so the car may have answered nothing at all; the session file
+and the state of the ignition are asked for. Also that day, a guard in
+the pass-through enumeration: an interface counts only when it is active
+and the device's bound service is `dtmonpro`. Not yet in a build.
+
 ## 2026-10-03 — the parameter and state names in SDD's own Russian
 
 The owner's idea for the assistant — speak Russian where there is no
