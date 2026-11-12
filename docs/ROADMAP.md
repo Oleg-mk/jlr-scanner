@@ -172,8 +172,11 @@ Everything below is implemented and tested offline; nothing has touched a
 vehicle.
 
 - **Adapter.** Discovery, connect, board identity over the inbox `usbser`
-  driver on Windows 11: hardware-confirmed. Both CAN routes (`hs-can` 6/14 at
-  500 kbit/s, `ms-can` 3/11 at 125 kbit/s) implemented; never opened on a car.
+  driver on Windows 11: hardware-confirmed. The same over the MongoosePro
+  package's own driver, where every SDD machine keeps the cable
+  (`ADR-0041`, 2026-11-12): built and fixture-tested, hardware check
+  pending. Both CAN routes (`hs-can` 6/14 at 500 kbit/s, `ms-can` 3/11 at
+  125 kbit/s) implemented; never opened on a car.
 - **Knowledge.** The whole SDD 169 corpus exported: 45 programme documents,
   126,706 records — addressing, buses, 15,281 identifier definitions with
   units, 93,521 fault-code descriptions. The application loads it as a data

@@ -51,12 +51,14 @@ refutes it, and the report records either.
   package binds it to Drew Technologies' driver, which Device Manager
   lists as "MongoosePro JLR J2534 Interface" under "Vehicle PassThru
   Interfaces"; Windows's own serial driver lists it as "USB Serial Device
-  (COMx)" under "Ports (COM & LPT)". Today the application finds the cable
-  only on Windows's serial driver, and it does not yet read it through
-  SDD's. On a PC where SDD's driver holds the cable the application says
-  "Adapter not detected" until the cable is handed over — the steps are
-  under "If something goes wrong" — and SDD does not see the cable until
-  it is handed back the same way.
+  (COMx)" under "Ports (COM & LPT)". Builds from 1.2.5 find the cable on
+  either driver and say which one holds it; builds up to 1.2.4 find it
+  only on Windows's serial driver, so on a PC where SDD's driver holds the
+  cable they say "Adapter not detected" until the cable is handed over —
+  the steps are under "If something goes wrong" — and SDD does not see
+  the cable until it is handed back the same way. Whichever driver holds
+  it, one program at a time can have the cable open: close SDD before
+  connecting here, and the other way round.
 - A MongoosePro JLR adapter, original or clone. If a clone does not appear
   in the application, say so: the USB identifiers from Device Manager
   (Hardware Ids, the `VID_` and `PID_` values) are what we need to add it.
@@ -576,9 +578,9 @@ its report only with its owner's consent.
 
 - **The adapter is not found.** Open Device Manager with the adapter
   plugged in and look for it. If it is "MongoosePro JLR J2534 Interface"
-  under "Vehicle PassThru Interfaces", SDD's driver holds the cable and
-  the application cannot see it. To hand the cable to Windows's serial
-  driver: right-click it, "Update driver", "Browse my computer for
+  under "Vehicle PassThru Interfaces", SDD's driver holds the cable; a
+  build from 1.2.5 lists it there, an earlier build cannot see it. To
+  hand the cable to Windows's serial driver: right-click it, "Update driver", "Browse my computer for
   drivers", "Let me pick from a list of available drivers on my computer",
   choose "USB Serial Device", "Next". It moves to "Ports (COM & LPT)" as
   "USB Serial Device (COMx)"; press "Detect adapter" in the application.
