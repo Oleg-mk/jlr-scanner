@@ -5487,6 +5487,17 @@ table.live-read-identifiers label {
   min-width: 0;
 }
 
+/* The three state capsules, and the two actions: two groups, so that a
+   narrow screen can place them on rows of its own. */
+.header-pills,
+.header-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem;
+  min-width: 0;
+}
+
 /* The widest of the three languages, in characters of this face, with the
    capsule's own padding on top. A translation longer than this would push
    its capsule wider and start the movement again, so a test counts them. */
@@ -5499,7 +5510,7 @@ table.live-read-identifiers label {
   white-space: nowrap;
 }
 
-.app-shell .app-header .header-controls > button {
+.app-shell .app-header .header-actions > button {
   /* 166 points: "Сервисный режим". */
   min-width: 11.5rem;
   white-space: nowrap;
@@ -6088,6 +6099,42 @@ table.live-read-identifiers label {
 /* picture wait for a wider screen.                                        */
 /* ===================================================================== */
 @media (max-width: 1100px) {
+  /* The head of the plate in two rows: the name with the two actions and
+     the language marks on the first, the three state capsules on the
+     second — instead of the five controls wrapping as they fell. */
+  .app-shell .app-header {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    grid-template-areas:
+      "brand actions language"
+      "pills pills pills";
+    align-items: center;
+    gap: 0.6rem 1rem;
+  }
+
+  .app-shell .app-header .brand {
+    grid-area: brand;
+  }
+
+  .app-shell .app-header .header-status,
+  .app-shell .app-header .header-controls {
+    display: contents;
+  }
+
+  .app-shell .app-header .header-pills {
+    grid-area: pills;
+    justify-content: flex-start;
+  }
+
+  .app-shell .app-header .header-actions {
+    grid-area: actions;
+    flex-wrap: nowrap;
+  }
+
+  .app-shell .app-header .language-switch {
+    grid-area: language;
+  }
+
   /* One column: the plate's own grid kept the two columns at every width
      until now, which is what the tester saw on his 1024 px screen. */
   .app-shell main.flow {
@@ -6129,9 +6176,11 @@ table.live-read-identifiers label {
     display: none;
   }
 
+  /* Four to a row, in columns: 5 stands under 1, 6 under 2, 7 under 3,
+     so the two rows read as one table (the owner, 2026-11-12). */
   .app-shell .flow-rail .session-steps {
-    display: flex;
-    flex-wrap: wrap;
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 0.3rem 0.5rem;
     margin: 0;
     padding: 0;
@@ -6152,6 +6201,11 @@ table.live-read-identifiers label {
 
   .app-shell .flow-rail .session-step-title {
     font-size: 0.9rem;
-    white-space: nowrap;
+  }
+}
+
+@media (max-width: 700px) {
+  .app-shell .flow-rail .session-steps {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }

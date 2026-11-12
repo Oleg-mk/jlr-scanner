@@ -482,6 +482,7 @@ export function App({
               the switch keeps its place at the right edge whatever the
               language does to the labels (the owner, 2026-09-18). */}
           <div className="header-controls">
+          <div className="header-pills">
           <BatteryCard
             snapshot={battery.snapshot}
             busy={battery.busy}
@@ -493,6 +494,8 @@ export function App({
           />
           {adapterPill}
           {libraryPill}
+          </div>
+          <div className="header-actions">
           <button
             className="button button--secondary"
             type="button"
@@ -515,6 +518,7 @@ export function App({
           >
             {t("Service mode")}
           </button>
+          </div>
           {/* Three marks milled into one plate, and a disc of glass that
               slides to the one in use — the operating system's own list has
               no place on an instrument (2026-09-13). */}
