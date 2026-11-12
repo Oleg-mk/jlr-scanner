@@ -102,6 +102,7 @@ pub fn read_record(
         decoded_result,
         pending_responses: raw.map(|value| value.pending_responses).unwrap_or(0),
         timeout_or_error_category: error.map(|value| value.category),
+        error_message: error.map(app_contracts::DiagnosticError::words),
         execution_stage: error
             .map(|value| value.stage)
             .unwrap_or(DiagnosticExecutionStage::Completed),
@@ -201,6 +202,7 @@ pub fn serial_read_record(
         decoded_result,
         pending_responses: 0,
         timeout_or_error_category: error.map(|value| value.category),
+        error_message: error.map(app_contracts::DiagnosticError::words),
         execution_stage: error
             .map(|value| value.stage)
             .unwrap_or(DiagnosticExecutionStage::Completed),

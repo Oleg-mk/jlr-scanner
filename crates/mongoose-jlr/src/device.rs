@@ -96,6 +96,10 @@ pub struct MongooseJlrDevice<T: ByteTransport> {
     /// from the bootloader if that is where the adapter was).
     firmware_ready: bool,
     open_route: Option<OpenReceiveRoute>,
+    /// A channel a failed close left on the adapter: closed again before
+    /// the next channel is asked for, so that the adapter holds one at a
+    /// time and a close that went unanswered does not block the session.
+    stale_channel: Option<u16>,
     pending_frames: VecDeque<RawCanFrame>,
     counters: ReceiveCounters,
 }
@@ -110,6 +114,7 @@ impl<T: ByteTransport> MongooseJlrDevice<T> {
             closed: false,
             firmware_ready: false,
             open_route: None,
+            stale_channel: None,
             pending_frames: VecDeque::new(),
             counters: ReceiveCounters::default(),
         }
@@ -275,13 +280,13 @@ impl<T: ByteTransport> MongooseJlrDevice<T> {
         let pin_request =
             crate::kline::set_pin_request(pin_sequence, opened.device_channel_id, pin);
         if let Err(error) = self.transport.write_all(&pin_request) {
-            let _ = self.close_channel_after_failed_setup(opened.device_channel_id);
+            let _ = self.close_channel(opened.device_channel_id);
             return Err(error.into());
         }
         if let Err(error) = self.wait_for_response(|frame| {
             passive::parse_set_pin_response(frame, pin_sequence, opened.device_channel_id)
         }) {
-            let _ = self.close_channel_after_failed_setup(opened.device_channel_id);
+            let _ = self.close_channel(opened.device_channel_id);
             return Err(error);
         }
 
@@ -289,7 +294,7 @@ impl<T: ByteTransport> MongooseJlrDevice<T> {
         let parity_request =
             crate::kline::set_parity_request(parity_sequence, opened.device_channel_id, parity);
         if let Err(error) = self.transport.write_all(&parity_request) {
-            let _ = self.close_channel_after_failed_setup(opened.device_channel_id);
+            let _ = self.close_channel(opened.device_channel_id);
             return Err(error.into());
         }
         if let Err(error) = self.wait_for_response(|frame| {
@@ -299,7 +304,7 @@ impl<T: ByteTransport> MongooseJlrDevice<T> {
                 opened.device_channel_id,
             )
         }) {
-            let _ = self.close_channel_after_failed_setup(opened.device_channel_id);
+            let _ = self.close_channel(opened.device_channel_id);
             return Err(error);
         }
 
@@ -313,7 +318,7 @@ impl<T: ByteTransport> MongooseJlrDevice<T> {
                 node_address,
             );
             if let Err(error) = self.transport.write_all(&init_request) {
-                let _ = self.close_channel_after_failed_setup(opened.device_channel_id);
+                let _ = self.close_channel(opened.device_channel_id);
                 return Err(error.into());
             }
             if let Err(error) = self.wait_for_response(|frame| {
@@ -323,7 +328,7 @@ impl<T: ByteTransport> MongooseJlrDevice<T> {
                     opened.device_channel_id,
                 )
             }) {
-                let _ = self.close_channel_after_failed_setup(opened.device_channel_id);
+                let _ = self.close_channel(opened.device_channel_id);
                 return Err(error);
             }
         }
@@ -371,19 +376,20 @@ impl<T: ByteTransport> MongooseJlrDevice<T> {
         }
     }
 
+    /// Closes the open route. Whatever the adapter answers, the route is
+    /// released here: on the first real car (2026-11-12) the adapter refused
+    /// a transmission, then did not answer the close, and the route stayed
+    /// marked open — every later read was refused by this code, not by the
+    /// car. A close that fails is reported, its channel remembered and closed
+    /// again before the next one is opened.
     pub fn close_route(&mut self) -> Result<(), ProtocolError> {
         self.require_open_transport()?;
-        let open_route = self.open_route.ok_or(ProtocolError::NoOpenRoute)?;
-        let sequence = self.sequences.allocate();
-        self.transport.write_all(&passive::close_channel_request(
-            sequence,
-            open_route.device_channel_id,
-        ))?;
-        self.wait_for_response(|frame| {
-            passive::parse_close_response(frame, sequence, open_route.device_channel_id)
-        })?;
-        self.open_route = None;
-        Ok(())
+        let open_route = self.open_route.take().ok_or(ProtocolError::NoOpenRoute)?;
+        let closed = self.close_channel(open_route.device_channel_id);
+        if closed.is_err() {
+            self.stale_channel = Some(open_route.device_channel_id);
+        }
+        closed
     }
 
     pub fn receive_counters(&self) -> ReceiveCounters {
@@ -391,9 +397,11 @@ impl<T: ByteTransport> MongooseJlrDevice<T> {
     }
 
     /// Closes the OS transport without sending a Mongoose cCloseDevice command.
+    /// A route still open is closed first, as well as it can be: a disconnect
+    /// is never refused for the adapter's sake.
     pub fn close(&mut self) -> Result<(), ProtocolError> {
         if self.open_route.is_some() {
-            return Err(ProtocolError::ActiveRoute);
+            let _ = self.close_route();
         }
         if !self.closed {
             self.transport.close()?;
@@ -431,6 +439,12 @@ impl<T: ByteTransport> MongooseJlrDevice<T> {
         self.require_open_transport()?;
         if self.open_route.is_some() {
             return Err(ProtocolError::RouteAlreadyOpen);
+        }
+        if let Some(stale) = self.stale_channel.take() {
+            // The channel a failed close left behind: closed, as well as it
+            // can be, before the adapter is asked for another.
+            self.transport.set_read_timeout(COMMAND_READ_TIMEOUT)?;
+            let _ = self.close_channel(stale);
         }
         let route = *passive::route_by_id(route_id);
         let PassiveCapability::Ready = route.passive_capability else {
@@ -475,7 +489,7 @@ impl<T: ByteTransport> MongooseJlrDevice<T> {
         let set_pin_request =
             passive::set_pin_request(pin_sequence, opened.device_channel_id, opened.route);
         if let Err(error) = self.transport.write_all(&set_pin_request) {
-            let _ = self.close_channel_after_failed_setup(opened.device_channel_id);
+            let _ = self.close_channel(opened.device_channel_id);
             return Err(error.into());
         }
         match self.wait_for_response(|frame| {
@@ -486,7 +500,7 @@ impl<T: ByteTransport> MongooseJlrDevice<T> {
                 Ok(opened)
             }
             Err(error) => {
-                let _ = self.close_channel_after_failed_setup(opened.device_channel_id);
+                let _ = self.close_channel(opened.device_channel_id);
                 Err(error)
             }
         }
@@ -599,7 +613,9 @@ impl<T: ByteTransport> MongooseJlrDevice<T> {
         }
     }
 
-    fn close_channel_after_failed_setup(&mut self, channel_id: u16) -> Result<(), ProtocolError> {
+    /// One close of one channel on the adapter: after a failed setup, after
+    /// an operation, or for a channel a failed close left behind.
+    fn close_channel(&mut self, channel_id: u16) -> Result<(), ProtocolError> {
         let sequence = self.sequences.allocate();
         self.transport
             .write_all(&passive::close_channel_request(sequence, channel_id))?;
@@ -813,6 +829,71 @@ mod tests {
         device.close().unwrap();
         let state = state.lock().unwrap();
         assert!(state.writes.is_empty());
+        assert_eq!(state.closes, 1);
+    }
+
+    /// The first real car (2026-11-12): the adapter refused a transmission,
+    /// then did not answer the close — a frame of another sequence here —
+    /// and the route stayed marked open, so every later read was refused by
+    /// this code. A failed close releases the route; the next open closes the
+    /// stale channel first, then opens its own.
+    #[test]
+    fn a_close_the_adapter_does_not_answer_releases_the_route_and_is_retried_before_the_next_open()
+    {
+        let responses = vec![
+            firmware_board_info(1),
+            command_response(CAN1_RESOURCE_ROUTE, OPEN_CHANNEL_RESPONSE, 2, 0),
+            command_response(CAN1_RESOURCE_ROUTE, SET_PIN_RESPONSE, 3, 0),
+            // The close (sequence 4) is answered with somebody else's sequence.
+            command_response(CAN1_RESOURCE_ROUTE, CLOSE_CHANNEL_RESPONSE, 9, 0),
+            // The stale channel's close before the next open (sequence 5).
+            command_response(CAN1_RESOURCE_ROUTE, CLOSE_CHANNEL_RESPONSE, 5, 0),
+            command_response(CAN2_RESOURCE_ROUTE, OPEN_CHANNEL_RESPONSE, 6, 0),
+            command_response(CAN2_RESOURCE_ROUTE, SET_PIN_RESPONSE, 7, 0),
+        ];
+        let (transport, state) = MockTransport::new(responses);
+        let mut device = MongooseJlrDevice::open(transport);
+
+        device.open_receive_route(VehicleRouteId::HsCan).unwrap();
+        assert!(device.close_route().is_err(), "the close was not answered");
+        assert!(
+            device.open_route.is_none(),
+            "the route is released all the same"
+        );
+        assert_eq!(device.stale_channel, Some(CAN1_RESOURCE_ROUTE));
+
+        let reopened = device.open_receive_route(VehicleRouteId::MsCan).unwrap();
+        assert_eq!(reopened.device_channel_id, CAN2_RESOURCE_ROUTE);
+        assert!(device.stale_channel.is_none());
+        let writes = &state.lock().unwrap().writes;
+        // Board-info, open, pins, the close that failed, the stale close, open, pins.
+        assert_eq!(writes.len(), 7);
+        assert_eq!(
+            writes[4],
+            passive::close_channel_request(5, CAN1_RESOURCE_ROUTE),
+            "the stale channel is closed before a new one is opened"
+        );
+    }
+
+    /// A disconnect with a route still open closes the route first instead
+    /// of refusing: the person at the screen must always be able to leave.
+    #[test]
+    fn close_with_a_route_open_closes_the_route_first() {
+        let responses = vec![
+            firmware_board_info(1),
+            command_response(CAN1_RESOURCE_ROUTE, OPEN_CHANNEL_RESPONSE, 2, 0),
+            command_response(CAN1_RESOURCE_ROUTE, SET_PIN_RESPONSE, 3, 0),
+            command_response(CAN1_RESOURCE_ROUTE, CLOSE_CHANNEL_RESPONSE, 4, 0),
+        ];
+        let (transport, state) = MockTransport::new(responses);
+        let mut device = MongooseJlrDevice::open(transport);
+        device.open_receive_route(VehicleRouteId::HsCan).unwrap();
+
+        device.close().unwrap();
+
+        assert!(device.open_route.is_none());
+        let state = state.lock().unwrap();
+        assert_eq!(state.writes.len(), 4, "board-info, open, pins, close");
         assert_eq!(state.closes, 1);
     }
 

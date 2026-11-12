@@ -490,6 +490,10 @@ fn build_report(
         decoded_result,
         pending_responses: raw.map(|value| value.pending_responses).unwrap_or(0),
         timeout_or_error_category: snapshot.error.as_ref().map(|value| value.category),
+        error_message: snapshot
+            .error
+            .as_ref()
+            .map(app_contracts::DiagnosticError::words),
         execution_stage: snapshot
             .error
             .as_ref()

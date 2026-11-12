@@ -215,6 +215,9 @@ fn read_report(responder: Option<&str>, response: Option<&str>) -> ModuleReadRep
         } else {
             None
         },
+        error_message: responder
+            .is_none()
+            .then(|| "no response from ECU before timeout".to_string()),
         execution_stage: if responder.is_none() {
             DiagnosticExecutionStage::ResponseReception
         } else {

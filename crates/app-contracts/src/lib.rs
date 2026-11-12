@@ -197,6 +197,17 @@ pub struct DiagnosticError {
     pub stage: DiagnosticExecutionStage,
 }
 
+impl DiagnosticError {
+    /// The error in one line: its message, and the technical words behind it
+    /// when there are any.
+    pub fn words(&self) -> String {
+        match &self.technical_details {
+            Some(details) if !details.is_empty() => format!("{}: {}", self.message, details),
+            _ => self.message.clone(),
+        }
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct DiagnosticSnapshot {
@@ -236,6 +247,11 @@ pub struct DiagnosticReport {
     pub raw_diagnostic_response: Option<String>,
     pub decoded_result: Option<String>,
     pub timeout_or_error_category: Option<DiagnosticErrorCategory>,
+    /// The error in words — the adapter's own status among them — where the
+    /// read brought no answer; the category alone told the first real-car
+    /// report nothing (2026-11-12).
+    #[serde(default)]
+    pub error_message: Option<String>,
     pub execution_stage: DiagnosticExecutionStage,
 }
 
@@ -949,6 +965,11 @@ pub struct ModuleReadReport {
     pub decoded_result: Option<String>,
     pub pending_responses: u32,
     pub timeout_or_error_category: Option<DiagnosticErrorCategory>,
+    /// The error in words — the adapter's own status among them — where the
+    /// read brought no answer; the category alone told the first real-car
+    /// report nothing (2026-11-12).
+    #[serde(default)]
+    pub error_message: Option<String>,
     pub execution_stage: DiagnosticExecutionStage,
 }
 

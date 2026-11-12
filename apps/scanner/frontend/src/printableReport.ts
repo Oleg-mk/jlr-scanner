@@ -122,8 +122,8 @@ interface ModuleRead {
   decodedResult?: string | null;
   actualResponder?: string | null;
   timestampUnixMs?: number;
-  /** Why the read brought nothing, when it brought nothing. */
-  error?: { message?: string; technicalDetails?: string | null } | null;
+  /** Why the read brought nothing, in words, when it brought nothing. */
+  errorMessage?: string | null;
 }
 
 interface LiveRun {
@@ -193,7 +193,11 @@ interface BatteryRun {
 }
 
 /** Which driver held the cable, in the words the adapter panel uses (ADR-0041). */
-function driverWords(driver: string | null, port: string | null): string {
+function driverWords(
+  driver: string | null,
+  port: string | null,
+  t: (key: string, values?: Record<string, string | number>) => string,
+): string {
   if (driver === "dtmonpro") return t("On SDD's own driver (Drew Technologies)");
   if (driver === "usbser") return t("On Windows's serial driver, {port}", { port: port ?? "—" });
   return text(driver);
@@ -305,7 +309,7 @@ export function buildReport(
   const adapter: Array<[string, string]> = [
     [t("Adapter"), text(info?.name)],
     [t("Port"), text(info?.port)],
-    [t("Driver"), driverWords(info?.driver ?? null, info?.port ?? null)],
+    [t("Driver"), driverWords(info?.driver ?? null, info?.port ?? null, t)],
     [t("Serial number"), serial === "—" ? "—" : mask ? maskTail(serial) : serial],
     [t("Backend"), text(info?.backend)],
   ];
@@ -341,7 +345,7 @@ export function buildReport(
         text(read.ecuFamily),
         text(read.operation),
         // A read that brought nothing says why, in the answer's place.
-        text(read.decodedResult ?? read.error?.message ?? null),
+        text(read.decodedResult ?? read.errorMessage ?? null),
         text(read.actualResponder),
         stamp(read.timestampUnixMs),
       ]),

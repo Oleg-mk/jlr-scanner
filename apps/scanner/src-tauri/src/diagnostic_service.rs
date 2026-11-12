@@ -333,6 +333,7 @@ fn build_report(
             .and_then(|value| value.calibration_ids.first())
             .map(|value| format!("Calibration ID: {value}")),
         timeout_or_error_category: error.map(|value| value.category),
+        error_message: error.map(app_contracts::DiagnosticError::words),
         execution_stage: error
             .map(|value| value.stage)
             .unwrap_or(DiagnosticExecutionStage::Completed),

@@ -75,7 +75,7 @@ function bundle(partial: Partial<SessionBundle> = {}): SessionBundle {
         decodedResult: null,
         actualResponder: null,
         timestampUnixMs: 1_788_479_001_000,
-        error: { message: "No response from the module within 1000 ms" },
+        errorMessage: "CAN connection failed: cOutboundData failed with device status 0x00000100",
       },
     ],
     battery_reads: [
@@ -115,7 +115,9 @@ describe("the readable report", () => {
     // The reads: the answer, and the reason where there was none.
     expect(screen.getByText("P0300, P0301")).toBeVisible();
     expect(screen.getByText("ABS")).toBeVisible();
-    expect(screen.getByText("No response from the module within 1000 ms")).toBeVisible();
+    expect(
+      screen.getByText("CAN connection failed: cOutboundData failed with device status 0x00000100"),
+    ).toBeVisible();
     expect(screen.getByText("78 %")).toBeVisible();
     // What the values are worth, said in the document and not only on screen.
     expect(screen.getAllByText("SOURCE_BACKED").length).toBeGreaterThan(0);
