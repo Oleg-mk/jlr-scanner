@@ -2674,6 +2674,7 @@ dependencies = [
  "tauri-build",
  "tauri-plugin-dialog",
  "transport-api",
+ "transport-dtmonpro",
  "transport-replay",
  "transport-serial",
  "uds-execution",
@@ -4057,6 +4058,14 @@ name = "transport-api"
 version = "1.2.4"
 dependencies = [
  "core-types",
+]
+
+[[package]]
+name = "transport-dtmonpro"
+version = "1.2.4"
+dependencies = [
+ "transport-api",
+ "windows",
 ]
 
 [[package]]

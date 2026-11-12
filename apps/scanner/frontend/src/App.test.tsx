@@ -198,8 +198,58 @@ describe("ProwlOne application shell", () => {
     expect(screen.getByText(/Jaguar XF \/ X250, 2010, 5\.0L Supercharged/)).toBeVisible();
     expect(screen.getByRole("button", { name: "Read Calibration ID" })).toBeDisabled();
     expect(
+      screen.getByText(
+        "Connect the adapter first, in Preparation above: these buttons read the car through it.",
+      ),
+    ).toBeVisible();
+    expect(
+      screen.getByText(
+        "Nothing has been read yet. The report fills as you read, and these buttons wake up with the first result.",
+      ),
+    ).toBeVisible();
+    expect(
       screen.queryByRole("heading", { name: "Supported vehicle interfaces" }),
     ).not.toBeInTheDocument();
+  });
+
+  it("says which driver holds the cable when it sits on SDD's own driver (ADR-0041)", async () => {
+    const onSddsDriver: AdapterSummary = {
+      ...candidate(
+        "\\\\?\\usb#vid_18e1&pid_0104#AOLHE0000009999B#{f99f6fce-03f4-4817-8a03-8cfde4743b92}",
+      ),
+      driver: "dtmonpro",
+    };
+    const client = new ControlledClient({
+      discoveries: [detectedSnapshot([onSddsDriver])],
+      connectResult: {
+        ...connectedSnapshot(),
+        adapters: [onSddsDriver],
+        selectedAdapterPort: onSddsDriver.port,
+        adapter: {
+          ...onSddsDriver,
+          connectionStatus: "Connected",
+          transport: "USB via the MongoosePro driver (dtmonpro)",
+          backend: "mongoose-jlr",
+          boardInfo: { responseCommand: "0x8109", rawResponseHex: "AA BB CC" },
+        },
+      },
+    });
+    render(
+      <App
+        client={client}
+        diagnosticClient={new ControlledDiagnosticClient()}
+        pollIntervalMs={60_000}
+      />,
+    );
+
+    const connect = await screen.findByRole("button", { name: "Connect" });
+    expect(screen.getByText("SDD's driver")).toBeVisible();
+    expect(screen.getByText("On SDD's own driver (Drew Technologies)")).toBeVisible();
+    fireEvent.click(connect);
+
+    expect(await screen.findByText("Verified")).toBeVisible();
+    expect(screen.getByText("USB via the MongoosePro driver (dtmonpro)")).toBeVisible();
+    expect(screen.getByText("On SDD's own driver (Drew Technologies)")).toBeVisible();
   });
 
   it("connects through the client and renders verified board communication", async () => {

@@ -357,6 +357,14 @@ const uk: Record<string, string> = {
   // Tools: adapter
   Adapter: "Адаптер",
   "Adapter not detected": "Адаптер не виявлено",
+  "On Windows's serial driver, {port}": "На послідовному драйвері Windows, {port}",
+  "On SDD's own driver (Drew Technologies)": "На власному драйвері SDD (Drew Technologies)",
+  "SDD's driver": "драйвер SDD",
+  Driver: "Драйвер",
+  "Connect the adapter first, in Preparation above: these buttons read the car through it.":
+    "Спершу підключіть адаптер у «Підготовці» вище: ці кнопки читають автомобіль через нього.",
+  "Nothing has been read yet. The report fills as you read, and these buttons wake up with the first result.":
+    "Поки нічого не прочитано. Звіт наповнюється читаннями, і ці кнопки оживають з першим результатом.",
   "Connect MongoosePro JLR by USB.": "Підключіть MongoosePro JLR через USB.",
   "A device of the same maker is on {port}: USB {vid}:{pid}. That is not the MongoosePro JLR this application speaks to.":
     "Пристрій того самого виробника на {port}: USB {vid}:{pid}. Це не MongoosePro JLR, з яким працює застосунок.",
@@ -1671,6 +1679,14 @@ const ru: Record<string, string> = {
   // Tools: adapter
   Adapter: "Адаптер",
   "Adapter not detected": "Адаптер не обнаружен",
+  "On Windows's serial driver, {port}": "На последовательном драйвере Windows, {port}",
+  "On SDD's own driver (Drew Technologies)": "На собственном драйвере SDD (Drew Technologies)",
+  "SDD's driver": "драйвер SDD",
+  Driver: "Драйвер",
+  "Connect the adapter first, in Preparation above: these buttons read the car through it.":
+    "Сначала подключите адаптер в «Подготовке» выше: эти кнопки читают автомобиль через него.",
+  "Nothing has been read yet. The report fills as you read, and these buttons wake up with the first result.":
+    "Пока ничего не прочитано. Отчёт наполняется чтениями, и эти кнопки оживают с первым результатом.",
   "Connect MongoosePro JLR by USB.": "Подключите MongoosePro JLR по USB.",
   "A device of the same maker is on {port}: USB {vid}:{pid}. That is not the MongoosePro JLR this application speaks to.":
     "Устройство того же производителя на {port}: USB {vid}:{pid}. Это не MongoosePro JLR, с которым работает приложение.",

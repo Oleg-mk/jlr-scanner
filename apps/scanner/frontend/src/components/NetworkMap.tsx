@@ -222,6 +222,13 @@ export function NetworkMap({
             </button>
           )}
       </div>
+      {!adapterReady ? (
+        <p className="button-hint">
+          {t("Connect the adapter first, in Preparation above: these buttons read the car through it.")}
+        </p>
+      ) : survey === null ? (
+        <p className="button-hint">{t("Survey the vehicle first: the modules to ask come from it.")}</p>
+      ) : null}
       <label className="check-option network-option">
         <input
           type="checkbox"

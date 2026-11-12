@@ -98,6 +98,11 @@ export function ReportPanel({
           </button>
         )}
       </div>
+      {snapshot.reportAvailable ? null : (
+        <p className="button-hint">
+          {t("Nothing has been read yet. The report fills as you read, and these buttons wake up with the first result.")}
+        </p>
+      )}
       {bench && preview !== null ? (
         <pre className="report-preview" aria-label={t("Session report (bench, not saved)")}>
           {preview}

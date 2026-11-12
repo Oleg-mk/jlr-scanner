@@ -16,6 +16,8 @@ use mongoose_jlr::{
 };
 use std::sync::{Mutex, MutexGuard};
 use std::time::Duration;
+use transport_api::{ByteTransport, TransportError};
+use transport_dtmonpro::{DtmonproTransport, PassThruDevice, SystemPassThruEnumerator};
 use transport_serial::{
     matching_devices, vendor_devices, SerialDevice, SerialTransport, SystemSerialDeviceEnumerator,
     MONGOOSE_JLR_USB_PID, MONGOOSE_JLR_USB_VID,
@@ -24,6 +26,9 @@ use uds_execution::{PreparedUdsService, PreparedUdsTransaction};
 
 const ADAPTER_NAME: &str = "MongoosePro JLR";
 const TRANSPORT_NAME: &str = "USB CDC / Serial";
+/// The cable on SDD's own driver (ADR-0041): the same bytes through the
+/// device interface the MongoosePro package's kernel driver exposes.
+const PASS_THRU_TRANSPORT_NAME: &str = "USB via the MongoosePro driver (dtmonpro)";
 const BACKEND_NAME: &str = "mongoose-jlr";
 const VEHICLE_MESSAGE: &str = "No vehicle connected";
 /// The bench (ADR-0020) as the adapter panel knows it: a port name no serial
@@ -84,19 +89,29 @@ impl Default for SystemAdapterBackend {
     }
 }
 
-/// One connection, to the adapter or to the bench; the device code above
-/// the transport is the same either way.
+/// One connection — to the adapter on Windows's serial driver, to the adapter
+/// on SDD's own driver (ADR-0041), or to the bench; the device code above the
+/// transport is the same on all three.
 pub enum Link {
     Serial(MongooseJlrDevice<SerialTransport>),
+    PassThru(MongooseJlrDevice<DtmonproTransport>),
     Bench(MongooseJlrDevice<BenchTransport>),
+}
+
+/// The same call on whichever link is open.
+macro_rules! on_link {
+    ($link:expr, $device:ident => $call:expr) => {
+        match $link {
+            Link::Serial($device) => $call,
+            Link::PassThru($device) => $call,
+            Link::Bench($device) => $call,
+        }
+    };
 }
 
 impl Link {
     fn close(&mut self) -> Result<(), ProtocolError> {
-        match self {
-            Self::Serial(device) => device.close(),
-            Self::Bench(device) => device.close(),
-        }
+        on_link!(self, device => device.close())
     }
 
     fn execute_prepared_calibration_identification(
@@ -104,14 +119,7 @@ impl Link {
         transaction: &PreparedDiagnosticTransaction,
         timeout: Duration,
     ) -> Result<MongooseCalibrationIdentificationResult, MongooseDiagnosticError> {
-        match self {
-            Self::Serial(device) => {
-                device.execute_prepared_calibration_identification(transaction, timeout)
-            }
-            Self::Bench(device) => {
-                device.execute_prepared_calibration_identification(transaction, timeout)
-            }
-        }
+        on_link!(self, device => device.execute_prepared_calibration_identification(transaction, timeout))
     }
 
     fn capture_route(
@@ -119,14 +127,7 @@ impl Link {
         route_id: VehicleRouteId,
         duration: Duration,
     ) -> Result<RouteCapture, ProtocolError> {
-        match self {
-            Self::Serial(device) => {
-                device.capture_route(route_id, duration, CAPTURE_IDLE_TIMEOUT, CAPTURE_MAX_FRAMES)
-            }
-            Self::Bench(device) => {
-                device.capture_route(route_id, duration, CAPTURE_IDLE_TIMEOUT, CAPTURE_MAX_FRAMES)
-            }
-        }
+        on_link!(self, device => device.capture_route(route_id, duration, CAPTURE_IDLE_TIMEOUT, CAPTURE_MAX_FRAMES))
     }
 
     fn execute_prepared_uds_read(
@@ -134,58 +135,43 @@ impl Link {
         transaction: &PreparedUdsTransaction,
         timeout: Duration,
     ) -> Result<MongooseUdsReadResult, MongooseDiagnosticError> {
-        match self {
-            Self::Serial(device) => device.execute_prepared_uds_read(transaction, timeout),
-            Self::Bench(device) => device.execute_prepared_uds_read(transaction, timeout),
-        }
+        on_link!(self, device => device.execute_prepared_uds_read(transaction, timeout))
     }
 
-    /// One read on a serial line (`ADR-0029` slice B), on either link.
+    /// One read on a serial line (`ADR-0029` slice B), on any link.
     fn execute_prepared_kline_read(
         &mut self,
         transaction: &PreparedKlineTransaction,
         timeout: Duration,
     ) -> Result<MongooseKlineReadResult, MongooseDiagnosticError> {
-        match self {
-            Self::Serial(device) => device.execute_prepared_kline_read(transaction, timeout),
-            Self::Bench(device) => device.execute_prepared_kline_read(transaction, timeout),
-        }
+        on_link!(self, device => device.execute_prepared_kline_read(transaction, timeout))
     }
 
-    /// One service operation over UDS (`ADR-0036`), on either link.
+    /// One service operation over UDS (`ADR-0036`), on any link.
     fn execute_prepared_uds_service(
         &mut self,
         service: &PreparedUdsService,
         timeout: Duration,
     ) -> Result<MongooseUdsServiceResult, MongooseDiagnosticError> {
-        match self {
-            Self::Serial(device) => device.execute_prepared_uds_service(service, timeout),
-            Self::Bench(device) => device.execute_prepared_uds_service(service, timeout),
-        }
+        on_link!(self, device => device.execute_prepared_uds_service(service, timeout))
     }
 
-    /// One keep-alive on a routine's route (`ADR-0036`, step 2), on either link.
+    /// One keep-alive on a routine's route (`ADR-0036`, step 2), on any link.
     fn execute_prepared_uds_keep_alive(
         &mut self,
         service: &PreparedUdsService,
         timeout: Duration,
     ) -> Result<MongooseUdsServiceResult, MongooseDiagnosticError> {
-        match self {
-            Self::Serial(device) => device.execute_prepared_uds_keep_alive(service, timeout),
-            Self::Bench(device) => device.execute_prepared_uds_keep_alive(service, timeout),
-        }
+        on_link!(self, device => device.execute_prepared_uds_keep_alive(service, timeout))
     }
 
-    /// One service operation on a serial line (`ADR-0036`), on either link.
+    /// One service operation on a serial line (`ADR-0036`), on any link.
     fn execute_prepared_kline_service(
         &mut self,
         service: &PreparedKlineService,
         timeout: Duration,
     ) -> Result<MongooseKlineReadResult, MongooseDiagnosticError> {
-        match self {
-            Self::Serial(device) => device.execute_prepared_kline_service(service, timeout),
-            Self::Bench(device) => device.execute_prepared_kline_service(service, timeout),
-        }
+        on_link!(self, device => device.execute_prepared_kline_service(service, timeout))
     }
 
     fn execute_prepared_j1979_read(
@@ -193,10 +179,7 @@ impl Link {
         transaction: &PreparedDiagnosticTransaction,
         timeout: Duration,
     ) -> Result<MongooseJ1979ReadResult, MongooseDiagnosticError> {
-        match self {
-            Self::Serial(device) => device.execute_prepared_j1979_read(transaction, timeout),
-            Self::Bench(device) => device.execute_prepared_j1979_read(transaction, timeout),
-        }
+        on_link!(self, device => device.execute_prepared_j1979_read(transaction, timeout))
     }
 }
 
@@ -218,24 +201,41 @@ fn bench_summary() -> AdapterSummary {
 impl AdapterBackend for SystemAdapterBackend {
     type Connection = SystemConnection;
 
+    /// The cable wherever it is: on Windows's serial driver, or on SDD's own
+    /// (ADR-0041). A cable is on one driver at a time, so one adapter appears
+    /// once. The serial path is the one every build so far ran on, so its
+    /// failure is a failure; the pass-through path's failure is reported only
+    /// when there is nothing else to show.
     fn discover(&self) -> Result<Vec<AdapterSummary>, BackendFailure> {
-        let devices = matching_devices(
+        let serial = matching_devices(
             &SystemSerialDeviceEnumerator,
             MONGOOSE_JLR_USB_VID,
             MONGOOSE_JLR_USB_PID,
         )
         .map_err(|error| BackendFailure::Discovery(error.to_string()))?;
-
-        Ok(devices.into_iter().map(summary_from_device).collect())
+        let pass_thru = match transport_dtmonpro::matching_devices(
+            &SystemPassThruEnumerator,
+            MONGOOSE_JLR_USB_VID,
+            MONGOOSE_JLR_USB_PID,
+        ) {
+            Ok(devices) => devices,
+            Err(error) if serial.is_empty() => {
+                return Err(BackendFailure::Discovery(error.to_string()))
+            }
+            Err(_) => Vec::new(),
+        };
+        Ok(merge_summaries(serial, pass_thru))
     }
 
     fn other_vendor_devices(&self) -> Result<Vec<AdapterSummary>, BackendFailure> {
-        let devices = vendor_devices(&SystemSerialDeviceEnumerator, MONGOOSE_JLR_USB_VID)
+        let serial = vendor_devices(&SystemSerialDeviceEnumerator, MONGOOSE_JLR_USB_VID)
             .map_err(|error| BackendFailure::Discovery(error.to_string()))?;
-        Ok(devices
+        let pass_thru =
+            transport_dtmonpro::vendor_devices(&SystemPassThruEnumerator, MONGOOSE_JLR_USB_VID)
+                .unwrap_or_default();
+        Ok(merge_summaries(serial, pass_thru)
             .into_iter()
             .filter(|device| device.usb_pid != MONGOOSE_JLR_USB_PID)
-            .map(summary_from_device)
             .collect())
     }
 
@@ -259,6 +259,22 @@ impl AdapterBackend for SystemAdapterBackend {
                 evidence,
             ));
         }
+        if on_pass_thru_driver(adapter) {
+            let device = PassThruDevice {
+                device_path: adapter.port.clone(),
+                usb_vid: adapter.usb_vid,
+                usb_pid: adapter.usb_pid,
+                usb_serial_number: adapter.serial_number.clone(),
+            };
+            let transport = DtmonproTransport::open(&device).map_err(open_failure)?;
+            let (mongoose, evidence) = verify_board(MongooseJlrDevice::open(transport))?;
+            return Ok((
+                SystemConnection {
+                    device: Link::PassThru(mongoose),
+                },
+                evidence,
+            ));
+        }
         let device = SerialDevice {
             port_name: adapter.port.clone(),
             usb_vid: adapter.usb_vid,
@@ -266,28 +282,8 @@ impl AdapterBackend for SystemAdapterBackend {
             usb_serial_number: adapter.serial_number.clone(),
             driver_service: adapter.driver.clone(),
         };
-        let transport = SerialTransport::open(&device).map_err(|error| {
-            let details = error.to_string();
-            if looks_like_adapter_in_use(&details) {
-                BackendFailure::AlreadyInUse(details)
-            } else {
-                BackendFailure::Open(details)
-            }
-        })?;
-        let mut mongoose = MongooseJlrDevice::open(transport);
-        let response = match mongoose.get_board_info() {
-            Ok(response) => response,
-            Err(error) => {
-                let details = error.to_string();
-                let _ = mongoose.close();
-                return Err(BackendFailure::BoardCommunication(details));
-            }
-        };
-
-        let evidence = BoardInfoEvidence {
-            response_command: format!("0x{:04X}", response.response_command),
-            raw_response_hex: encode_hex(&response.raw_board_info),
-        };
+        let transport = SerialTransport::open(&device).map_err(open_failure)?;
+        let (mongoose, evidence) = verify_board(MongooseJlrDevice::open(transport))?;
         Ok((
             SystemConnection {
                 device: Link::Serial(mongoose),
@@ -475,7 +471,7 @@ impl<B: AdapterBackend> AdapterService<B> {
                     usb_vid: selected.usb_vid,
                     usb_pid: selected.usb_pid,
                     serial_number: selected.serial_number.clone(),
-                    transport: TRANSPORT_NAME.to_owned(),
+                    transport: transport_name(&selected).to_owned(),
                     driver: selected.driver.clone(),
                     backend: BACKEND_NAME.to_owned(),
                     board_info,
@@ -803,6 +799,74 @@ fn summary_from_device(device: SerialDevice) -> AdapterSummary {
     }
 }
 
+/// A cable on SDD's driver: its `port` is the device interface path, opaque
+/// above here, and its `driver` names the service that holds it.
+fn summary_from_pass_thru(device: PassThruDevice) -> AdapterSummary {
+    AdapterSummary {
+        name: ADAPTER_NAME.to_owned(),
+        port: device.device_path,
+        usb_vid: device.usb_vid,
+        usb_pid: device.usb_pid,
+        serial_number: device.usb_serial_number,
+        driver: Some(transport_dtmonpro::DRIVER_SERVICE.to_owned()),
+    }
+}
+
+/// One list: the serial path first, as every build so far listed it, then
+/// the cables on SDD's driver.
+fn merge_summaries(
+    serial: Vec<SerialDevice>,
+    pass_thru: Vec<PassThruDevice>,
+) -> Vec<AdapterSummary> {
+    serial
+        .into_iter()
+        .map(summary_from_device)
+        .chain(pass_thru.into_iter().map(summary_from_pass_thru))
+        .collect()
+}
+
+fn on_pass_thru_driver(adapter: &AdapterSummary) -> bool {
+    adapter.driver.as_deref() == Some(transport_dtmonpro::DRIVER_SERVICE)
+}
+
+/// What the panel calls the path the bytes take.
+fn transport_name(adapter: &AdapterSummary) -> &'static str {
+    if on_pass_thru_driver(adapter) {
+        PASS_THRU_TRANSPORT_NAME
+    } else {
+        TRANSPORT_NAME
+    }
+}
+
+fn open_failure(error: TransportError) -> BackendFailure {
+    let details = error.to_string();
+    if looks_like_adapter_in_use(&details) {
+        BackendFailure::AlreadyInUse(details)
+    } else {
+        BackendFailure::Open(details)
+    }
+}
+
+/// The first exchange on any link: the board asked what it is. A board that
+/// does not answer leaves the transport closed behind it.
+fn verify_board<T: ByteTransport>(
+    mut mongoose: MongooseJlrDevice<T>,
+) -> Result<(MongooseJlrDevice<T>, BoardInfoEvidence), BackendFailure> {
+    let response = match mongoose.get_board_info() {
+        Ok(response) => response,
+        Err(error) => {
+            let details = error.to_string();
+            let _ = mongoose.close();
+            return Err(BackendFailure::BoardCommunication(details));
+        }
+    };
+    let evidence = BoardInfoEvidence {
+        response_command: format!("0x{:04X}", response.response_command),
+        raw_response_hex: encode_hex(&response.raw_board_info),
+    };
+    Ok((mongoose, evidence))
+}
+
 fn interface_capabilities() -> Vec<VehicleInterfaceCapability> {
     let mut capabilities = list_vehicle_routes()
         .iter()
@@ -1050,6 +1114,56 @@ mod tests {
 
         assert_eq!(snapshot.adapters.len(), 1);
         assert!(snapshot.other_vendor_devices.is_empty());
+    }
+
+    /// ADR-0041: a cable on SDD's own driver is listed after the serial ones,
+    /// carries the service that holds it, and connects as a path of its own.
+    #[test]
+    fn a_cable_on_sdds_driver_is_listed_with_its_driver_and_named_as_its_own_path() {
+        let serial = vec![SerialDevice {
+            port_name: "COM3".to_owned(),
+            usb_vid: MONGOOSE_JLR_USB_VID,
+            usb_pid: MONGOOSE_JLR_USB_PID,
+            usb_serial_number: Some("AOLHE0000003666A".to_owned()),
+            driver_service: Some("usbser".to_owned()),
+        }];
+        let pass_thru = vec![PassThruDevice {
+            device_path:
+                r"\\?\usb#vid_18e1&pid_0104#AOLHE0000009999B#{f99f6fce-03f4-4817-8a03-8cfde4743b92}"
+                    .to_owned(),
+            usb_vid: MONGOOSE_JLR_USB_VID,
+            usb_pid: MONGOOSE_JLR_USB_PID,
+            usb_serial_number: Some("AOLHE0000009999B".to_owned()),
+        }];
+
+        let merged = merge_summaries(serial, pass_thru);
+
+        assert_eq!(merged.len(), 2);
+        assert_eq!(merged[0].port, "COM3");
+        assert_eq!(merged[0].driver.as_deref(), Some("usbser"));
+        assert_eq!(transport_name(&merged[0]), TRANSPORT_NAME);
+        assert_eq!(merged[1].name, ADAPTER_NAME);
+        assert_eq!(merged[1].driver.as_deref(), Some("dtmonpro"));
+        assert_eq!(merged[1].serial_number.as_deref(), Some("AOLHE0000009999B"));
+        assert!(merged[1].port.starts_with(r"\\?\usb#vid_18e1&pid_0104#"));
+        assert_eq!(transport_name(&merged[1]), PASS_THRU_TRANSPORT_NAME);
+        assert!(on_pass_thru_driver(&merged[1]) && !on_pass_thru_driver(&merged[0]));
+    }
+
+    #[test]
+    fn connecting_a_cable_on_sdds_driver_names_that_path_on_the_adapter() {
+        let mut found =
+            adapter(r"\\?\usb#vid_18e1&pid_0104#S#{f99f6fce-03f4-4817-8a03-8cfde4743b92}");
+        found.driver = Some("dtmonpro".to_owned());
+        let backend = FakeBackend::with_discoveries(vec![Ok(vec![found])]);
+        let mut service = AdapterService::new(backend);
+
+        let snapshot = service.connect(None);
+
+        assert_eq!(snapshot.state, AdapterState::Connected);
+        let connected = snapshot.adapter.expect("connected adapter");
+        assert_eq!(connected.transport, PASS_THRU_TRANSPORT_NAME);
+        assert_eq!(connected.driver.as_deref(), Some("dtmonpro"));
     }
 
     #[test]

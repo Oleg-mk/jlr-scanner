@@ -3980,7 +3980,29 @@ table.live-read-identifiers label {
 }
 
 .app-shell .app-header h1[data-lamp="waiting"] {
+  position: relative;
+  isolation: isolate;
   animation: lamp-heartbeat 1.395s linear infinite;
+  /* The upper lip's shadow, still; it used to ride along in every stop. */
+  filter: drop-shadow(0 1px 0 rgb(255 255 255 / 70%));
+}
+
+/* The glow as its own layer: the same letters, blurred, in the lamp colour,
+   beating on opacity in step with the face above them. */
+.app-shell .app-header h1[data-lamp="waiting"]::after {
+  content: "ProwlOne";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background: none;
+  -webkit-background-clip: border-box;
+  background-clip: border-box;
+  color: rgb(var(--lamp) / 32%);
+  -webkit-text-fill-color: rgb(var(--lamp) / 32%);
+  text-shadow: none;
+  filter: blur(6px);
+  animation: lamp-glow 1.395s linear infinite;
 }
 
 .app-shell .app-header h1[data-lamp="live"] {
@@ -4013,59 +4035,99 @@ table.live-read-identifiers label {
    leaves, and the glow runs with it. The rises are S-shaped like the
    measured ones; the fade is a chain of straight falls, which is what an
    exponential looks like through nine stops. */
+/* The beat moves opacity alone. Until 2026-11-12 every stop also redrew
+   the glow as a wider or narrower drop-shadow, and the first tester's old
+   workshop laptop, drawing without a graphics chip to speak of, found the
+   whole window slow while the name beat. Opacity costs a compositor
+   nothing; the glow is now a second layer under the letters — see the
+   ::after below — that beats in step on opacity too. The stops, the
+   timing and the darkness between beats are the owner's, from his video
+   of his own car's button (2026-10-03). */
 @keyframes lamp-heartbeat {
   /* 0.000 s - the end of the previous fade, the darkest the name gets */
   0% {
     opacity: 0.54;
-    filter: drop-shadow(0 1px 0 rgb(255 255 255 / 70%)) drop-shadow(0 0 3px rgb(var(--lamp) / 10%));
     animation-timing-function: cubic-bezier(0.4, 0, 0.6, 1);
   }
   /* 0.150 s - the first beat, a shade under the second */
   10.75% {
     opacity: 0.98;
-    filter: drop-shadow(0 1px 0 rgb(255 255 255 / 70%)) drop-shadow(0 0 10px rgb(var(--lamp) / 31%));
     animation-timing-function: cubic-bezier(0.45, 0, 0.55, 1);
   }
   /* 0.375 s - the short fall between the beats, down to a quarter */
   26.88% {
     opacity: 0.58;
-    filter: drop-shadow(0 1px 0 rgb(255 255 255 / 70%)) drop-shadow(0 0 4px rgb(var(--lamp) / 12%));
     animation-timing-function: cubic-bezier(0.4, 0, 0.6, 1);
   }
   /* 0.525 s - the second beat, the peak */
   37.63% {
     opacity: 1;
-    filter: drop-shadow(0 1px 0 rgb(255 255 255 / 70%)) drop-shadow(0 0 11px rgb(var(--lamp) / 32%));
     animation-timing-function: linear;
   }
   /* 0.675 s - the fade begins fast */
   48.39% {
     opacity: 0.85;
-    filter: drop-shadow(0 1px 0 rgb(255 255 255 / 70%)) drop-shadow(0 0 8px rgb(var(--lamp) / 25%));
     animation-timing-function: linear;
   }
   /* 0.800 s */
   57.35% {
     opacity: 0.75;
-    filter: drop-shadow(0 1px 0 rgb(255 255 255 / 70%)) drop-shadow(0 0 7px rgb(var(--lamp) / 20%));
     animation-timing-function: linear;
   }
   /* 1.000 s */
   71.68% {
     opacity: 0.66;
-    filter: drop-shadow(0 1px 0 rgb(255 255 255 / 70%)) drop-shadow(0 0 5px rgb(var(--lamp) / 16%));
     animation-timing-function: linear;
   }
   /* 1.250 s - and slower */
   89.61% {
     opacity: 0.61;
-    filter: drop-shadow(0 1px 0 rgb(255 255 255 / 70%)) drop-shadow(0 0 4px rgb(var(--lamp) / 13%));
     animation-timing-function: linear;
   }
   /* 1.395 s - still fading when the next beat starts */
   100% {
     opacity: 0.54;
-    filter: drop-shadow(0 1px 0 rgb(255 255 255 / 70%)) drop-shadow(0 0 3px rgb(var(--lamp) / 10%));
+  }
+}
+
+/* The light escaping the groove: at the peak the glow stands at the
+   strength the owner chose (32 % of the lamp colour), and between beats it
+   falls to a third of that, as the old shadow did. */
+@keyframes lamp-glow {
+  0% {
+    opacity: 0.31;
+    animation-timing-function: cubic-bezier(0.4, 0, 0.6, 1);
+  }
+  10.75% {
+    opacity: 0.97;
+    animation-timing-function: cubic-bezier(0.45, 0, 0.55, 1);
+  }
+  26.88% {
+    opacity: 0.38;
+    animation-timing-function: cubic-bezier(0.4, 0, 0.6, 1);
+  }
+  37.63% {
+    opacity: 1.00;
+    animation-timing-function: linear;
+  }
+  48.39% {
+    opacity: 0.78;
+    animation-timing-function: linear;
+  }
+  57.35% {
+    opacity: 0.62;
+    animation-timing-function: linear;
+  }
+  71.68% {
+    opacity: 0.50;
+    animation-timing-function: linear;
+  }
+  89.61% {
+    opacity: 0.41;
+    animation-timing-function: linear;
+  }
+  100% {
+    opacity: 0.31;
   }
 }
 
@@ -4077,6 +4139,10 @@ table.live-read-identifiers label {
     filter:
       drop-shadow(0 -1px 0 rgb(0 0 0 / 55%))
       drop-shadow(0 0 7px rgb(var(--lamp) / 34%));
+  }
+
+  .app-shell .app-header h1[data-lamp="waiting"]::after {
+    content: none;
   }
 }
 
@@ -6010,4 +6076,82 @@ table.live-read-identifiers label {
 
 .fault-summary .mode-operation {
   margin: 0.5rem 0 0.75rem;
+}
+
+/* ===================================================================== */
+/* Below 1100 px the column cannot stand beside the session, and until    */
+/* 2026-11-12 it lay at the top and scrolled away with it. The first      */
+/* tester, on a 1024 px laptop, asked for a menu along the top instead of  */
+/* scrolling down the page. So here the rail is that menu: the steps in   */
+/* one row, stuck to the top of the window, each one a button to its       */
+/* section, red where the session stands. The hints and the vehicle's     */
+/* picture wait for a wider screen.                                        */
+/* ===================================================================== */
+@media (max-width: 1100px) {
+  /* One column: the plate's own grid kept the two columns at every width
+     until now, which is what the tester saw on his 1024 px screen. */
+  .app-shell main.flow {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  /* The slot beside the session column has no column to stand beside. */
+  .app-shell main.flow::before {
+    display: none;
+  }
+
+  .app-shell .flow-rail {
+    position: sticky;
+    top: 0;
+    z-index: 30;
+    margin: 0 calc(-1 * var(--content-pad, 1.5rem));
+  }
+
+  .app-shell .flow-rail .session-panel {
+    width: auto;
+    height: auto;
+    padding: 0.45rem var(--content-pad, 1.5rem) 0.5rem;
+    border-radius: 0;
+    border-width: 0 0 1px;
+  }
+
+  .app-shell .flow-rail .rail-scroll {
+    height: auto;
+    overflow: visible;
+    margin-right: 0;
+    padding-right: 0;
+  }
+
+  .app-shell .flow-rail .section-heading,
+  .app-shell .flow-rail .operation-copy,
+  .app-shell .flow-rail .session-step-hint,
+  .app-shell .flow-rail .session-step-state,
+  .app-shell .flow-rail .rail-vehicle {
+    display: none;
+  }
+
+  .app-shell .flow-rail .session-steps {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.3rem 0.5rem;
+    margin: 0;
+    padding: 0;
+  }
+
+  .app-shell .flow-rail .session-step {
+    margin: 0;
+    padding-left: 10px;
+  }
+
+  .app-shell .flow-rail .session-step-button {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    min-height: 0;
+    padding: 0.25rem 0.5rem 0.25rem 0;
+  }
+
+  .app-shell .flow-rail .session-step-title {
+    font-size: 0.9rem;
+    white-space: nowrap;
+  }
 }

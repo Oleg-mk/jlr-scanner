@@ -101,6 +101,25 @@ function BenchOffer({
   );
 }
 
+/** The Windows service SDD's MongoosePro package installs for the cable (ADR-0041). */
+const PASS_THRU_DRIVER = "dtmonpro";
+
+/**
+ * Which driver holds the cable, in words. On a PC that runs SDD the cable
+ * sits on SDD's own driver, and the first tester's question of 2026-11-11 —
+ * why SDD sees it and this did not — is answered here before it is asked.
+ */
+function heldBy(adapter: { port: string; driver: string | null }): string {
+  return adapter.driver === PASS_THRU_DRIVER
+    ? t("On SDD's own driver (Drew Technologies)")
+    : t("On Windows's serial driver, {port}", { port: adapter.port });
+}
+
+/** The short form for a badge or a list: the COM port, or whose driver it is. */
+function portBadge(adapter: { port: string; driver: string | null }): string {
+  return adapter.driver === PASS_THRU_DRIVER ? t("SDD's driver") : adapter.port;
+}
+
 /** Four hex digits, the way a USB identifier is written. */
 function hex4(value: number): string {
   return value.toString(16).toUpperCase().padStart(4, "0");
@@ -238,6 +257,7 @@ export function AdapterPanel({
             <div><dt>USB PID</dt><dd>{hexId(adapter.usbPid)}</dd></div>
             <div><dt>{t("Serial")}</dt><dd>{adapter.serialNumber ?? t("Not provided by OS")}</dd></div>
             <div><dt>{t("Port")}</dt><dd>{adapter.port}</dd></div>
+            <div><dt>{t("Driver")}</dt><dd>{heldBy(adapter)}</dd></div>
             <div><dt>{t("Transport")}</dt><dd>{adapter.transport}</dd></div>
             <div>
               <dt>{t("Driver / backend")}</dt>
@@ -320,7 +340,7 @@ export function AdapterPanel({
         <>
           <div className="adapter-title-row">
             <h3>{t("{name} detected", { name: detected.name })}</h3>
-            <StatusBadge tone="neutral">{detected.port}</StatusBadge>
+            <StatusBadge tone="neutral">{portBadge(detected)}</StatusBadge>
           </div>
           {snapshot.selectionRequired ? (
             <label className="adapter-select">
@@ -332,7 +352,7 @@ export function AdapterPanel({
                 <option value="" disabled>{t("Select a COM port")}</option>
                 {snapshot.adapters.map((adapter) => (
                   <option value={adapter.port} key={adapter.port}>
-                    {adapter.name} — {adapter.port}
+                    {adapter.name} — {portBadge(adapter)}
                   </option>
                 ))}
               </select>
@@ -342,6 +362,7 @@ export function AdapterPanel({
             <div><dt>USB VID / PID</dt><dd>{hexId(detected.usbVid)}:{hexId(detected.usbPid)}</dd></div>
             <div><dt>{t("Serial")}</dt><dd>{detected.serialNumber ?? t("Not provided by OS")}</dd></div>
             <div><dt>{t("Port")}</dt><dd>{detected.port}</dd></div>
+            <div><dt>{t("Driver")}</dt><dd>{heldBy(detected)}</dd></div>
           </dl>
           <div className="adapter-actions">
             <button

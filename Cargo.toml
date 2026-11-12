@@ -20,6 +20,7 @@ members = [
   "crates/report-intake",
   "crates/sdd-ingest",
   "crates/transport-api",
+  "crates/transport-dtmonpro",
   "crates/transport-replay",
   "crates/transport-serial",
   "crates/uds",
@@ -64,6 +65,7 @@ serde_json = { version = "1", features = ["raw_value"] }
 sha2 = "0.10"
 tauri = { version = "2" }
 transport-api = { path = "crates/transport-api" }
+transport-dtmonpro = { path = "crates/transport-dtmonpro" }
 transport-replay = { path = "crates/transport-replay" }
 transport-serial = { path = "crates/transport-serial" }
 uds = { path = "crates/uds" }
