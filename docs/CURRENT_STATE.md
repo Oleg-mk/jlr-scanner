@@ -256,6 +256,26 @@ zip `0807-B35C`, the 1.2.4 folder moved to
 x86 installer's name and the ask: the cable back on "MongoosePro JLR J2534
 Interface", the application expected to list it there on its own.
 
+The same afternoon the first real car: the tester connected build 1.2.4,
+on Windows's serial driver, to his Discovery 4, surveyed it, read it, and
+has a session report — the first this product has had from a car; it is
+on its way, and the 1.2.5 run on SDD's driver is still to come. His
+two observations on the vehicle card were both right and both in the
+data's own terms: his VIN decoded to "508PN - V8 5.0 NA Petrol" but the
+engine field stayed "not stated", and the "Engine variant" list offered
+him the diesels' 2.7 and 3.0 under a V8. The Discovery 4's data is
+qualified by four engines (V6DIESEL, V6NA, V6SC, V8NA) and splits only the
+diesel by displacement. Built at the owner's word («роби обидва
+поліпшення»): the catalogue carries the variants per engine, the card
+offers only the chosen engine's and none under one the data does not
+split, and the decode suggests the engine code when SDD's own words for it
+fit exactly one of the programme's codes — `V8` and `NA` to V8NA, `V6` and
+`Diesel` to V6DIESEL — with the variant where the words carry the
+displacement; two codes, or none, suggest nothing, and the person confirms
+either way. Checked against his copy with three Discovery 4 VINs: the V8
+suggests V8NA and no variant, the 3.0 diesel V6DIESEL and 3L, the 2.7
+V6DIESEL and 2.7L. Not yet in a build.
+
 ## 2026-10-03 — the parameter and state names in SDD's own Russian
 
 The owner's idea for the assistant — speak Russian where there is no
