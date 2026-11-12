@@ -2158,7 +2158,44 @@ main.flow {
 /* Printing hides the application and leaves the document alone on the page.
    Visibility rather than display, so the rule holds however deep the portal
    sits in the tree; the portal is lifted to the top of the sheet. */
+/* Printed, the page holds the document and nothing else. Hiding the rest
+   by visibility alone left its height on the sheet: the first real-car
+   report (2026-11-12) ended in five blank pages, the hidden window still
+   standing behind the document. So everything that is not on the
+   document's own branch is taken out of the layout as well. */
 @media print {
+  html,
+  body,
+  .app-shell,
+  main.flow,
+  .flow-body {
+    display: block !important;
+    height: auto !important;
+    min-height: 0 !important;
+    overflow: visible !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    background: none !important;
+  }
+  .app-header,
+  .app-footer,
+  .flow-rail,
+  .demo-banner,
+  .service-band,
+  .flow-section:not(:has(.print-portal)),
+  .flow-section:has(.print-portal) > *:not(:has(.print-portal)),
+  .report-panel > *:not(.print-portal) {
+    display: none !important;
+  }
+  .flow-section:has(.print-portal),
+  .report-panel {
+    display: block !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    border: none !important;
+    box-shadow: none !important;
+    background: none !important;
+  }
   body * {
     visibility: hidden;
   }
@@ -2167,13 +2204,12 @@ main.flow {
     visibility: visible;
   }
   .print-portal {
-    position: absolute;
-    left: 0;
-    top: 0;
+    position: static;
     width: 100%;
     border: none;
     margin: 0;
     border-radius: 0;
+    overflow: visible;
   }
 }
 

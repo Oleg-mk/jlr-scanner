@@ -60,12 +60,22 @@ function bundle(partial: Partial<SessionBundle> = {}): SessionBundle {
     },
     module_reads: [
       {
-        ecu_family: "PCM",
+        ecuFamily: "PCM",
         operation: "READ_DTC_INFORMATION",
-        route_validation: "SOURCE_BACKED",
-        decoded_result: "P0300, P0301",
-        actual_responder: "0x7E8",
-        timestamp_unix_ms: 1_788_479_000_000,
+        routeValidation: "SOURCE_BACKED",
+        decodedResult: "P0300, P0301",
+        actualResponder: "0x7E8",
+        timestampUnixMs: 1_788_479_000_000,
+      },
+      {
+        // A module that did not answer: the row keeps its name and says why.
+        ecuFamily: "ABS",
+        operation: "READ_DTC_INFORMATION",
+        routeValidation: "SOURCE_BACKED",
+        decodedResult: null,
+        actualResponder: null,
+        timestampUnixMs: 1_788_479_001_000,
+        error: { message: "No response from the module within 1000 ms" },
       },
     ],
     battery_reads: [
@@ -102,8 +112,10 @@ describe("the readable report", () => {
     expect(screen.getByText("D9C9-6B50")).toBeVisible();
     // The modules, with the reason beside the one that is a hypothesis.
     expect(screen.getByText(/the adapter has not opened a K-line yet/)).toBeVisible();
-    // The reads.
+    // The reads: the answer, and the reason where there was none.
     expect(screen.getByText("P0300, P0301")).toBeVisible();
+    expect(screen.getByText("ABS")).toBeVisible();
+    expect(screen.getByText("No response from the module within 1000 ms")).toBeVisible();
     expect(screen.getByText("78 %")).toBeVisible();
     // What the values are worth, said in the document and not only on screen.
     expect(screen.getAllByText("SOURCE_BACKED").length).toBeGreaterThan(0);

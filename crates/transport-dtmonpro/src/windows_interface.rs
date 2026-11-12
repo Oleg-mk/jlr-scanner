@@ -5,15 +5,16 @@
 
 use crate::{
     parse_instance_id, DiscoveryError, PassThruDevice, Pipe, PipeError, DEVICE_INTERFACE_GUID,
-    WRITE_TIMEOUT,
+    DRIVER_SERVICE, WRITE_TIMEOUT,
 };
 use std::mem::size_of;
 use std::ptr;
 use windows::core::{Error, GUID, PCWSTR};
 use windows::Win32::Devices::DeviceAndDriverInstallation::{
     SetupDiDestroyDeviceInfoList, SetupDiEnumDeviceInterfaces, SetupDiGetClassDevsW,
-    SetupDiGetDeviceInstanceIdW, SetupDiGetDeviceInterfaceDetailW, DIGCF_DEVICEINTERFACE,
-    DIGCF_PRESENT, HDEVINFO, SP_DEVICE_INTERFACE_DATA, SP_DEVICE_INTERFACE_DETAIL_DATA_W,
+    SetupDiGetDeviceInstanceIdW, SetupDiGetDeviceInterfaceDetailW,
+    SetupDiGetDeviceRegistryPropertyW, DIGCF_DEVICEINTERFACE, DIGCF_PRESENT, HDEVINFO,
+    SPDRP_SERVICE, SPINT_ACTIVE, SP_DEVICE_INTERFACE_DATA, SP_DEVICE_INTERFACE_DETAIL_DATA_W,
     SP_DEVINFO_DATA,
 };
 use windows::Win32::Foundation::{
@@ -37,7 +38,11 @@ fn enumeration_error(what: &str, error: Error) -> DiscoveryError {
 
 /// Every present device interface of the driver's GUID whose instance id
 /// names a USB device, sorted by path. Only the instance id is trusted for
-/// what the device is.
+/// what the device is, and only an interface that is active on a device
+/// the `dtmonpro` service holds right now is listed: on the owner's PC a
+/// registration the driver had left behind outlived the driver, its path
+/// opened the cable through Windows's serial driver instead, and the panel
+/// said "on SDD's driver" of a cable that was not (2026-11-12).
 pub(crate) fn enumerate() -> Result<Vec<PassThruDevice>, DiscoveryError> {
     let guid = GUID::from_u128(DEVICE_INTERFACE_GUID);
     // SAFETY: the GUID outlives the call and the flags are the documented ones.
@@ -69,6 +74,10 @@ fn enumerate_in(set: HDEVINFO, guid: &GUID) -> Result<Vec<PassThruDevice>, Disco
             Ok(()) => {}
             Err(error) if is_win32(&error, ERROR_NO_MORE_ITEMS) => break,
             Err(error) => return Err(enumeration_error("SetupDiEnumDeviceInterfaces", error)),
+        }
+        // A registration without a live symbolic link is a leftover, not a cable.
+        if interface.Flags & SPINT_ACTIVE == 0 {
+            continue;
         }
 
         let mut required = 0_u32;
@@ -135,6 +144,11 @@ fn enumerate_in(set: HDEVINFO, guid: &GUID) -> Result<Vec<PassThruDevice>, Disco
             .position(|&unit| unit == 0)
             .unwrap_or(instance_id.len());
         let instance_id = String::from_utf16_lossy(&instance_id[..length]);
+        // The device must be bound to the package's driver now, whatever
+        // interfaces its registry carries from before.
+        if !bound_service(set, &info).eq_ignore_ascii_case(DRIVER_SERVICE) {
+            continue;
+        }
         if let Some(identity) = parse_instance_id(&instance_id) {
             devices.push(PassThruDevice {
                 device_path,
@@ -147,6 +161,35 @@ fn enumerate_in(set: HDEVINFO, guid: &GUID) -> Result<Vec<PassThruDevice>, Disco
     devices.sort_by(|left, right| left.device_path.cmp(&right.device_path));
     devices.dedup();
     Ok(devices)
+}
+
+/// The name of the service that holds the device: `usbser` for Windows's
+/// serial driver, `dtmonpro` for the package's; empty when Windows does not
+/// say.
+fn bound_service(set: HDEVINFO, info: &SP_DEVINFO_DATA) -> String {
+    let mut buffer = [0_u8; 512];
+    let mut kind = 0_u32;
+    let mut filled = 0_u32;
+    // SAFETY: info came from the detail call on this set; the buffer is ours.
+    let read = unsafe {
+        SetupDiGetDeviceRegistryPropertyW(
+            set,
+            info,
+            SPDRP_SERVICE,
+            Some(&mut kind),
+            Some(&mut buffer),
+            Some(&mut filled),
+        )
+    };
+    if read.is_err() {
+        return String::new();
+    }
+    let units: Vec<u16> = buffer[..(filled as usize).min(buffer.len())]
+        .chunks_exact(2)
+        .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
+        .take_while(|&unit| unit != 0)
+        .collect();
+    String::from_utf16_lossy(&units)
 }
 
 fn wide(text: &str) -> Vec<u16> {

@@ -26,6 +26,8 @@ export interface SessionBundle {
       port?: string;
       serialNumber?: string | null;
       backend?: string;
+      /** The Windows service that held the cable: usbser, or SDD's dtmonpro (ADR-0041). */
+      driver?: string | null;
     } | null;
   } | null;
   library?: {
@@ -105,14 +107,23 @@ interface SurveyModule {
   dtcRead?: { status?: string; reasons?: string[] };
 }
 
+/**
+ * A module read as the shell records it: the `ModuleReadReport` contract,
+ * whose keys are camel case. The first real-car report (2026-11-12) printed
+ * every one of its 39 reads as a row of dashes because this reader asked
+ * for snake-case keys the record never had; the test fixture had the same
+ * keys and so saw nothing wrong.
+ */
 interface ModuleRead {
-  ecu_family?: string;
+  ecuFamily?: string;
   operation?: string;
   vehicle?: VehicleContext;
-  route_validation?: string;
-  decoded_result?: string | null;
-  actual_responder?: string | null;
-  timestamp_unix_ms?: number;
+  routeValidation?: string;
+  decodedResult?: string | null;
+  actualResponder?: string | null;
+  timestampUnixMs?: number;
+  /** Why the read brought nothing, when it brought nothing. */
+  error?: { message?: string; technicalDetails?: string | null } | null;
 }
 
 interface LiveRun {
@@ -179,6 +190,13 @@ interface BatteryRun {
     routeValidation?: string;
   }>;
   route_validation?: string;
+}
+
+/** Which driver held the cable, in the words the adapter panel uses (ADR-0041). */
+function driverWords(driver: string | null, port: string | null): string {
+  if (driver === "dtmonpro") return t("On SDD's own driver (Drew Technologies)");
+  if (driver === "usbser") return t("On Windows's serial driver, {port}", { port: port ?? "—" });
+  return text(driver);
 }
 
 /** One table of the document: a heading, its rows, and what they are worth. */
@@ -287,6 +305,7 @@ export function buildReport(
   const adapter: Array<[string, string]> = [
     [t("Adapter"), text(info?.name)],
     [t("Port"), text(info?.port)],
+    [t("Driver"), driverWords(info?.driver ?? null, info?.port ?? null)],
     [t("Serial number"), serial === "—" ? "—" : mask ? maskTail(serial) : serial],
     [t("Backend"), text(info?.backend)],
   ];
@@ -316,14 +335,15 @@ export function buildReport(
     sections.push({
       id: "module-reads",
       title: t("Module reads"),
-      worth: worthOf(reads[0]?.route_validation),
+      worth: worthOf(reads[0]?.routeValidation),
       columns: [t("Module"), t("Operation"), t("Answer"), t("Responder"), t("When")],
       rows: reads.map((read) => [
-        text(read.ecu_family),
+        text(read.ecuFamily),
         text(read.operation),
-        text(read.decoded_result),
-        text(read.actual_responder),
-        stamp(read.timestamp_unix_ms),
+        // A read that brought nothing says why, in the answer's place.
+        text(read.decodedResult ?? read.error?.message ?? null),
+        text(read.actualResponder),
+        stamp(read.timestampUnixMs),
       ]),
     });
   }
