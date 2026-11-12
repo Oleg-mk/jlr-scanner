@@ -299,6 +299,25 @@ and the state of the ignition are asked for. Also that day, a guard in
 the pass-through enumeration: an interface counts only when it is active
 and the device's bound service is `dtmonpro`. Not yet in a build.
 
+The session file came within the hour and says what the document could
+not. The first operation to reach the car was a live read of the PCM on
+HS-CAN: the adapter opened the channel (500 kbit/s, pins 6/14) and then
+answered the transmission with its own status — `cOutboundData failed
+with device status 0x00000100` — twice. The car took nothing; the bus
+did not acknowledge, which is what an ignition left off looks like, and
+the status word's meaning is not in the research. After the second
+refusal the close of the channel failed too, and this code left the
+route marked open: from then on every operation of the session — the
+rest of the live run and all thirty-nine reads of "Check all modules",
+MS-CAN never tried — was refused by the application itself with "a
+passive receive route is already open", and a disconnect would have
+been refused the same way. Fixed: a failed close releases the route and
+remembers the channel, the next open closes that channel first, and a
+disconnect closes an open route instead of refusing; the module-read
+record now carries the error in words, the adapter's status among them,
+so the next report says what this one could not. The tester is asked
+to run again with the ignition on. All of it goes into build 1.2.6.
+
 ## 2026-10-03 — the parameter and state names in SDD's own Russian
 
 The owner's idea for the assistant — speak Russian where there is no
