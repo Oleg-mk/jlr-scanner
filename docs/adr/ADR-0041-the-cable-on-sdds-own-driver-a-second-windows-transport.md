@@ -166,3 +166,39 @@ not to add a step to it.
   (administrator rights, and it would touch SDD's installation); loading
   `monpj432.dll` (Drew's runtime, x86 only, the J2534 road this product does
   not take).
+
+## Built, 2026-11-12
+
+Decisions 1 to 6 were built the morning the record was accepted: the crate
+`transport-dtmonpro` with nine tests against a fake pipe, the shell's
+merged discovery with two tests, the panel's words; the Windows side
+compiles for `x86_64` and `i686`, and 150 interface tests pass.
+
+The hardware check could not run where this record put it. On the owner's
+Windows 11 PC the cable was handed to the package's driver in Device
+Manager and came up with a yellow triangle: Code 39, problem status
+`0xC0E90002`, and the Code Integrity log of the same minute — "Code
+Integrity determined that a process (System) attempted to load
+dtmonpro.sys that did not meet the Authenticode signing level
+requirements or violated code integrity policy", and "Windows is unable
+to verify the image integrity of the file ... because file hash could not
+be found on the system". Smart App Control was off (registry state 0);
+memory integrity (HVCI) was running. So the 2012 driver, signed by Drew
+Technologies and not by Microsoft, does not load on this Windows 11 at
+all — which is also the answer to the question left open above: Windows
+bound the inbox `usbser` because the package's own driver cannot start
+here. SDD itself could not run on such a PC; on a machine like it the
+serial path is the only path, and on the SDD-era laptops, where the
+driver loads, the path of this record is the one that matters.
+
+Handing the cable back was not a dialog's work: "Update driver" to "USB
+Serial Device" did not stick, twice, nor after a restart. At the owner's
+hand the package was removed from his PC —
+`pnputil /delete-driver oem90.inf /uninstall /force` — and the replugged
+cable came up as "USB Serial Device (COM4)". The new build then listed it
+on Windows's serial driver, connected, and got `0x8109` back: the merged
+discovery is `HARDWARE_CONFIRMED` on the serial path. The path through
+`dtmonpro.sys` stays `IMPLEMENTED / FIXTURE_TESTED`, and its hardware check
+moves to a PC where the driver loads — the first tester's SDD laptop is
+the nearest — on the owner's word; the serial path stays beside it as the
+fallback either way.

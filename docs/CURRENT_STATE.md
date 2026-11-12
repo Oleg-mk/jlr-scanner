@@ -221,6 +221,24 @@ one column with the steps as a row of buttons stuck to the top of the
 window. 150 interface tests pass; the owner has not yet seen these at the
 screen.
 
+The hardware check of `ADR-0041` ran into Windows 11 itself: the owner's
+cable, handed to the package's driver, came up with Code 39 — the Code
+Integrity log says the 2012 driver "did not meet the Authenticode signing
+level requirements or violated code integrity policy", with Smart App
+Control off and memory integrity on. That is why his PC had bound `usbser`
+all along, and it means SDD's own driver cannot load on a Windows 11 PC
+like his at all. Handing the cable back through "Update driver" did not
+stick, nor after a restart; at his hand the package was removed from his
+PC with `pnputil /delete-driver oem90.inf /uninstall /force`, the replugged
+cable came up as "USB Serial Device (COM4)", and the new build listed it on
+Windows's serial driver, connected and got `0x8109` back — the merged
+discovery `HARDWARE_CONFIRMED` on the serial path, the path through
+`dtmonpro.sys` still `FIXTURE_TESTED`, its check moved to a PC where the
+driver loads (the ADR's "Built" note). At the owner's eye the narrow window
+was tidied twice more: the head of the plate in two rows — the name, the
+two actions and the language marks, then the three state capsules — and
+the steps four to a row in columns, so that 5 stands under 1.
+
 ## 2026-10-03 — the parameter and state names in SDD's own Russian
 
 The owner's idea for the assistant — speak Russian where there is no
