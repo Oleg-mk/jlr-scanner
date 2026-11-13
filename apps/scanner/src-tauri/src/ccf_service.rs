@@ -24,7 +24,7 @@ use app_contracts::{
 };
 use diagnostic_session::ccf::{decode, CcfBlockRef, CcfParameter, CcfValue};
 use diagnostic_session::{vehicle_context, KnowledgeLibrary};
-use mongoose_jlr::MongooseUdsReadResult;
+use mongoose_jlr::{ExchangeTrace, MongooseUdsReadResult};
 use serde_json::{json, Value};
 use std::collections::BTreeMap;
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -245,13 +245,16 @@ impl CcfService {
 
     /// Record what one module answered for one identifier, or that it did
     /// not; slice the blocks out of the answer.
+    /// `trace` is what the adapter did around the read (`ADR-0042`), for
+    /// the record.
     pub fn record(
         &mut self,
         index: usize,
         result: Result<MongooseUdsReadResult, DiagnosticError>,
+        trace: Option<ExchangeTrace>,
     ) -> CcfReadSnapshot {
         if let Some(run) = self.run.as_mut() {
-            run.record(index, result);
+            run.record(index, result, trace.as_ref());
             if run.entries.iter().all(|entry| entry.done) {
                 run.finish();
             }
@@ -327,7 +330,12 @@ impl Entry {
 }
 
 impl Run {
-    fn record(&mut self, index: usize, result: Result<MongooseUdsReadResult, DiagnosticError>) {
+    fn record(
+        &mut self,
+        index: usize,
+        result: Result<MongooseUdsReadResult, DiagnosticError>,
+        trace: Option<&ExchangeTrace>,
+    ) {
         let Some(entry) = self.entries.get(index) else {
             return;
         };
@@ -346,8 +354,13 @@ impl Run {
             Ok(raw) => ReadOutcome::Answered(raw),
             Err(error) => ReadOutcome::Failed(error),
         };
-        self.records
-            .push(read_record(identity, &entry.transaction, outcome, None));
+        self.records.push(read_record(
+            identity,
+            &entry.transaction,
+            outcome,
+            None,
+            trace,
+        ));
 
         let mut row = CcfBlockRead {
             ecu_family: entry.ecu_family.clone(),

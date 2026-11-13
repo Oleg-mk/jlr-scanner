@@ -9,11 +9,11 @@ use mongoose_jlr::bench::{BenchTransport, SharedBenchBus};
 use mongoose_jlr::MongooseJ1979ReadResult;
 use mongoose_jlr::MongooseKlineReadResult;
 use mongoose_jlr::{list_vehicle_routes, MongooseJlrDevice, VehicleRouteId};
-use mongoose_jlr::{MongooseCalibrationIdentificationResult, MongooseDiagnosticError};
 use mongoose_jlr::{
-    MongooseUdsReadResult, MongooseUdsServiceResult, ProtocolError, RouteCapture,
+    ExchangeTrace, MongooseUdsReadResult, MongooseUdsServiceResult, ProtocolError, RouteCapture,
     CAPTURE_IDLE_TIMEOUT, CAPTURE_MAX_FRAMES,
 };
+use mongoose_jlr::{MongooseCalibrationIdentificationResult, MongooseDiagnosticError};
 use std::sync::{Mutex, MutexGuard};
 use std::time::Duration;
 use transport_api::{ByteTransport, TransportError};
@@ -112,6 +112,11 @@ macro_rules! on_link {
 impl Link {
     fn close(&mut self) -> Result<(), ProtocolError> {
         on_link!(self, device => device.close())
+    }
+
+    /// What the adapter did around the last operation (`ADR-0042`).
+    fn exchange_trace(&self) -> ExchangeTrace {
+        on_link!(self, device => device.exchange_trace().clone())
     }
 
     fn execute_prepared_calibration_identification(
@@ -634,6 +639,15 @@ impl AdapterService<SystemAdapterBackend> {
         (self.state == AdapterState::Connected)
             .then(|| self.adapter.clone())
             .flatten()
+    }
+
+    /// What the adapter did around the operation just executed on this
+    /// connection (`ADR-0042`): read right after the call, whatever it
+    /// returned, for the read's record.
+    pub fn last_exchange_trace(&self) -> Option<ExchangeTrace> {
+        self.connection
+            .as_ref()
+            .map(|connection| connection.device.exchange_trace())
     }
 
     pub fn execute_calibration_identification(

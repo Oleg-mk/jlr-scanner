@@ -17,7 +17,7 @@
 //! answers is what confirms them. Until one does, the survey keeps calling
 //! these routes a hypothesis — `ADR-0015`'s rule, on a line instead of a bus.
 
-use crate::device::{MongooseDiagnosticError, MongooseJlrDevice};
+use crate::device::{ExchangeTrace, MongooseDiagnosticError, MongooseJlrDevice};
 use crate::kline::{self, LineParity};
 use crate::passive::VehicleRouteId;
 use kline_execution::{
@@ -41,6 +41,8 @@ pub struct MongooseKlineReadResult {
     pub node_address: u8,
     pub request_payload: Vec<u8>,
     pub raw_line_bytes: Vec<u8>,
+    /// What the adapter did around the read (ADR-0042).
+    pub trace: ExchangeTrace,
 }
 
 impl<T: ByteTransport> MongooseJlrDevice<T> {
@@ -102,12 +104,13 @@ impl<T: ByteTransport> MongooseJlrDevice<T> {
         )
         .map_err(MongooseDiagnosticError::CanConnection)?;
         let result = self.kline_exchange(transaction, route_id, timeout);
-        let close = self.close_route();
-        match (result, close) {
-            (Ok(result), Ok(())) => Ok(result),
-            (Ok(_), Err(error)) => Err(MongooseDiagnosticError::ChannelClose(error)),
-            (Err(error), _) => Err(error),
-        }
+        // An answer that was received stands; a failed close is in the trace
+        // and the channel is remembered (ADR-0042, decision 5).
+        let _ = self.close_route();
+        result.map(|mut result| {
+            result.trace = self.exchange_trace().clone();
+            result
+        })
     }
 
     fn kline_exchange(
@@ -146,6 +149,7 @@ impl<T: ByteTransport> MongooseJlrDevice<T> {
             node_address: transaction.node_address(),
             request_payload,
             raw_line_bytes,
+            trace: self.exchange_trace().clone(),
         })
     }
 }

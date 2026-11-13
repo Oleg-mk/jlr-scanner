@@ -387,7 +387,7 @@ fn a_scenario_ending_in_nine_reads_a_low_battery_through_the_whole_stack() {
                 .execute_uds_read(&due.transaction, BATTERY_READ_TIMEOUT)
                 .expect("the bench is connected")
                 .map_err(map_live_error);
-            battery.record(due.index, result);
+            battery.record(due.index, result, None);
             battery.mark_synthetic();
         }
         let read = battery.snapshot();
@@ -648,6 +648,7 @@ fn the_bench_connects_without_a_port_reads_the_surveyed_vehicle_and_marks_everyt
         Some(session.library()),
         true,
         ds2_result,
+        None,
     );
     assert_eq!(ds2_read.state, ModuleReadState::Succeeded, "{ds2_read:?}");
     // Every value the bench gives is synthetic and says so (ADR-0020).
@@ -691,6 +692,7 @@ fn the_bench_connects_without_a_port_reads_the_surveyed_vehicle_and_marks_everyt
         Some(session.library()),
         true,
         faults_result,
+        None,
     );
     assert_eq!(
         faults_read.state,
@@ -844,7 +846,7 @@ fn the_bench_connects_without_a_port_reads_the_surveyed_vehicle_and_marks_everyt
                     .execute_uds_read(&due.transaction, LIVE_READ_TIMEOUT)
                     .expect("the bench is connected")
                     .map_err(map_live_error);
-                live.record(due.index, result);
+                live.record(due.index, result, None);
                 live.mark_synthetic()
             }
             None => live.snapshot(),
@@ -928,7 +930,7 @@ fn the_bench_connects_without_a_port_reads_the_surveyed_vehicle_and_marks_everyt
             .execute_uds_read(&due.transaction, MILEAGE_READ_TIMEOUT)
             .expect("the bench is connected")
             .map_err(map_live_error);
-        mileage.record(due.index, result);
+        mileage.record(due.index, result, None);
         mileage.mark_synthetic();
     }
     let surveyed = mileage.snapshot();
@@ -996,7 +998,7 @@ fn the_bench_connects_without_a_port_reads_the_surveyed_vehicle_and_marks_everyt
             .execute_uds_read(&due.transaction, PASSPORT_READ_TIMEOUT)
             .expect("the bench is connected")
             .map_err(map_live_error);
-        passport.record(due.index, result);
+        passport.record(due.index, result, None);
         passport.mark_synthetic();
     }
     let identified = passport.snapshot();
@@ -1099,7 +1101,7 @@ fn the_bench_connects_without_a_port_reads_the_surveyed_vehicle_and_marks_everyt
             .execute_uds_read(&due.transaction, CCF_READ_TIMEOUT)
             .expect("the bench is connected")
             .map_err(map_live_error);
-        ccf.record(due.index, result);
+        ccf.record(due.index, result, None);
         ccf.mark_synthetic();
     }
     let configured = ccf.snapshot();
@@ -1188,7 +1190,7 @@ fn the_bench_connects_without_a_port_reads_the_surveyed_vehicle_and_marks_everyt
             .execute_uds_read(&due.transaction, BATTERY_READ_TIMEOUT)
             .expect("the bench is connected")
             .map_err(map_live_error);
-        battery.record(due.index, result);
+        battery.record(due.index, result, None);
         battery.mark_synthetic();
     }
     let charged = battery.snapshot();
@@ -1396,6 +1398,7 @@ fn the_bench_connects_without_a_port_reads_the_surveyed_vehicle_and_marks_everyt
         Some(session.library()),
         true,
         ds2_again_result,
+        None,
     );
     assert_eq!(
         ds2_again.0.state,

@@ -28,7 +28,7 @@ use kline_execution::{
     decode_response, prepare_read_only_kline_read, KlineReadOutcome, KlineTarget,
     PreparedKlineTransaction, ReadOnlyKlineIntent,
 };
-use mongoose_jlr::MongooseKlineReadResult;
+use mongoose_jlr::{ExchangeTrace, MongooseKlineReadResult};
 use std::time::Duration;
 
 /// How long one module is given to answer on a serial line. A K-line module
@@ -151,7 +151,9 @@ impl KlineReadService {
         None
     }
 
-    /// Record what the line carried back, or why nothing did.
+    /// Record what the line carried back, or why nothing did. `trace` is
+    /// what the adapter did around the read (`ADR-0042`), fetched after it
+    /// whatever it returned.
     pub fn finish(
         request: &ModuleReadRequest,
         prepared: &PreparedKlineRead,
@@ -159,6 +161,7 @@ impl KlineReadService {
         library: Option<&KnowledgeLibrary>,
         synthetic: bool,
         result: Result<MongooseKlineReadResult, DiagnosticError>,
+        trace: Option<&ExchangeTrace>,
     ) -> (ModuleReadSnapshot, ModuleReadReport) {
         let transaction = &prepared.transaction;
         let mut snapshot = idle();
@@ -235,8 +238,11 @@ impl KlineReadService {
                 &line,
                 SerialOutcome::Answered(&raw.raw_line_bytes),
                 decoded_result,
+                trace.or(Some(&raw.trace)),
             ),
-            Err(error) => serial_read_record(identity, &line, SerialOutcome::Failed(error), None),
+            Err(error) => {
+                serial_read_record(identity, &line, SerialOutcome::Failed(error), None, trace)
+            }
         };
         (snapshot, record)
     }

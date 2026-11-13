@@ -9,7 +9,7 @@
 //! whatever happens. The raw response is returned undecoded; decoding is the
 //! codec's own `obd_j1979::decode_response`, as the offline paths use it.
 
-use crate::device::{MongooseDiagnosticError, MongooseJlrDevice};
+use crate::device::{ExchangeTrace, MongooseDiagnosticError, MongooseJlrDevice};
 use crate::passive::{self, CanIdFormat, VehicleRouteId};
 use diagnostic_execution::{
     PreparedDiagnosticTransaction, TransactionSafetyClass, CALIBRATION_IDENTIFICATION_CAPABILITY,
@@ -32,6 +32,8 @@ pub struct MongooseJ1979ReadResult {
     pub raw_diagnostic_response: Vec<u8>,
     /// ResponsePending answers received before the final one.
     pub pending_responses: u32,
+    /// What the adapter did around the read (ADR-0042).
+    pub trace: ExchangeTrace,
 }
 
 impl<T: ByteTransport> MongooseJlrDevice<T> {
@@ -47,12 +49,13 @@ impl<T: ByteTransport> MongooseJlrDevice<T> {
         self.open_route_internal(route_id, false)
             .map_err(MongooseDiagnosticError::CanConnection)?;
         let result = self.execute_j1979_inner(transaction, route_id, timeout);
-        let close = self.close_route();
-        match (result, close) {
-            (Ok(result), Ok(())) => Ok(result),
-            (Ok(_), Err(error)) => Err(MongooseDiagnosticError::ChannelClose(error)),
-            (Err(error), _) => Err(error),
-        }
+        // An answer that was received stands; a failed close is in the trace
+        // and the channel is remembered (ADR-0042, decision 5).
+        let _ = self.close_route();
+        result.map(|mut result| {
+            result.trace = self.exchange_trace().clone();
+            result
+        })
     }
 
     fn execute_j1979_inner(
@@ -131,6 +134,7 @@ impl<T: ByteTransport> MongooseJlrDevice<T> {
                 request_payload,
                 raw_diagnostic_response: raw_response,
                 pending_responses,
+                trace: self.exchange_trace().clone(),
             });
         }
     }
@@ -273,6 +277,18 @@ mod tests {
         assert_eq!(result.responder, 0x7E8);
         assert_eq!(result.request_payload, [0x01, 0x0C, 0x0D]);
         assert_eq!(result.pending_responses, 0);
+        // The bench acknowledges as the adapter has, and the trace says so.
+        assert_eq!(result.trace.transmits, 1);
+        assert_eq!(
+            result
+                .trace
+                .last_acknowledgement
+                .as_ref()
+                .map(|acknowledgement| acknowledgement.status),
+            Some(0x100)
+        );
+        assert_eq!(result.trace.indications, 1);
+        assert!(result.trace.close_error.is_none());
         match decode_response(request, &result.raw_diagnostic_response).unwrap() {
             J1979Response::CurrentData(values) => {
                 assert_eq!(values[0].value, ParameterValue::Number(750.0));

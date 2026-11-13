@@ -30,6 +30,12 @@ pub(crate) const CLOSE_CHANNEL: u16 = 0x0007;
 pub(crate) const CLOSE_CHANNEL_RESPONSE: u16 = 0x8007;
 pub(crate) const OUTBOUND_DATA: u16 = 0x0008;
 pub(crate) const INBOUND_DATA: u16 = 0x0009;
+/// `cIndication`: a record the firmware sends on its own, named in the vendor
+/// library as the asynchronous status of a transmit (research, STRONG) and
+/// consumed after every transmit by the sister product's open client. Its
+/// exact statuses on this adapter are unknown; the device records it and
+/// waits on (ADR-0042). Nothing here is ever sent with this word.
+pub(crate) const INDICATION: u16 = 0x000A;
 pub(crate) const OUTBOUND_DATA_RESPONSE: u16 = 0x8008;
 pub(crate) const SET_PIN: u16 = 0x0012;
 pub(crate) const SET_PIN_RESPONSE: u16 = 0x8012;
@@ -204,6 +210,15 @@ pub(crate) struct CommandResponse {
     pub channel_id: u16,
 }
 
+/// The firmware's answer to a transmit, as it came: the status word and the
+/// words after it, judged by nobody here (ADR-0042, decision 1).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct TransmitAck {
+    pub channel_id: u16,
+    pub status: u32,
+    pub message: String,
+}
+
 pub(crate) fn open_channel_request(sequence: u16, route_word: u16, bitrate: u32) -> Vec<u8> {
     open_channel_request_with_flags(sequence, route_word, bitrate, DT_LISTEN_ONLY)
 }
@@ -321,18 +336,46 @@ pub(crate) fn parse_set_pin_response(
     require_channel(response, channel_id)
 }
 
-pub(crate) fn parse_outbound_response(
+/// The acknowledgement of a transmit, whatever its status word. The bench
+/// (2026-09-06/08) and both real-car sessions (2026-11-12) drew `0x100` with
+/// no text for every transmit; what the word means is for a module's answer
+/// to show, so this parser checks the frame's identity and reads the word
+/// without turning it into a refusal (ADR-0042, decision 1).
+pub(crate) fn parse_outbound_acknowledgement(
     frame: &Frame,
     expected_sequence: u16,
     channel_id: u16,
-) -> Result<CommandResponse, ProtocolError> {
-    let response = parse_command_response(
-        frame,
-        OUTBOUND_DATA_RESPONSE,
-        expected_sequence,
-        "cOutboundData",
-    )?;
-    require_channel(response, channel_id)
+) -> Result<TransmitAck, ProtocolError> {
+    let payload = frame.payload();
+    if payload.len() < COMMAND_HEADER_LENGTH + 4 {
+        return Err(ProtocolError::PayloadTooShort(payload.len()));
+    }
+    let actual_command = read_u16(payload, 4).expect("header length checked");
+    if actual_command != OUTBOUND_DATA_RESPONSE {
+        return Err(ProtocolError::UnexpectedCommand {
+            expected: OUTBOUND_DATA_RESPONSE,
+            actual: actual_command,
+        });
+    }
+    let actual_sequence = read_u16(payload, 6).expect("header length checked");
+    if actual_sequence != expected_sequence {
+        return Err(ProtocolError::SequenceMismatch {
+            expected: expected_sequence,
+            actual: actual_sequence,
+        });
+    }
+    let actual_channel = read_u16(payload, 2).expect("header length checked");
+    if actual_channel != channel_id {
+        return Err(ProtocolError::RouteMismatch {
+            expected: channel_id,
+            actual: actual_channel,
+        });
+    }
+    Ok(TransmitAck {
+        channel_id: actual_channel,
+        status: read_u32(payload, COMMAND_HEADER_LENGTH).expect("response length checked"),
+        message: firmware_message(&payload[COMMAND_HEADER_LENGTH..]),
+    })
 }
 
 pub(crate) fn parse_close_response(
@@ -347,11 +390,6 @@ pub(crate) fn parse_close_response(
         "cCloseChannel",
     )?;
     require_channel(response, channel_id)
-}
-
-pub(crate) fn is_inbound_data(frame: &Frame) -> bool {
-    let payload = frame.payload();
-    payload.len() >= COMMAND_HEADER_LENGTH && read_u16(payload, 4) == Some(INBOUND_DATA)
 }
 
 pub(crate) fn parse_inbound_can(
@@ -475,7 +513,7 @@ pub(crate) fn require_channel(
 
 /// The text the firmware puts after the status and tick words of a refusal
 /// ("SetPins: … only supports CAN on pins 6 and 14"), when there is one.
-fn firmware_message(body: &[u8]) -> String {
+pub(crate) fn firmware_message(body: &[u8]) -> String {
     let Some(rest) = body.get(8..) else {
         return String::new();
     };
@@ -566,6 +604,45 @@ pub(crate) fn command_response_with_text(
     payload.extend_from_slice(&tick.to_le_bytes());
     payload.extend_from_slice(text.as_bytes());
     payload.push(0);
+    outer_frame(&payload)
+}
+
+/// The acknowledgement of a transmit as the firmware has given it every time
+/// (bench 2026-09-06/08, the first car 2026-11-12): `0x8008`, the count word
+/// `1` echoed, status `0x100`, the tick, four zero bytes, no text. The bench
+/// answers with this; the tests replay it.
+pub(crate) fn outbound_acknowledgement(channel_id: u16, sequence: u16, tick: u32) -> Vec<u8> {
+    let mut payload = Vec::with_capacity(24);
+    payload.extend_from_slice(&0_u16.to_le_bytes());
+    payload.extend_from_slice(&channel_id.to_le_bytes());
+    payload.extend_from_slice(&OUTBOUND_DATA_RESPONSE.to_le_bytes());
+    payload.extend_from_slice(&sequence.to_le_bytes());
+    payload.extend_from_slice(&1_u16.to_le_bytes());
+    payload.extend_from_slice(&0_u16.to_le_bytes());
+    payload.extend_from_slice(&TRANSMIT_ACKNOWLEDGED_STATUS.to_le_bytes());
+    payload.extend_from_slice(&tick.to_le_bytes());
+    payload.extend_from_slice(&0_u32.to_le_bytes());
+    outer_frame(&payload)
+}
+
+/// The status word every transmit acknowledgement has carried so far.
+pub(crate) const TRANSMIT_ACKNOWLEDGED_STATUS: u32 = 0x0000_0100;
+
+/// A `cIndication` record as the bench emits it and the tests replay it:
+/// the response shape — zero, channel, the word, the sequence it refers to,
+/// the status, the tick. **The layout is the hypothesis of ADR-0042**: no
+/// such record has been captured byte for byte yet; the device's handling
+/// does not depend on anything past the command and sequence words.
+pub(crate) fn indication(channel_id: u16, sequence: u16, status: u32, tick: u32) -> Vec<u8> {
+    let mut payload = Vec::with_capacity(20);
+    payload.extend_from_slice(&0_u16.to_le_bytes());
+    payload.extend_from_slice(&channel_id.to_le_bytes());
+    payload.extend_from_slice(&INDICATION.to_le_bytes());
+    payload.extend_from_slice(&sequence.to_le_bytes());
+    payload.extend_from_slice(&0_u16.to_le_bytes());
+    payload.extend_from_slice(&0_u16.to_le_bytes());
+    payload.extend_from_slice(&status.to_le_bytes());
+    payload.extend_from_slice(&tick.to_le_bytes());
     outer_frame(&payload)
 }
 
@@ -683,6 +760,60 @@ mod tests {
                 0x0C, 0x00, 0xEA, 0x51, 0x02, 0x01, 0x00, 0x00, 0x07, 0x00, 0x03, 0x00, 0x00, 0x00,
                 0x00, 0x00,
             ]
+        );
+    }
+
+    /// The acknowledgement the adapter gave the application's own record on
+    /// resource 5, 2026-09-08 (`mongoose-probe-2026-09-08/diagnostic_open_and_
+    /// outbound_resources_21_and_5.txt`), byte for byte: status `0x100`, the
+    /// tick, four zero bytes, no words. It parses as an acknowledgement — not
+    /// as a refusal — and the bench's copy of it is the same frame but for
+    /// the tick.
+    #[test]
+    fn the_recorded_acknowledgement_parses_with_status_0x100_and_no_words() {
+        let recorded = [
+            0x00, 0x00, 0x01, 0x05, 0x08, 0x80, 0x08, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x01,
+            0x00, 0x00, 0x50, 0x63, 0xF9, 0x07, 0x00, 0x00, 0x00, 0x00,
+        ];
+        let frame = decode(&outer_frame(&recorded));
+        let acknowledgement =
+            parse_outbound_acknowledgement(&frame, 8, CAN1_RESOURCE_ROUTE).unwrap();
+        assert_eq!(acknowledgement.status, TRANSMIT_ACKNOWLEDGED_STATUS);
+        assert_eq!(acknowledgement.channel_id, CAN1_RESOURCE_ROUTE);
+        assert!(acknowledgement.message.is_empty());
+        assert_eq!(
+            outbound_acknowledgement(CAN1_RESOURCE_ROUTE, 8, 0x07F9_6350),
+            outer_frame(&recorded)
+        );
+        // Another sequence or another channel is not this transmit's answer.
+        assert!(matches!(
+            parse_outbound_acknowledgement(&frame, 9, CAN1_RESOURCE_ROUTE),
+            Err(ProtocolError::SequenceMismatch { .. })
+        ));
+        assert!(matches!(
+            parse_outbound_acknowledgement(&frame, 8, CAN2_RESOURCE_ROUTE),
+            Err(ProtocolError::RouteMismatch { .. })
+        ));
+    }
+
+    /// A transmit the firmware refuses in words — the bench's "channel is not
+    /// open" — parses with its words, for the device to turn into a refusal.
+    #[test]
+    fn an_acknowledgement_with_words_carries_them() {
+        let refusal = command_response_with_text(
+            CAN1_RESOURCE_ROUTE,
+            OUTBOUND_DATA_RESPONSE,
+            4,
+            2,
+            77,
+            "cOutboundData: channel is not open",
+        );
+        let acknowledgement =
+            parse_outbound_acknowledgement(&decode(&refusal), 4, CAN1_RESOURCE_ROUTE).unwrap();
+        assert_eq!(acknowledgement.status, 2);
+        assert_eq!(
+            acknowledgement.message,
+            "cOutboundData: channel is not open"
         );
     }
 

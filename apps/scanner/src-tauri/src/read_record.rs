@@ -10,9 +10,10 @@
 //! session contributed nothing. This is the builder all three share.
 
 use app_contracts::{
-    AdapterInfo, DiagnosticError, DiagnosticExecutionStage, ModuleReadReport, VehicleContextInput,
+    AdapterInfo, AdapterTrace, DiagnosticError, DiagnosticExecutionStage, ModuleReadReport,
+    VehicleContextInput,
 };
-use mongoose_jlr::MongooseUdsReadResult;
+use mongoose_jlr::{ExchangeTrace, MongooseUdsReadResult};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
 use uds_execution::PreparedUdsTransaction;
@@ -37,13 +38,37 @@ pub enum ReadOutcome<'a> {
     Failed(&'a DiagnosticError),
 }
 
+/// The adapter's trace in the record's shape (`ADR-0042`): the words of the
+/// status and of the frames, the counts as they are.
+pub fn adapter_trace(trace: &ExchangeTrace) -> AdapterTrace {
+    let acknowledgement = trace.last_acknowledgement.as_ref();
+    AdapterTrace {
+        transmits: trace.transmits,
+        acknowledgement_status: acknowledgement.map(|value| format!("{:#010X}", value.status)),
+        acknowledgement_message: acknowledgement
+            .map(|value| value.message.clone())
+            .filter(|message| !message.is_empty()),
+        acknowledgement_wait_ms: acknowledgement.map(|value| value.waited_ms),
+        inbound_frames: trace.inbound_frames,
+        indications: trace.indications,
+        last_indication: trace.last_indication.map(|frame| frame.to_string()),
+        stale_frames: trace.stale_frames,
+        last_stale_frame: trace.last_stale_frame.map(|frame| frame.to_string()),
+        dropped_frames: trace.dropped_frames,
+        dropped_bytes: trace.dropped_bytes,
+        close_error: trace.close_error.clone(),
+    }
+}
+
 /// The record of one read, from the transaction that was sent and what came
-/// back.
+/// back. `trace` is what the adapter did around the read, fetched after it
+/// whatever the outcome; an answer carries its own and needs none.
 pub fn read_record(
     identity: ReadIdentity<'_>,
     transaction: &PreparedUdsTransaction,
     outcome: ReadOutcome<'_>,
     decoded_result: Option<String>,
+    trace: Option<&ExchangeTrace>,
 ) -> ModuleReadReport {
     let timestamp_unix_ms = SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -56,6 +81,7 @@ pub fn read_record(
         ReadOutcome::Answered(raw) => (Some(raw), None),
         ReadOutcome::Failed(error) => (None, Some(error)),
     };
+    let trace = trace.or(raw.map(|value| &value.trace));
     let adapter = identity.adapter;
     ModuleReadReport {
         schema_version: 1,
@@ -103,6 +129,7 @@ pub fn read_record(
         pending_responses: raw.map(|value| value.pending_responses).unwrap_or(0),
         timeout_or_error_category: error.map(|value| value.category),
         error_message: error.map(app_contracts::DiagnosticError::words),
+        adapter_trace: trace.map(adapter_trace),
         execution_stage: error
             .map(|value| value.stage)
             .unwrap_or(DiagnosticExecutionStage::Completed),
@@ -144,6 +171,7 @@ pub fn serial_read_record(
     line: &SerialRead<'_>,
     outcome: SerialOutcome<'_>,
     decoded_result: Option<String>,
+    trace: Option<&ExchangeTrace>,
 ) -> ModuleReadReport {
     let timestamp_unix_ms = SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -203,6 +231,7 @@ pub fn serial_read_record(
         pending_responses: 0,
         timeout_or_error_category: error.map(|value| value.category),
         error_message: error.map(app_contracts::DiagnosticError::words),
+        adapter_trace: trace.map(adapter_trace),
         execution_stage: error
             .map(|value| value.stage)
             .unwrap_or(DiagnosticExecutionStage::Completed),

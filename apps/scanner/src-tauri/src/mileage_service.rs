@@ -23,7 +23,7 @@ use app_contracts::{
 };
 use diagnostic_session::decode::decode_parameters;
 use diagnostic_session::{mileage, vehicle_context, KnowledgeLibrary};
-use mongoose_jlr::MongooseUdsReadResult;
+use mongoose_jlr::{ExchangeTrace, MongooseUdsReadResult};
 use serde_json::{json, Value};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
@@ -219,13 +219,16 @@ impl MileageService {
     }
 
     /// Record what one module answered, or that it did not.
+    /// `trace` is what the adapter did around the read (`ADR-0042`), for
+    /// the record.
     pub fn record(
         &mut self,
         index: usize,
         result: Result<MongooseUdsReadResult, DiagnosticError>,
+        trace: Option<ExchangeTrace>,
     ) -> MileageSurveySnapshot {
         if let Some(run) = self.run.as_mut() {
-            run.record(index, result);
+            run.record(index, result, trace.as_ref());
             if run.entries.iter().all(|entry| entry.done) {
                 run.finish();
             }
@@ -300,7 +303,12 @@ impl Entry {
 }
 
 impl Run {
-    fn record(&mut self, index: usize, result: Result<MongooseUdsReadResult, DiagnosticError>) {
+    fn record(
+        &mut self,
+        index: usize,
+        result: Result<MongooseUdsReadResult, DiagnosticError>,
+        trace: Option<&ExchangeTrace>,
+    ) {
         let Some(entry) = self.entries.get(index) else {
             return;
         };
@@ -321,7 +329,7 @@ impl Run {
             Ok(raw) => ReadOutcome::Answered(raw),
             Err(error) => ReadOutcome::Failed(error),
         };
-        let record = read_record(identity, &entry.transaction, outcome, None);
+        let record = read_record(identity, &entry.transaction, outcome, None, trace);
         self.records.push(record);
         let mut rows: Vec<MileageReading> = entry
             .wanted

@@ -27,7 +27,7 @@ use app_contracts::{
 };
 use diagnostic_session::decode::decode_parameters;
 use diagnostic_session::KnowledgeLibrary;
-use mongoose_jlr::MongooseUdsReadResult;
+use mongoose_jlr::{ExchangeTrace, MongooseUdsReadResult};
 use serde_json::{json, Value};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
@@ -284,10 +284,13 @@ impl LiveReadService {
 
     /// Record what came back for one entry: a sample, or a failure counted
     /// against that entry.
+    /// `trace` is what the adapter did around the read (`ADR-0042`), for
+    /// the record.
     pub fn record(
         &mut self,
         index: usize,
         result: Result<MongooseUdsReadResult, DiagnosticError>,
+        trace: Option<ExchangeTrace>,
     ) -> LiveReadSnapshot {
         let mut all_dropped = false;
         if let Some(run) = self.run.as_mut() {
@@ -314,7 +317,13 @@ impl LiveReadService {
                     Ok(raw) => ReadOutcome::Answered(raw),
                     Err(error) => ReadOutcome::Failed(error),
                 };
-                entry.record = Some(read_record(identity, &entry.transaction, outcome, None));
+                entry.record = Some(read_record(
+                    identity,
+                    &entry.transaction,
+                    outcome,
+                    None,
+                    trace.as_ref(),
+                ));
                 let mut sample = Sample {
                     at_ms,
                     ecu_family: entry.ecu_family.clone(),

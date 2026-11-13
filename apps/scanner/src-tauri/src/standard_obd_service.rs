@@ -4,6 +4,7 @@
 //! the asking — every OBD-II car answers these at the same addresses — and
 //! the library is consulted only for the wording of a fault code.
 
+use crate::read_record::adapter_trace;
 use app_contracts::{
     AdapterInfo, DiagnosticError, DiagnosticErrorCategory, DiagnosticExecutionStage, DtcSummary,
     LabelledValue, ModuleReadState, StandardObdMonitor, StandardObdReadKind, StandardObdRequest,
@@ -13,7 +14,7 @@ use diagnostic_execution::{
     prepare_standard_obd_transaction, PreparedDiagnosticTransaction, StandardObdResponder,
 };
 use diagnostic_session::{vehicle_context, KnowledgeLibrary, VehicleContext};
-use mongoose_jlr::MongooseJ1979ReadResult;
+use mongoose_jlr::{ExchangeTrace, MongooseJ1979ReadResult};
 use obd_j1979::{
     decode_response, negative_response_text, DtcKind, J1979Error, J1979Request, J1979Response,
     MonitorResult, ParameterValue, VehicleInformation,
@@ -122,6 +123,20 @@ impl StandardObdService {
         library: Option<&KnowledgeLibrary>,
         result: Result<MongooseJ1979ReadResult, DiagnosticError>,
     ) -> StandardObdSnapshot {
+        self.finish_with_trace(request, prepared, adapter, library, result, None)
+    }
+
+    /// `finish`, with what the adapter did around the read (`ADR-0042`) for
+    /// the record, fetched after the read whatever it returned.
+    pub fn finish_with_trace(
+        &mut self,
+        request: &StandardObdRequest,
+        prepared: Option<&PreparedStandardObd>,
+        adapter: Option<&AdapterInfo>,
+        library: Option<&KnowledgeLibrary>,
+        result: Result<MongooseJ1979ReadResult, DiagnosticError>,
+        trace: Option<ExchangeTrace>,
+    ) -> StandardObdSnapshot {
         let mut snapshot = idle();
         snapshot.kind = Some(request.kind);
         if let Some(prepared) = prepared {
@@ -183,7 +198,7 @@ impl StandardObdService {
             }
         };
         snapshot.report_available = true;
-        let report = build_report(request, adapter, &snapshot, raw.as_ref());
+        let report = build_report(request, adapter, &snapshot, raw.as_ref(), trace.as_ref());
         self.last = Some((snapshot.clone(), report));
         snapshot
     }
@@ -457,6 +472,7 @@ fn build_report(
     adapter: Option<&AdapterInfo>,
     snapshot: &StandardObdSnapshot,
     raw: Option<&MongooseJ1979ReadResult>,
+    trace: Option<&ExchangeTrace>,
 ) -> Value {
     let timestamp_unix_ms = SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -482,6 +498,8 @@ fn build_report(
         "request_hex": snapshot.request_hex,
         "raw_response_hex": raw.map(|value| hex(&value.raw_diagnostic_response)),
         "pending_responses": raw.map(|value| value.pending_responses).unwrap_or(0),
+        // What the adapter did around the read (ADR-0042), answered or not.
+        "adapter_trace": trace.or(raw.map(|value| &value.trace)).map(adapter_trace),
         "route_validation": snapshot.route_validation,
         "validation": "a legislated answer proves the responder answered at the standard's address; the meaning of a value is the standard's, never ours",
         "result": snapshot,

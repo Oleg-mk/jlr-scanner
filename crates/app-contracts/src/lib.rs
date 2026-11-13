@@ -202,10 +202,43 @@ impl DiagnosticError {
     /// when there are any.
     pub fn words(&self) -> String {
         match &self.technical_details {
+            // The technical words often begin with the same message (the
+            // adapter's errors do); it is said once.
+            Some(details) if details.starts_with(self.message.as_str()) => details.clone(),
             Some(details) if !details.is_empty() => format!("{}: {}", self.message, details),
             _ => self.message.clone(),
         }
     }
+}
+
+/// What the adapter did around one read (`ADR-0042`), written into every
+/// read's record so a session file says how far a request got: whether the
+/// transmit was acknowledged and with which status word, how many frames the
+/// adapter delivered, what it said on its own, and how the close went. The
+/// first two real-car sessions (2026-11-12) could show none of this.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AdapterTrace {
+    /// Outbound records the adapter acknowledged.
+    pub transmits: u32,
+    /// The status word of the last acknowledgement, as `0x00000100`.
+    pub acknowledgement_status: Option<String>,
+    /// The firmware's words after that status, when it gave any.
+    pub acknowledgement_message: Option<String>,
+    /// From the write to the acknowledgement, in milliseconds.
+    pub acknowledgement_wait_ms: Option<u64>,
+    /// Inbound records the adapter delivered while the route was open.
+    pub inbound_frames: u64,
+    /// The adapter's own indications, and the last of them in words.
+    pub indications: u32,
+    pub last_indication: Option<String>,
+    /// Answers to earlier commands that arrived late, and the last of them.
+    pub stale_frames: u32,
+    pub last_stale_frame: Option<String>,
+    pub dropped_frames: u64,
+    pub dropped_bytes: u64,
+    /// The close's failure in words, when the route's close failed.
+    pub close_error: Option<String>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -970,12 +1003,40 @@ pub struct ModuleReadReport {
     /// report nothing (2026-11-12).
     #[serde(default)]
     pub error_message: Option<String>,
+    /// What the adapter did around the read (`ADR-0042`), answered or not.
+    #[serde(default)]
+    pub adapter_trace: Option<AdapterTrace>,
     pub execution_stage: DiagnosticExecutionStage,
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The record of 1.2.6 read "CAN connection failed: CAN connection
+    /// failed: …": the adapter's words begin with the message, and the
+    /// message is said once.
+    #[test]
+    fn the_error_words_say_the_message_once() {
+        let error = DiagnosticError {
+            category: DiagnosticErrorCategory::CanConnectionFailed,
+            message: "CAN connection failed".into(),
+            technical_details: Some("CAN connection failed: transport read timed out".into()),
+            stage: DiagnosticExecutionStage::CanConnection,
+        };
+        assert_eq!(
+            error.words(),
+            "CAN connection failed: transport read timed out"
+        );
+        let other = DiagnosticError {
+            technical_details: Some("no response from ECU before timeout".into()),
+            ..error
+        };
+        assert_eq!(
+            other.words(),
+            "CAN connection failed: no response from ECU before timeout"
+        );
+    }
 
     #[test]
     fn application_states_remain_small_and_explicit() {

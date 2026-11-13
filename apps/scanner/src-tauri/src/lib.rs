@@ -39,7 +39,9 @@ use dtc_clear_service::{
 use kline_read_service::{KlineReadService, PreparedKlineRead, KLINE_READ_TIMEOUT};
 use live_read_service::{LiveReadService, LIVE_READ_TIMEOUT};
 use mileage_service::{MileageService, MILEAGE_READ_TIMEOUT};
-use module_read_service::{adapter_unavailable, map_live_error, ModuleReadService};
+use module_read_service::{
+    adapter_unavailable, map_live_error, map_live_error_with_trace, ModuleReadService,
+};
 use mongoose_jlr::bench::{share_bus, SharedBenchBus};
 use mongoose_jlr::{MongooseDiagnosticError, VehicleRouteId};
 use passport_service::{PassportService, PASSPORT_READ_TIMEOUT};
@@ -559,14 +561,20 @@ fn read_kline_module_now(
         }
     };
 
-    let (adapter, result, bench) = {
+    let (adapter, result, trace, bench) = {
         let mut service = lock_service(&adapter_state);
         let adapter = service.connected_adapter();
         let bench = service.is_bench();
         let result = service.execute_kline_read(&prepared.transaction, KLINE_READ_TIMEOUT);
+        let trace = service.last_exchange_trace();
         match (adapter, result) {
-            (Some(adapter), Some(result)) => (Some(adapter), result.map_err(map_live_error), bench),
-            _ => (None, Err(adapter_unavailable()), bench),
+            (Some(adapter), Some(result)) => (
+                Some(adapter),
+                result.map_err(|error| map_live_error_with_trace(error, trace.as_ref())),
+                trace,
+                bench,
+            ),
+            _ => (None, Err(adapter_unavailable()), None, bench),
         }
     };
 
@@ -579,6 +587,7 @@ fn read_kline_module_now(
             Some(session.library()),
             bench,
             result,
+            trace.as_ref(),
         )
     };
     let json = serde_json::to_string(&record).ok();
@@ -636,7 +645,7 @@ fn read_module_now(
         }
     };
 
-    let (adapter, result, bench) = {
+    let (adapter, result, trace, bench) = {
         let mut service = lock_service(&adapter_state);
         let Some(adapter) = service.connected_adapter() else {
             return lock_module_read(&module_read_state).finish(
@@ -657,18 +666,26 @@ fn read_module_now(
                 Err(adapter_unavailable()),
             );
         };
-        (adapter, result.map_err(map_live_error), service.is_bench())
+        // What the adapter did around the read, for the record (ADR-0042).
+        let trace = service.last_exchange_trace();
+        (
+            adapter,
+            result.map_err(|error| map_live_error_with_trace(error, trace.as_ref())),
+            trace,
+            service.is_bench(),
+        )
     };
 
     let (snapshot, report) = {
         let session = lock_session(&session_state);
         let mut reads = lock_module_read(&module_read_state);
-        let mut snapshot = reads.finish(
+        let mut snapshot = reads.finish_with_trace(
             &request,
             Some(&prepared),
             Some(&adapter),
             Some(session.library()),
             result,
+            trace,
         );
         if bench {
             snapshot = reads.mark_synthetic();
@@ -1246,7 +1263,7 @@ fn read_standard_obd_now(
         }
     };
 
-    let (adapter, result, bench) = {
+    let (adapter, result, trace, bench) = {
         let mut service = lock_service(&adapter_state);
         let Some(adapter) = service.connected_adapter() else {
             return lock_standard_obd(&standard_obd_state).finish(
@@ -1267,18 +1284,25 @@ fn read_standard_obd_now(
                 Err(adapter_unavailable()),
             );
         };
-        (adapter, result.map_err(map_live_error), service.is_bench())
+        let trace = service.last_exchange_trace();
+        (
+            adapter,
+            result.map_err(|error| map_live_error_with_trace(error, trace.as_ref())),
+            trace,
+            service.is_bench(),
+        )
     };
 
     let (snapshot, report) = {
         let session = lock_session(&session_state);
         let mut reads = lock_standard_obd(&standard_obd_state);
-        let mut snapshot = reads.finish(
+        let mut snapshot = reads.finish_with_trace(
             &request,
             Some(&prepared),
             Some(&adapter),
             Some(session.library()),
             result,
+            trace,
         );
         if bench {
             snapshot = reads.mark_synthetic();
@@ -1680,20 +1704,21 @@ fn live_read_step_now(
         return lock_live_read(&live_state).snapshot();
     };
 
-    let (result, bench) = {
+    let (result, trace, bench) = {
         let mut service = lock_service(&adapter_state);
         let bench = service.is_bench();
-        let result = service
-            .execute_uds_read(&due.transaction, LIVE_READ_TIMEOUT)
-            .map(|result| result.map_err(map_live_error));
-        (result, bench)
+        let result = service.execute_uds_read(&due.transaction, LIVE_READ_TIMEOUT);
+        let trace = service.last_exchange_trace();
+        let result = result
+            .map(|result| result.map_err(|error| map_live_error_with_trace(error, trace.as_ref())));
+        (result, trace, bench)
     };
     let connected = result.is_some();
     let outcome = result.unwrap_or_else(|| Err(adapter_unavailable()));
 
     {
         let mut live = lock_live_read(&live_state);
-        live.record(due.index, outcome);
+        live.record(due.index, outcome, trace);
         if bench {
             live.mark_synthetic();
         }
@@ -1822,20 +1847,21 @@ fn mileage_survey_step_now(
         return lock_mileage(&mileage_state).snapshot();
     };
 
-    let (result, bench) = {
+    let (result, trace, bench) = {
         let mut service = lock_service(&adapter_state);
         let bench = service.is_bench();
-        let result = service
-            .execute_uds_read(&due.transaction, MILEAGE_READ_TIMEOUT)
-            .map(|result| result.map_err(map_live_error));
-        (result, bench)
+        let result = service.execute_uds_read(&due.transaction, MILEAGE_READ_TIMEOUT);
+        let trace = service.last_exchange_trace();
+        let result = result
+            .map(|result| result.map_err(|error| map_live_error_with_trace(error, trace.as_ref())));
+        (result, trace, bench)
     };
     let connected = result.is_some();
     let outcome = result.unwrap_or_else(|| Err(adapter_unavailable()));
 
     {
         let mut mileage = lock_mileage(&mileage_state);
-        mileage.record(due.index, outcome);
+        mileage.record(due.index, outcome, trace);
         if bench {
             mileage.mark_synthetic();
         }
@@ -1965,20 +1991,21 @@ fn module_passport_step_now(
         return lock_passport(&passport_state).snapshot();
     };
 
-    let (result, bench) = {
+    let (result, trace, bench) = {
         let mut service = lock_service(&adapter_state);
         let bench = service.is_bench();
-        let result = service
-            .execute_uds_read(&due.transaction, PASSPORT_READ_TIMEOUT)
-            .map(|result| result.map_err(map_live_error));
-        (result, bench)
+        let result = service.execute_uds_read(&due.transaction, PASSPORT_READ_TIMEOUT);
+        let trace = service.last_exchange_trace();
+        let result = result
+            .map(|result| result.map_err(|error| map_live_error_with_trace(error, trace.as_ref())));
+        (result, trace, bench)
     };
     let connected = result.is_some();
     let outcome = result.unwrap_or_else(|| Err(adapter_unavailable()));
 
     {
         let mut passport = lock_passport(&passport_state);
-        passport.record(due.index, outcome);
+        passport.record(due.index, outcome, trace);
         if bench {
             passport.mark_synthetic();
         }
@@ -2090,20 +2117,21 @@ fn ccf_read_step_now(
         return lock_ccf(&ccf_state).snapshot();
     };
 
-    let (result, bench) = {
+    let (result, trace, bench) = {
         let mut service = lock_service(&adapter_state);
         let bench = service.is_bench();
-        let result = service
-            .execute_uds_read(&due.transaction, CCF_READ_TIMEOUT)
-            .map(|result| result.map_err(map_live_error));
-        (result, bench)
+        let result = service.execute_uds_read(&due.transaction, CCF_READ_TIMEOUT);
+        let trace = service.last_exchange_trace();
+        let result = result
+            .map(|result| result.map_err(|error| map_live_error_with_trace(error, trace.as_ref())));
+        (result, trace, bench)
     };
     let connected = result.is_some();
     let outcome = result.unwrap_or_else(|| Err(adapter_unavailable()));
 
     {
         let mut ccf = lock_ccf(&ccf_state);
-        ccf.record(due.index, outcome);
+        ccf.record(due.index, outcome, trace);
         if bench {
             ccf.mark_synthetic();
         }
@@ -2229,20 +2257,21 @@ fn battery_read_step_now(
         return lock_battery(&battery_state).snapshot();
     };
 
-    let (result, bench) = {
+    let (result, trace, bench) = {
         let mut service = lock_service(&adapter_state);
         let bench = service.is_bench();
-        let result = service
-            .execute_uds_read(&due.transaction, BATTERY_READ_TIMEOUT)
-            .map(|result| result.map_err(map_live_error));
-        (result, bench)
+        let result = service.execute_uds_read(&due.transaction, BATTERY_READ_TIMEOUT);
+        let trace = service.last_exchange_trace();
+        let result = result
+            .map(|result| result.map_err(|error| map_live_error_with_trace(error, trace.as_ref())));
+        (result, trace, bench)
     };
     let connected = result.is_some();
     let outcome = result.unwrap_or_else(|| Err(adapter_unavailable()));
 
     {
         let mut battery = lock_battery(&battery_state);
-        battery.record(due.index, outcome);
+        battery.record(due.index, outcome, trace);
         if bench {
             battery.mark_synthetic();
         }

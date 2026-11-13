@@ -1,6 +1,6 @@
 use crate::{
-    list_vehicle_routes, passive, OpenReceiveRoute, PassiveCapability, RawCanFrame, VehicleRoute,
-    VehicleRouteId,
+    list_vehicle_routes, passive, NetworkType, OpenReceiveRoute, PassiveCapability, RawCanFrame,
+    VehicleRoute, VehicleRouteId,
 };
 use crate::{BoardInfoResponse, FrameDecoder, MongoosePacket, ProtocolError, SequenceCounter};
 use diagnostic_execution::{PreparedDiagnosticTransaction, TransactionSafetyClass};
@@ -12,16 +12,130 @@ use transport_api::{ByteTransport, CanId, TransportError};
 
 const BOARD_INFO_READ_TIMEOUT: Duration = Duration::from_secs(1);
 const COMMAND_READ_TIMEOUT: Duration = Duration::from_secs(1);
+/// How long a transmit's acknowledgement is waited for (ADR-0042, decision
+/// 3). On a bench with nothing to acknowledge the frame, the firmware answered
+/// after about three seconds (2026-09-06/08); in a car, within milliseconds.
+/// The one-second wait of the earlier builds was shorter than the firmware's
+/// own give-up, and the late acknowledgement then met the next command as a
+/// stray frame.
+pub const TRANSMIT_ACK_TIMEOUT: Duration = Duration::from_secs(5);
 /// After the jump the firmware is polled with board-info until it answers
 /// with a running tick; how long it takes to start was not measurable on
 /// the bench (the adapter stays in firmware until it is unplugged), so the
 /// transport waits for the fact rather than for a guessed delay.
 const FIRMWARE_START_TIMEOUT: Duration = Duration::from_secs(5);
 const FIRMWARE_POLL_INTERVAL: Duration = Duration::from_millis(100);
+/// A read is never asked to wait less than this: a zero timeout means "do
+/// not wait" to a serial driver, and a deadline a few microseconds away is
+/// still a deadline.
+const MINIMUM_READ_TIMEOUT: Duration = Duration::from_millis(1);
 
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub struct ReceiveCounters {
+/// The adapter's own answer to a transmit (ADR-0042, decision 1): recorded as
+/// it came, with the firmware's words when there were any, and the time the
+/// acknowledgement took — milliseconds on a live bus, seconds on a dead one.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct TransmitAcknowledgement {
+    pub status: u32,
+    pub message: String,
+    pub waited_ms: u64,
+}
+
+/// A frame the adapter sent that no wait was for: a `cIndication`, or the
+/// answer to an earlier command arriving late. Its identity is kept so the
+/// next session file says what the first two could not (ADR-0042).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct UnsolicitedFrame {
+    pub command: u16,
+    pub sequence: u16,
+    /// The word at the status position, when the record was long enough.
+    pub status: Option<u32>,
+}
+
+impl fmt::Display for UnsolicitedFrame {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            formatter,
+            "{:#06X} sequence {}",
+            self.command, self.sequence
+        )?;
+        match self.status {
+            Some(status) => write!(formatter, " status {status:#010X}"),
+            None => formatter.write_str(" (no status word)"),
+        }
+    }
+}
+
+/// What the adapter did around one operation, counted where the frames pass,
+/// from the open to the close (ADR-0042, decision 4). Every result carries
+/// it, and it can be read after a failure; the shell writes it into every
+/// read's record.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct ExchangeTrace {
+    /// Outbound records acknowledged.
+    pub transmits: u32,
+    pub last_acknowledgement: Option<TransmitAcknowledgement>,
+    /// `cInboundData` records the adapter delivered, kept or not.
+    pub inbound_frames: u64,
+    /// `cIndication` records, and the last of them.
+    pub indications: u32,
+    pub last_indication: Option<UnsolicitedFrame>,
+    /// Command-class frames that were not the answer awaited, and the last.
+    pub stale_frames: u32,
+    pub last_stale_frame: Option<UnsolicitedFrame>,
+    /// Frames dropped: too short for a command header, an inbound record on
+    /// another channel, one the route could not parse while no read wanted
+    /// it.
     pub dropped_frames: u64,
+    /// Bytes the codec could not frame, dropped one at a time.
+    pub dropped_bytes: u64,
+    /// The close's failure in words, when the route's close failed.
+    pub close_error: Option<String>,
+}
+
+impl fmt::Display for ExchangeTrace {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let mut parts: Vec<String> = Vec::new();
+        match &self.last_acknowledgement {
+            Some(acknowledgement) => {
+                let mut text = format!(
+                    "transmit acknowledged with status {:#010X} after {} ms",
+                    acknowledgement.status, acknowledgement.waited_ms
+                );
+                if !acknowledgement.message.is_empty() {
+                    text.push_str(": ");
+                    text.push_str(&acknowledgement.message);
+                }
+                if self.transmits > 1 {
+                    text.push_str(&format!(" ({} transmits)", self.transmits));
+                }
+                parts.push(text);
+            }
+            None => parts.push("no transmit acknowledged".into()),
+        }
+        parts.push(format!("{} inbound frames", self.inbound_frames));
+        if let Some(indication) = &self.last_indication {
+            parts.push(format!(
+                "{} indication(s), last {indication}",
+                self.indications
+            ));
+        }
+        if let Some(stale) = &self.last_stale_frame {
+            parts.push(format!(
+                "{} stale frame(s), last {stale}",
+                self.stale_frames
+            ));
+        }
+        if self.dropped_frames > 0 {
+            parts.push(format!("{} frame(s) dropped", self.dropped_frames));
+        }
+        if self.dropped_bytes > 0 {
+            parts.push(format!("{} byte(s) dropped", self.dropped_bytes));
+        }
+        if let Some(close) = &self.close_error {
+            parts.push(format!("close failed: {close}"));
+        }
+        formatter.write_str(&parts.join("; "))
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -30,6 +144,7 @@ pub struct MongooseCalibrationIdentificationResult {
     pub request_payload: Vec<u8>,
     pub raw_diagnostic_response: Vec<u8>,
     pub calibration_ids: Vec<String>,
+    pub trace: ExchangeTrace,
 }
 
 #[derive(Debug)]
@@ -38,10 +153,16 @@ pub enum MongooseDiagnosticError {
     CanConnection(ProtocolError),
     RequestTransmission(ProtocolError),
     ResponseReception(ProtocolError),
+    /// Kept for the shell's mapping; since ADR-0042 an answer that was
+    /// received stands when the close after it fails, and the close's error
+    /// travels in the trace instead.
     ChannelClose(ProtocolError),
     IsoTp(isotp::IsoTpError),
     J1979(J1979Error),
-    UnexpectedResponder { expected: u32, actual: u32 },
+    UnexpectedResponder {
+        expected: u32,
+        actual: u32,
+    },
     Timeout,
 }
 
@@ -87,6 +208,47 @@ impl From<J1979Error> for MongooseDiagnosticError {
     }
 }
 
+/// One frame from the adapter, by its command word.
+enum Incoming {
+    /// `cInboundData`: a frame from the bus, for the open route.
+    Inbound(crate::Frame),
+    /// `cIndication`: the adapter's own word, recorded and waited on.
+    Indication(UnsolicitedFrame),
+    /// The answer to some command: the awaited one, or a stale one.
+    Command {
+        command: u16,
+        sequence: u16,
+        status: Option<u32>,
+        frame: crate::Frame,
+    },
+    /// Shorter than a command header: dropped and counted.
+    Short,
+}
+
+fn classify(frame: crate::Frame) -> Incoming {
+    let payload = frame.payload();
+    if payload.len() < passive::COMMAND_HEADER_LENGTH {
+        return Incoming::Short;
+    }
+    let command = passive::read_u16(payload, 4).expect("header length checked");
+    let sequence = passive::read_u16(payload, 6).expect("header length checked");
+    let status = passive::read_u32(payload, passive::COMMAND_HEADER_LENGTH);
+    match command {
+        passive::INBOUND_DATA => Incoming::Inbound(frame),
+        passive::INDICATION => Incoming::Indication(UnsolicitedFrame {
+            command,
+            sequence,
+            status,
+        }),
+        _ => Incoming::Command {
+            command,
+            sequence,
+            status,
+            frame,
+        },
+    }
+}
+
 pub struct MongooseJlrDevice<T: ByteTransport> {
     transport: T,
     decoder: FrameDecoder,
@@ -100,8 +262,10 @@ pub struct MongooseJlrDevice<T: ByteTransport> {
     /// the next channel is asked for, so that the adapter holds one at a
     /// time and a close that went unanswered does not block the session.
     stale_channel: Option<u16>,
+    /// Frames of the open route that arrived while a command's answer was
+    /// awaited; the next receive hands them out first. Cleared at every open.
     pending_frames: VecDeque<RawCanFrame>,
-    counters: ReceiveCounters,
+    trace: ExchangeTrace,
 }
 
 impl<T: ByteTransport> MongooseJlrDevice<T> {
@@ -116,8 +280,14 @@ impl<T: ByteTransport> MongooseJlrDevice<T> {
             open_route: None,
             stale_channel: None,
             pending_frames: VecDeque::new(),
-            counters: ReceiveCounters::default(),
+            trace: ExchangeTrace::default(),
         }
+    }
+
+    /// What the adapter did around the last operation — or around this one,
+    /// while it runs (ADR-0042, decision 4).
+    pub fn exchange_trace(&self) -> &ExchangeTrace {
+        &self.trace
     }
 
     /// The adapter powers up in its bootloader, which refuses every channel
@@ -131,11 +301,15 @@ impl<T: ByteTransport> MongooseJlrDevice<T> {
         let info = self.get_board_info()?;
         if info.in_bootloader() {
             let sequence = self.sequences.allocate();
-            self.transport.set_read_timeout(COMMAND_READ_TIMEOUT)?;
-            self.transport
-                .write_all(&passive::jump_to_firmware_request(sequence))?;
-            self.wait_for_response(|frame| passive::parse_jump_response(frame, sequence))?;
-            let deadline = std::time::Instant::now() + FIRMWARE_START_TIMEOUT;
+            let request = passive::jump_to_firmware_request(sequence);
+            self.command_exchange(
+                &request,
+                passive::JUMP_TO_FIRMWARE_RESPONSE,
+                sequence,
+                COMMAND_READ_TIMEOUT,
+                |frame| passive::parse_jump_response(frame, sequence),
+            )?;
+            let deadline = Instant::now() + FIRMWARE_START_TIMEOUT;
             loop {
                 std::thread::sleep(FIRMWARE_POLL_INTERVAL);
                 match self.get_board_info() {
@@ -145,7 +319,7 @@ impl<T: ByteTransport> MongooseJlrDevice<T> {
                     Ok(_) | Err(ProtocolError::Transport(TransportError::Timeout)) => {}
                     Err(error) => return Err(error),
                 }
-                if std::time::Instant::now() >= deadline {
+                if Instant::now() >= deadline {
                     return Err(ProtocolError::FirmwareNotStarted);
                 }
             }
@@ -158,27 +332,22 @@ impl<T: ByteTransport> MongooseJlrDevice<T> {
         list_vehicle_routes()
     }
 
-    /// Sends exactly one allowlisted cGetBoardInfo request and waits for one response.
+    /// Sends exactly one allowlisted cGetBoardInfo request and waits for its
+    /// answer — its own, by command word and sequence; a frame an earlier
+    /// session left in the stream is skipped and counted.
     pub fn get_board_info(&mut self) -> Result<BoardInfoResponse, ProtocolError> {
         if self.closed {
             return Err(TransportError::Closed.into());
         }
         let sequence = self.sequences.allocate();
         let request = MongoosePacket::get_board_info(sequence)?.encode()?;
-        self.transport.set_read_timeout(BOARD_INFO_READ_TIMEOUT)?;
-        self.transport.write_all(&request)?;
-
-        let mut read_buffer = [0_u8; 512];
-        loop {
-            if let Some(frame) = self.decoder.next_frame()? {
-                return BoardInfoResponse::from_frame(&frame, sequence);
-            }
-            let read = self.transport.read(&mut read_buffer)?;
-            if read == 0 {
-                return Err(TransportError::Closed.into());
-            }
-            self.decoder.push(&read_buffer[..read]);
-        }
+        self.command_exchange(
+            &request,
+            crate::BOARD_INFO_RESPONSE_COMMAND,
+            sequence,
+            BOARD_INFO_READ_TIMEOUT,
+            |frame| BoardInfoResponse::from_frame(frame, sequence),
+        )
     }
 
     pub fn open_receive_route(
@@ -199,14 +368,19 @@ impl<T: ByteTransport> MongooseJlrDevice<T> {
         self.open_route_internal(route_id, false)
             .map_err(MongooseDiagnosticError::CanConnection)?;
         let result = self.execute_calibration_inner(transaction, timeout);
-        let close = self.close_route();
-        match (result, close) {
-            (Ok(result), Ok(())) => Ok(result),
-            (Ok(_), Err(error)) => Err(MongooseDiagnosticError::ChannelClose(error)),
-            (Err(error), _) => Err(error),
-        }
+        // An answer that was received stands; the close's failure is in the
+        // trace and the channel is remembered (ADR-0042, decision 5).
+        let _ = self.close_route();
+        result.map(|mut result| {
+            result.trace = self.trace.clone();
+            result
+        })
     }
 
+    /// The next frame of the open route, within `timeout`: one kept earlier,
+    /// or one read now. The adapter's own records on the way — indications,
+    /// late answers, another channel's frames — are counted, not the read's
+    /// failure.
     pub fn receive_frame(
         &mut self,
         timeout: Duration,
@@ -216,21 +390,36 @@ impl<T: ByteTransport> MongooseJlrDevice<T> {
         if let Some(frame) = self.pending_frames.pop_front() {
             return Ok(Some(frame));
         }
-        self.transport.set_read_timeout(timeout)?;
+        let deadline = Instant::now() + timeout;
         loop {
-            if let Some(frame) = self.decoder.next_frame()? {
-                if !passive::is_inbound_data(&frame) {
-                    self.counters.dropped_frames += 1;
-                    continue;
+            let frame = match self.read_frame(deadline) {
+                Ok(frame) => frame,
+                Err(ProtocolError::Transport(TransportError::Timeout)) => return Ok(None),
+                Err(error) => return Err(error),
+            };
+            match classify(frame) {
+                Incoming::Inbound(frame) => {
+                    self.trace.inbound_frames += 1;
+                    match passive::parse_inbound_can(&frame, open_route) {
+                        Ok(frame) => return Ok(Some(frame)),
+                        // Another channel's frame — one a failed close left
+                        // open on the adapter, say — is not this read's.
+                        Err(ProtocolError::RouteMismatch { .. }) => self.trace.dropped_frames += 1,
+                        Err(error) => return Err(error),
+                    }
                 }
-                return passive::parse_inbound_can(&frame, open_route).map(Some);
-            }
-            let mut read_buffer = [0_u8; 512];
-            match self.transport.read(&mut read_buffer) {
-                Ok(0) => return Err(TransportError::Closed.into()),
-                Ok(read) => self.decoder.push(&read_buffer[..read]),
-                Err(TransportError::Timeout) => return Ok(None),
-                Err(error) => return Err(error.into()),
+                Incoming::Indication(frame) => self.record_indication(frame),
+                Incoming::Command {
+                    command,
+                    sequence,
+                    status,
+                    ..
+                } => self.record_stale(UnsolicitedFrame {
+                    command,
+                    sequence,
+                    status,
+                }),
+                Incoming::Short => self.trace.dropped_frames += 1,
             }
         }
     }
@@ -251,6 +440,7 @@ impl<T: ByteTransport> MongooseJlrDevice<T> {
         if self.open_route.is_some() {
             return Err(ProtocolError::RouteAlreadyOpen);
         }
+        self.begin_operation();
         let route = *passive::route_by_id(if pin == 8 {
             VehicleRouteId::KLine8
         } else {
@@ -259,52 +449,45 @@ impl<T: ByteTransport> MongooseJlrDevice<T> {
         self.ensure_firmware()?;
 
         let open_sequence = self.sequences.allocate();
-        self.transport.set_read_timeout(COMMAND_READ_TIMEOUT)?;
-        self.transport
-            .write_all(&passive::diagnostic_open_channel_request(
-                open_sequence,
-                resource,
-                baud,
-            ))?;
-        let open_response = self.wait_for_response(|frame| {
-            passive::parse_open_response(frame, open_sequence, resource)
-        })?;
+        let open_request = passive::diagnostic_open_channel_request(open_sequence, resource, baud);
+        let open_response = self.command_exchange(
+            &open_request,
+            passive::OPEN_CHANNEL_RESPONSE,
+            open_sequence,
+            COMMAND_READ_TIMEOUT,
+            |frame| passive::parse_open_response(frame, open_sequence, resource),
+        )?;
         let opened = OpenReceiveRoute {
             route,
             device_channel_id: open_response.channel_id,
         };
+        let channel = opened.device_channel_id;
 
         // The line, then how a byte on it is framed. A failure at either
         // step closes the channel rather than leaving it open on a guess.
         let pin_sequence = self.sequences.allocate();
-        let pin_request =
-            crate::kline::set_pin_request(pin_sequence, opened.device_channel_id, pin);
-        if let Err(error) = self.transport.write_all(&pin_request) {
-            let _ = self.close_channel(opened.device_channel_id);
-            return Err(error.into());
-        }
-        if let Err(error) = self.wait_for_response(|frame| {
-            passive::parse_set_pin_response(frame, pin_sequence, opened.device_channel_id)
-        }) {
-            let _ = self.close_channel(opened.device_channel_id);
+        let pin_request = crate::kline::set_pin_request(pin_sequence, channel, pin);
+        if let Err(error) = self.command_exchange(
+            &pin_request,
+            passive::SET_PIN_RESPONSE,
+            pin_sequence,
+            COMMAND_READ_TIMEOUT,
+            |frame| passive::parse_set_pin_response(frame, pin_sequence, channel),
+        ) {
+            let _ = self.close_channel(channel);
             return Err(error);
         }
 
         let parity_sequence = self.sequences.allocate();
-        let parity_request =
-            crate::kline::set_parity_request(parity_sequence, opened.device_channel_id, parity);
-        if let Err(error) = self.transport.write_all(&parity_request) {
-            let _ = self.close_channel(opened.device_channel_id);
-            return Err(error.into());
-        }
-        if let Err(error) = self.wait_for_response(|frame| {
-            crate::kline::parse_set_config_response(
-                frame,
-                parity_sequence,
-                opened.device_channel_id,
-            )
-        }) {
-            let _ = self.close_channel(opened.device_channel_id);
+        let parity_request = crate::kline::set_parity_request(parity_sequence, channel, parity);
+        if let Err(error) = self.command_exchange(
+            &parity_request,
+            crate::kline::SET_CONFIG_RESPONSE,
+            parity_sequence,
+            COMMAND_READ_TIMEOUT,
+            |frame| crate::kline::parse_set_config_response(frame, parity_sequence, channel),
+        ) {
+            let _ = self.close_channel(channel);
             return Err(error);
         }
 
@@ -312,23 +495,16 @@ impl<T: ByteTransport> MongooseJlrDevice<T> {
         // init is a command this adapter performs itself; DS2 asks for none.
         if wakeup == crate::kline::WAKEUP_KW2000_FAST {
             let init_sequence = self.sequences.allocate();
-            let init_request = crate::kline::fast_init_request(
+            let init_request =
+                crate::kline::fast_init_request(init_sequence, channel, node_address);
+            if let Err(error) = self.command_exchange(
+                &init_request,
+                crate::kline::FAST_INIT_RESPONSE,
                 init_sequence,
-                opened.device_channel_id,
-                node_address,
-            );
-            if let Err(error) = self.transport.write_all(&init_request) {
-                let _ = self.close_channel(opened.device_channel_id);
-                return Err(error.into());
-            }
-            if let Err(error) = self.wait_for_response(|frame| {
-                crate::kline::parse_fast_init_response(
-                    frame,
-                    init_sequence,
-                    opened.device_channel_id,
-                )
-            }) {
-                let _ = self.close_channel(opened.device_channel_id);
+                COMMAND_READ_TIMEOUT,
+                |frame| crate::kline::parse_fast_init_response(frame, init_sequence, channel),
+            ) {
+                let _ = self.close_channel(channel);
                 return Err(error);
             }
         }
@@ -345,9 +521,7 @@ impl<T: ByteTransport> MongooseJlrDevice<T> {
         let sequence = self.sequences.allocate();
         let request =
             crate::kline::outbound_line_request(sequence, open_route.device_channel_id, bytes);
-        self.transport.write_all(&request)?;
-        self.wait_for_outbound_response(sequence, open_route)?;
-        Ok(())
+        self.acknowledged_transmit(&request, sequence, open_route.device_channel_id)
     }
 
     /// Whatever the line carried back, until it goes quiet.
@@ -357,43 +531,53 @@ impl<T: ByteTransport> MongooseJlrDevice<T> {
     ) -> Result<Option<Vec<u8>>, ProtocolError> {
         self.require_open_transport()?;
         let open_route = self.open_route.ok_or(ProtocolError::NoOpenRoute)?;
-        self.transport.set_read_timeout(timeout)?;
+        let deadline = Instant::now() + timeout;
         loop {
-            if let Some(frame) = self.decoder.next_frame()? {
-                if !passive::is_inbound_data(&frame) {
-                    self.counters.dropped_frames += 1;
-                    continue;
+            let frame = match self.read_frame(deadline) {
+                Ok(frame) => frame,
+                Err(ProtocolError::Transport(TransportError::Timeout)) => return Ok(None),
+                Err(error) => return Err(error),
+            };
+            match classify(frame) {
+                Incoming::Inbound(frame) => {
+                    self.trace.inbound_frames += 1;
+                    match crate::kline::parse_inbound_line(&frame, open_route) {
+                        Ok(bytes) => return Ok(Some(bytes)),
+                        Err(ProtocolError::RouteMismatch { .. }) => self.trace.dropped_frames += 1,
+                        Err(error) => return Err(error),
+                    }
                 }
-                return crate::kline::parse_inbound_line(&frame, open_route).map(Some);
-            }
-            let mut read_buffer = [0_u8; 512];
-            match self.transport.read(&mut read_buffer) {
-                Ok(0) => return Err(TransportError::Closed.into()),
-                Ok(read) => self.decoder.push(&read_buffer[..read]),
-                Err(TransportError::Timeout) => return Ok(None),
-                Err(error) => return Err(error.into()),
+                Incoming::Indication(frame) => self.record_indication(frame),
+                Incoming::Command {
+                    command,
+                    sequence,
+                    status,
+                    ..
+                } => self.record_stale(UnsolicitedFrame {
+                    command,
+                    sequence,
+                    status,
+                }),
+                Incoming::Short => self.trace.dropped_frames += 1,
             }
         }
     }
 
     /// Closes the open route. Whatever the adapter answers, the route is
-    /// released here: on the first real car (2026-11-12) the adapter refused
-    /// a transmission, then did not answer the close, and the route stayed
-    /// marked open — every later read was refused by this code, not by the
-    /// car. A close that fails is reported, its channel remembered and closed
-    /// again before the next one is opened.
+    /// released here: on the first real car (2026-11-12) a close the adapter
+    /// did not answer left the route marked open, and every later read was
+    /// refused by this code, not by the car. A close that fails is reported,
+    /// written into the trace, its channel remembered and closed again before
+    /// the next one is opened.
     pub fn close_route(&mut self) -> Result<(), ProtocolError> {
         self.require_open_transport()?;
         let open_route = self.open_route.take().ok_or(ProtocolError::NoOpenRoute)?;
         let closed = self.close_channel(open_route.device_channel_id);
-        if closed.is_err() {
+        if let Err(error) = &closed {
             self.stale_channel = Some(open_route.device_channel_id);
+            self.trace.close_error = Some(error.to_string());
         }
         closed
-    }
-
-    pub fn receive_counters(&self) -> ReceiveCounters {
-        self.counters
     }
 
     /// Closes the OS transport without sending a Mongoose cCloseDevice command.
@@ -410,25 +594,130 @@ impl<T: ByteTransport> MongooseJlrDevice<T> {
         Ok(())
     }
 
-    fn wait_for_response<R>(
+    /// The start of one operation: the trace of the last one goes, and so do
+    /// frames kept for a route that is no longer open (ADR-0042, decision 6).
+    fn begin_operation(&mut self) {
+        self.trace = ExchangeTrace::default();
+        self.pending_frames.clear();
+    }
+
+    /// One command and its one answer: the request written, the frame with
+    /// the response word and the sequence waited for within `timeout`, then
+    /// parsed by the command's own parser.
+    fn command_exchange<R>(
         &mut self,
-        parse: impl Fn(&crate::Frame) -> Result<R, ProtocolError>,
+        request: &[u8],
+        expected_command: u16,
+        sequence: u16,
+        timeout: Duration,
+        parse: impl FnOnce(&crate::Frame) -> Result<R, ProtocolError>,
     ) -> Result<R, ProtocolError> {
+        self.transport.write_all(request)?;
+        let frame = self.wait_for_answer(expected_command, sequence, timeout)?;
+        parse(&frame)
+    }
+
+    /// The answer to one command (ADR-0042, decision 2): the frame whose
+    /// command word and sequence are the ones expected. On the way, inbound
+    /// records are kept for the open route, indications are recorded, and a
+    /// command-class frame with another sequence — an earlier command's
+    /// answer arriving late — is skipped and recorded. A frame with the
+    /// expected sequence and another command is an error, as is the
+    /// deadline.
+    fn wait_for_answer(
+        &mut self,
+        expected_command: u16,
+        expected_sequence: u16,
+        timeout: Duration,
+    ) -> Result<crate::Frame, ProtocolError> {
+        let deadline = Instant::now() + timeout;
+        loop {
+            let frame = self.read_frame(deadline)?;
+            match classify(frame) {
+                Incoming::Inbound(frame) => self.keep_inbound(frame),
+                Incoming::Indication(frame) => self.record_indication(frame),
+                Incoming::Short => self.trace.dropped_frames += 1,
+                Incoming::Command {
+                    command,
+                    sequence,
+                    status,
+                    frame,
+                } => {
+                    if sequence != expected_sequence {
+                        self.record_stale(UnsolicitedFrame {
+                            command,
+                            sequence,
+                            status,
+                        });
+                        continue;
+                    }
+                    if command != expected_command {
+                        return Err(ProtocolError::UnexpectedCommand {
+                            expected: expected_command,
+                            actual: command,
+                        });
+                    }
+                    return Ok(frame);
+                }
+            }
+        }
+    }
+
+    /// The next frame from the adapter before `deadline`: one already
+    /// decoded, or one read with the time that is left. Bytes the codec
+    /// cannot frame are dropped one at a time and counted, so a stream left
+    /// half-read by an earlier session resynchronises on the next frame.
+    fn read_frame(&mut self, deadline: Instant) -> Result<crate::Frame, ProtocolError> {
         let mut read_buffer = [0_u8; 512];
         loop {
-            if let Some(frame) = self.decoder.next_frame()? {
-                if passive::is_inbound_data(&frame) {
-                    self.counters.dropped_frames += 1;
+            match self.decoder.next_frame() {
+                Ok(Some(frame)) => return Ok(frame),
+                Ok(None) => {}
+                Err(_) => {
+                    self.trace.dropped_bytes += 1;
                     continue;
                 }
-                return parse(&frame);
             }
-            let read = self.transport.read(&mut read_buffer)?;
-            if read == 0 {
-                return Err(TransportError::Closed.into());
+            let remaining = deadline.saturating_duration_since(Instant::now());
+            if remaining.is_zero() {
+                return Err(TransportError::Timeout.into());
             }
-            self.decoder.push(&read_buffer[..read]);
+            self.transport
+                .set_read_timeout(remaining.max(MINIMUM_READ_TIMEOUT))?;
+            match self.transport.read(&mut read_buffer)? {
+                0 => return Err(TransportError::Closed.into()),
+                read => self.decoder.push(&read_buffer[..read]),
+            }
         }
+    }
+
+    /// An inbound record that arrived while a command's answer was awaited:
+    /// kept for the open CAN route, so a module's answer that races the
+    /// transmit's acknowledgement is not lost; counted and dropped when no
+    /// route is open or the route is a line, whose bytes the line reader
+    /// gathers itself.
+    fn keep_inbound(&mut self, frame: crate::Frame) {
+        self.trace.inbound_frames += 1;
+        let Some(route) = self.open_route else {
+            return;
+        };
+        if route.route.network_type != NetworkType::Can {
+            return;
+        }
+        match passive::parse_inbound_can(&frame, route) {
+            Ok(frame) => self.pending_frames.push_back(frame),
+            Err(_) => self.trace.dropped_frames += 1,
+        }
+    }
+
+    fn record_indication(&mut self, frame: UnsolicitedFrame) {
+        self.trace.indications += 1;
+        self.trace.last_indication = Some(frame);
+    }
+
+    fn record_stale(&mut self, frame: UnsolicitedFrame) {
+        self.trace.stale_frames += 1;
+        self.trace.last_stale_frame = Some(frame);
     }
 
     pub(crate) fn open_route_internal(
@@ -440,10 +729,10 @@ impl<T: ByteTransport> MongooseJlrDevice<T> {
         if self.open_route.is_some() {
             return Err(ProtocolError::RouteAlreadyOpen);
         }
+        self.begin_operation();
         if let Some(stale) = self.stale_channel.take() {
             // The channel a failed close left behind: closed, as well as it
             // can be, before the adapter is asked for another.
-            self.transport.set_read_timeout(COMMAND_READ_TIMEOUT)?;
             let _ = self.close_channel(stale);
         }
         let route = *passive::route_by_id(route_id);
@@ -470,37 +759,39 @@ impl<T: ByteTransport> MongooseJlrDevice<T> {
             })?;
 
         let open_sequence = self.sequences.allocate();
-        self.transport.set_read_timeout(COMMAND_READ_TIMEOUT)?;
         let open_request = if listen_only {
             passive::open_channel_request(open_sequence, route_word, bitrate)
         } else {
             passive::diagnostic_open_channel_request(open_sequence, route_word, bitrate)
         };
-        self.transport.write_all(&open_request)?;
-        let open_response = self.wait_for_response(|frame| {
-            passive::parse_open_response(frame, open_sequence, route_word)
-        })?;
+        let open_response = self.command_exchange(
+            &open_request,
+            passive::OPEN_CHANNEL_RESPONSE,
+            open_sequence,
+            COMMAND_READ_TIMEOUT,
+            |frame| passive::parse_open_response(frame, open_sequence, route_word),
+        )?;
         let opened = OpenReceiveRoute {
             route,
             device_channel_id: open_response.channel_id,
         };
+        let channel = opened.device_channel_id;
 
         let pin_sequence = self.sequences.allocate();
-        let set_pin_request =
-            passive::set_pin_request(pin_sequence, opened.device_channel_id, opened.route);
-        if let Err(error) = self.transport.write_all(&set_pin_request) {
-            let _ = self.close_channel(opened.device_channel_id);
-            return Err(error.into());
-        }
-        match self.wait_for_response(|frame| {
-            passive::parse_set_pin_response(frame, pin_sequence, opened.device_channel_id)
-        }) {
+        let set_pin_request = passive::set_pin_request(pin_sequence, channel, opened.route);
+        match self.command_exchange(
+            &set_pin_request,
+            passive::SET_PIN_RESPONSE,
+            pin_sequence,
+            COMMAND_READ_TIMEOUT,
+            |frame| passive::parse_set_pin_response(frame, pin_sequence, channel),
+        ) {
             Ok(_) => {
                 self.open_route = Some(opened);
                 Ok(opened)
             }
             Err(error) => {
-                let _ = self.close_channel(opened.device_channel_id);
+                let _ = self.close_channel(channel);
                 Err(error)
             }
         }
@@ -565,6 +856,7 @@ impl<T: ByteTransport> MongooseJlrDevice<T> {
                     request_payload,
                     raw_diagnostic_response: raw_response,
                     calibration_ids: decoded.calibration_ids,
+                    trace: self.trace.clone(),
                 });
             }
         }
@@ -584,43 +876,59 @@ impl<T: ByteTransport> MongooseJlrDevice<T> {
             arbitration_id.is_extended(),
             payload,
         );
-        self.transport.write_all(&request)?;
-        self.wait_for_outbound_response(sequence, open_route)?;
-        Ok(())
+        self.acknowledged_transmit(&request, sequence, open_route.device_channel_id)
     }
 
-    fn wait_for_outbound_response(
+    /// One outbound record and its acknowledgement (ADR-0042, decision 1):
+    /// the acknowledgement ends the wait whatever its status word, and the
+    /// word, the firmware's words and the time it took go into the trace.
+    /// Text after the status is a refusal — every refusal this firmware has
+    /// given carried text, and no acknowledgement has.
+    fn acknowledged_transmit(
         &mut self,
+        request: &[u8],
         sequence: u16,
-        open_route: OpenReceiveRoute,
+        channel_id: u16,
     ) -> Result<(), ProtocolError> {
-        let mut read_buffer = [0_u8; 512];
-        loop {
-            if let Some(frame) = self.decoder.next_frame()? {
-                if passive::is_inbound_data(&frame) {
-                    self.pending_frames
-                        .push_back(passive::parse_inbound_can(&frame, open_route)?);
-                    continue;
-                }
-                passive::parse_outbound_response(&frame, sequence, open_route.device_channel_id)?;
-                return Ok(());
-            }
-            let read = self.transport.read(&mut read_buffer)?;
-            if read == 0 {
-                return Err(TransportError::Closed.into());
-            }
-            self.decoder.push(&read_buffer[..read]);
+        self.transport.write_all(request)?;
+        let sent = Instant::now();
+        let frame = self.wait_for_answer(
+            passive::OUTBOUND_DATA_RESPONSE,
+            sequence,
+            TRANSMIT_ACK_TIMEOUT,
+        )?;
+        let acknowledgement =
+            passive::parse_outbound_acknowledgement(&frame, sequence, channel_id)?;
+        let waited_ms = u64::try_from(sent.elapsed().as_millis()).unwrap_or(u64::MAX);
+        self.trace.transmits += 1;
+        self.trace.last_acknowledgement = Some(TransmitAcknowledgement {
+            status: acknowledgement.status,
+            message: acknowledgement.message.clone(),
+            waited_ms,
+        });
+        if !acknowledgement.message.is_empty() {
+            return Err(ProtocolError::DeviceStatus {
+                operation: "cOutboundData",
+                status: acknowledgement.status,
+                message: acknowledgement.message,
+            });
         }
+        Ok(())
     }
 
     /// One close of one channel on the adapter: after a failed setup, after
     /// an operation, or for a channel a failed close left behind.
     fn close_channel(&mut self, channel_id: u16) -> Result<(), ProtocolError> {
         let sequence = self.sequences.allocate();
-        self.transport
-            .write_all(&passive::close_channel_request(sequence, channel_id))?;
-        self.wait_for_response(|frame| passive::parse_close_response(frame, sequence, channel_id))?;
-        Ok(())
+        let request = passive::close_channel_request(sequence, channel_id);
+        self.command_exchange(
+            &request,
+            passive::CLOSE_CHANNEL_RESPONSE,
+            sequence,
+            COMMAND_READ_TIMEOUT,
+            |frame| passive::parse_close_response(frame, sequence, channel_id),
+        )
+        .map(|_| ())
     }
 
     fn require_open_transport(&self) -> Result<(), ProtocolError> {
@@ -689,9 +997,10 @@ mod tests {
     use super::*;
     use crate::codec::encode_board_info_response;
     use crate::passive::{
-        command_response, inbound_can_frame, CAN1_RESOURCE_ROUTE, CAN2_RESOURCE_ROUTE,
-        CLOSE_CHANNEL_RESPONSE, DEVICE_ROUTE, JUMP_TO_FIRMWARE_RESPONSE, OPEN_CHANNEL_RESPONSE,
-        OUTBOUND_DATA_RESPONSE, SET_PIN_RESPONSE,
+        command_response, command_response_with_text, inbound_can_frame, indication,
+        outbound_acknowledgement, CAN1_RESOURCE_ROUTE, CAN2_RESOURCE_ROUTE, CLOSE_CHANNEL_RESPONSE,
+        DEVICE_ROUTE, JUMP_TO_FIRMWARE_RESPONSE, OPEN_CHANNEL_RESPONSE, OUTBOUND_DATA_RESPONSE,
+        SET_PIN_RESPONSE, TRANSMIT_ACKNOWLEDGED_STATUS,
     };
 
     /// Board-info as the running firmware answers it: a non-zero tick at
@@ -715,25 +1024,38 @@ mod tests {
     use std::collections::VecDeque;
     use std::sync::{Arc, Mutex};
 
+    /// What the adapter does next when read: bytes, or silence. `Silent`
+    /// stays at the front and answers every read with a timeout until the
+    /// device writes something, as a quiet adapter does.
+    enum Step {
+        Bytes(Vec<u8>),
+        Silent,
+    }
+
     #[derive(Default)]
     struct MockState {
         writes: Vec<Vec<u8>>,
-        timeout: Option<Duration>,
+        /// Every read timeout the device set, in order.
+        timeouts: Vec<Duration>,
         closes: usize,
     }
 
     struct MockTransport {
         state: Arc<Mutex<MockState>>,
-        reads: VecDeque<Vec<u8>>,
+        steps: VecDeque<Step>,
     }
 
     impl MockTransport {
         fn new(reads: Vec<Vec<u8>>) -> (Self, Arc<Mutex<MockState>>) {
+            Self::scripted(reads.into_iter().map(Step::Bytes).collect())
+        }
+
+        fn scripted(steps: Vec<Step>) -> (Self, Arc<Mutex<MockState>>) {
             let state = Arc::new(Mutex::new(MockState::default()));
             (
                 Self {
                     state: Arc::clone(&state),
-                    reads: reads.into(),
+                    steps: steps.into(),
                 },
                 state,
             )
@@ -743,18 +1065,28 @@ mod tests {
     impl ByteTransport for MockTransport {
         fn write_all(&mut self, bytes: &[u8]) -> Result<(), TransportError> {
             self.state.lock().unwrap().writes.push(bytes.to_vec());
+            if matches!(self.steps.front(), Some(Step::Silent)) {
+                self.steps.pop_front();
+            }
             Ok(())
         }
 
         fn read(&mut self, buffer: &mut [u8]) -> Result<usize, TransportError> {
-            let bytes = self.reads.pop_front().ok_or(TransportError::Timeout)?;
-            let count = bytes.len().min(buffer.len());
-            buffer[..count].copy_from_slice(&bytes[..count]);
-            Ok(count)
+            match self.steps.front() {
+                Some(Step::Silent) | None => Err(TransportError::Timeout),
+                Some(Step::Bytes(_)) => {
+                    let Some(Step::Bytes(bytes)) = self.steps.pop_front() else {
+                        unreachable!()
+                    };
+                    let count = bytes.len().min(buffer.len());
+                    buffer[..count].copy_from_slice(&bytes[..count]);
+                    Ok(count)
+                }
+            }
         }
 
         fn set_read_timeout(&mut self, timeout: Duration) -> Result<(), TransportError> {
-            self.state.lock().unwrap().timeout = Some(timeout);
+            self.state.lock().unwrap().timeouts.push(timeout);
             Ok(())
         }
 
@@ -762,6 +1094,16 @@ mod tests {
             self.state.lock().unwrap().closes += 1;
             Ok(())
         }
+    }
+
+    /// Board-info, open and pins for one channel, as the firmware answers
+    /// them: the start of every operation's script.
+    fn opened(channel: u16) -> Vec<Step> {
+        vec![
+            Step::Bytes(firmware_board_info(1)),
+            Step::Bytes(command_response(channel, OPEN_CHANNEL_RESPONSE, 2, 0)),
+            Step::Bytes(command_response(channel, SET_PIN_RESPONSE, 3, 0)),
+        ]
     }
 
     #[test]
@@ -792,33 +1134,69 @@ mod tests {
         );
     }
 
+    /// ADR-0042, decision 2: an answer with another sequence is not this
+    /// command's. It is skipped and recorded, and the wait goes on to its
+    /// deadline — here, the adapter's silence.
     #[test]
-    fn sequence_match_is_required() {
+    fn an_answer_with_another_sequence_is_skipped_and_recorded() {
         let response = encode_board_info_response(2, &[]);
         let (transport, _) = MockTransport::new(vec![response]);
         let mut device = MongooseJlrDevice::open(transport);
         assert_eq!(
             device.get_board_info(),
-            Err(ProtocolError::SequenceMismatch {
-                expected: 1,
-                actual: 2
+            Err(ProtocolError::Transport(TransportError::Timeout))
+        );
+        let trace = device.exchange_trace();
+        assert_eq!(trace.stale_frames, 1);
+        assert_eq!(
+            trace.last_stale_frame,
+            Some(UnsolicitedFrame {
+                command: 0x8109,
+                sequence: 2,
+                status: None,
             })
         );
     }
 
+    /// The expected sequence under another command word is the firmware
+    /// answering this command with something else: an error, not a skip.
     #[test]
-    fn response_command_must_match_board_info() {
+    fn the_expected_sequence_under_another_command_is_an_error() {
         let mut response = encode_board_info_response(1, &[]);
         response[8] = 0x08;
         let (transport, _) = MockTransport::new(vec![response]);
         let mut device = MongooseJlrDevice::open(transport);
         assert_eq!(
             device.get_board_info(),
-            Err(ProtocolError::UnexpectedResponse {
-                opcode: 0x08,
-                flag: 0x81
+            Err(ProtocolError::UnexpectedCommand {
+                expected: 0x8109,
+                actual: 0x8108,
             })
         );
+    }
+
+    /// A stream an earlier session left half-read: the answer to its last
+    /// close, and bytes no frame begins with, ahead of the board-info this
+    /// session asks for. Both are counted and the connection stands.
+    #[test]
+    fn frames_and_bytes_left_by_an_earlier_session_are_skipped_before_board_info() {
+        let mut leftovers = command_response(CAN1_RESOURCE_ROUTE, CLOSE_CHANNEL_RESPONSE, 97, 0);
+        leftovers.extend_from_slice(&[0xFF, 0xFF, 0x00]);
+        leftovers.extend_from_slice(&firmware_board_info(1));
+        let (transport, _) = MockTransport::new(vec![leftovers]);
+        let mut device = MongooseJlrDevice::open(transport);
+
+        let info = device.get_board_info().unwrap();
+        assert!(!info.in_bootloader());
+        let trace = device.exchange_trace();
+        assert_eq!(trace.stale_frames, 1);
+        assert_eq!(
+            trace
+                .last_stale_frame
+                .map(|frame| (frame.command, frame.sequence)),
+            Some((CLOSE_CHANNEL_RESPONSE, 97))
+        );
+        assert_eq!(trace.dropped_bytes, 3);
     }
 
     #[test]
@@ -832,26 +1210,39 @@ mod tests {
         assert_eq!(state.closes, 1);
     }
 
-    /// The first real car (2026-11-12): the adapter refused a transmission,
-    /// then did not answer the close — a frame of another sequence here —
-    /// and the route stayed marked open, so every later read was refused by
-    /// this code. A failed close releases the route; the next open closes the
-    /// stale channel first, then opens its own.
+    /// The first real car (2026-11-12): a close the adapter did not answer
+    /// left the route marked open, so every later read was refused by this
+    /// code. A failed close releases the route and is written into the trace;
+    /// the next open closes the stale channel first, then opens its own.
     #[test]
     fn a_close_the_adapter_does_not_answer_releases_the_route_and_is_retried_before_the_next_open()
     {
-        let responses = vec![
-            firmware_board_info(1),
-            command_response(CAN1_RESOURCE_ROUTE, OPEN_CHANNEL_RESPONSE, 2, 0),
-            command_response(CAN1_RESOURCE_ROUTE, SET_PIN_RESPONSE, 3, 0),
-            // The close (sequence 4) is answered with somebody else's sequence.
-            command_response(CAN1_RESOURCE_ROUTE, CLOSE_CHANNEL_RESPONSE, 9, 0),
-            // The stale channel's close before the next open (sequence 5).
-            command_response(CAN1_RESOURCE_ROUTE, CLOSE_CHANNEL_RESPONSE, 5, 0),
-            command_response(CAN2_RESOURCE_ROUTE, OPEN_CHANNEL_RESPONSE, 6, 0),
-            command_response(CAN2_RESOURCE_ROUTE, SET_PIN_RESPONSE, 7, 0),
-        ];
-        let (transport, state) = MockTransport::new(responses);
+        let mut steps = opened(CAN1_RESOURCE_ROUTE);
+        // The close (sequence 4) is not answered: a silence ends at the
+        // close's own write, so a second one keeps the adapter quiet until
+        // the next command is written.
+        steps.push(Step::Silent);
+        steps.push(Step::Silent);
+        // The stale channel's close before the next open (sequence 5).
+        steps.push(Step::Bytes(command_response(
+            CAN1_RESOURCE_ROUTE,
+            CLOSE_CHANNEL_RESPONSE,
+            5,
+            0,
+        )));
+        steps.push(Step::Bytes(command_response(
+            CAN2_RESOURCE_ROUTE,
+            OPEN_CHANNEL_RESPONSE,
+            6,
+            0,
+        )));
+        steps.push(Step::Bytes(command_response(
+            CAN2_RESOURCE_ROUTE,
+            SET_PIN_RESPONSE,
+            7,
+            0,
+        )));
+        let (transport, state) = MockTransport::scripted(steps);
         let mut device = MongooseJlrDevice::open(transport);
 
         device.open_receive_route(VehicleRouteId::HsCan).unwrap();
@@ -861,10 +1252,18 @@ mod tests {
             "the route is released all the same"
         );
         assert_eq!(device.stale_channel, Some(CAN1_RESOURCE_ROUTE));
+        assert_eq!(
+            device.exchange_trace().close_error.as_deref(),
+            Some("transport read timed out")
+        );
 
         let reopened = device.open_receive_route(VehicleRouteId::MsCan).unwrap();
         assert_eq!(reopened.device_channel_id, CAN2_RESOURCE_ROUTE);
         assert!(device.stale_channel.is_none());
+        assert!(
+            device.exchange_trace().close_error.is_none(),
+            "a new operation starts with a clean trace"
+        );
         let writes = &state.lock().unwrap().writes;
         // Board-info, open, pins, the close that failed, the stale close, open, pins.
         assert_eq!(writes.len(), 7);
@@ -879,13 +1278,14 @@ mod tests {
     /// of refusing: the person at the screen must always be able to leave.
     #[test]
     fn close_with_a_route_open_closes_the_route_first() {
-        let responses = vec![
-            firmware_board_info(1),
-            command_response(CAN1_RESOURCE_ROUTE, OPEN_CHANNEL_RESPONSE, 2, 0),
-            command_response(CAN1_RESOURCE_ROUTE, SET_PIN_RESPONSE, 3, 0),
-            command_response(CAN1_RESOURCE_ROUTE, CLOSE_CHANNEL_RESPONSE, 4, 0),
-        ];
-        let (transport, state) = MockTransport::new(responses);
+        let mut steps = opened(CAN1_RESOURCE_ROUTE);
+        steps.push(Step::Bytes(command_response(
+            CAN1_RESOURCE_ROUTE,
+            CLOSE_CHANNEL_RESPONSE,
+            4,
+            0,
+        )));
+        let (transport, state) = MockTransport::scripted(steps);
         let mut device = MongooseJlrDevice::open(transport);
         device.open_receive_route(VehicleRouteId::HsCan).unwrap();
 
@@ -919,6 +1319,7 @@ mod tests {
             .unwrap();
         assert_eq!(frame.arbitration_id, 0x321);
         assert_eq!(frame.payload(), [1, 2, 3]);
+        assert_eq!(device.exchange_trace().inbound_frames, 1);
         device.close_route().unwrap();
 
         let reopened = device.open_receive_route(VehicleRouteId::MsCan).unwrap();
@@ -984,18 +1385,14 @@ mod tests {
 
     #[test]
     fn a_refusal_carries_the_firmware_words() {
-        let mut refusal = command_response(CAN1_RESOURCE_ROUTE, SET_PIN_RESPONSE, 3, 0x206);
-        // Rebuild with the firmware's text after status and tick.
-        let mut payload = refusal.split_off(4);
-        payload.truncate(16);
-        payload.extend_from_slice(&[0x11, 0x22, 0x33, 0x44]);
-        payload.extend_from_slice(
-            b"SetPins: MongoosePro JLR board only supports CAN on pins 6 and 14\0",
+        let refusal = command_response_with_text(
+            CAN1_RESOURCE_ROUTE,
+            SET_PIN_RESPONSE,
+            3,
+            0x206,
+            0x4433_2211,
+            "SetPins: MongoosePro JLR board only supports CAN on pins 6 and 14",
         );
-        let length = payload.len() as u16;
-        refusal = length.to_le_bytes().to_vec();
-        refusal.extend_from_slice(&(length ^ 0x51E6).to_le_bytes());
-        refusal.extend_from_slice(&payload);
         let responses = vec![
             firmware_board_info(1),
             command_response(CAN1_RESOURCE_ROUTE, OPEN_CHANNEL_RESPONSE, 2, 0),
@@ -1046,6 +1443,393 @@ mod tests {
         );
     }
 
+    /// ADR-0042, decision 1: the word the firmware has given every transmit —
+    /// `0x100`, no text — ends the wait and goes into the trace; it is not a
+    /// refusal. The 1.2.5 and 1.2.6 builds abandoned every request on it.
+    #[test]
+    fn a_transmit_acknowledged_with_status_0x100_is_recorded_not_refused() {
+        let mut steps = opened(CAN1_RESOURCE_ROUTE);
+        steps.push(Step::Bytes(outbound_acknowledgement(
+            CAN1_RESOURCE_ROUTE,
+            4,
+            0x07F9_6350,
+        )));
+        let (transport, state) = MockTransport::scripted(steps);
+        let mut device = MongooseJlrDevice::open(transport);
+        device
+            .open_route_internal(VehicleRouteId::HsCan, false)
+            .unwrap();
+
+        device
+            .transmit_diagnostic_frame(CanId::Standard(0x7E0), &[0x02, 0x10, 0x01])
+            .unwrap();
+
+        let trace = device.exchange_trace();
+        assert_eq!(trace.transmits, 1);
+        let acknowledgement = trace.last_acknowledgement.as_ref().unwrap();
+        assert_eq!(acknowledgement.status, TRANSMIT_ACKNOWLEDGED_STATUS);
+        assert!(acknowledgement.message.is_empty());
+        // The acknowledgement was waited for with the transmit's own timeout,
+        // not the one-second command wait.
+        let timeouts = &state.lock().unwrap().timeouts;
+        let last = *timeouts.last().unwrap();
+        assert!(
+            last > Duration::from_millis(4_900) && last <= TRANSMIT_ACK_TIMEOUT,
+            "{last:?}"
+        );
+    }
+
+    /// The one judgment kept: text after the status is a refusal, as every
+    /// refusal of this firmware has carried text — here the bench's words for
+    /// a transmit on a channel that is not open.
+    #[test]
+    fn an_acknowledgement_with_the_firmware_words_is_a_refusal() {
+        let mut steps = opened(CAN1_RESOURCE_ROUTE);
+        steps.push(Step::Bytes(command_response_with_text(
+            CAN1_RESOURCE_ROUTE,
+            OUTBOUND_DATA_RESPONSE,
+            4,
+            2,
+            77,
+            "cOutboundData: channel is not open",
+        )));
+        let (transport, _) = MockTransport::scripted(steps);
+        let mut device = MongooseJlrDevice::open(transport);
+        device
+            .open_route_internal(VehicleRouteId::HsCan, false)
+            .unwrap();
+
+        let error = device
+            .transmit_diagnostic_frame(CanId::Standard(0x7E0), &[0x02, 0x10, 0x01])
+            .unwrap_err();
+        assert_eq!(
+            error.to_string(),
+            "cOutboundData failed with device status 0x00000002: cOutboundData: channel is not open"
+        );
+        let acknowledgement = device
+            .exchange_trace()
+            .last_acknowledgement
+            .as_ref()
+            .unwrap();
+        assert_eq!(acknowledgement.status, 2);
+        assert_eq!(
+            acknowledgement.message,
+            "cOutboundData: channel is not open"
+        );
+    }
+
+    /// ADR-0042, decision 2: a `cIndication` between a command and its answer
+    /// is recorded and the wait goes on. In the second real-car session the
+    /// close's wait took such a frame for its answer, and every later command
+    /// read the one before it.
+    #[test]
+    fn an_indication_during_a_wait_is_recorded_and_the_wait_goes_on() {
+        let mut steps = opened(CAN1_RESOURCE_ROUTE);
+        steps.push(Step::Bytes(outbound_acknowledgement(
+            CAN1_RESOURCE_ROUTE,
+            4,
+            10,
+        )));
+        // The indication arrives while the close's answer is awaited.
+        steps.push(Step::Bytes(indication(CAN1_RESOURCE_ROUTE, 4, 0, 11)));
+        steps.push(Step::Bytes(command_response(
+            CAN1_RESOURCE_ROUTE,
+            CLOSE_CHANNEL_RESPONSE,
+            5,
+            0,
+        )));
+        let (transport, _) = MockTransport::scripted(steps);
+        let mut device = MongooseJlrDevice::open(transport);
+        device
+            .open_route_internal(VehicleRouteId::HsCan, false)
+            .unwrap();
+        device
+            .transmit_diagnostic_frame(CanId::Standard(0x7E0), &[0x02, 0x10, 0x01])
+            .unwrap();
+
+        device.close_route().unwrap();
+
+        let trace = device.exchange_trace();
+        assert_eq!(trace.indications, 1);
+        assert_eq!(
+            trace.last_indication,
+            Some(UnsolicitedFrame {
+                command: 0x000A,
+                sequence: 4,
+                status: Some(0),
+            })
+        );
+        assert!(trace.close_error.is_none());
+        assert!(device.stale_channel.is_none());
+    }
+
+    /// An indication that arrives while the module's answer is awaited is
+    /// recorded the same way, and the answer behind it is still received.
+    #[test]
+    fn an_indication_during_the_receive_is_recorded_and_the_answer_behind_it_received() {
+        let mut steps = opened(CAN1_RESOURCE_ROUTE);
+        steps.push(Step::Bytes(outbound_acknowledgement(
+            CAN1_RESOURCE_ROUTE,
+            4,
+            10,
+        )));
+        steps.push(Step::Bytes(indication(CAN1_RESOURCE_ROUTE, 4, 0, 11)));
+        steps.push(Step::Bytes(inbound_can_frame(
+            CAN1_RESOURCE_ROUTE,
+            0,
+            12,
+            0x7E8,
+            &[0x06, 0x50, 0x01, 0x00, 0x32, 0x01, 0xF4],
+        )));
+        let (transport, _) = MockTransport::scripted(steps);
+        let mut device = MongooseJlrDevice::open(transport);
+        device
+            .open_route_internal(VehicleRouteId::HsCan, false)
+            .unwrap();
+        device
+            .transmit_diagnostic_frame(CanId::Standard(0x7E0), &[0x02, 0x10, 0x01])
+            .unwrap();
+
+        let frame = device
+            .receive_frame(Duration::from_millis(10))
+            .unwrap()
+            .unwrap();
+        assert_eq!(frame.arbitration_id, 0x7E8);
+        let trace = device.exchange_trace();
+        assert_eq!(trace.indications, 1);
+        assert_eq!(trace.inbound_frames, 1);
+    }
+
+    /// The bench of 2026-09-06/08 by another door: the firmware acknowledged
+    /// a transmit after three seconds, the earlier builds waited one. An
+    /// acknowledgement that arrives only when the close is already awaited
+    /// is a stale frame now — skipped, recorded, and the close's own answer
+    /// still read.
+    #[test]
+    fn a_late_acknowledgement_is_a_stale_frame_that_does_not_shift_the_session() {
+        let mut steps = opened(CAN1_RESOURCE_ROUTE);
+        // Nothing within the acknowledgement wait: one silence ends at the
+        // transmit's write, the second lasts until the close is written.
+        steps.push(Step::Silent);
+        steps.push(Step::Silent);
+        // Then, while the close (5) is awaited, the acknowledgement of 4.
+        steps.push(Step::Bytes(outbound_acknowledgement(
+            CAN1_RESOURCE_ROUTE,
+            4,
+            10,
+        )));
+        steps.push(Step::Bytes(command_response(
+            CAN1_RESOURCE_ROUTE,
+            CLOSE_CHANNEL_RESPONSE,
+            5,
+            0,
+        )));
+        let (transport, _) = MockTransport::scripted(steps);
+        let mut device = MongooseJlrDevice::open(transport);
+        device
+            .open_route_internal(VehicleRouteId::HsCan, false)
+            .unwrap();
+
+        let error = device
+            .transmit_diagnostic_frame(CanId::Standard(0x7E0), &[0x02, 0x10, 0x01])
+            .unwrap_err();
+        assert_eq!(error, ProtocolError::Transport(TransportError::Timeout));
+        assert_eq!(device.exchange_trace().transmits, 0);
+
+        device.close_route().unwrap();
+        let trace = device.exchange_trace();
+        assert_eq!(trace.stale_frames, 1);
+        assert_eq!(
+            trace.last_stale_frame,
+            Some(UnsolicitedFrame {
+                command: OUTBOUND_DATA_RESPONSE,
+                sequence: 4,
+                status: Some(TRANSMIT_ACKNOWLEDGED_STATUS),
+            })
+        );
+        assert!(trace.close_error.is_none());
+    }
+
+    /// ADR-0042, decision 3: a close after a read that ran its budget down
+    /// is waited for with its own second, not with the milliseconds the last
+    /// receive had left.
+    #[test]
+    fn the_close_sets_its_own_timeout_whatever_the_last_receive_left() {
+        let mut steps = opened(CAN1_RESOURCE_ROUTE);
+        steps.push(Step::Silent);
+        steps.push(Step::Bytes(command_response(
+            CAN1_RESOURCE_ROUTE,
+            CLOSE_CHANNEL_RESPONSE,
+            4,
+            0,
+        )));
+        let (transport, state) = MockTransport::scripted(steps);
+        let mut device = MongooseJlrDevice::open(transport);
+        device.open_receive_route(VehicleRouteId::HsCan).unwrap();
+
+        assert!(device
+            .receive_frame(Duration::from_millis(3))
+            .unwrap()
+            .is_none());
+        device.close_route().unwrap();
+
+        let timeouts = &state.lock().unwrap().timeouts;
+        let receive = timeouts[timeouts.len() - 2];
+        let close = timeouts[timeouts.len() - 1];
+        assert!(receive <= Duration::from_millis(3), "{receive:?}");
+        assert!(
+            close > Duration::from_millis(900) && close <= COMMAND_READ_TIMEOUT,
+            "{close:?}"
+        );
+    }
+
+    /// A module's answer that races the acknowledgement is kept for the read;
+    /// one kept and never read does not survive the next open (ADR-0042,
+    /// decision 6).
+    #[test]
+    fn a_frame_kept_during_the_acknowledgement_wait_is_the_next_received_and_does_not_survive_a_reopen(
+    ) {
+        let mut steps = opened(CAN1_RESOURCE_ROUTE);
+        steps.push(Step::Bytes(inbound_can_frame(
+            CAN1_RESOURCE_ROUTE,
+            0,
+            9,
+            0x7E8,
+            &[0x02, 0x50, 0x01],
+        )));
+        steps.push(Step::Bytes(outbound_acknowledgement(
+            CAN1_RESOURCE_ROUTE,
+            4,
+            10,
+        )));
+        steps.push(Step::Bytes(inbound_can_frame(
+            CAN1_RESOURCE_ROUTE,
+            0,
+            11,
+            0x7E8,
+            &[0x02, 0x50, 0x02],
+        )));
+        steps.push(Step::Bytes(outbound_acknowledgement(
+            CAN1_RESOURCE_ROUTE,
+            5,
+            12,
+        )));
+        steps.push(Step::Bytes(command_response(
+            CAN1_RESOURCE_ROUTE,
+            CLOSE_CHANNEL_RESPONSE,
+            6,
+            0,
+        )));
+        steps.push(Step::Bytes(command_response(
+            CAN1_RESOURCE_ROUTE,
+            OPEN_CHANNEL_RESPONSE,
+            7,
+            0,
+        )));
+        steps.push(Step::Bytes(command_response(
+            CAN1_RESOURCE_ROUTE,
+            SET_PIN_RESPONSE,
+            8,
+            0,
+        )));
+        steps.push(Step::Silent);
+        let (transport, _) = MockTransport::scripted(steps);
+        let mut device = MongooseJlrDevice::open(transport);
+        device
+            .open_route_internal(VehicleRouteId::HsCan, false)
+            .unwrap();
+
+        device
+            .transmit_diagnostic_frame(CanId::Standard(0x7E0), &[0x02, 0x10, 0x01])
+            .unwrap();
+        let first = device
+            .receive_frame(Duration::from_millis(10))
+            .unwrap()
+            .unwrap();
+        assert_eq!(first.payload(), [0x02, 0x50, 0x01]);
+        // A second transmit keeps a second frame, which nobody reads.
+        device
+            .transmit_diagnostic_frame(CanId::Standard(0x7E0), &[0x02, 0x10, 0x01])
+            .unwrap();
+        assert_eq!(device.pending_frames.len(), 1);
+        device.close_route().unwrap();
+
+        device
+            .open_route_internal(VehicleRouteId::HsCan, false)
+            .unwrap();
+        assert!(device.pending_frames.is_empty());
+        assert!(device
+            .receive_frame(Duration::from_millis(5))
+            .unwrap()
+            .is_none());
+    }
+
+    /// An inbound record on another channel — one a failed close left open
+    /// on the adapter, say — is counted, and the read goes on to its own.
+    #[test]
+    fn an_inbound_frame_on_another_channel_is_counted_not_fatal() {
+        let mut steps = opened(CAN1_RESOURCE_ROUTE);
+        steps.push(Step::Bytes(inbound_can_frame(
+            CAN2_RESOURCE_ROUTE,
+            0,
+            5,
+            0x123,
+            &[1],
+        )));
+        steps.push(Step::Bytes(inbound_can_frame(
+            CAN1_RESOURCE_ROUTE,
+            0,
+            6,
+            0x321,
+            &[2],
+        )));
+        let (transport, _) = MockTransport::scripted(steps);
+        let mut device = MongooseJlrDevice::open(transport);
+        device.open_receive_route(VehicleRouteId::HsCan).unwrap();
+
+        let frame = device
+            .receive_frame(Duration::from_millis(10))
+            .unwrap()
+            .unwrap();
+        assert_eq!(frame.arbitration_id, 0x321);
+        let trace = device.exchange_trace();
+        assert_eq!(trace.inbound_frames, 2);
+        assert_eq!(trace.dropped_frames, 1);
+    }
+
+    /// The trace in words, as the shell writes it into a read's record.
+    #[test]
+    fn the_trace_says_in_words_what_the_adapter_did() {
+        let trace = ExchangeTrace {
+            transmits: 1,
+            last_acknowledgement: Some(TransmitAcknowledgement {
+                status: 0x100,
+                message: String::new(),
+                waited_ms: 3,
+            }),
+            inbound_frames: 0,
+            indications: 1,
+            last_indication: Some(UnsolicitedFrame {
+                command: 0x000A,
+                sequence: 5,
+                status: Some(0),
+            }),
+            stale_frames: 0,
+            last_stale_frame: None,
+            dropped_frames: 0,
+            dropped_bytes: 0,
+            close_error: Some("transport read timed out".into()),
+        };
+        assert_eq!(
+            trace.to_string(),
+            "transmit acknowledged with status 0x00000100 after 3 ms; 0 inbound frames; 1 indication(s), last 0x000A sequence 5 status 0x00000000; close failed: transport read timed out"
+        );
+        assert_eq!(
+            ExchangeTrace::default().to_string(),
+            "no transmit acknowledged; 0 inbound frames"
+        );
+    }
+
     #[test]
     fn typed_prepared_transaction_drives_fixed_multiframe_calibration_exchange() {
         let target = DiagnosticTargetIdentity::new(ECU_FAMILY, DIAGNOSTIC_IMPLEMENTATION).unwrap();
@@ -1066,9 +1850,9 @@ mod tests {
             firmware_board_info(1),
             command_response(CAN1_RESOURCE_ROUTE, OPEN_CHANNEL_RESPONSE, 2, 0),
             command_response(CAN1_RESOURCE_ROUTE, SET_PIN_RESPONSE, 3, 0),
-            command_response(CAN1_RESOURCE_ROUTE, OUTBOUND_DATA_RESPONSE, 4, 0),
+            outbound_acknowledgement(CAN1_RESOURCE_ROUTE, 4, 10),
             inbound_can_frame(CAN1_RESOURCE_ROUTE, 0, 10, 0x7e8, &frames[0]),
-            command_response(CAN1_RESOURCE_ROUTE, OUTBOUND_DATA_RESPONSE, 5, 0),
+            outbound_acknowledgement(CAN1_RESOURCE_ROUTE, 5, 20),
             inbound_can_frame(CAN1_RESOURCE_ROUTE, 0, 20, 0x7e8, &frames[1]),
             inbound_can_frame(CAN1_RESOURCE_ROUTE, 0, 30, 0x7e8, &frames[2]),
             command_response(CAN1_RESOURCE_ROUTE, CLOSE_CHANNEL_RESPONSE, 6, 0),
@@ -1083,6 +1867,9 @@ mod tests {
         assert_eq!(result.responder, 0x7e8);
         assert_eq!(result.raw_diagnostic_response, response);
         assert_eq!(result.calibration_ids, [OBSERVED_CALIBRATION_ID]);
+        assert_eq!(result.trace.transmits, 2);
+        assert_eq!(result.trace.inbound_frames, 3);
+        assert!(result.trace.close_error.is_none());
 
         let writes = &state.lock().unwrap().writes;
         assert_eq!(writes.len(), 6);

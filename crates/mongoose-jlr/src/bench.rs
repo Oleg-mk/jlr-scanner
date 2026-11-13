@@ -118,6 +118,23 @@ impl BenchTransport {
         self.emit(passive::command_response(route, response, sequence, 0));
     }
 
+    /// The acknowledgement of a transmit as the adapter has given it every
+    /// time (ADR-0042, decision 7): status `0x100`, the recorded twelve-byte
+    /// body, no words.
+    fn acknowledge_transmit(&mut self, route: u16, sequence: u16) {
+        let tick = self.tick();
+        self.emit(passive::outbound_acknowledgement(route, sequence, tick));
+    }
+
+    /// The one frame both real-car sessions showed after an acknowledgement,
+    /// read as `cIndication` carrying the transmit's sequence — the hypothesis
+    /// of ADR-0042 made executable, so the code above the transport is run on
+    /// it. Status zero: no fault is known to have been reported.
+    fn indicate_transmit(&mut self, route: u16, sequence: u16) {
+        let tick = self.tick();
+        self.emit(passive::indication(route, sequence, 0, tick));
+    }
+
     fn handle(&mut self, frame: &Frame) {
         let Ok(packet) = MongoosePacket::from_frame(frame) else {
             return;
@@ -275,12 +292,15 @@ impl BenchTransport {
         };
         let bench_route = channel.route;
         let forward = !channel.listen_only && channel.pins_selected;
-        // The application waits for this word before it reads any frame;
-        // an inbound frame ahead of it would be dropped (`wait_for_response`).
-        self.accept(route, passive::OUTBOUND_DATA_RESPONSE, sequence);
+        // The acknowledgement first, as the adapter sends it; the application
+        // keeps any frame that overtakes it for the read (ADR-0042).
+        self.acknowledge_transmit(route, sequence);
         if !forward {
             return;
         }
+        // Then the adapter's own word about the transmit, before whatever the
+        // vehicle answers.
+        self.indicate_transmit(route, sequence);
         // A serial line carries bytes, not frames: the record's data is the
         // whole of it and the vehicle answers in bytes (ADR-0029 slice B).
         if bench_route.is_serial() {
@@ -560,10 +580,47 @@ mod tests {
             vec![0x62, 0x19, 0x45, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
         );
         assert_eq!(result.route, VehicleRouteId::HsCan);
+        // The adapter's shape, end to end: two transmits (the request and the
+        // flow control), each acknowledged with 0x100 and followed by an
+        // indication, and the vehicle's three frames.
+        assert_eq!(result.trace.transmits, 2);
+        assert_eq!(
+            result
+                .trace
+                .last_acknowledgement
+                .as_ref()
+                .map(|acknowledgement| acknowledgement.status),
+            Some(passive::TRANSMIT_ACKNOWLEDGED_STATUS)
+        );
+        assert_eq!(result.trace.indications, 2);
+        assert_eq!(result.trace.inbound_frames, 3);
+        assert_eq!(result.trace.stale_frames, 0);
         // The vehicle saw the padded request and the tester's flow control.
         let guard = bus.lock().unwrap();
         let _ = guard.describe();
         drop(guard);
+    }
+
+    /// A transmit the bench refuses — on a channel that is not open — carries
+    /// the firmware's words, and the device turns those into a refusal.
+    #[test]
+    fn a_transmit_on_a_closed_channel_is_refused_in_words() {
+        let bus = share_bus(Box::new(transport_api::EmptyBench));
+        let mut transport = BenchTransport::new(bus);
+        transport.in_bootloader = false;
+        transport
+            .write_all(&passive::outbound_data_request(
+                1,
+                CAN1_RESOURCE_ROUTE,
+                0x7E0,
+                false,
+                &[0x02, 0x10, 0x01],
+            ))
+            .unwrap();
+        let mut buffer = [0_u8; 256];
+        let read = transport.read(&mut buffer).unwrap();
+        let text = String::from_utf8_lossy(&buffer[..read]).to_string();
+        assert!(text.contains("channel is not open"), "{text}");
     }
 
     #[test]

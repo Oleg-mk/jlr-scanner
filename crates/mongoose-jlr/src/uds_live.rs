@@ -17,7 +17,7 @@
 //! to the default session before the route is closed. The read function
 //! opens no session - the guard reads its body to make sure.
 
-use crate::device::{MongooseDiagnosticError, MongooseJlrDevice};
+use crate::device::{ExchangeTrace, MongooseDiagnosticError, MongooseJlrDevice};
 use crate::passive::CanIdFormat;
 use crate::passive::{self, VehicleRouteId};
 use std::time::{Duration, Instant};
@@ -44,6 +44,9 @@ pub struct MongooseUdsReadResult {
     pub raw_diagnostic_response: Vec<u8>,
     /// ResponsePending answers received before the final one.
     pub pending_responses: u32,
+    /// What the adapter did around the read (ADR-0042): the transmit's
+    /// acknowledgement, the frames delivered, its own records, the close.
+    pub trace: ExchangeTrace,
 }
 
 /// What a service operation brought back (ADR-0036): the module's final
@@ -64,6 +67,8 @@ pub struct MongooseUdsServiceResult {
     /// it - the session opening, the operation again, and the return to the
     /// default session.
     pub exchanges: Vec<(Vec<u8>, Vec<u8>)>,
+    /// What the adapter did around the whole sequence (ADR-0042).
+    pub trace: ExchangeTrace,
 }
 
 impl<T: ByteTransport> MongooseJlrDevice<T> {
@@ -84,12 +89,13 @@ impl<T: ByteTransport> MongooseJlrDevice<T> {
             route_id,
             timeout,
         );
-        let close = self.close_route();
-        match (result, close) {
-            (Ok(result), Ok(())) => Ok(result),
-            (Ok(_), Err(error)) => Err(MongooseDiagnosticError::ChannelClose(error)),
-            (Err(error), _) => Err(error),
-        }
+        // An answer that was received stands; a failed close is in the trace
+        // and the channel is remembered (ADR-0042, decision 5).
+        let _ = self.close_route();
+        result.map(|mut result| {
+            result.trace = self.exchange_trace().clone();
+            result
+        })
     }
 
     /// Executes one prepared service operation (ADR-0036): the clear of the
@@ -113,12 +119,13 @@ impl<T: ByteTransport> MongooseJlrDevice<T> {
         self.open_route_internal(route_id, false)
             .map_err(MongooseDiagnosticError::CanConnection)?;
         let result = self.service_sequence(service, route_id, timeout);
-        let close = self.close_route();
-        match (result, close) {
-            (Ok(result), Ok(())) => Ok(result),
-            (Ok(_), Err(error)) => Err(MongooseDiagnosticError::ChannelClose(error)),
-            (Err(error), _) => Err(error),
-        }
+        // What the module did, it did: a failed close after it is in the
+        // trace, not a failure of the operation (ADR-0042, decision 5).
+        let _ = self.close_route();
+        result.map(|mut result| {
+            result.trace = self.exchange_trace().clone();
+            result
+        })
     }
 
     /// The operation, the session around it where needed, and the way back.
@@ -158,6 +165,7 @@ impl<T: ByteTransport> MongooseJlrDevice<T> {
                     pending_responses: answer.pending_responses,
                     session: EXTENDED_DIAGNOSTIC_SESSION,
                     exchanges,
+                    trace: ExchangeTrace::default(),
                 });
             }
             // A routine's last step: a keep-alive so the session is still
@@ -185,6 +193,7 @@ impl<T: ByteTransport> MongooseJlrDevice<T> {
                     pending_responses: answer.pending_responses,
                     session: EXTENDED_DIAGNOSTIC_SESSION,
                     exchanges,
+                    trace: ExchangeTrace::default(),
                 });
             }
             SessionUse::DefaultThenExtended | SessionUse::Extended => {}
@@ -202,6 +211,7 @@ impl<T: ByteTransport> MongooseJlrDevice<T> {
                     pending_responses: answer.pending_responses,
                     session: DEFAULT_SESSION,
                     exchanges,
+                    trace: ExchangeTrace::default(),
                 });
             }
         }
@@ -237,6 +247,7 @@ impl<T: ByteTransport> MongooseJlrDevice<T> {
             pending_responses: answer.pending_responses,
             session: EXTENDED_DIAGNOSTIC_SESSION,
             exchanges,
+            trace: ExchangeTrace::default(),
         })
     }
 
@@ -254,12 +265,11 @@ impl<T: ByteTransport> MongooseJlrDevice<T> {
         self.open_route_internal(route_id, false)
             .map_err(MongooseDiagnosticError::CanConnection)?;
         let result = self.keep_alive_exchange(transaction, route_id, timeout);
-        let close = self.close_route();
-        match (result, close) {
-            (Ok(result), Ok(())) => Ok(result),
-            (Ok(_), Err(error)) => Err(MongooseDiagnosticError::ChannelClose(error)),
-            (Err(error), _) => Err(error),
-        }
+        let _ = self.close_route();
+        result.map(|mut result| {
+            result.trace = self.exchange_trace().clone();
+            result
+        })
     }
 
     fn keep_alive_exchange(
@@ -278,6 +288,7 @@ impl<T: ByteTransport> MongooseJlrDevice<T> {
             pending_responses: answer.pending_responses,
             session: EXTENDED_DIAGNOSTIC_SESSION,
             exchanges: vec![(alive.as_bytes().to_vec(), answer.raw_diagnostic_response)],
+            trace: ExchangeTrace::default(),
         })
     }
 
@@ -367,6 +378,7 @@ impl<T: ByteTransport> MongooseJlrDevice<T> {
                 request_payload,
                 raw_diagnostic_response: raw_response,
                 pending_responses,
+                trace: self.exchange_trace().clone(),
             });
         }
     }
@@ -464,8 +476,9 @@ fn validate_uds_transaction(
 mod tests {
     use super::*;
     use crate::passive::{
-        command_response, inbound_can_frame, CAN_29BIT_ID, CLOSE_CHANNEL_RESPONSE,
-        OPEN_CHANNEL_RESPONSE, OUTBOUND_DATA_RESPONSE, SET_PIN_RESPONSE,
+        command_response, command_response_with_text, inbound_can_frame, indication,
+        outbound_acknowledgement, CAN_29BIT_ID, CLOSE_CHANNEL_RESPONSE, OPEN_CHANNEL_RESPONSE,
+        OUTBOUND_DATA_RESPONSE, SET_PIN_RESPONSE, TRANSMIT_ACKNOWLEDGED_STATUS,
     };
     use diagnostic_environment::{
         CanIdFormat as IdFormat, DiagnosticEnvironmentResolution, ReadableIdentifier,
@@ -624,6 +637,255 @@ mod tests {
             )),
             Step::Bytes(inbound_can_frame(CHANNEL, 0, timestamp, 0x7E8, answer)),
         ]
+    }
+
+    /// The acknowledgement as the adapter has given it every time: `0x100`,
+    /// no words (bench 2026-09-06/08, the first car 2026-11-12).
+    fn acknowledged(sequence: u16, tick: u32) -> Step {
+        Step::Bytes(outbound_acknowledgement(CHANNEL, sequence, tick))
+    }
+
+    fn answered(sequence: u16) -> Step {
+        Step::Bytes(command_response(
+            CHANNEL,
+            CLOSE_CHANNEL_RESPONSE,
+            sequence,
+            0,
+        ))
+    }
+
+    /// The second real-car session (build 1.2.6, 2026-11-12, ignition on),
+    /// replayed as the sequence numbers reconstruct it: the request
+    /// acknowledged with `0x100` at once, nothing from the module, and one
+    /// extra frame — read as the adapter's indication — met by the close's
+    /// wait. In 1.2.6 the acknowledgement was taken for a refusal and the
+    /// extra frame for the close's answer, and every later command of the
+    /// session read the answer before its own. Now: the read times out with
+    /// the acknowledgement in its trace, the close skips the indication and
+    /// reads its own answer, and the next read runs clean.
+    #[test]
+    fn the_second_real_car_session_replayed_the_indication_is_skipped_and_the_next_read_is_clean() {
+        let mut steps = opened();
+        steps.push(acknowledged(4, 10));
+        steps.push(Step::Silent);
+        steps.push(Step::Bytes(indication(CHANNEL, 4, 0, 11)));
+        steps.push(answered(5));
+        // The next read: the firmware is known, so open, pins, the request.
+        steps.push(Step::Bytes(command_response(
+            CHANNEL,
+            OPEN_CHANNEL_RESPONSE,
+            6,
+            0,
+        )));
+        steps.push(Step::Bytes(command_response(
+            CHANNEL,
+            SET_PIN_RESPONSE,
+            7,
+            0,
+        )));
+        steps.push(acknowledged(8, 20));
+        steps.push(Step::Bytes(inbound_can_frame(
+            CHANNEL,
+            0,
+            21,
+            0x7E8,
+            &[0x05, 0x62, 0x19, 0x45, 0x12, 0x34, 0x00, 0x00],
+        )));
+        steps.push(answered(9));
+        let (transport, writes) = ScriptedTransport::new(steps);
+        let mut device = MongooseJlrDevice::open(transport);
+
+        let first = device.execute_prepared_uds_read(
+            &did_transaction("normal", "hs-can"),
+            Duration::from_millis(40),
+        );
+        assert!(
+            matches!(first, Err(MongooseDiagnosticError::Timeout)),
+            "{first:?}"
+        );
+        let trace = device.exchange_trace().clone();
+        assert_eq!(trace.transmits, 1);
+        let acknowledgement = trace.last_acknowledgement.as_ref().unwrap();
+        assert_eq!(acknowledgement.status, TRANSMIT_ACKNOWLEDGED_STATUS);
+        assert!(acknowledgement.message.is_empty());
+        assert_eq!(trace.inbound_frames, 0);
+        assert_eq!(trace.indications, 1);
+        assert_eq!(trace.last_indication.map(|frame| frame.sequence), Some(4));
+        assert_eq!(trace.stale_frames, 0);
+        assert!(trace.close_error.is_none(), "the close read its own answer");
+
+        let second = device
+            .execute_prepared_uds_read(
+                &did_transaction("normal", "hs-can"),
+                Duration::from_millis(40),
+            )
+            .unwrap();
+        assert_eq!(
+            second.raw_diagnostic_response,
+            [0x62, 0x19, 0x45, 0x12, 0x34]
+        );
+        assert_eq!(second.trace.transmits, 1);
+        assert_eq!(second.trace.indications, 0);
+        assert_eq!(second.trace.inbound_frames, 1);
+        // Board-info, open, pins, request, close; open, pins, request, close.
+        assert_eq!(writes.lock().unwrap().len(), 9);
+    }
+
+    /// The first real-car session (build 1.2.5, the same morning): two live
+    /// samples, both acknowledged with `0x100`, the extra frame after the
+    /// second — during its close. Both reads time out; neither close fails;
+    /// nothing is left marked open.
+    #[test]
+    fn the_first_real_car_session_replayed_both_reads_time_out_and_both_closes_succeed() {
+        let mut steps = opened();
+        steps.push(acknowledged(4, 10));
+        steps.push(Step::Silent);
+        steps.push(answered(5));
+        steps.push(Step::Bytes(command_response(
+            CHANNEL,
+            OPEN_CHANNEL_RESPONSE,
+            6,
+            0,
+        )));
+        steps.push(Step::Bytes(command_response(
+            CHANNEL,
+            SET_PIN_RESPONSE,
+            7,
+            0,
+        )));
+        steps.push(acknowledged(8, 20));
+        steps.push(Step::Silent);
+        steps.push(Step::Bytes(indication(CHANNEL, 8, 0, 21)));
+        steps.push(answered(9));
+        let (transport, writes) = ScriptedTransport::new(steps);
+        let mut device = MongooseJlrDevice::open(transport);
+
+        for _ in 0..2 {
+            let result = device.execute_prepared_uds_read(
+                &did_transaction("normal", "hs-can"),
+                Duration::from_millis(40),
+            );
+            assert!(
+                matches!(result, Err(MongooseDiagnosticError::Timeout)),
+                "{result:?}"
+            );
+            assert!(device.exchange_trace().close_error.is_none());
+        }
+        let trace = device.exchange_trace();
+        assert_eq!(trace.indications, 1);
+        assert_eq!(trace.transmits, 1);
+        assert_eq!(writes.lock().unwrap().len(), 9);
+    }
+
+    /// ADR-0042, decision 5: the module answered, then the adapter did not
+    /// answer the close. The answer stands, the close's failure is in the
+    /// trace, and the next read closes the stale channel before its own open.
+    #[test]
+    fn an_answer_received_stands_when_the_close_after_it_fails() {
+        let mut steps = opened();
+        steps.push(acknowledged(4, 10));
+        steps.push(Step::Bytes(inbound_can_frame(
+            CHANNEL,
+            0,
+            11,
+            0x7E8,
+            &[0x05, 0x62, 0x19, 0x45, 0x12, 0x34, 0x00, 0x00],
+        )));
+        // The close (5) goes unanswered: a silence ends at the close's own
+        // write, so a second one lasts until the next command is written.
+        steps.push(Step::Silent);
+        steps.push(Step::Silent);
+        // The next read: the stale channel closed (6), then open, pins, the
+        // request, the answer, the close.
+        steps.push(answered(6));
+        steps.push(Step::Bytes(command_response(
+            CHANNEL,
+            OPEN_CHANNEL_RESPONSE,
+            7,
+            0,
+        )));
+        steps.push(Step::Bytes(command_response(
+            CHANNEL,
+            SET_PIN_RESPONSE,
+            8,
+            0,
+        )));
+        steps.push(acknowledged(9, 20));
+        steps.push(Step::Bytes(inbound_can_frame(
+            CHANNEL,
+            0,
+            21,
+            0x7E8,
+            &[0x05, 0x62, 0x19, 0x45, 0x56, 0x78, 0x00, 0x00],
+        )));
+        steps.push(answered(10));
+        let (transport, writes) = ScriptedTransport::new(steps);
+        let mut device = MongooseJlrDevice::open(transport);
+
+        let first = device
+            .execute_prepared_uds_read(
+                &did_transaction("normal", "hs-can"),
+                Duration::from_millis(40),
+            )
+            .unwrap();
+        assert_eq!(
+            first.raw_diagnostic_response,
+            [0x62, 0x19, 0x45, 0x12, 0x34]
+        );
+        assert_eq!(
+            first.trace.close_error.as_deref(),
+            Some("transport read timed out")
+        );
+
+        let second = device
+            .execute_prepared_uds_read(
+                &did_transaction("normal", "hs-can"),
+                Duration::from_millis(40),
+            )
+            .unwrap();
+        assert_eq!(
+            second.raw_diagnostic_response,
+            [0x62, 0x19, 0x45, 0x56, 0x78]
+        );
+        assert!(second.trace.close_error.is_none());
+        let writes = writes.lock().unwrap();
+        assert_eq!(writes.len(), 10);
+        assert_eq!(
+            writes[5],
+            crate::passive::close_channel_request(6, CHANNEL),
+            "the stale channel is closed before the next open"
+        );
+    }
+
+    /// The one judgment kept on an acknowledgement: the firmware's words make
+    /// it a refusal, reported as the transmission's failure, with the route
+    /// still closed.
+    #[test]
+    fn an_acknowledgement_with_the_firmware_words_fails_the_transmission() {
+        let mut steps = opened();
+        steps.push(Step::Bytes(command_response_with_text(
+            CHANNEL,
+            OUTBOUND_DATA_RESPONSE,
+            4,
+            2,
+            77,
+            "cOutboundData: channel is not open",
+        )));
+        steps.push(answered(5));
+        let (transport, writes) = ScriptedTransport::new(steps);
+        let mut device = MongooseJlrDevice::open(transport);
+
+        let error = device
+            .execute_prepared_uds_read(
+                &did_transaction("normal", "hs-can"),
+                Duration::from_millis(40),
+            )
+            .unwrap_err();
+        assert_eq!(
+            error.to_string(),
+            "diagnostic request transmission failed: cOutboundData failed with device status 0x00000002: cOutboundData: channel is not open"
+        );
+        assert_eq!(writes.lock().unwrap().len(), 5);
     }
 
     /// ADR-0036: a module that accepts the clear in the default session is

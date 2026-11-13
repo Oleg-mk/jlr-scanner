@@ -4,6 +4,7 @@
 //! the last result and the wording.
 
 use crate::diagnostic_service::map_mongoose_error;
+use crate::read_record::adapter_trace;
 use app_contracts::{
     AdapterInfo, DecodedParameterSummary, DiagnosticError, DiagnosticErrorCategory,
     DiagnosticExecutionStage, DtcSummary, ModuleReadKind, ModuleReadReport, ModuleReadRequest,
@@ -12,7 +13,7 @@ use app_contracts::{
 use diagnostic_environment::{DiagnosticEnvironmentResolution, DiagnosticEnvironmentResolver};
 use diagnostic_session::decode::decode_parameters;
 use diagnostic_session::{validation_label, vehicle_context, KnowledgeLibrary};
-use mongoose_jlr::{MongooseDiagnosticError, MongooseUdsReadResult};
+use mongoose_jlr::{ExchangeTrace, MongooseDiagnosticError, MongooseUdsReadResult};
 use std::collections::BTreeMap;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -151,6 +152,21 @@ impl ModuleReadService {
         library: Option<&KnowledgeLibrary>,
         result: Result<MongooseUdsReadResult, DiagnosticError>,
     ) -> ModuleReadSnapshot {
+        self.finish_with_trace(request, prepared, adapter, library, result, None)
+    }
+
+    /// `finish`, with what the adapter did around the read (`ADR-0042`) for
+    /// the record — fetched after the read whatever it returned, so a read
+    /// that brought nothing still says how far the request got.
+    pub fn finish_with_trace(
+        &mut self,
+        request: &ModuleReadRequest,
+        prepared: Option<&PreparedModuleRead>,
+        adapter: Option<&AdapterInfo>,
+        library: Option<&KnowledgeLibrary>,
+        result: Result<MongooseUdsReadResult, DiagnosticError>,
+        trace: Option<ExchangeTrace>,
+    ) -> ModuleReadSnapshot {
         let mut snapshot = idle();
         snapshot.ecu_family = request.ecu_family.clone();
         if let Some(prepared) = prepared {
@@ -284,6 +300,7 @@ impl ModuleReadService {
             &snapshot,
             outcome.as_ref().ok().map(|(raw, _)| raw),
             decoded_result,
+            trace.as_ref(),
         );
         self.last = Some((snapshot.clone(), report));
         self.remember_fault_codes();
@@ -356,6 +373,27 @@ pub fn map_live_error(error: MongooseDiagnosticError) -> DiagnosticError {
     map_mongoose_error(error)
 }
 
+/// The error in the shell's words, with what the adapter did around the
+/// read appended (`ADR-0042`): whether the transmit was acknowledged and
+/// with which word, how many frames came, what the adapter said on its own,
+/// how the close went — so the record says what the first two real-car
+/// sessions could not.
+pub fn map_live_error_with_trace(
+    error: MongooseDiagnosticError,
+    trace: Option<&ExchangeTrace>,
+) -> DiagnosticError {
+    let mut mapped = map_mongoose_error(error);
+    if let Some(trace) = trace {
+        let details = mapped.technical_details.take().unwrap_or_default();
+        mapped.technical_details = Some(if details.is_empty() {
+            format!("adapter: {trace}")
+        } else {
+            format!("{details}; adapter: {trace}")
+        });
+    }
+    mapped
+}
+
 pub fn adapter_unavailable() -> DiagnosticError {
     DiagnosticError {
         category: DiagnosticErrorCategory::AdapterNotFound,
@@ -422,6 +460,7 @@ fn build_report(
     snapshot: &ModuleReadSnapshot,
     raw: Option<&MongooseUdsReadResult>,
     decoded_result: Option<String>,
+    trace: Option<&ExchangeTrace>,
 ) -> ModuleReadReport {
     let timestamp_unix_ms = SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -494,6 +533,7 @@ fn build_report(
             .error
             .as_ref()
             .map(app_contracts::DiagnosticError::words),
+        adapter_trace: trace.or(raw.map(|value| &value.trace)).map(adapter_trace),
         execution_stage: snapshot
             .error
             .as_ref()
@@ -508,7 +548,7 @@ mod tests {
     use app_contracts::VehicleContextInput;
     use diagnostic_environment::{ReadableIdentifier, ValidationState};
     use jlr_profiles::{x250_2010_supercharged_ecm_environment, ECU_FAMILY};
-    use mongoose_jlr::VehicleRouteId;
+    use mongoose_jlr::{TransmitAcknowledgement, UnsolicitedFrame, VehicleRouteId};
     use uds_execution::UDS_PROTOCOL_FAMILY;
 
     fn request(kind: ModuleReadKind) -> ModuleReadRequest {
@@ -574,7 +614,65 @@ mod tests {
             request_payload: vec![0x19, 0x02, 0x08],
             raw_diagnostic_response: bytes.to_vec(),
             pending_responses: 1,
+            trace: ExchangeTrace::default(),
         }
+    }
+
+    /// `ADR-0042`: what the adapter did around a read that brought nothing
+    /// is in the record — structured, and in the error's words.
+    #[test]
+    fn a_failed_read_carries_the_adapter_trace_in_its_record_and_its_words() {
+        let mut service = ModuleReadService::new();
+        let prepared = prepared(ModuleReadKind::Identifier);
+        let trace = ExchangeTrace {
+            transmits: 1,
+            last_acknowledgement: Some(TransmitAcknowledgement {
+                status: 0x100,
+                message: String::new(),
+                waited_ms: 3,
+            }),
+            indications: 1,
+            last_indication: Some(UnsolicitedFrame {
+                command: 0x000A,
+                sequence: 4,
+                status: Some(0),
+            }),
+            ..ExchangeTrace::default()
+        };
+        let snapshot = service.finish_with_trace(
+            &request(ModuleReadKind::Identifier),
+            Some(&prepared),
+            None,
+            None,
+            Err(map_live_error_with_trace(
+                MongooseDiagnosticError::Timeout,
+                Some(&trace),
+            )),
+            Some(trace),
+        );
+        assert_eq!(snapshot.state, ModuleReadState::Failed);
+
+        let report: ModuleReadReport =
+            serde_json::from_str(&service.report_json().unwrap()).unwrap();
+        let recorded = report.adapter_trace.expect("the trace is in the record");
+        assert_eq!(recorded.transmits, 1);
+        assert_eq!(
+            recorded.acknowledgement_status.as_deref(),
+            Some("0x00000100")
+        );
+        assert_eq!(recorded.acknowledgement_message, None);
+        assert_eq!(recorded.acknowledgement_wait_ms, Some(3));
+        assert_eq!(recorded.inbound_frames, 0);
+        assert_eq!(recorded.indications, 1);
+        assert_eq!(
+            recorded.last_indication.as_deref(),
+            Some("0x000A sequence 4 status 0x00000000")
+        );
+        let words = report.error_message.expect("the error in words");
+        assert!(
+            words.starts_with("No response from ECU: no response from ECU before timeout; adapter: transmit acknowledged with status 0x00000100 after 3 ms; 0 inbound frames; 1 indication(s)"),
+            "{words}"
+        );
     }
 
     #[test]

@@ -37,7 +37,10 @@ pub struct RouteCapture {
     pub frames: Vec<CapturedFrame>,
     /// How long the route was actually open for listening.
     pub listened: Duration,
-    /// Non-data packets the adapter delivered during the capture.
+    /// Non-data packets the adapter delivered during the capture: its own
+    /// indications, late answers, and frames too short or on another
+    /// channel. Nothing was transmitted, so every one of them is the
+    /// adapter's own word (ADR-0042).
     pub dropped_frames: u64,
     /// The frame cap was reached before the deadline; more traffic existed.
     pub truncated: bool,
@@ -55,7 +58,6 @@ impl<T: ByteTransport> MongooseJlrDevice<T> {
         max_frames: usize,
     ) -> Result<RouteCapture, ProtocolError> {
         let open = self.open_receive_route(route_id)?;
-        let dropped_before = self.receive_counters().dropped_frames;
         let started = Instant::now();
         let deadline = started + duration;
         let mut frames = Vec::new();
@@ -80,10 +82,11 @@ impl<T: ByteTransport> MongooseJlrDevice<T> {
             }
         };
         let listened = started.elapsed();
-        let dropped_frames = self
-            .receive_counters()
-            .dropped_frames
-            .saturating_sub(dropped_before);
+        // The trace began at this capture's open, so its counts are the
+        // capture's own.
+        let trace = self.exchange_trace();
+        let dropped_frames =
+            trace.dropped_frames + u64::from(trace.indications) + u64::from(trace.stale_frames);
         let closed = self.close_route();
 
         match (outcome, closed) {
@@ -104,7 +107,7 @@ mod tests {
     use super::*;
     use crate::codec::encode_board_info_response;
     use crate::passive::{
-        command_response, inbound_can_frame, open_channel_request, CAN1_RESOURCE_ROUTE,
+        command_response, inbound_can_frame, indication, open_channel_request, CAN1_RESOURCE_ROUTE,
         CAN2_RESOURCE_ROUTE, CLOSE_CHANNEL_RESPONSE, OPEN_CHANNEL_RESPONSE, SET_PIN_RESPONSE,
     };
     use std::collections::VecDeque;
@@ -265,6 +268,37 @@ mod tests {
             writes.lock().unwrap()[1],
             open_channel_request(2, CAN2_RESOURCE_ROUTE, 125_000)
         );
+    }
+
+    /// Nothing is transmitted during a capture, so an adapter record that is
+    /// not a frame — an indication, a late answer — is counted as dropped
+    /// and the frames around it are still captured (ADR-0042).
+    #[test]
+    fn the_adapters_own_records_during_a_capture_are_counted_as_dropped() {
+        let (transport, _) = ScriptedTransport::new(session(
+            CHANNEL,
+            vec![
+                inbound_can_frame(CHANNEL, 0, 10, 0x321, &[1]),
+                indication(CHANNEL, 0, 0, 11),
+                command_response(CHANNEL, CLOSE_CHANNEL_RESPONSE, 90, 0),
+                inbound_can_frame(CHANNEL, 0, 12, 0x322, &[2]),
+            ],
+            false,
+        ));
+        let mut device = MongooseJlrDevice::open(transport);
+
+        let capture = device
+            .capture_route(
+                VehicleRouteId::HsCan,
+                Duration::from_secs(5),
+                Duration::from_millis(10),
+                2,
+            )
+            .unwrap();
+
+        assert_eq!(capture.frames.len(), 2);
+        assert_eq!(capture.frames[1].frame.arbitration_id, 0x322);
+        assert_eq!(capture.dropped_frames, 2);
     }
 
     #[test]

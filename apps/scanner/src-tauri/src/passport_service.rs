@@ -31,7 +31,7 @@ use diagnostic_session::{
     catalogue_comparisons, vehicle_context, CatalogueAssembly, IdentificationIdentifier,
     KnowledgeLibrary,
 };
-use mongoose_jlr::MongooseUdsReadResult;
+use mongoose_jlr::{ExchangeTrace, MongooseUdsReadResult};
 use serde_json::{json, Value};
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -214,13 +214,16 @@ impl PassportService {
 
     /// Record what one module answered for one identifier, or that it did
     /// not.
+    /// `trace` is what the adapter did around the read (`ADR-0042`), for
+    /// the record.
     pub fn record(
         &mut self,
         index: usize,
         result: Result<MongooseUdsReadResult, DiagnosticError>,
+        trace: Option<ExchangeTrace>,
     ) -> ModulePassportSnapshot {
         if let Some(run) = self.run.as_mut() {
-            run.record(index, result);
+            run.record(index, result, trace.as_ref());
             if run.entries.iter().all(|entry| entry.done) {
                 run.finish();
             }
@@ -295,7 +298,12 @@ impl Entry {
 }
 
 impl Run {
-    fn record(&mut self, index: usize, result: Result<MongooseUdsReadResult, DiagnosticError>) {
+    fn record(
+        &mut self,
+        index: usize,
+        result: Result<MongooseUdsReadResult, DiagnosticError>,
+        trace: Option<&ExchangeTrace>,
+    ) {
         let Some(entry) = self.entries.get(index) else {
             return;
         };
@@ -315,7 +323,7 @@ impl Run {
             Ok(raw) => ReadOutcome::Answered(raw),
             Err(error) => ReadOutcome::Failed(error),
         };
-        let record = read_record(identity, &entry.transaction, outcome, None);
+        let record = read_record(identity, &entry.transaction, outcome, None, trace);
         self.records.push(record);
 
         let mut row = PassportReading {

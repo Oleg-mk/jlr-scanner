@@ -165,7 +165,9 @@ fn passive_route(route: VehicleRouteId) -> Result<(), String> {
             }
         }
     }
-    let dropped_frames = mongoose.receive_counters().dropped_frames;
+    let trace = mongoose.exchange_trace();
+    let dropped_frames =
+        trace.dropped_frames + u64::from(trace.indications) + u64::from(trace.stale_frames);
     let close_result = mongoose.close_route();
     let transport_close_result = mongoose.close();
     close_result.map_err(|error| error.to_string())?;
