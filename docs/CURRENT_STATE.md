@@ -299,6 +299,20 @@ inbound frames in two seconds, the ignition on, is the filter question
 answered and the next work named. Build 1.2.7 carries all of it; its
 record follows below.
 
+Build 1.2.7, the same morning: commit fa430f3, the preflight passed on
+that commit before the push, run 43367485173, all five jobs green. Windows
+x64 ProwlOne_1.2.7_x64-setup.exe, 5,912,968 bytes, SHA-256
+fd113f40b685b92dd9250d9fdcac84b0ecab8ae0868b67b38b3dc29cda853f3e; Windows
+x86 ProwlOne_1.2.7_x86-setup.exe, 5,641,662 bytes, SHA-256
+ddde8ec6f24534498299b3cf776cfbe43655d3b818c53bbb871f147e14058e00; macOS
+ProwlOne_1.2.7_universal.dmg, 16,085,805 bytes, SHA-256
+20a2d37da45443ad9599199212420556ea4f8402a0de538503c3b9ff22a62d07. All three
+in `Desktop\ProwlOne-1.2.7` beside the owner's library zip `0807-B35C`;
+the 1.2.6 folder moved to `Downloads\prowlone-superseded\ProwlOne-1.2.6`.
+The gate above ran on the x64 installer. The tag and the Releases page
+follow the gate's session file, read in full; the tester gets the link
+only then.
+
 ## 2026-11-12 — the cable on SDD's own driver
 
 The tester's first run, 2026-11-11, on the 32-bit laptop his SDD runs on:
