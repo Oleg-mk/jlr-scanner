@@ -309,9 +309,16 @@ ProwlOne_1.2.7_universal.dmg, 16,085,805 bytes, SHA-256
 20a2d37da45443ad9599199212420556ea4f8402a0de538503c3b9ff22a62d07. All three
 in `Desktop\ProwlOne-1.2.7` beside the owner's library zip `0807-B35C`;
 the 1.2.6 folder moved to `Downloads\prowlone-superseded\ProwlOne-1.2.6`.
-The gate above ran on the x64 installer. The tag and the Releases page
-follow the gate's session file, read in full; the tester gets the link
-only then.
+The gate above ran on the x64 installer, and its session file, read in
+full, carried the two reads and a live run of six samples, every one of
+them the same: acknowledged with `0x100` after 0 ms, zero inbound frames,
+zero indications, zero stale frames, a clean close, and the run stopping
+itself after three silences per entry, as designed. Tag `v1.2.7` on
+`fa430f3`, pushed by name; the three installers on the Releases page as a
+pre-release the same morning. The tester is asked to run it with the
+ignition on, as last time, and to add a listen-only capture of HS-CAN:
+the capture's frame count answers the filter question without a
+transmit, and every read's `adapterTrace` says how far each request got.
 
 ## 2026-11-12 — the cable on SDD's own driver
 
