@@ -155,3 +155,30 @@ The audit's §6 says what settles each.
 - A read whose close failed is a success with a close error in its trace,
   where 1.2.6 reported `CAN channel close failed`.
 - The probe tool and the capture read their counts from the trace.
+
+## Built, 2026-11-13
+
+Decisions 1 to 7 were built the day the record was accepted: 74 tests in
+`mongoose-jlr`, the shell's bench run on the new shape, the workspace,
+clippy, the formatting and the architecture guard clean; the preflight
+passed on `fa430f3`, CI built the three installers (run 43367485173).
+
+**The gate ran the same day**, on the owner's bare adapter: the PCM's
+fault codes read twice with nothing on the OBD side. The record carries the
+acknowledgement (`0x00000100`, no words), zero inbound frames, zero
+indications, zero stale or dropped frames and a clean close, and the second
+read ran clean. The build does what this record says.
+
+**One claim of this record is wrong**, and the gate showed it: the
+acknowledgement came after **0 ms**, not "about three seconds". The three
+seconds of the bench transcript of 2026-09-08 were the probe's own
+collection window; the firmware's ticks in that transcript put the
+acknowledgement tens of milliseconds after the transmit, in September as
+today (the audit's §10 has the arithmetic). So: the firmware acknowledges a
+transmit at once, bus or no bus; `0x100` at once says nothing about the bus;
+finding 3 of the context falls, and the five-second wait of decision 3
+stays only as an upper bound a late acknowledgement cannot miss. What the
+bare adapter did not send — any indication — the car did, once after every
+acknowledgement: the one difference is a bus that completes the transmit,
+which sharpens decision 2's reading of that frame as `cIndication` without
+confirming it. The next session file records it and settles it.

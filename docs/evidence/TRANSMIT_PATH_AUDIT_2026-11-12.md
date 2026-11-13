@@ -356,3 +356,55 @@ failed: …"; the message is said once now.
 | The meaning of `0x100` | `UNKNOWN` still; read as the acknowledgement (`HYPOTHESIS`); a module's answer after it confirms it |
 | The extra frame | `UNKNOWN` still; the next session file carries its command, sequence and status word |
 | Inbound delivery on a real bus, with or without a filter | `NOT_YET_VALIDATED`; the next session file carries the inbound count of every read |
+
+## 10. The gate on the bare adapter, 2026-11-13 — and a correction
+
+Build 1.2.7 on the owner's PC, the adapter in USB and nothing on the OBD
+side, his X250 context, the PCM's confirmed fault codes read twice. The
+second read's record:
+
+| Field | Value |
+| --- | --- |
+| `acknowledgementStatus` | `0x00000100`, no words |
+| `acknowledgementWaitMs` | **0** |
+| `inboundFrames` | 0 |
+| `indications` | 0 |
+| `staleFrames`, `droppedFrames`, `droppedBytes` | 0 |
+| `closeError` | none |
+| error in words | `No response from ECU: no response from ECU before timeout; adapter: transmit acknowledged with status 0x00000100 after 0 ms; 0 inbound frames` |
+
+So the build does what `ADR-0042` says: the acknowledgement is recorded, the
+answer is waited for, the close is clean, and the second read runs clean —
+no stale frame, which also says the first read's close was answered.
+
+**The correction.** §3.1, finding 3 and `ADR-0042`'s decision 3 say the
+firmware answered a transmit on the bench "after about three seconds". It
+did not. The two "after 3.12 s" and "after 3.04 s" lines of the 2026-09-08
+transcript are the probe's own collection window — three seconds plus
+overhead, both times — and the firmware's own ticks in that transcript say
+how long the acknowledgement really took: the tick advances about
+1,032,000 between the open's answer and the pin command's answer, and
+about 1,110,000 between the pin command's answer and the acknowledgement;
+with the probe waiting its fixed second between commands both gaps are one
+second plus the firmware's latency, so the acknowledgement followed the
+transmit by tens of milliseconds, in September as today. The firmware
+acknowledges a transmit at once, bus or no bus, and `0x100` at once says
+nothing about the bus. Finding 3 falls (the five-second wait stays as a
+harmless upper bound); §3.2's reading of the car's quick acknowledgement as
+a sign of a live bus falls with it.
+
+**What stands, sharpened.** On the bare adapter there was no indication at
+all within the two-second wait and the close. In the car there was one
+extra frame right after each acknowledgement. The one difference between
+the two is the bus: a CAN controller keeps retrying a frame nobody
+acknowledges and never completes it, where on a live bus any node
+acknowledges it and the transmit completes. So the extra frame is the
+bus-dependent signal, and the reading of §3.4 — `cIndication`, the
+transmit's completion status — gains the bare adapter's silence as
+evidence. Still `HYPOTHESIS`: the next session file records the frame's
+command, sequence and status word, and settles it.
+
+What the next car session therefore means: an acknowledgement at 0 ms and
+one indication say the frame went out on the bus; a module's frame behind
+it confirms the whole path; zero inbound frames behind it, with the
+ignition on, is the filter question answered.

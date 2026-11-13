@@ -13,11 +13,12 @@ use transport_api::{ByteTransport, CanId, TransportError};
 const BOARD_INFO_READ_TIMEOUT: Duration = Duration::from_secs(1);
 const COMMAND_READ_TIMEOUT: Duration = Duration::from_secs(1);
 /// How long a transmit's acknowledgement is waited for (ADR-0042, decision
-/// 3). On a bench with nothing to acknowledge the frame, the firmware answered
-/// after about three seconds (2026-09-06/08); in a car, within milliseconds.
-/// The one-second wait of the earlier builds was shorter than the firmware's
-/// own give-up, and the late acknowledgement then met the next command as a
-/// stray frame.
+/// 3). The firmware has acknowledged every transmit at once — in a car and
+/// on a bare adapter alike (the gate of 2026-11-13: 0 ms); the "three
+/// seconds" the bench of 2026-09-08 seemed to show were the probe's own
+/// collection window, as the firmware's ticks in that transcript say. Five
+/// seconds is an upper bound a late acknowledgement cannot miss, so that it
+/// never meets the next command as a stray frame.
 pub const TRANSMIT_ACK_TIMEOUT: Duration = Duration::from_secs(5);
 /// After the jump the firmware is polled with board-info until it answers
 /// with a running tick; how long it takes to start was not measurable on

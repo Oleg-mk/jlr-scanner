@@ -192,9 +192,9 @@ written that evening from the two session files, the bench transcripts of
 product's open client and the code. What it found:
 
 - The adapter answers every transmit with `0x8008` and status `0x100`,
-  with no text — within milliseconds on a live bus (both sessions), after
-  about three seconds on a bench where nothing acknowledges the frame
-  (2026-09-06/08). The code applied the rule it had learned from open, pins
+  with no text — within milliseconds, in the car and on the bench alike
+  (the audit first read the bench as three seconds; the next day's gate
+  and the firmware's own ticks corrected it). The code applied the rule it had learned from open, pins
   and close — a non-zero status is a refusal — to that word, on no evidence
   (`ADR-0018` had left the word open), and abandoned every request a few
   milliseconds after sending it. Nothing was ever waited for. Three signs
@@ -213,9 +213,9 @@ product's open client and the code. What it found:
   its own; that the frame was one is the one reading the sources offer,
   and a hypothesis, because its identity was not recorded: the close's error
   was discarded when the exchange before it had failed.
-- The one-second acknowledgement wait was shorter than the firmware's own
-  three-second give-up on a silent bus, so the owner's bare adapter starts
-  the same chain by another door.
+- The one-second acknowledgement wait had no evidence behind it either
+  way; the audit's claim that the firmware takes three seconds on a silent
+  bus did not survive the next day (below).
 - The close's error and the adapter's counters were never in a read's
   record; the number of inbound frames delivered during a read — which
   answers the filter question on its own — was counted for captures only.
@@ -279,16 +279,25 @@ and the architecture check clean. `IMPLEMENTED` / `FIXTURE_TESTED`. Not
 added, for want of evidence: a filter table entry, any value/config command
 after the open, `cOpenDevice`.
 
-**The gate before the tester gets a build** is the owner's bare adapter, no
-car: a module read must record an acknowledgement with status `0x100` after
-about three seconds, time out with zero inbound frames, close cleanly, and
-the next read must run clean — no `expected k, got k-1` anywhere in the
-session file. The bench cannot show the indication (none has been seen
-without a bus) or reception. Then the tester's car: either a module answers
-after the acknowledgement, or the trace shows an acknowledged transmit, a
-bus the ignition has on, and zero inbound frames in two seconds — the filter
-question answered and the next work named. Build 1.2.7 carries all of it;
-its record follows when the installers exist.
+**The gate before the tester gets a build** was the owner's bare adapter,
+no car, and it ran the same day on build 1.2.7: the PCM's fault codes read
+twice. The record carries the acknowledgement (`0x00000100`, no words),
+zero inbound frames, zero indications, zero stale or dropped frames and a
+clean close, and the second read ran clean — no `expected k, got k-1`. The
+build does what the record says. It also corrected the record: the
+acknowledgement came after 0 ms, not the "about three seconds" the audit
+had read off the 2026-09-08 bench transcript — those were the probe's own
+collection window, and the firmware's ticks in the same transcript put the
+acknowledgement tens of milliseconds after the transmit then too (the
+audit's §10). So `0x100` at once says nothing about the bus. What the bare
+adapter never sent — an indication — the car sent once after every
+acknowledgement: a bus that completes the transmit is the one difference,
+which sharpens the reading of that frame as the transmit's completion
+without confirming it. Then the tester's car: an acknowledgement, one
+indication and a module's frame confirm the whole path; the same with zero
+inbound frames in two seconds, the ignition on, is the filter question
+answered and the next work named. Build 1.2.7 carries all of it; its
+record follows below.
 
 ## 2026-11-12 — the cable on SDD's own driver
 
