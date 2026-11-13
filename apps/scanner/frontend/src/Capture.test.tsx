@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { App } from "./App";
 import { createEmptySnapshot, type AdapterClient, type AdapterSnapshot } from "./adapter";
@@ -181,7 +181,10 @@ describe("listen-only bus capture", () => {
     renderApp(connectedSnapshot(), client);
 
     const listen = await screen.findByRole("button", { name: "Listen" });
-    expect(listen).toBeEnabled();
+    // The button exists before the adapter's verified state has reached it;
+    // under load (the preflight's full suite) the first look found it still
+    // disabled, 2026-11-13. Wait for the state, not for the element.
+    await waitFor(() => expect(listen).toBeEnabled());
     fireEvent.change(screen.getByLabelText("Pair"), { target: { value: "ms-can" } });
     fireEvent.change(screen.getByLabelText("Seconds (1–15)"), { target: { value: "3" } });
     fireEvent.click(listen);
