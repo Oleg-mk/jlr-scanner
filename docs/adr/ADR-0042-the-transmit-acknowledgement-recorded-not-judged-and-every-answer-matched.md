@@ -182,3 +182,20 @@ bare adapter did not send — any indication — the car did, once after every
 acknowledgement: the one difference is a bus that completes the transmit,
 which sharpens decision 2's reading of that frame as `cIndication` without
 confirming it. The next session file records it and settles it.
+
+## On the vehicle, 2026-11-13
+
+The tester ran build 1.2.7 on his Discovery 4 the same afternoon, ignition
+on: a live run, "Check all modules" on both buses and a listen-only capture
+of HS-CAN. Every record carries its trace, and the traces agree with each
+other: 45 transmits acknowledged with `0x100` within milliseconds, one
+`cIndication` after every one of them — command `0x000A`, the transmit's
+sequence, status `0x00000106` — zero inbound records in every wait, zero
+frames in the capture, no stale frame, no close error. Decision 2's reading
+of the extra frame is `VEHICLE_CONFIRMED`; the state machine of decisions
+1 to 6 held for the whole session; decision 4's trace said what the first
+two sessions could not. What the word `0x106` means is not known, and the
+firmware handed the host no frame on either bus, with or without a
+transmit: the filter table entry this record left undecided is the next
+work, with the evidence listed in the audit's §11. It gets a record of its
+own before any byte of it is sent.

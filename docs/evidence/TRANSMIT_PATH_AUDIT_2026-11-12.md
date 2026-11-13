@@ -408,3 +408,74 @@ What the next car session therefore means: an acknowledgement at 0 ms and
 one indication say the frame went out on the bus; a module's frame behind
 it confirms the whole path; zero inbound frames behind it, with the
 ignition on, is the filter question answered.
+
+## 11. The third session, 2026-11-13 — every frame accounted for
+
+Build 1.2.7 on the tester's Discovery 4 (L319, MY10, V8 NA), the cable on
+SDD's driver, ignition on and engine off as asked. In order: a live run of
+the PCM (six samples, 07:05 UTC), "Check all modules" (39 reads: 16 on
+HS-CAN, 23 on MS-CAN, 07:05–07:07), a listen-only capture of HS-CAN
+(07:08), the session saved (07:09). The `adapterTrace` of every record:
+
+| Over 45 transmits (6 live, 39 module reads) | |
+| --- | --- |
+| acknowledged `0x8008`, status `0x100`, no words | 45 of 45; the first after 163 ms, the rest within 0–90 ms |
+| indications | **45 of 45: one `0x000A` after every transmit, carrying the transmit's sequence, status `0x00000106`**, on HS-CAN and on MS-CAN alike |
+| inbound records during the two-second waits | 0 |
+| stale frames, dropped frames, dropped bytes | 0, 0, 0 |
+| close errors | 0 |
+| the listen-only capture of HS-CAN | 0 frames; the record says no frame was transmitted or acknowledged |
+
+**Settled on the vehicle.**
+
+1. The extra frame of §3.4 is `cIndication`: command `0x000A`, the
+   transmit's own sequence, within milliseconds of the acknowledgement,
+   after every transmit. `CONFIRMED`.
+2. The state machine of `ADR-0042` holds in the car: 45 transmits, 49
+   opens and closes, no shift, no stale frame, every record complete.
+3. The firmware delivered no inbound record on either bus during any wait,
+   and no frame to a listen-only channel on HS-CAN with the ignition on.
+   The acknowledgement's timing is the same as on the bare adapter, so it
+   says nothing about the bus (§10); the indication is what the bare
+   adapter never sent.
+
+**Not settled: the word `0x106`.** Family 1 — the transmit's — code 6. It
+is not one of the three faults the sister product's client names (`0x105`
+bus off, `0x10C` no flow-control filter, `0x121` no source address), and
+the research has no table for this family. Two readings:
+
+- *completion*: the frame went out and the bus acknowledged it; the
+  firmware forwards nothing to the host without a filter table entry — the
+  rule the sister product's client states for its firmware, and the one
+  thing both buses and the listen-only channel have in common;
+- *failure*: the transmit did not complete, and the adapter is not on a bus
+  at the right rate. Against it: the identical result on both buses, whose
+  rates the data gives separately; SDD reading the same car through the
+  same cable on the same laptop; and the bare adapter's silence, which says
+  an indication comes only when something is on the other side of the
+  transceiver.
+
+The reading taken is the first, as `HYPOTHESIS`. What settles it, in
+order of cost:
+
+1. Static research on the vendor library, on the owner's own tooling: the
+   filter builder's record (the table entry of 27 bytes, subtype 7) and the
+   library's table for the transmit family's status words, where `0x106`
+   has a name.
+2. The bench, the owner's bare adapter: the firmware's acceptance of a
+   table entry — it refuses a malformed one with its own words, as it does
+   for pins — and whether the acknowledgement or the indication changes
+   with one in place.
+3. The tester's car, with the entry in a build: inbound frames in a
+   capture, or a module's answer.
+
+The strongest evidence of all would be a USB capture of SDD's own session
+on the tester's laptop — what the library sends after the open, filters
+and configuration included, and what the firmware answers — with the
+capture scripts the repository already holds. It is the owner's call: it
+asks the tester to install a capture driver and run a script, more than a
+tester should be asked lightly.
+
+Nothing in this session points at the car, the cable, the laptop, the
+driver or the application's own sequencing. The one question left is what
+the firmware needs before it hands a frame to the host.

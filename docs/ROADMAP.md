@@ -182,9 +182,14 @@ vehicle.
   session one answer behind (`docs/evidence/TRANSMIT_PATH_AUDIT_2026-11-12.md`).
   Rebuilt under `ADR-0042` (2026-11-13): the acknowledgement recorded, every
   answer matched by command and sequence, the adapter's trace in every read
-  record. The gate before the next tester build is the owner's bare adapter;
-  the first answer from a real car is still ahead, and whether frames arrive
-  without a filter table entry is the question the next session file answers.
+  record; held for a whole session on the tester's car the same day. That
+  session settled the shape of the exchange — every transmit acknowledged,
+  every one followed by the adapter's own indication, status `0x106`, never
+  named in the research — and showed the firmware handing the host no frame
+  on either bus, even to a listen-only channel. The filter table entry
+  (`cTableAddEntry`) is the next work, by its own record: the vendor
+  library's builder read, the entry tried on the owner's bare adapter, then
+  a build. The first answer from a real car is still ahead.
 - **Knowledge.** The whole SDD 169 corpus exported: 45 programme documents,
   126,706 records — addressing, buses, 15,281 identifier definitions with
   units, 93,521 fault-code descriptions. The application loads it as a data

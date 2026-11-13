@@ -320,6 +320,41 @@ ignition on, as last time, and to add a listen-only capture of HS-CAN:
 the capture's frame count answers the filter question without a
 transmit, and every read's `adapterTrace` says how far each request got.
 
+The tester's third session came the same afternoon, from 1.2.7 on his
+Discovery 4 with the ignition on: a live run of the PCM, "Check all
+modules" — 16 reads on HS-CAN, 23 on MS-CAN — and a listen-only capture of
+HS-CAN, saved at 07:09 UTC. For the first time every record says what
+happened, and every record says the same: the transmit acknowledged with
+`0x100` within milliseconds (the first after 163 ms), then one `cIndication`
+— `0x000A`, the transmit's own sequence, status `0x00000106` — after every
+one of the 45 transmits on both buses, zero inbound records in every
+two-second wait, zero frames in the capture, no stale frame, no dropped
+frame, no close error; the live run stopped itself after three silences per
+entry, as designed. So: the extra frame that ended the second session is
+confirmed as `cIndication` on the vehicle; the state machine of `ADR-0042`
+held for 45 transmits and 49 opens and closes; and the firmware handed the
+host no frame on either bus, with or without a transmit. What `0x106`
+means is not known — not one of the three faults the sister product's
+client names, no table for it in the research — and the audit's §11 takes
+the reading the evidence favours, as a hypothesis: the frame went out and
+was acknowledged, and the firmware forwards nothing without a filter table
+entry, the rule the sister product's client states for its firmware. The
+reading against it — a transmit that fails because the adapter is not on a
+bus at the right rate — has the identical result on two buses of two rates,
+SDD reading the same car through the same cable, and the bare adapter's
+silence (no indication at all without a bus) against it. Nothing points at
+the car, the cable, the laptop, the driver or the application's sequencing.
+
+The next work is the filter table entry (`cTableAddEntry`), which
+`ADR-0042` left undecided for want of its record: first the static
+research on the vendor library's builder and on its table of transmit
+status words, where `0x106` has a name; then the bench, where the firmware
+refuses a malformed entry in words; then a record of its own and a build.
+The strongest evidence would be a USB capture of SDD's own session on the
+tester's laptop, with the capture scripts the repository holds since
+September — the owner's call, since it asks the tester for a capture driver
+and a script. The tester is thanked and asked for nothing more.
+
 ## 2026-11-12 — the cable on SDD's own driver
 
 The tester's first run, 2026-11-11, on the 32-bit laptop his SDD runs on:
