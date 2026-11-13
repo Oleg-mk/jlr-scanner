@@ -174,9 +174,17 @@ vehicle.
 - **Adapter.** Discovery, connect, board identity over the inbox `usbser`
   driver on Windows 11: hardware-confirmed. The same over the MongoosePro
   package's own driver, where every SDD machine keeps the cable
-  (`ADR-0041`, 2026-11-12): built and fixture-tested, hardware check
-  pending. Both CAN routes (`hs-can` 6/14 at 500 kbit/s, `ms-can` 3/11 at
-  125 kbit/s) implemented; never opened on a car.
+  (`ADR-0041`): hardware-confirmed on the first tester's SDD laptop,
+  2026-11-12. Both CAN routes (`hs-can` 6/14 at 500 kbit/s, `ms-can` 3/11
+  at 125 kbit/s) implemented and opened on a car twice that day, with no
+  module answer: the transmit path was abandoning every request on the
+  adapter's own acknowledgement, and one unexpected frame then put a whole
+  session one answer behind (`docs/evidence/TRANSMIT_PATH_AUDIT_2026-11-12.md`).
+  Rebuilt under `ADR-0042` (2026-11-13): the acknowledgement recorded, every
+  answer matched by command and sequence, the adapter's trace in every read
+  record. The gate before the next tester build is the owner's bare adapter;
+  the first answer from a real car is still ahead, and whether frames arrive
+  without a filter table entry is the question the next session file answers.
 - **Knowledge.** The whole SDD 169 corpus exported: 45 programme documents,
   126,706 records — addressing, buses, 15,281 identifier definitions with
   units, 93,521 fault-code descriptions. The application loads it as a data
