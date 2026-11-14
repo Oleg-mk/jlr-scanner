@@ -183,10 +183,11 @@ vehicle.
   Rebuilt under `ADR-0042` (2026-11-13): the acknowledgement recorded, every
   answer matched by command and sequence, the adapter's trace in every read
   record; held for a whole session on the tester's car the same day. That
-  session settled the shape of the exchange — every transmit acknowledged,
-  every one followed by the adapter's own indication, status `0x106`, never
-  named in the research — and showed the firmware handing the host no frame
-  on either bus, even to a listen-only channel. The filter table entry
+  session settled the shape of the exchange — every transmit acknowledged
+  (`0x100`, eMsgQueued) and completed on the bus (`0x106`, iMsgTxDone, by
+  the library's own status table, 2026-11-14) — and showed the firmware
+  handing the host no frame on either bus, even to a listen-only channel.
+  The filter table entry
   (`cTableAddEntry`) is the next work, by its own record: the vendor
   library's builder read, the entry tried on the owner's bare adapter, then
   a build. The first answer from a real car is still ahead.

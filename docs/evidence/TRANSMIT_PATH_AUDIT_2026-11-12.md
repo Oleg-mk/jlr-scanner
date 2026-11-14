@@ -479,3 +479,22 @@ tester should be asked lightly.
 Nothing in this session points at the car, the cable, the laptop, the
 driver or the application's own sequencing. The one question left is what
 the firmware needs before it hands a frame to the host.
+
+## 12. The word named, 2026-11-14
+
+The vendor library carries its own table of the firmware's status words,
+in the function that names them for its log lines; read back statically
+the next morning (`MONGOOSE_STATUS_WORDS_2026-11-14.md`), it names every
+status this project has seen, three of them word for word against the
+firmware's texts: `0x003` eInvalidProtocolID, `0x206` ePinNotSupported,
+`0x208` eInitTimeout, **`0x100` eMsgQueued**, and **`0x106` iMsgTxDone** —
+the transmit completed. The sister product's `0x105` and `0x10C` are in it
+under the same meanings.
+
+So the first reading of §11 stands and the second is out: on 2026-11-13
+all 45 frames went out and were acknowledged on the tester's buses, HS-CAN
+and MS-CAN alike, at the rates the data gives; what the firmware never did
+was hand a received frame to the host. The filter table entry is the next
+work, and the library's own session on the owner's bench — its filter
+record and whatever else it sends after the open — is the shortest way to
+its bytes.

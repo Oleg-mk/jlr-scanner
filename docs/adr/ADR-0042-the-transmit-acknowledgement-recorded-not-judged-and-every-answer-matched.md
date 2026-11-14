@@ -199,3 +199,10 @@ firmware handed the host no frame on either bus, with or without a
 transmit: the filter table entry this record left undecided is the next
 work, with the evidence listed in the audit's §11. It gets a record of its
 own before any byte of it is sent.
+
+**The word named, 2026-11-14.** The library's own status table
+(`docs/evidence/MONGOOSE_STATUS_WORDS_2026-11-14.md`) says `0x100` is
+eMsgQueued and `0x106` is iMsgTxDone: decision 1's reading of the
+acknowledgement is confirmed, and the indication after every transmit on
+the tester's car says each frame completed on the bus. The filter table
+entry is the next record.
