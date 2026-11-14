@@ -168,8 +168,15 @@ dates.
 
 ### Where the product stands today
 
-Everything below is implemented and tested offline; nothing has touched a
-vehicle.
+Everything below was implemented and tested offline until 2026-11-14, when
+build 1.2.8 read the first tester's Discovery 4 (L319 MY10): frames in a
+listen-only capture of each bus, 28 of 39 modules answering the fault-code
+read on both buses, fault codes in five of them agreeing with SDD and the
+tester's Autel on the same car. The read path is `VEHICLE_CONFIRMED` for
+those 28 modules; the eleven silent ones are a question to the data, not a
+refutation; the knowledge records wait on the report intake
+(`CURRENT_STATE.md`, 2026-11-14 evening). The states below are updated to
+that day.
 
 - **Adapter.** Discovery, connect, board identity over the inbox `usbser`
   driver on Windows 11: hardware-confirmed. The same over the MongoosePro
@@ -191,11 +198,14 @@ vehicle.
   2026-11-14, is on every CAN channel since `ADR-0043` (built the same day,
   `FIXTURE_TESTED`; on the bare adapter 450 listen-only opens on both
   buses and build 1.2.8's 29 reads on diagnostic channels, every entry
-  accepted): next the tester's car,
-  where a listen-only capture with frames in it settles whether the entry
-  was the missing piece. If it was not, the vendor library's own session
-  on a Windows 10 machine is the next evidence. The first answer from a
-  real car is still ahead.
+  accepted). **The tester's car answered the same day**: 20,259 frames in
+  ten seconds of HS-CAN and 5,399 of MS-CAN in listen-only captures, and
+  28 of 39 modules answering "Check all modules" on their own identifiers
+  — the entry was the missing piece, `ADR-0043` is `VEHICLE_CONFIRMED`
+  on both buses, and the Windows 10 capture is not needed. The whole
+  adapter path — discovery, the vendor's driver, both routes, the entries,
+  the transmit, the module's answer, the close — is `VEHICLE_CONFIRMED`
+  on an L319 of MY10.
 - **Knowledge.** The whole SDD 169 corpus exported: 45 programme documents,
   126,706 records — addressing, buses, 15,281 identifier definitions with
   units, 93,521 fault-code descriptions. The application loads it as a data
@@ -207,10 +217,19 @@ vehicle.
   yet bound.
 - **Reads.** UDS ReadDataByIdentifier and ReadDTCInformation prepared from
   the plan and executed offline; the live Mongoose path implemented and
-  tested against a scripted adapter, never against a module. The F8 J1979
-  calibration read on the X250 profile, likewise.
+  tested against a scripted adapter and, since 2026-11-14, against a car:
+  ReadDTCInformation answered by 28 modules of an L319 MY10 on both buses,
+  seven fault codes in five of them, `VEHICLE_CONFIRMED` for those
+  modules. ReadDataByIdentifier reached the PCM the same day and was
+  declined (RequestOutOfRange) for the two identifiers chosen: the module
+  answers, the identifier choice is the data's question. The F8 J1979
+  calibration read on the X250 profile, the mileage survey, the passport,
+  the configuration file and the battery read have still met only the
+  bench.
 - **Capture.** Listen-only recording of a J1962 pair, saved as a `captured`
-  fixture: the tester's zero-risk first contact.
+  fixture: the tester's zero-risk first contact, and on 2026-11-14 the
+  first evidence of a bus from a car — both pairs of an L319 MY10, every
+  frame 11-bit, `captured_listen_only_bus_activity_not_module_confirmed`.
 - **Installer.** CI builds an unsigned Windows NSIS installer on every push
   and, since 2026-09-05, an unsigned universal macOS disk image. The unsigned build runs after
   SmartScreen's per-file "Run anyway" on Windows 10, and on Windows 11 without
@@ -235,6 +254,19 @@ map-converter scale waits on a tester's read of one quantity through a
 linear and a map identifier, and F14's second slice waits on the adapter
 and the first early Range Rover. M6 closes it, and nothing built at the
 desk can.
+
+Status on 2026-11-14: the multi-module read path has met a car. The first
+tester's Discovery 4 (L319 MY10) answered build 1.2.8 — frames on both
+buses, 28 of 39 modules, fault codes in five that agree with SDD and his
+Autel — after three sessions that drew nothing and the two records that
+found the cause in the code (`ADR-0042`, `ADR-0043`). M6's first car of the
+two-bus era is done; the 2014-and-later car is still ahead. What follows,
+in the owner's order: the analysis of the session file to the end — the
+eleven silent modules against the data, the identifiers for the live read,
+the seven codes' descriptions against the library — and the report intake
+(M2) run on it, which is what raises the library's records; then build
+1.2.9 with the reads only the bench has seen so far, on a car that
+answers.
 
 **M1 — an application a tester can use without knowing SDD (F11, size L).**
 Today the vehicle is described by typing SDD's programme name and breakpoint
@@ -315,7 +347,10 @@ architectures: one two-bus-era car — X250, X150, X351 MY10–13, L319 or L320
 MY10 onward, L405 MY13 — to confirm the documented routes, and one
 2014-and-later car — L405 MY14+, L494, L538 MY14+, X760 — to confirm or
 refute the gateway-relay hypothesis. Each first read yields the first
-`VEHICLE_CONFIRMED` records the project has ever had.
+`VEHICLE_CONFIRMED` records the project has ever had. *The first car of
+the two-bus era read on 2026-11-14: an L319 MY10, 28 of 39 modules on both
+buses, the documented routes confirmed for every module that answered
+(`CURRENT_STATE.md`). The 2014-and-later car is still ahead.*
 
 F14, K-line for the early Range Rover's body modules and the Defender's
 ABS and VIM, was to follow M6; on 2026-09-12 the owner brought
@@ -553,6 +588,11 @@ application does and does not do, report submission, and the intake path that
 turns a returned report into F5 evidence. Testers operate their own vehicles at
 their own discretion; the application must never imply otherwise.
 
+*2026-11-14:* the first report with answers in it is in — the first tester's
+L319 MY10 on build 1.2.8 (`CURRENT_STATE.md`). The intake has not been run
+on it yet; that run is part of the analysis that comes next, and it is the
+step that raises the library's routes to vehicle-confirmed.
+
 ### F21 — the battery, read and shown as a standing indicator (2026-09-12, `ADR-0030`)
 
 Built. A diagnostic session runs on the car's own battery and is exactly
@@ -700,8 +740,15 @@ re-exported for it.
 
 Not in this slice: a routine to any gateway (the X250's ring included:
 its evidence path is a capture of a genuine SDD session, or the owner's
-decision on SDD's program binaries), the `enhanced` layout, NGI. Nothing
-has met a car.
+decision on SDD's program binaries), the `enhanced` layout, NGI.
+
+*2026-11-14, on the first tester's L319 MY10:* four of the nine MOST
+modules the hypothesis put on `ms-can` answered the fault-code read by
+their own address — AAM (with a fault code), APIM, FEM, TEL — so the
+hypothesis is `VEHICLE_CONFIRMED` for this programme-year for those four,
+as the record said it would be, by the first answered read. The five
+silent ones (DABM, DACMC, REM, SRM, TVM) are equipment a car has or has
+not; they stay a hypothesis, refuted by nothing.
 
 ### F26 — the parameter and state names in SDD's Russian (built 2026-10-03, `ADR-0034` amended)
 
