@@ -4,7 +4,7 @@ This file records what is done. `ROADMAP.md` records what is next and why in tha
 order, including the owner-only gates. Keep both current; neither may live only
 in a chat session.
 
-Status: **2026-11-14, evening — the first answers from a car. Build 1.2.8 on the first tester's Discovery 4 (L319 MY10): frames on both buses in the listen-only captures — 20,259 in ten seconds of HS-CAN, 5,399 of MS-CAN — and 28 of 39 modules answering "Check all modules" on their own identifiers, 13 on HS-CAN and 15 on MS-CAN, with seven fault codes in five of them that the tester found to agree with SDD and his Autel on the same car. The pass entry of `ADR-0043` was the missing piece; the read path is `VEHICLE_CONFIRMED` on an L319 of MY10 for the modules that answered, and four of the nine MOST modules of `ADR-0039` answered by their own address. Eleven modules were silent — a question to the data, not a refutation; the PCM declined the two live-read identifiers the catalogue chose (RequestOutOfRange); the report intake has not yet been run on the file. Next, in the owner's order: the analysis of the file to the end, then build 1.2.9 with the reads only the bench has seen.**
+Status: **2026-11-14, evening — the first answers from a car. Build 1.2.8 on the first tester's Discovery 4 (L319 MY10): frames on both buses in the listen-only captures — 20,259 in ten seconds of HS-CAN, 5,399 of MS-CAN — and 28 of 39 modules answering "Check all modules" on their own identifiers, 13 on HS-CAN and 15 on MS-CAN, with seven fault codes in five of them that the tester found to agree with SDD and his Autel on the same car. The pass entry of `ADR-0043` was the missing piece; the read path is `VEHICLE_CONFIRMED` on an L319 of MY10 for the modules that answered, and four of the nine MOST modules of `ADR-0039` answered by their own address. Eleven modules were silent — a question to the data, not a refutation; the PCM declined the two live-read identifiers the catalogue chose (RequestOutOfRange); the report intake, run that night against the tester's library, confirmed 30 reads and recorded 11 attempts, and showed one defect — the adapter's serial copied into a bus-activity note, to be fixed before the manifest goes anywhere. The file read to the end: the data cannot say which of the eleven are fitted (the CCF read and the tester's SDD can); SDD's twelve identifiers qualified to L319 MY10 V8NA are the live set for the next session; six of the seven codes have SDD's description in the index and P1806 its help screen. Next: build 1.2.9.**
 
 Earlier — **2026-11-14, afternoon — the pass filter on every CAN channel (`ADR-0043`), accepted and built: after its pins every channel the application opens gets the PASS entry the owner's bare adapter accepted that morning — an 11-bit and a 29-bit one, zero mask, zero pattern — recorded with the firmware's answer in every read record; a refused entry ends the open in the firmware's words; every status word is said with its name from the library's table. `IMPLEMENTED` / `FIXTURE_TESTED`, and on the owner's bare adapter 450 listen-only opens on both buses and build 1.2.8's 29 reads on diagnostic channels of both buses with every entry accepted; the tester's car is next, where frames in a listen-only capture settle whether the entry was the missing piece.** Earlier — **2026-11-14 — the firmware's status words named from the vendor library's own table (`docs/evidence/MONGOOSE_STATUS_WORDS_2026-11-14.md`): `0x100` is eMsgQueued and the `0x106` the tester's car returned after all 45 transmits of 2026-11-13 is iMsgTxDone — every frame completed on his buses, HS-CAN and MS-CAN alike, and the firmware handed no received frame to the host; the filter table entry is the next work, by its own record, and the library's own session on the owner's bench is the way to its bytes.** Earlier — **2026-11-13 — the transmit path, audited and rebuilt (`ADR-0042`): the first tester's two sessions on his Discovery 4 drew zero answers from 91 requests, and the second session file — ignition on — showed the code, not the car: the adapter's acknowledgement of every transmit (`0x8008`, status `0x100`, no text) was being taken for a refusal a few milliseconds after the write, and one frame the code did not expect then put every later command one answer behind for the whole session. The audit is `docs/evidence/TRANSMIT_PATH_AUDIT_2026-11-12.md`; the record is `ADR-0042`: the acknowledgement recorded, not judged; every answer matched by command word and sequence, indications and late answers skipped and counted; every wait with its own deadline, five seconds for the acknowledgement; what the adapter did around every read written into the read's record. Built and fixture-tested on both sessions' shapes; the gate before the tester's build is the owner's bare adapter; the first answer from a real car is still ahead.** Earlier — **2026-11-12 — builds 1.2.5 and 1.2.6: the cable on SDD's own driver (`ADR-0041`): the first tester's SDD laptop could not see his MongoosePro because SDD's package binds it to its own kernel driver and the application listed COM ports only; a second Windows transport opens that driver's device interface and the panel says which driver holds the cable — hardware-confirmed on the first tester's SDD laptop the same day (his Windows 10 Toughbook loads the driver; the owner's Windows 11 refuses it outright). His first session reached his Discovery 4 and drew no answer — read that day as the bus not acknowledging, which the next day's audit corrected: the code abandoned each request on the adapter's acknowledgement — and a close the adapter did not answer then blocked the session, fixed in 1.2.6 with the report defects his document showed.** Earlier — **2026-11-08 — build 1.2.4: the library is read one manifest at a time, and a 32-bit Windows installer joins the 64-bit one (`ADR-0040`), for the first tester from the forum, whose workshop laptop runs 32-bit Windows 10; his copy is cut to the Discovery 4 in English.** Earlier — **2026-10-12 — the testers' line is 1.2.x (`ADR-0036`, decision 8 amended at the owner's word).** No report has come from the club since September and the owner's car is not a test car, so he looks for testers beyond the club and gives them the current build, the service mode included, with his warning that a write to the car is at the tester's own risk; the tester guide describes the mode. Earlier — **2026-10-03 — the parameter and state names come in SDD's own Russian beside the English (`ADR-0034`, amended before the code), joined by the structure both language packs share, and the library is re-issued for it: `2AFF-199F`, 533,208 records.** Under the switch the help already follows, a Ukrainian or Russian reader sees SDD's own Russian name for a parameter and a decoded state where we have no wording of our own; nothing new is drawn. Later the same day the passport, mileage and battery rows followed: the mileage from the catalogue's twins; the battery through a twin the platform adapter writes from the Russian name the exporter joins to the formatting row by structure, since the platform document has no Russian of its own; the passport with none to show, because SDD names the identification identifiers in the platform document alone, in English — our own wording stands there, and nothing is invented. The library is re-issued again: `0807-B35C`, 533,775 records, 38 battery rows named in Russian. Build 1.2.2 carries the Mac fix of 2026-10-01 and all of this — the third build of stage 2, to the owner alone; build 1.2.3, the same evening, adds the header lamp beating as his own car's Start/Stop button does, measured from his video, and replaces 1.2.2 on his desk. Earlier — **2026-10-01 — the macOS build found the MongoosePro on the owner's Intel Mac, and listed it twice.** macOS gives one USB serial adapter two port names, the call-out `/dev/cu.…` and the dial-in `/dev/tty.…`; the serial library returns both and the enumeration passed both on, so the adapter panel asked him to choose between two names of one adapter. The dial-in twin is dropped now and a Mac shows one adapter. What he reported is discovery: that the adapter connects and reads on a Mac is not yet reported. Build 1.2.1 carries the fix, with step 2 of `ADR-0036` and `ADR-0039` — the second build of stage 2, to the owner alone.
 
@@ -267,11 +267,88 @@ the data, not to the car.
 - The capture files are evidence of bus activity on an L319 of MY10 and
   nothing more; no identifier in them is attributed to a module here.
 
-**Next, in the owner's order.** The analysis of the file to the end: the
-eleven silent modules against the data, the identifiers for the live
-read, the seven codes' descriptions against the library — then build
-1.2.9 with the reads the bench alone has seen so far, on a car that now
-answers.
+**The file, read to the end, the same night.** On the owner's word
+(«Так, починай»), against the L319 English cut of the library the tester
+runs (4,314 manifests, 118,555 records):
+
+- *The eleven silent modules against the data.* Every one of them is in
+  SDD's platform document for L319 MY10 with an address, a bus and the two
+  read capabilities: CCM `0x764`, OCS `0x765` and VIM `0x722` on CAN_HS;
+  AHCM `0x7E3`, FCDIM `0x7A5` and SPRM `0x772` on CAN_MS; DABM `0x7D6`,
+  DACMC `0x7D5`, REM `0x771`, SRM `0x782` and TVM `0x707` on the MOST ring
+  behind the ACM. Eight have a module document of their own at MY10; DACMC,
+  SRM and TVM have none, and the data gives DACMC and SPRM no name. The
+  platform document's record kinds are addressing, network, gateway,
+  capability, identification and physical address: nothing in the data
+  says that a module is optional, so the data alone cannot say whether any
+  of the eleven is fitted to this car. What can: the car configuration
+  file (F20), which this session did not read. The MY10 CCF table has
+  parameters named for most of these options — `DAB` and `DAB_RECEIVER`,
+  `TV` and `TV_RECEIVER`, `SDARS_RECEIVER` (satellite radio), the `RSE_*`
+  group (rear entertainment), `POWERTRAIN_CRUISE_CONTROL` and
+  `JAGUAR_CRUISE_FITMENT`, `CLIMATE_FUEL_BURN_HEATER` and the EUCD
+  `ADDITIONAL_HEATER`, `HLDF` (the high-level display front), the EUCD
+  `VOICE_CONTROL` and `OCCUPANT_WEIGHT_SENSOR`; nothing found by name for
+  the VIM. Which parameter governs which module is not stated in the data
+  and is not asserted here. Two things answer the question: a CCF read in
+  the next session, and the tester's own SDD, which lists the modules it
+  finds on his car — a question for him, through the owner.
+- *The identifiers for the live read.* The 104 identifiers the catalogue
+  lists as readable for this PCM come from SDD's snapshot "DID formatting"
+  documents, most of them qualified by module type alone — any programme,
+  any engine — which is why glow-plug duty and particulate-filter pressure
+  are offered for a V8 petrol. `0xDA02` (vehicle speed) and `0xDA48`
+  (engine speed) are of that kind, and this PCM declined both. SDD's fully
+  qualified records for L319 MY10 name three engines, and for V8NA twelve
+  identifiers: `0x035A` barometric pressure, `0x0504`/`0x0505` mass air
+  flow bank 1/2, `0x0917` throttle position sensor 1 voltage, `0xDD01`
+  total distance, `0xF41F` time since engine start, `0xF421` distance with
+  the lamp on, `0xF431` distance since codes cleared, `0xF402`, `0xF415`,
+  `0xF419`, `0xF456`. Those are the ones SDD itself would read on this
+  car; they are the live set for the next session. The survey does not
+  tell a qualified identifier from a module-wide one, so the picker shows
+  all 104 alike; marking the qualified ones, or offering them first, is a
+  1.2.9 change for the owner to decide. Speed and engine speed are also
+  reachable through the standard OBD read the product already has.
+- *The seven codes against the library.* Decoded as the product decodes
+  them (`crates/uds/src/dtc.rs`): BCM `B1B01-87` "Key transponder" with
+  failure type 87, "system programming failure — invalid/incompatible
+  software component", and `U0241-00` "Lost communication with the headlamp
+  control module A"; TCCM `P1806-00`; ACM `U2003-86` "Fibre optic
+  communication bus" (SDD's module-scoped wording for the ACM) with type
+  86, "invalid/incompatible configuration", and `U0159-00` "Lost
+  communication with parking assist control module"; KVM `B10C6-00`
+  "Exterior luggage compartment antenna"; AAM `B1A11-13` "Speaker 11
+  circuit", type 13 "SAE — reserved". Six of the seven have SDD's one-line
+  description in the index; `P1806` has none there, and has SDD's help
+  screen for the TCCM on L319 ("LED circuit short to power", "switch pack
+  LED failure"), which the help path shows. The HCM and the PAM, whose loss
+  two codes record, both answered this session with no codes: the state of
+  the car, not a question for the data. Whether the screen showed these
+  texts was not checked here; the session file does not carry them.
+- *The intake, run.* `report-intake` ran natively on the file against the
+  same library and wrote `capture-session-1fcf67149a4956f0.json`: 221
+  records with 221 observations, all `capture_validated` — 30 confirmations
+  (the 28 fault-code reads and the PCM's two negative responses, six facts
+  each: addressing, bus, physical and adapter route, protocol, capability;
+  five for a negative response), 11 attempts recorded for the silent
+  modules, 2 bus-activity observations. The four MOST modules' routes are
+  among the confirmations, as `ADR-0039` said they would be. **One defect**:
+  the bus-activity record copies the capture's own note verbatim, and that
+  note, written by `capture_service.rs`, carries the adapter's serial
+  number — against F13's rule that the manifest never does. The manifest
+  stays in the scratch folder, outside the repository and every library,
+  until the intake builds that note from the route, pins and bit rate
+  alone; then it is re-run. Where the manifest then lives — the owner's
+  library, the tester's issued copy, the export set — is `ADR-0016`'s
+  decision 8 (the library directory) and the owner's call.
+
+**Next.** Build 1.2.9: the intake note without the serial; the qualified
+identifiers told apart in the live set, if the owner says so; and the
+record asked of the tester — the car configuration file, the module
+passports, the mileage survey, the battery, a live run on the twelve
+qualified identifiers and the standard OBD read, all of which only the
+bench has seen so far — on a car that now answers.
 
 ## 2026-11-14, afternoon — the pass filter on every CAN channel (`ADR-0043`)
 

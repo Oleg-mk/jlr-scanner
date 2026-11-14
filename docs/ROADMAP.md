@@ -268,6 +268,18 @@ the seven codes' descriptions against the library — and the report intake
 1.2.9 with the reads only the bench has seen so far, on a car that
 answers.
 
+*The same night, the analysis done (`CURRENT_STATE.md`, 2026-11-14 evening):* the
+data has no fitment for a module, so the eleven stay a question for the car
+configuration read and for the tester's SDD; SDD's twelve identifiers
+qualified to L319 MY10 V8NA are the live set for the next session, where
+the picker today shows 104 module-wide ones alike; six of seven codes have
+SDD's description and `P1806` its help screen; the intake confirmed 30
+reads and must stop copying the adapter's serial from the capture note
+before its manifest is placed in any library. 1.2.9 carries the intake
+fix, the qualified identifiers told apart if the owner says so, and the
+tester's record of the reads only the bench has seen: configuration file,
+passports, mileage, battery, the live run on the twelve, standard OBD.
+
 **M1 — an application a tester can use without knowing SDD (F11, size L).**
 Today the vehicle is described by typing SDD's programme name and breakpoint
 marker; the module list shows identifiers, not values; fault codes show
