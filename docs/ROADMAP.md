@@ -601,9 +601,13 @@ turns a returned report into F5 evidence. Testers operate their own vehicles at
 their own discretion; the application must never imply otherwise.
 
 *2026-11-14:* the first report with answers in it is in — the first tester's
-L319 MY10 on build 1.2.8 (`CURRENT_STATE.md`). The intake has not been run
-on it yet; that run is part of the analysis that comes next, and it is the
-step that raises the library's routes to vehicle-confirmed.
+L319 MY10 on build 1.2.8 (`CURRENT_STATE.md`) — and the intake ran on it the
+same evening: 30 confirmations, 11 attempts, 2 bus observations, in a
+manifest placed in the export set and in the re-issued copies of the owner
+and the tester. The L319 MY10 survey shows 39 modules reachable and no
+hypothesis: M2's mechanism has done its job once. What the intake does not
+do yet (read a report inside the application, aggregate across reports) is
+unchanged.
 
 ### F21 — the battery, read and shown as a standing indicator (2026-09-12, `ADR-0030`)
 
