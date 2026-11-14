@@ -190,8 +190,8 @@ vehicle.
   The filter table's PASS entry, accepted by the owner's bare adapter on
   2026-11-14, is on every CAN channel since `ADR-0043` (built the same day,
   `FIXTURE_TESTED`; on the bare adapter 450 listen-only opens on both
-  buses, every entry accepted): next the installer's module read on the
-  bare adapter; then the tester's car,
+  buses and build 1.2.8's 29 reads on diagnostic channels, every entry
+  accepted): next the tester's car,
   where a listen-only capture with frames in it settles whether the entry
   was the missing piece. If it was not, the vendor library's own session
   on a Windows 10 machine is the next evidence. The first answer from a

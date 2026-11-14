@@ -262,7 +262,14 @@ entries, zero frames, a clean close. The 29-bit entry stays in the build.
 450 opens did not fill the firmware's table; the word an accepted entry
 returns rose and fell between `0x01C0` and `0x91C4` and is still unknown.
 Listen-only channels on both buses, the 29-bit flag and two entries on one
-channel are `HARDWARE_CONFIRMED`. Not yet run on the product's own build:
-the diagnostic channel with both entries — the morning's probe showed the
-11-bit one accepted on such a channel — which the installer's module read
-on the bare adapter shows next, with the record's `adapterTrace`.
+channel are `HARDWARE_CONFIRMED`.
+
+The installer's gate followed the same day on build 1.2.8 (commit
+8e635bb), the owner's bare adapter, the X250 of MY08 described: "Check all
+modules" — 27 reads, 15 on HS-CAN and 14 on MS-CAN — a live run of two
+samples and a listen-only capture of each bus. Every one of the 29 read
+records carries both entries accepted with status 0 on a diagnostic
+channel, the transmit acknowledged (`0x00000100 eMsgQueued`), zero inbound
+frames and a clean close; both captures carry both entries. The diagnostic
+channel with both entries is `HARDWARE_CONFIRMED` on both buses. What the
+bare adapter cannot show — reception — is the tester's car.
