@@ -1,0 +1,41 @@
+port: COM4
+phase: baseline
+route: hs-can
+network: X250 HS-CAN
+device_channel_id: 0x0501
+application_can_tx: 0
+capture_duration_ms: 20020
+frames_received: 0
+unique_ids: 0
+parse_errors: 0
+dropped_frames: 0
+application_can_tx: 0
+adapter_inbound_frames: 0
+channel_close_status: 0x00000000
+phase: pass
+pass_filter_status: 0x00000000
+route: hs-can
+network: X250 HS-CAN
+device_channel_id: 0x0501
+application_can_tx: 0
+capture_duration_ms: 20039
+frames_received: 0
+unique_ids: 0
+parse_errors: 0
+dropped_frames: 0
+application_can_tx: 0
+adapter_inbound_frames: 0
+channel_close_status: 0x00000000
+phase: reopened
+route: hs-can
+network: X250 HS-CAN
+device_channel_id: 0x0501
+application_can_tx: 0
+capture_duration_ms: 20030
+frames_received: 0
+unique_ids: 0
+parse_errors: 0
+dropped_frames: 0
+application_can_tx: 0
+adapter_inbound_frames: 0
+channel_close_status: 0x00000000

@@ -1,0 +1,16 @@
+usb_vid: 18E1
+usb_pid: 0104
+usb_serial: <serial>
+port: COM4
+route: ms-can
+network: X250 MS-CAN
+device_channel_id: 0x1501
+receive_filter: 11-bit pass 0x00000000 eSuccess (word 0x0000505C)
+receive_filter: 29-bit pass 0x00000000 eSuccess (word 0x00005090)
+application_can_tx: 0
+capture_duration_ms: 20046
+frames_received: 0
+unique_ids: 0
+parse_errors: 0
+dropped_frames: 0
+application_can_tx: 0

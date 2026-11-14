@@ -1,0 +1,33 @@
+usb_vid: 18E1
+usb_pid: 0104
+usb_serial: <serial>
+port: COM4
+route: hs-can
+application_can_tx: 0
+cycle 1: 11-bit pass 0x00000000 eSuccess (word 0x00000D20), 29-bit pass 0x00000000 eSuccess (word 0x00000D88)
+cycle 2: 11-bit pass 0x00000000 eSuccess (word 0x00000E8C), 29-bit pass 0x00000000 eSuccess (word 0x00000EF4)
+cycle 3: 11-bit pass 0x00000000 eSuccess (word 0x00000FF8), 29-bit pass 0x00000000 eSuccess (word 0x00001060)
+cycle 4: 11-bit pass 0x00000000 eSuccess (word 0x00001164), 29-bit pass 0x00000000 eSuccess (word 0x000011CC)
+cycle 5: 11-bit pass 0x00000000 eSuccess (word 0x000012D0), 29-bit pass 0x00000000 eSuccess (word 0x00001338)
+cycle 6: 11-bit pass 0x00000000 eSuccess (word 0x0000143C), 29-bit pass 0x00000000 eSuccess (word 0x000014A4)
+cycle 7: 11-bit pass 0x00000000 eSuccess (word 0x000015A8), 29-bit pass 0x00000000 eSuccess (word 0x00001610)
+cycle 8: 11-bit pass 0x00000000 eSuccess (word 0x00001714), 29-bit pass 0x00000000 eSuccess (word 0x0000177C)
+cycle 9: 11-bit pass 0x00000000 eSuccess (word 0x00001880), 29-bit pass 0x00000000 eSuccess (word 0x000018E8)
+cycle 10: 11-bit pass 0x00000000 eSuccess (word 0x000019EC), 29-bit pass 0x00000000 eSuccess (word 0x00001A54)
+cycle 11: 11-bit pass 0x00000000 eSuccess (word 0x00001B58), 29-bit pass 0x00000000 eSuccess (word 0x00001BC0)
+cycle 12: 11-bit pass 0x00000000 eSuccess (word 0x00001CC4), 29-bit pass 0x00000000 eSuccess (word 0x00001D2C)
+cycle 13: 11-bit pass 0x00000000 eSuccess (word 0x00001E30), 29-bit pass 0x00000000 eSuccess (word 0x00001E98)
+cycle 14: 11-bit pass 0x00000000 eSuccess (word 0x00001F9C), 29-bit pass 0x00000000 eSuccess (word 0x00002004)
+cycle 15: 11-bit pass 0x00000000 eSuccess (word 0x00002108), 29-bit pass 0x00000000 eSuccess (word 0x00002170)
+cycle 16: 11-bit pass 0x00000000 eSuccess (word 0x00002274), 29-bit pass 0x00000000 eSuccess (word 0x000022DC)
+cycle 17: 11-bit pass 0x00000000 eSuccess (word 0x000023E0), 29-bit pass 0x00000000 eSuccess (word 0x00002448)
+cycle 18: 11-bit pass 0x00000000 eSuccess (word 0x0000254C), 29-bit pass 0x00000000 eSuccess (word 0x000025B4)
+cycle 19: 11-bit pass 0x00000000 eSuccess (word 0x000026B8), 29-bit pass 0x00000000 eSuccess (word 0x00002720)
+cycle 20: 11-bit pass 0x00000000 eSuccess (word 0x00002824), 29-bit pass 0x00000000 eSuccess (word 0x0000288C)
+cycle 21: 11-bit pass 0x00000000 eSuccess (word 0x00002990), 29-bit pass 0x00000000 eSuccess (word 0x000029F8)
+cycle 22: 11-bit pass 0x00000000 eSuccess (word 0x00002AFC), 29-bit pass 0x00000000 eSuccess (word 0x00002B64)
+cycle 23: 11-bit pass 0x00000000 eSuccess (word 0x00002C68), 29-bit pass 0x00000000 eSuccess (word 0x00002CD0)
+cycle 24: 11-bit pass 0x00000000 eSuccess (word 0x00002DD4), 29-bit pass 0x00000000 eSuccess (word 0x00002E3C)
+cycle 25: 11-bit pass 0x00000000 eSuccess (word 0x00002F40), 29-bit pass 0x00000000 eSuccess (word 0x00002FA8)
+cycles_completed: 25 of 25
+application_can_tx: 0

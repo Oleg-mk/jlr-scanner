@@ -1,0 +1,137 @@
+port COM4 open at 115200; bus hs: 500000 bit/s, pins (6, 14)
+
+>>> cGetBoardInfo
+    TX 0C 00 EA 51 01 00 00 00 09 01 01 00 00 00 00 00
+    RX FRAME 00 00 01 00 09 81 01 00 00 00 00 00 00 00 00 00 EC D7 A6 03 05 01 01 01 B4 B0 00 00 D8 55 00 00 00 08 01 01 00 10 01 01 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+       route_a=0x0000 route_b=0x0001 command=0x8109 seq=1 body[168]=00 00 00 00 EC D7 A6 03 05 01 01 01 B4 B0 00 00 D8 55 00 00 00 08 01 01… | status=0x00000000
+
+>>> cOpenChannel (no listen-only flag), route 0x0501, 500000 bit/s
+    TX 14 00 F2 51 01 05 00 00 06 00 02 00 00 00 00 00 00 00 00 00 20 A1 07 00
+    RX FRAME 00 00 01 05 06 80 02 00 00 00 00 00 00 00 00 00 F4 F5 B7 03 00
+       route_a=0x0000 route_b=0x0501 command=0x8006 seq=2 body[9]=00 00 00 00 F4 F5 B7 03 00 | status=0x00000000
+
+>>> cSetPin(connect=1, 6, 14) on token 0x0501
+    TX 18 00 FE 51 01 05 00 00 12 00 03 00 00 00 00 00 01 00 00 00 06 00 00 00 0E 00 00 00
+    RX FRAME 00 00 01 05 12 80 03 00 00 00 00 00 00 00 00 00 A4 11 C9 03 00
+       route_a=0x0000 route_b=0x0501 command=0x8012 seq=3 body[9]=00 00 00 00 A4 11 C9 03 00 | status=0x00000000
+
+>>> cTableAddEntry type 0, mask 0, pattern 0, word 4, byte 1 (seq 4)
+    TX 1B 00 FD 51 01 05 00 00 0D 00 04 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 04 00 01
+    RX FRAME 00 00 01 05 0D 80 04 00 00 00 00 00 02 02 00 00 50 1D DA 03 46 69 6C 74 65 72 41 64 64 3A 20 49 6E 76 61 6C 69 64 20 46 69 6C 74 65 72 20 74 79 70 65 00
+       route_a=0x0000 route_b=0x0501 command=0x800D seq=4 body[39]=02 02 00 00 50 1D DA 03 46 69 6C 74 65 72 41 64 64 3A 20 49 6E 76 61 6C… | status=0x00000202
+   -> status 0x00000202 eInvalidValue : FilterAdd: Invalid Filter type
+
+>>> cTableAddEntry type 1, mask 0, pattern 0, word 4, byte 1 (seq 5)
+    TX 1B 00 FD 51 01 05 00 00 0D 00 05 00 00 00 00 00 01 00 00 00 00 00 00 00 00 00 00 00 04 00 01
+    RX FRAME 00 00 01 05 0D 80 05 00 00 00 00 00 02 02 00 00 5C 7B E3 03 46 69 6C 74 65 72 41 64 64 3A 20 49 6E 76 61 6C 69 64 20 46 69 6C 74 65 72 20 74 79 70 65 00
+       route_a=0x0000 route_b=0x0501 command=0x800D seq=5 body[39]=02 02 00 00 5C 7B E3 03 46 69 6C 74 65 72 41 64 64 3A 20 49 6E 76 61 6C… | status=0x00000202
+   -> status 0x00000202 eInvalidValue : FilterAdd: Invalid Filter type
+
+>>> cTableAddEntry type 2, mask 0, pattern 0, word 4, byte 1 (seq 6)
+    TX 1B 00 FD 51 01 05 00 00 0D 00 06 00 00 00 00 00 02 00 00 00 00 00 00 00 00 00 00 00 04 00 01
+    RX FRAME 00 00 01 05 0D 80 06 00 00 00 00 00 00 02 00 00 58 E4 EC 03 43 61 6E 54 61 62 6C 65 41 64 64 3A 20 55 6E 73 75 70 70 6F 72 74 65 64 20 6F 72 20 49 6E 76 61 6C 69 64 20 74 61 62 6C 65 20 74 79 70 65 00
+       route_a=0x0000 route_b=0x0501 command=0x800D seq=6 body[55]=00 02 00 00 58 E4 EC 03 43 61 6E 54 61 62 6C 65 41 64 64 3A 20 55 6E 73… | status=0x00000200
+   -> status 0x00000200 unknown : CanTableAdd: Unsupported or Invalid table type
+
+>>> cTableAddEntry type 3, mask 0, pattern 0, word 4, byte 1 (seq 7)
+    TX 1B 00 FD 51 01 05 00 00 0D 00 07 00 00 00 00 00 03 00 00 00 00 00 00 00 00 00 00 00 04 00 01
+    RX FRAME 00 00 01 05 0D 80 07 00 00 00 00 00 00 02 00 00 78 47 F6 03 43 61 6E 54 61 62 6C 65 41 64 64 3A 20 55 6E 73 75 70 70 6F 72 74 65 64 20 6F 72 20 49 6E 76 61 6C 69 64 20 74 61 62 6C 65 20 74 79 70 65 00
+       route_a=0x0000 route_b=0x0501 command=0x800D seq=7 body[55]=00 02 00 00 78 47 F6 03 43 61 6E 54 61 62 6C 65 41 64 64 3A 20 55 6E 73… | status=0x00000200
+   -> status 0x00000200 unknown : CanTableAdd: Unsupported or Invalid table type
+
+>>> cTableAddEntry type 4, mask 0, pattern 0, word 4, byte 1 (seq 8)
+    TX 1B 00 FD 51 01 05 00 00 0D 00 08 00 00 00 00 00 04 00 00 00 00 00 00 00 00 00 00 00 04 00 01
+    RX FRAME 00 00 01 05 0D 80 08 00 00 00 00 00 03 02 00 00 24 9C FF 03 50 65 72 69 6F 64 69 63 41 64 64 3A 20 49 6E 76 61 6C 69 64 20 6D 65 73 73 61 67 65 20 6C 65 6E 67 74 68 00
+       route_a=0x0000 route_b=0x0501 command=0x800D seq=8 body[44]=03 02 00 00 24 9C FF 03 50 65 72 69 6F 64 69 63 41 64 64 3A 20 49 6E 76… | status=0x00000203
+   -> status 0x00000203 eInvalidMsgLength : PeriodicAdd: Invalid message length
+
+>>> cTableAddEntry type 5, mask 0, pattern 0, word 4, byte 1 (seq 9)
+    TX 1B 00 FD 51 01 05 00 00 0D 00 09 00 00 00 00 00 05 00 00 00 00 00 00 00 00 00 00 00 04 00 01
+    RX FRAME 00 00 01 05 0D 80 09 00 00 00 00 00 00 02 00 00 98 0A 09 04 43 61 6E 54 61 62 6C 65 41 64 64 3A 20 55 6E 73 75 70 70 6F 72 74 65 64 20 6F 72 20 49 6E 76 61 6C 69 64 20 74 61 62 6C 65 20 74 79 70 65 00
+       route_a=0x0000 route_b=0x0501 command=0x800D seq=9 body[55]=00 02 00 00 98 0A 09 04 43 61 6E 54 61 62 6C 65 41 64 64 3A 20 55 6E 73… | status=0x00000200
+   -> status 0x00000200 unknown : CanTableAdd: Unsupported or Invalid table type
+
+>>> cTableAddEntry type 6, mask 0, pattern 0, word 4, byte 1 (seq 10)
+    TX 1B 00 FD 51 01 05 00 00 0D 00 0A 00 00 00 00 00 06 00 00 00 00 00 00 00 00 00 00 00 04 00 01
+    RX FRAME 00 00 01 05 0D 80 0A 00 00 00 00 00 00 02 00 00 40 68 12 04 43 61 6E 54 61 62 6C 65 41 64 64 3A 20 55 6E 73 75 70 70 6F 72 74 65 64 20 6F 72 20 49 6E 76 61 6C 69 64 20 74 61 62 6C 65 20 74 79 70 65 00
+       route_a=0x0000 route_b=0x0501 command=0x800D seq=10 body[55]=00 02 00 00 40 68 12 04 43 61 6E 54 61 62 6C 65 41 64 64 3A 20 55 6E 73… | status=0x00000200
+   -> status 0x00000200 unknown : CanTableAdd: Unsupported or Invalid table type
+
+>>> cTableAddEntry type 7, mask 0, pattern 0, word 4, byte 1 (seq 11)
+    TX 1B 00 FD 51 01 05 00 00 0D 00 0B 00 00 00 00 00 07 00 00 00 00 00 00 00 00 00 00 00 04 00 01
+    RX FRAME 00 00 01 05 0D 80 0B 00 00 00 00 00 00 02 00 00 E0 BE 1B 04 43 61 6E 54 61 62 6C 65 41 64 64 3A 20 55 6E 73 75 70 70 6F 72 74 65 64 20 6F 72 20 49 6E 76 61 6C 69 64 20 74 61 62 6C 65 20 74 79 70 65 00
+       route_a=0x0000 route_b=0x0501 command=0x800D seq=11 body[55]=00 02 00 00 E0 BE 1B 04 43 61 6E 54 61 62 6C 65 41 64 64 3A 20 55 6E 73… | status=0x00000200
+   -> status 0x00000200 unknown : CanTableAdd: Unsupported or Invalid table type
+
+>>> cTableAddEntry type 8, mask 0, pattern 0, word 4, byte 1 (seq 12)
+    TX 1B 00 FD 51 01 05 00 00 0D 00 0C 00 00 00 00 00 08 00 00 00 00 00 00 00 00 00 00 00 04 00 01
+    RX FRAME 00 00 01 05 0D 80 0C 00 00 00 00 00 00 02 00 00 A0 18 25 04 43 61 6E 54 61 62 6C 65 41 64 64 3A 20 55 6E 73 75 70 70 6F 72 74 65 64 20 6F 72 20 49 6E 76 61 6C 69 64 20 74 61 62 6C 65 20 74 79 70 65 00
+       route_a=0x0000 route_b=0x0501 command=0x800D seq=12 body[55]=00 02 00 00 A0 18 25 04 43 61 6E 54 61 62 6C 65 41 64 64 3A 20 55 6E 73… | status=0x00000200
+   -> status 0x00000200 unknown : CanTableAdd: Unsupported or Invalid table type
+
+>>> cTableAddEntry type 9, mask 0, pattern 0, word 4, byte 1 (seq 13)
+    TX 1B 00 FD 51 01 05 00 00 0D 00 0D 00 00 00 00 00 09 00 00 00 00 00 00 00 00 00 00 00 04 00 01
+    RX FRAME 00 00 01 05 0D 80 0D 00 00 00 00 00 00 02 00 00 88 7C 2E 04 43 61 6E 54 61 62 6C 65 41 64 64 3A 20 55 6E 73 75 70 70 6F 72 74 65 64 20 6F 72 20 49 6E 76 61 6C 69 64 20 74 61 62 6C 65 20 74 79 70 65 00
+       route_a=0x0000 route_b=0x0501 command=0x800D seq=13 body[55]=00 02 00 00 88 7C 2E 04 43 61 6E 54 61 62 6C 65 41 64 64 3A 20 55 6E 73… | status=0x00000200
+   -> status 0x00000200 unknown : CanTableAdd: Unsupported or Invalid table type
+
+>>> cTableAddEntry type 10, mask 0, pattern 0, word 4, byte 1 (seq 14)
+    TX 1B 00 FD 51 01 05 00 00 0D 00 0E 00 00 00 00 00 0A 00 00 00 00 00 00 00 00 00 00 00 04 00 01
+    RX FRAME 00 00 01 05 0D 80 0E 00 00 00 00 00 00 02 00 00 F0 EC 37 04 43 61 6E 54 61 62 6C 65 41 64 64 3A 20 55 6E 73 75 70 70 6F 72 74 65 64 20 6F 72 20 49 6E 76 61 6C 69 64 20 74 61 62 6C 65 20 74 79 70 65 00
+       route_a=0x0000 route_b=0x0501 command=0x800D seq=14 body[55]=00 02 00 00 F0 EC 37 04 43 61 6E 54 61 62 6C 65 41 64 64 3A 20 55 6E 73… | status=0x00000200
+   -> status 0x00000200 unknown : CanTableAdd: Unsupported or Invalid table type
+
+>>> cTableAddEntry type 11, mask 0, pattern 0, word 4, byte 1 (seq 15)
+    TX 1B 00 FD 51 01 05 00 00 0D 00 0F 00 00 00 00 00 0B 00 00 00 00 00 00 00 00 00 00 00 04 00 01
+    RX FRAME 00 00 01 05 0D 80 0F 00 00 00 00 00 00 02 00 00 1C 4E 41 04 43 61 6E 54 61 62 6C 65 41 64 64 3A 20 55 6E 73 75 70 70 6F 72 74 65 64 20 6F 72 20 49 6E 76 61 6C 69 64 20 74 61 62 6C 65 20 74 79 70 65 00
+       route_a=0x0000 route_b=0x0501 command=0x800D seq=15 body[55]=00 02 00 00 1C 4E 41 04 43 61 6E 54 61 62 6C 65 41 64 64 3A 20 55 6E 73… | status=0x00000200
+   -> status 0x00000200 unknown : CanTableAdd: Unsupported or Invalid table type
+
+>>> cTableAddEntry type 12, mask 0, pattern 0, word 4, byte 1 (seq 16)
+    TX 1B 00 FD 51 01 05 00 00 0D 00 10 00 00 00 00 00 0C 00 00 00 00 00 00 00 00 00 00 00 04 00 01
+    RX FRAME 00 00 01 05 0D 80 10 00 00 00 00 00 00 02 00 00 A8 B8 4A 04 43 61 6E 54 61 62 6C 65 41 64 64 3A 20 55 6E 73 75 70 70 6F 72 74 65 64 20 6F 72 20 49 6E 76 61 6C 69 64 20 74 61 62 6C 65 20 74 79 70 65 00
+       route_a=0x0000 route_b=0x0501 command=0x800D seq=16 body[55]=00 02 00 00 A8 B8 4A 04 43 61 6E 54 61 62 6C 65 41 64 64 3A 20 55 6E 73… | status=0x00000200
+   -> status 0x00000200 unknown : CanTableAdd: Unsupported or Invalid table type
+
+>>> cTableAddEntry type 13, mask 0, pattern 0, word 4, byte 1 (seq 17)
+    TX 1B 00 FD 51 01 05 00 00 0D 00 11 00 00 00 00 00 0D 00 00 00 00 00 00 00 00 00 00 00 04 00 01
+    RX FRAME 00 00 01 05 0D 80 11 00 00 00 00 00 00 02 00 00 4C 1F 54 04 43 61 6E 54 61 62 6C 65 41 64 64 3A 20 55 6E 73 75 70 70 6F 72 74 65 64 20 6F 72 20 49 6E 76 61 6C 69 64 20 74 61 62 6C 65 20 74 79 70 65 00
+       route_a=0x0000 route_b=0x0501 command=0x800D seq=17 body[55]=00 02 00 00 4C 1F 54 04 43 61 6E 54 61 62 6C 65 41 64 64 3A 20 55 6E 73… | status=0x00000200
+   -> status 0x00000200 unknown : CanTableAdd: Unsupported or Invalid table type
+
+>>> cTableAddEntry type 14, mask 0, pattern 0, word 4, byte 1 (seq 18)
+    TX 1B 00 FD 51 01 05 00 00 0D 00 12 00 00 00 00 00 0E 00 00 00 00 00 00 00 00 00 00 00 04 00 01
+    RX FRAME 00 00 01 05 0D 80 12 00 00 00 00 00 00 02 00 00 48 88 5D 04 43 61 6E 54 61 62 6C 65 41 64 64 3A 20 55 6E 73 75 70 70 6F 72 74 65 64 20 6F 72 20 49 6E 76 61 6C 69 64 20 74 61 62 6C 65 20 74 79 70 65 00
+       route_a=0x0000 route_b=0x0501 command=0x800D seq=18 body[55]=00 02 00 00 48 88 5D 04 43 61 6E 54 61 62 6C 65 41 64 64 3A 20 55 6E 73… | status=0x00000200
+   -> status 0x00000200 unknown : CanTableAdd: Unsupported or Invalid table type
+
+>>> cTableAddEntry type 15, mask 0, pattern 0, word 4, byte 1 (seq 19)
+    TX 1B 00 FD 51 01 05 00 00 0D 00 13 00 00 00 00 00 0F 00 00 00 00 00 00 00 00 00 00 00 04 00 01
+    RX FRAME 00 00 01 05 0D 80 13 00 00 00 00 00 00 02 00 00 44 F1 66 04 43 61 6E 54 61 62 6C 65 41 64 64 3A 20 55 6E 73 75 70 70 6F 72 74 65 64 20 6F 72 20 49 6E 76 61 6C 69 64 20 74 61 62 6C 65 20 74 79 70 65 00
+       route_a=0x0000 route_b=0x0501 command=0x800D seq=19 body[55]=00 02 00 00 44 F1 66 04 43 61 6E 54 61 62 6C 65 41 64 64 3A 20 55 6E 73… | status=0x00000200
+   -> status 0x00000200 unknown : CanTableAdd: Unsupported or Invalid table type
+
+>>> cCloseChannel on 0x0501
+    TX 0C 00 EA 51 01 05 00 00 07 00 14 00 00 00 00 00
+    RX FRAME 00 00 01 05 07 80 14 00 00 00 00 00 00 00 00 00 94 4C 70 04 00
+       route_a=0x0000 route_b=0x0501 command=0x8007 seq=20 body[9]=00 00 00 00 94 4C 70 04 00 | status=0x00000000
+
+== summary ==
+  type  0: 0x00000202 eInvalidValue FilterAdd: Invalid Filter type
+  type  1: 0x00000202 eInvalidValue FilterAdd: Invalid Filter type
+  type  2: 0x00000200 unknown CanTableAdd: Unsupported or Invalid table type
+  type  3: 0x00000200 unknown CanTableAdd: Unsupported or Invalid table type
+  type  4: 0x00000203 eInvalidMsgLength PeriodicAdd: Invalid message length
+  type  5: 0x00000200 unknown CanTableAdd: Unsupported or Invalid table type
+  type  6: 0x00000200 unknown CanTableAdd: Unsupported or Invalid table type
+  type  7: 0x00000200 unknown CanTableAdd: Unsupported or Invalid table type
+  type  8: 0x00000200 unknown CanTableAdd: Unsupported or Invalid table type
+  type  9: 0x00000200 unknown CanTableAdd: Unsupported or Invalid table type
+  type 10: 0x00000200 unknown CanTableAdd: Unsupported or Invalid table type
+  type 11: 0x00000200 unknown CanTableAdd: Unsupported or Invalid table type
+  type 12: 0x00000200 unknown CanTableAdd: Unsupported or Invalid table type
+  type 13: 0x00000200 unknown CanTableAdd: Unsupported or Invalid table type
+  type 14: 0x00000200 unknown CanTableAdd: Unsupported or Invalid table type
+  type 15: 0x00000200 unknown CanTableAdd: Unsupported or Invalid table type
+
+done

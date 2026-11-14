@@ -219,7 +219,7 @@ status offset/value. Result: **PARTIAL**.
 - GM-II `0C 00` value reads align with JLR `cGetValue`, but JLR channel/value IDs
   for HS/MS routing are not fully reconstructed.
 
-No filter/control command is enabled in the JLR runtime implementation.
+One filter command is enabled in the JLR runtime implementation since `ADR-0043`: a PASS entry — subtype 0, flags 0 or `0x0100`, rule 1, a zero four-byte mask and pattern — after the pins of every CAN channel, the record the bare adapter accepted on 2026-11-14 (`docs/evidence/mongoose-probe-2026-11-14/`). Its offsets agree with the GM-II record above (rule +0x12, length +0x13, mask +0x14, pattern +0x18); the 27-byte subtype-7 builder is not the CAN filter's. No other filter or control command is enabled.
 
 ## Serial initialization and COM3
 
