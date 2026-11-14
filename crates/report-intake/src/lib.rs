@@ -929,11 +929,7 @@ impl Builder {
             capture.frames.len(),
             ids.len(),
             top_text.join(" "),
-            capture
-                .metadata
-                .evidence
-                .as_deref()
-                .unwrap_or("no capture notes")
+            capture_note(capture.metadata.evidence.as_deref())
         );
         self.add(
             format!("{}.capture.{index:03}", self.source_id),
@@ -1111,6 +1107,39 @@ fn date_of_unix_ms(ms: u64) -> String {
     format!("{year:04}-{month:02}-{day:02}")
 }
 
+/// The capture's own note, with the adapter left out. The shell writes the
+/// route, the pins and the bit rate into the note's first part and ends
+/// that part with the adapter's model and serial number (`via <model>
+/// serial <number>`, `capture_service.rs`); the breakpoint marker and the
+/// receive filters follow in parts of their own. ADR-0016 says a manifest
+/// never carries the serial, so every `;`-separated part that names one is
+/// cut before its `via` clause, or dropped when nothing precedes it. A note
+/// with no parts left says so.
+fn capture_note(note: Option<&str>) -> String {
+    let kept: Vec<&str> = note
+        .unwrap_or("")
+        .split(';')
+        .map(str::trim)
+        .filter_map(|part| {
+            if !part.to_ascii_lowercase().contains("serial") {
+                return Some(part);
+            }
+            let head = part
+                .split(" via ")
+                .next()
+                .unwrap_or("")
+                .trim_end_matches(',');
+            (!head.is_empty() && !head.to_ascii_lowercase().contains("serial")).then_some(head)
+        })
+        .filter(|part| !part.is_empty())
+        .collect();
+    if kept.is_empty() {
+        "no capture notes".to_string()
+    } else {
+        kept.join("; ")
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1119,6 +1148,21 @@ mod tests {
     fn unix_milliseconds_become_a_civil_date() {
         assert_eq!(date_of_unix_ms(0), "1970-01-01");
         assert_eq!(date_of_unix_ms(1_788_480_000_000), "2026-09-04");
+    }
+
+    #[test]
+    fn the_capture_note_is_copied_without_the_adapters_serial() {
+        let note = "listen-only capture on route hs-can, J1962 pins 6/14, 500000 bit/s, via MongoosePro JLR serial ABC123; SDD breakpoint marker MY10; receive filter 11-bit pass 0x00000000 eSuccess (word 0x00005404); no frame was transmitted or acknowledged";
+        let kept = capture_note(Some(note));
+        assert!(!kept.contains("ABC123"), "{kept}");
+        assert!(!kept.contains("serial"), "{kept}");
+        assert_eq!(
+            kept,
+            "listen-only capture on route hs-can, J1962 pins 6/14, 500000 bit/s; SDD breakpoint marker MY10; receive filter 11-bit pass 0x00000000 eSuccess (word 0x00005404); no frame was transmitted or acknowledged"
+        );
+        assert_eq!(capture_note(Some("plain note")), "plain note");
+        assert_eq!(capture_note(None), "no capture notes");
+        assert_eq!(capture_note(Some("serial X")), "no capture notes");
     }
 
     #[test]

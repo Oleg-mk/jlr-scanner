@@ -1,8 +1,13 @@
 # F13 — reports become evidence (milestone M2, the intake)
 
-Status: `IMPLEMENTED / FIXTURE_TESTED`. No report from a vehicle exists yet,
-so nothing here is `HARDWARE_CONFIRMED` or `VEHICLE_CONFIRMED`; the tool is
-what will make those words true when the first report arrives. The rules are
+Status: `IMPLEMENTED / FIXTURE_TESTED`, and run on the first report from a
+vehicle on 2026-11-14 — the first tester's L319 MY10 on build 1.2.8: 221
+records, 30 confirmations (28 fault-code reads and two negative responses),
+11 attempts, 2 bus-activity observations (`CURRENT_STATE.md`, 2026-11-14
+evening). That run found one defect, fixed the same night: the
+bus-activity record copied the capture's own note, in which the shell
+writes the adapter's serial number; the intake now cuts that clause before
+copying. The rules are
 `docs/adr/ADR-0016-session-reports-as-captured-evidence.md`.
 
 ## What the intake does
@@ -13,7 +18,9 @@ library, and writes one F5 manifest:
 
 - source: `SourceType::Captured`, fingerprinted with the report's SHA-256,
   dated from the report, declaring the programme(s) it describes; never the
-  VIN, never the adapter's serial number;
+  VIN, never the adapter's serial number — the capture's note, which the
+  shell ends with the adapter's model and serial, is copied with that
+  clause cut (since 2026-11-14);
 - evidence: one `DirectObservation` per record, located at the report item
   (`module_reads[3]`, `captures[0]`, …) with the exchange as excerpt and the
   report's timestamp;

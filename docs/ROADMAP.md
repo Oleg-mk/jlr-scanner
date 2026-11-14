@@ -274,9 +274,9 @@ configuration read and for the tester's SDD; SDD's twelve identifiers
 qualified to L319 MY10 V8NA are the live set for the next session, where
 the picker today shows 104 module-wide ones alike; six of seven codes have
 SDD's description and `P1806` its help screen; the intake confirmed 30
-reads and must stop copying the adapter's serial from the capture note
-before its manifest is placed in any library. 1.2.9 carries the intake
-fix, the qualified identifiers told apart if the owner says so, and the
+reads and was copying the adapter's serial from the capture note — fixed
+the same night, before its manifest is placed in any library. 1.2.9
+carries that fix, the qualified identifiers told apart if the owner says so, and the
 tester's record of the reads only the bench has seen: configuration file,
 passports, mileage, battery, the live run on the twelve, standard OBD.
 

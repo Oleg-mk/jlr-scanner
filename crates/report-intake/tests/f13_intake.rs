@@ -292,7 +292,7 @@ fn session_bundle_with_battery(
             "schema_version": 1,
             "fixture_class": "captured",
             "name": "capture-hs-can-1",
-            "metadata": { "vehicle_program": "SYNTHA", "model_year": 2010, "evidence": "listen-only capture on route hs-can" },
+            "metadata": { "vehicle_program": "SYNTHA", "model_year": 2010, "evidence": "listen-only capture on route hs-can, J1962 pins 6/14, 500000 bit/s, via MongoosePro JLR serial SERIAL-1; no frame was transmitted or acknowledged" },
             "frames": [
                 { "timestamp_us": 10, "route": "hs-can", "id": 0x7E8, "extended": false, "dlc": 8, "data": [1,2,3,4,5,6,7,8] },
                 { "timestamp_us": 20, "route": "hs-can", "id": 0x7E8, "extended": false, "dlc": 8, "data": [1,2,3,4,5,6,7,8] },
@@ -496,6 +496,14 @@ fn silence_and_a_capture_are_observations_that_confirm_nothing() {
     assert_eq!(outcome.summary.observations.len(), 2);
 
     let manifest = serde_json::to_string(&outcome.batch).unwrap();
+    // ADR-0016: the manifest never carries the adapter's serial number, and
+    // the capture's own note is where the shell writes it.
+    assert!(!manifest.contains("SERIAL-1"), "{manifest}");
+    assert!(!manifest.contains("serial"), "{manifest}");
+    assert!(manifest.contains("no frame was transmitted or acknowledged"));
+    assert!(
+        manifest.contains("listen-only capture on route hs-can, J1962 pins 6/14, 500000 bit/s;")
+    );
     let after = library(&[("captured.json".into(), manifest)]);
     assert_eq!(
         status_of(&after, "RELAYMOD"),
