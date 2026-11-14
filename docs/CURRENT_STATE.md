@@ -227,9 +227,13 @@ captures carry both entries and zero frames. No module answered, as none
 can without a car. The diagnostic channel with both entries is
 `HARDWARE_CONFIRMED` on both buses. The word an accepted entry returns ran
 on from `0x9128` to `0x01C0` between the two captures, the range the
-probe's runs showed: a position that wraps, its meaning unknown. Next: the
-tester's car, a listen-only capture of HS-CAN and MS-CAN and "Check all
-modules" with the ignition on.
+probe's runs showed: a position that wraps, its meaning unknown. Tag
+`v1.2.8` on `8e635bb`, pushed by name; the three installers on the
+Releases page as a pre-release the same day, at the owner's word («Так,
+публікуй»); the 1.2.7 folder moved to
+`Downloads\prowlone-superseded\ProwlOne-1.2.7`. Next: the tester's car,
+with the ignition on — a listen-only capture of HS-CAN, then of MS-CAN,
+then "Check all modules", and the session file with the two capture files.
 
 ## 2026-11-14 — the firmware's status words, from the library's own table
 
