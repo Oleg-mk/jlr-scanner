@@ -477,8 +477,9 @@ mod tests {
     use super::*;
     use crate::passive::{
         command_response, command_response_with_text, inbound_can_frame, indication,
-        outbound_acknowledgement, CAN_29BIT_ID, CLOSE_CHANNEL_RESPONSE, OPEN_CHANNEL_RESPONSE,
-        OUTBOUND_DATA_RESPONSE, SET_PIN_RESPONSE, TRANSMIT_ACKNOWLEDGED_STATUS,
+        outbound_acknowledgement, table_entry_accepted, CAN_29BIT_ID, CLOSE_CHANNEL_RESPONSE,
+        OPEN_CHANNEL_RESPONSE, OUTBOUND_DATA_RESPONSE, PASS_ENTRY_FORMATS, SET_PIN_RESPONSE,
+        TRANSMIT_ACKNOWLEDGED_STATUS,
     };
     use diagnostic_environment::{
         CanIdFormat as IdFormat, DiagnosticEnvironmentResolution, ReadableIdentifier,
@@ -605,12 +606,36 @@ mod tests {
         .unwrap()
     }
 
+    /// The pass entries every CAN open adds after its pins (ADR-0043). The
+    /// scripts count with it, so they hold whichever formats the gate keeps.
+    const ENTRIES: u16 = PASS_ENTRY_FORMATS.len() as u16;
+    const E: usize = PASS_ENTRY_FORMATS.len();
+    /// The first sequence after the first open's board-info, open, pins and
+    /// entries.
+    const NEXT: u16 = 4 + ENTRIES;
+
+    /// The firmware's answers to one open's pass entries, from `first`.
+    fn entry_steps(first: u16) -> Vec<Step> {
+        (0..ENTRIES)
+            .map(|index| {
+                Step::Bytes(table_entry_accepted(
+                    CHANNEL,
+                    first + index,
+                    0x50 + u32::from(index),
+                    0x04CC + u32::from(index),
+                ))
+            })
+            .collect()
+    }
+
     fn opened() -> Vec<Step> {
-        vec![
+        let mut steps = vec![
             Step::Bytes(firmware_board_info(1)),
             Step::Bytes(command_response(CHANNEL, OPEN_CHANNEL_RESPONSE, 2, 0)),
             Step::Bytes(command_response(CHANNEL, SET_PIN_RESPONSE, 3, 0)),
-        ]
+        ];
+        steps.extend(entry_steps(4));
+        steps
     }
 
     /// The clear (ADR-0036), prepared from the plan the fault-code read uses.
@@ -666,24 +691,26 @@ mod tests {
     #[test]
     fn the_second_real_car_session_replayed_the_indication_is_skipped_and_the_next_read_is_clean() {
         let mut steps = opened();
-        steps.push(acknowledged(4, 10));
+        steps.push(acknowledged(NEXT, 10));
         steps.push(Step::Silent);
-        steps.push(Step::Bytes(indication(CHANNEL, 4, 0, 11)));
-        steps.push(answered(5));
-        // The next read: the firmware is known, so open, pins, the request.
+        steps.push(Step::Bytes(indication(CHANNEL, NEXT, 0, 11)));
+        steps.push(answered(NEXT + 1));
+        // The next read: the firmware is known, so open, pins, entries, the
+        // request.
         steps.push(Step::Bytes(command_response(
             CHANNEL,
             OPEN_CHANNEL_RESPONSE,
-            6,
+            NEXT + 2,
             0,
         )));
         steps.push(Step::Bytes(command_response(
             CHANNEL,
             SET_PIN_RESPONSE,
-            7,
+            NEXT + 3,
             0,
         )));
-        steps.push(acknowledged(8, 20));
+        steps.extend(entry_steps(NEXT + 4));
+        steps.push(acknowledged(NEXT + 4 + ENTRIES, 20));
         steps.push(Step::Bytes(inbound_can_frame(
             CHANNEL,
             0,
@@ -691,7 +718,7 @@ mod tests {
             0x7E8,
             &[0x05, 0x62, 0x19, 0x45, 0x12, 0x34, 0x00, 0x00],
         )));
-        steps.push(answered(9));
+        steps.push(answered(NEXT + 5 + ENTRIES));
         let (transport, writes) = ScriptedTransport::new(steps);
         let mut device = MongooseJlrDevice::open(transport);
 
@@ -710,7 +737,10 @@ mod tests {
         assert!(acknowledgement.message.is_empty());
         assert_eq!(trace.inbound_frames, 0);
         assert_eq!(trace.indications, 1);
-        assert_eq!(trace.last_indication.map(|frame| frame.sequence), Some(4));
+        assert_eq!(
+            trace.last_indication.map(|frame| frame.sequence),
+            Some(NEXT)
+        );
         assert_eq!(trace.stale_frames, 0);
         assert!(trace.close_error.is_none(), "the close read its own answer");
 
@@ -727,8 +757,9 @@ mod tests {
         assert_eq!(second.trace.transmits, 1);
         assert_eq!(second.trace.indications, 0);
         assert_eq!(second.trace.inbound_frames, 1);
-        // Board-info, open, pins, request, close; open, pins, request, close.
-        assert_eq!(writes.lock().unwrap().len(), 9);
+        // Board-info, open, pins, entries, request, close; open, pins,
+        // entries, request, close.
+        assert_eq!(writes.lock().unwrap().len(), 9 + 2 * E);
     }
 
     /// The first real-car session (build 1.2.5, the same morning): two live
@@ -738,25 +769,26 @@ mod tests {
     #[test]
     fn the_first_real_car_session_replayed_both_reads_time_out_and_both_closes_succeed() {
         let mut steps = opened();
-        steps.push(acknowledged(4, 10));
+        steps.push(acknowledged(NEXT, 10));
         steps.push(Step::Silent);
-        steps.push(answered(5));
+        steps.push(answered(NEXT + 1));
         steps.push(Step::Bytes(command_response(
             CHANNEL,
             OPEN_CHANNEL_RESPONSE,
-            6,
+            NEXT + 2,
             0,
         )));
         steps.push(Step::Bytes(command_response(
             CHANNEL,
             SET_PIN_RESPONSE,
-            7,
+            NEXT + 3,
             0,
         )));
-        steps.push(acknowledged(8, 20));
+        steps.extend(entry_steps(NEXT + 4));
+        steps.push(acknowledged(NEXT + 4 + ENTRIES, 20));
         steps.push(Step::Silent);
-        steps.push(Step::Bytes(indication(CHANNEL, 8, 0, 21)));
-        steps.push(answered(9));
+        steps.push(Step::Bytes(indication(CHANNEL, NEXT + 4 + ENTRIES, 0, 21)));
+        steps.push(answered(NEXT + 5 + ENTRIES));
         let (transport, writes) = ScriptedTransport::new(steps);
         let mut device = MongooseJlrDevice::open(transport);
 
@@ -774,7 +806,7 @@ mod tests {
         let trace = device.exchange_trace();
         assert_eq!(trace.indications, 1);
         assert_eq!(trace.transmits, 1);
-        assert_eq!(writes.lock().unwrap().len(), 9);
+        assert_eq!(writes.lock().unwrap().len(), 9 + 2 * E);
     }
 
     /// ADR-0042, decision 5: the module answered, then the adapter did not
@@ -783,7 +815,7 @@ mod tests {
     #[test]
     fn an_answer_received_stands_when_the_close_after_it_fails() {
         let mut steps = opened();
-        steps.push(acknowledged(4, 10));
+        steps.push(acknowledged(NEXT, 10));
         steps.push(Step::Bytes(inbound_can_frame(
             CHANNEL,
             0,
@@ -791,26 +823,27 @@ mod tests {
             0x7E8,
             &[0x05, 0x62, 0x19, 0x45, 0x12, 0x34, 0x00, 0x00],
         )));
-        // The close (5) goes unanswered: a silence ends at the close's own
+        // The close goes unanswered: a silence ends at the close's own
         // write, so a second one lasts until the next command is written.
         steps.push(Step::Silent);
         steps.push(Step::Silent);
-        // The next read: the stale channel closed (6), then open, pins, the
-        // request, the answer, the close.
-        steps.push(answered(6));
+        // The next read: the stale channel closed, then open, pins, entries,
+        // the request, the answer, the close.
+        steps.push(answered(NEXT + 2));
         steps.push(Step::Bytes(command_response(
             CHANNEL,
             OPEN_CHANNEL_RESPONSE,
-            7,
+            NEXT + 3,
             0,
         )));
         steps.push(Step::Bytes(command_response(
             CHANNEL,
             SET_PIN_RESPONSE,
-            8,
+            NEXT + 4,
             0,
         )));
-        steps.push(acknowledged(9, 20));
+        steps.extend(entry_steps(NEXT + 5));
+        steps.push(acknowledged(NEXT + 5 + ENTRIES, 20));
         steps.push(Step::Bytes(inbound_can_frame(
             CHANNEL,
             0,
@@ -818,7 +851,7 @@ mod tests {
             0x7E8,
             &[0x05, 0x62, 0x19, 0x45, 0x56, 0x78, 0x00, 0x00],
         )));
-        steps.push(answered(10));
+        steps.push(answered(NEXT + 6 + ENTRIES));
         let (transport, writes) = ScriptedTransport::new(steps);
         let mut device = MongooseJlrDevice::open(transport);
 
@@ -849,10 +882,10 @@ mod tests {
         );
         assert!(second.trace.close_error.is_none());
         let writes = writes.lock().unwrap();
-        assert_eq!(writes.len(), 10);
+        assert_eq!(writes.len(), 10 + 2 * E);
         assert_eq!(
-            writes[5],
-            crate::passive::close_channel_request(6, CHANNEL),
+            writes[5 + E],
+            crate::passive::close_channel_request(NEXT + 2, CHANNEL),
             "the stale channel is closed before the next open"
         );
     }
@@ -866,12 +899,12 @@ mod tests {
         steps.push(Step::Bytes(command_response_with_text(
             CHANNEL,
             OUTBOUND_DATA_RESPONSE,
-            4,
+            NEXT,
             2,
             77,
             "cOutboundData: channel is not open",
         )));
-        steps.push(answered(5));
+        steps.push(answered(NEXT + 1));
         let (transport, writes) = ScriptedTransport::new(steps);
         let mut device = MongooseJlrDevice::open(transport);
 
@@ -883,9 +916,9 @@ mod tests {
             .unwrap_err();
         assert_eq!(
             error.to_string(),
-            "diagnostic request transmission failed: cOutboundData failed with device status 0x00000002: cOutboundData: channel is not open"
+            "diagnostic request transmission failed: cOutboundData failed with device status 0x00000002 eInvalidChannelId: cOutboundData: channel is not open"
         );
-        assert_eq!(writes.lock().unwrap().len(), 5);
+        assert_eq!(writes.lock().unwrap().len(), 5 + E);
     }
 
     /// ADR-0036: a module that accepts the clear in the default session is
@@ -893,11 +926,11 @@ mod tests {
     #[test]
     fn a_clear_accepted_in_the_default_session_opens_no_session() {
         let mut steps = opened();
-        steps.extend(exchange(4, 10, &[0x01, 0x54, 0, 0, 0, 0, 0, 0]));
+        steps.extend(exchange(NEXT, 10, &[0x01, 0x54, 0, 0, 0, 0, 0, 0]));
         steps.push(Step::Bytes(command_response(
             CHANNEL,
             CLOSE_CHANNEL_RESPONSE,
-            5,
+            NEXT + 1,
             0,
         )));
         let (transport, writes) = ScriptedTransport::new(steps);
@@ -912,9 +945,10 @@ mod tests {
         assert_eq!(result.exchanges.len(), 1);
 
         let writes = writes.lock().unwrap();
-        // Board-info, open, pins, the clear, close: nothing else went out.
-        assert_eq!(writes.len(), 5);
-        assert!(writes[3]
+        // Board-info, open, pins, entries, the clear, close: nothing else
+        // went out.
+        assert_eq!(writes.len(), 5 + E);
+        assert!(writes[3 + E]
             .ends_with(&[0x00, 0x00, 0x07, 0xE0, 0x04, 0x14, 0xFF, 0xFF, 0xFF, 0x00, 0x00, 0x00]));
     }
 
@@ -924,22 +958,22 @@ mod tests {
     #[test]
     fn a_module_that_wants_the_extended_session_gets_it_and_is_returned() {
         let mut steps = opened();
-        steps.extend(exchange(4, 10, &[0x03, 0x7F, 0x14, 0x7F, 0, 0, 0, 0]));
+        steps.extend(exchange(NEXT, 10, &[0x03, 0x7F, 0x14, 0x7F, 0, 0, 0, 0]));
         steps.extend(exchange(
-            5,
+            NEXT + 1,
             20,
             &[0x06, 0x50, 0x03, 0x00, 0x32, 0x01, 0xF4, 0],
         ));
-        steps.extend(exchange(6, 30, &[0x01, 0x54, 0, 0, 0, 0, 0, 0]));
+        steps.extend(exchange(NEXT + 2, 30, &[0x01, 0x54, 0, 0, 0, 0, 0, 0]));
         steps.extend(exchange(
-            7,
+            NEXT + 3,
             40,
             &[0x06, 0x50, 0x01, 0x00, 0x32, 0x01, 0xF4, 0],
         ));
         steps.push(Step::Bytes(command_response(
             CHANNEL,
             CLOSE_CHANNEL_RESPONSE,
-            8,
+            NEXT + 4,
             0,
         )));
         let (transport, writes) = ScriptedTransport::new(steps);
@@ -965,7 +999,7 @@ mod tests {
             ],
             "the clear, the session opened, the clear again, the way back"
         );
-        assert_eq!(writes.lock().unwrap().len(), 8);
+        assert_eq!(writes.lock().unwrap().len(), 8 + E);
     }
 
     /// Any refusal other than "not in this session" is final: the module is
@@ -973,11 +1007,11 @@ mod tests {
     #[test]
     fn a_refusal_other_than_the_session_is_final() {
         let mut steps = opened();
-        steps.extend(exchange(4, 10, &[0x03, 0x7F, 0x14, 0x22, 0, 0, 0, 0]));
+        steps.extend(exchange(NEXT, 10, &[0x03, 0x7F, 0x14, 0x22, 0, 0, 0, 0]));
         steps.push(Step::Bytes(command_response(
             CHANNEL,
             CLOSE_CHANNEL_RESPONSE,
-            5,
+            NEXT + 1,
             0,
         )));
         let (transport, writes) = ScriptedTransport::new(steps);
@@ -989,7 +1023,7 @@ mod tests {
         assert_eq!(result.session, DEFAULT_SESSION);
         assert_eq!(result.raw_diagnostic_response, [0x7F, 0x14, 0x22]);
         assert_eq!(result.exchanges.len(), 1);
-        assert_eq!(writes.lock().unwrap().len(), 5);
+        assert_eq!(writes.lock().unwrap().len(), 5 + E);
     }
 
     /// The read function refuses a service and the service function refuses
@@ -1022,7 +1056,7 @@ mod tests {
         steps.push(Step::Bytes(command_response(
             CHANNEL,
             OUTBOUND_DATA_RESPONSE,
-            4,
+            NEXT,
             0,
         )));
         steps.push(Step::Bytes(inbound_can_frame(
@@ -1035,7 +1069,7 @@ mod tests {
         steps.push(Step::Bytes(command_response(
             CHANNEL,
             CLOSE_CHANNEL_RESPONSE,
-            5,
+            NEXT + 1,
             0,
         )));
         let (transport, writes) = ScriptedTransport::new(steps);
@@ -1059,12 +1093,12 @@ mod tests {
 
         let writes = writes.lock().unwrap();
         // Board-info, open for transmission (no listen-only flag), pins,
-        // request, close.
-        assert_eq!(writes.len(), 5);
+        // entries, request, close.
+        assert_eq!(writes.len(), 5 + E);
         assert_eq!(&writes[1][16..20], &0_u32.to_le_bytes());
         assert_eq!(&writes[2][20..24], &6_u32.to_le_bytes());
         assert_eq!(&writes[2][24..28], &14_u32.to_le_bytes());
-        assert!(writes[3]
+        assert!(writes[3 + E]
             .ends_with(&[0x00, 0x00, 0x07, 0xE0, 0x03, 0x22, 0x19, 0x45, 0x00, 0x00, 0x00, 0x00]));
     }
 
@@ -1081,7 +1115,7 @@ mod tests {
         steps.push(Step::Bytes(command_response(
             CHANNEL,
             OUTBOUND_DATA_RESPONSE,
-            4,
+            NEXT,
             0,
         )));
         steps.push(Step::Bytes(inbound_can_frame(
@@ -1090,7 +1124,7 @@ mod tests {
         steps.push(Step::Bytes(command_response(
             CHANNEL,
             OUTBOUND_DATA_RESPONSE,
-            5,
+            NEXT + 1,
             0,
         )));
         steps.push(Step::Bytes(inbound_can_frame(
@@ -1099,7 +1133,7 @@ mod tests {
         steps.push(Step::Bytes(command_response(
             CHANNEL,
             CLOSE_CHANNEL_RESPONSE,
-            6,
+            NEXT + 2,
             0,
         )));
         let (transport, writes) = ScriptedTransport::new(steps);
@@ -1114,9 +1148,9 @@ mod tests {
         assert_eq!(result.raw_diagnostic_response, response);
 
         let writes = writes.lock().unwrap();
-        assert_eq!(writes.len(), 6);
+        assert_eq!(writes.len(), 6 + E);
         // One padded Flow Control to the request identifier after the First Frame.
-        assert!(writes[4]
+        assert!(writes[4 + E]
             .ends_with(&[0x00, 0x00, 0x07, 0xE0, 0x30, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]));
     }
 
@@ -1126,7 +1160,7 @@ mod tests {
         steps.push(Step::Bytes(command_response(
             CHANNEL,
             OUTBOUND_DATA_RESPONSE,
-            4,
+            NEXT,
             0,
         )));
         steps.push(Step::Bytes(inbound_can_frame(
@@ -1146,7 +1180,7 @@ mod tests {
         steps.push(Step::Bytes(command_response(
             CHANNEL,
             CLOSE_CHANNEL_RESPONSE,
-            5,
+            NEXT + 1,
             0,
         )));
         let (transport, writes) = ScriptedTransport::new(steps);
@@ -1158,7 +1192,7 @@ mod tests {
         assert_eq!(result.request_payload, [0x19, 0x02, 0x08]);
         assert_eq!(result.raw_diagnostic_response, [0x59, 0x02, 0xFF]);
         assert_eq!(result.pending_responses, 1);
-        assert_eq!(writes.lock().unwrap().len(), 5);
+        assert_eq!(writes.lock().unwrap().len(), 5 + E);
     }
 
     #[test]
@@ -1167,14 +1201,14 @@ mod tests {
         steps.push(Step::Bytes(command_response(
             CHANNEL,
             OUTBOUND_DATA_RESPONSE,
-            4,
+            NEXT,
             0,
         )));
         steps.push(Step::Silent);
         steps.push(Step::Bytes(command_response(
             CHANNEL,
             CLOSE_CHANNEL_RESPONSE,
-            5,
+            NEXT + 1,
             0,
         )));
         let (transport, writes) = ScriptedTransport::new(steps);
@@ -1185,7 +1219,7 @@ mod tests {
             Duration::from_millis(40),
         );
         assert!(matches!(result, Err(MongooseDiagnosticError::Timeout)));
-        assert_eq!(writes.lock().unwrap().len(), 5);
+        assert_eq!(writes.lock().unwrap().len(), 5 + E);
     }
 
     #[test]
@@ -1255,7 +1289,7 @@ mod tests {
         steps.push(Step::Bytes(command_response(
             CHANNEL,
             OUTBOUND_DATA_RESPONSE,
-            4,
+            NEXT,
             0,
         )));
         // An 11-bit frame whose value happens to match is another conversation.
@@ -1276,7 +1310,7 @@ mod tests {
         steps.push(Step::Bytes(command_response(
             CHANNEL,
             CLOSE_CHANNEL_RESPONSE,
-            5,
+            NEXT + 1,
             0,
         )));
         let (transport, writes) = ScriptedTransport::new(steps);
@@ -1292,7 +1326,7 @@ mod tests {
         );
 
         let writes = writes.lock().unwrap();
-        let request = &writes[3];
+        let request = &writes[3 + E];
         // Outer header, then channel, 0, command, sequence, 1, 0, two status
         // words, size, 0, identifier, eight data bytes.
         let base = request.len() - (28 + 8);

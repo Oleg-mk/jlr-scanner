@@ -3,7 +3,9 @@
 //! A capture is the tester's zero-risk first contact with a car and the
 //! artifact the tester programme collects. Everything here is receive-only:
 //! the route is opened with `DT_LISTEN_ONLY`, so the adapter neither transmits
-//! nor acknowledges frames, and a capture cannot disturb the vehicle.
+//! nor acknowledges frames, and a capture cannot disturb the vehicle. The
+//! channel gets its pass entries like every CAN channel (ADR-0043): they
+//! choose what the adapter hands up, and transmit nothing.
 //!
 //! What a capture can establish is bounded, and the bound is stated where the
 //! result is shown: traffic present or absent at the configured rate on the
@@ -11,7 +13,7 @@
 //! hearing, and a silent pair cannot be told apart from a mismatched rate or
 //! an unconnected one.
 
-use crate::device::MongooseJlrDevice;
+use crate::device::{MongooseJlrDevice, ReceiveFilterEntry};
 use crate::error::ProtocolError;
 use crate::passive::{RawCanFrame, VehicleRoute, VehicleRouteId};
 use std::time::{Duration, Instant};
@@ -44,12 +46,15 @@ pub struct RouteCapture {
     pub dropped_frames: u64,
     /// The frame cap was reached before the deadline; more traffic existed.
     pub truncated: bool,
+    /// The pass entries the channel got before it listened (ADR-0043), as
+    /// the firmware answered them.
+    pub receive_filters: Vec<ReceiveFilterEntry>,
 }
 
 impl<T: ByteTransport> MongooseJlrDevice<T> {
     /// Listen on a route for `duration`, or until `max_frames` frames have been
     /// received, then close the route. Only the listen-only open, the pin
-    /// selection and the close are written to the adapter.
+    /// selection, the pass entries and the close are written to the adapter.
     pub fn capture_route(
         &mut self,
         route_id: VehicleRouteId,
@@ -87,6 +92,7 @@ impl<T: ByteTransport> MongooseJlrDevice<T> {
         let trace = self.exchange_trace();
         let dropped_frames =
             trace.dropped_frames + u64::from(trace.indications) + u64::from(trace.stale_frames);
+        let receive_filters = trace.receive_filters.clone();
         let closed = self.close_route();
 
         match (outcome, closed) {
@@ -96,6 +102,7 @@ impl<T: ByteTransport> MongooseJlrDevice<T> {
                 listened,
                 dropped_frames,
                 truncated,
+                receive_filters,
             }),
             (Ok(()), Err(error)) | (Err(error), _) => Err(error),
         }
@@ -107,9 +114,29 @@ mod tests {
     use super::*;
     use crate::codec::encode_board_info_response;
     use crate::passive::{
-        command_response, inbound_can_frame, indication, open_channel_request, CAN1_RESOURCE_ROUTE,
-        CAN2_RESOURCE_ROUTE, CLOSE_CHANNEL_RESPONSE, OPEN_CHANNEL_RESPONSE, SET_PIN_RESPONSE,
+        command_response, inbound_can_frame, indication, open_channel_request,
+        pass_everything_entry_request, table_entry_accepted, CAN1_RESOURCE_ROUTE,
+        CAN2_RESOURCE_ROUTE, CLOSE_CHANNEL_RESPONSE, OPEN_CHANNEL_RESPONSE, PASS_ENTRY_FORMATS,
+        SET_PIN_RESPONSE,
     };
+    use crate::CanIdFormat;
+
+    /// The pass entries every CAN open adds after its pins (ADR-0043).
+    const ENTRIES: u16 = PASS_ENTRY_FORMATS.len() as u16;
+    const E: usize = PASS_ENTRY_FORMATS.len();
+
+    fn entry_steps(channel: u16) -> Vec<Step> {
+        (0..ENTRIES)
+            .map(|index| {
+                Step::Bytes(table_entry_accepted(
+                    channel,
+                    4 + index,
+                    0x50 + u32::from(index),
+                    0x04CC + u32::from(index),
+                ))
+            })
+            .collect()
+    }
     use std::collections::VecDeque;
     use std::sync::{Arc, Mutex};
     use transport_api::TransportError;
@@ -187,6 +214,7 @@ mod tests {
             Step::Bytes(command_response(channel, OPEN_CHANNEL_RESPONSE, 2, 0)),
             Step::Bytes(command_response(channel, SET_PIN_RESPONSE, 3, 0)),
         ];
+        steps.extend(entry_steps(channel));
         steps.extend(frames.into_iter().map(Step::Bytes));
         if silent_after_frames {
             steps.push(Step::Silent);
@@ -194,7 +222,7 @@ mod tests {
         steps.push(Step::Bytes(command_response(
             channel,
             CLOSE_CHANNEL_RESPONSE,
-            4,
+            4 + ENTRIES,
             0,
         )));
         steps
@@ -232,16 +260,23 @@ mod tests {
         assert!(capture.truncated);
         assert_eq!(capture.dropped_frames, 0);
 
-        // Exactly four writes: board-info, listen-only open, pin selection,
+        // Board-info, listen-only open, pin selection, the pass entries,
         // close. The open carries the CAN1 resource, the listen-only flag and
         // the route's rate; nothing resembling a CAN transmission is ever
         // written.
         let writes = writes.lock().unwrap();
-        assert_eq!(writes.len(), 4);
+        assert_eq!(writes.len(), 4 + E);
         assert_eq!(
             writes[1],
             open_channel_request(2, CAN1_RESOURCE_ROUTE, 500_000)
         );
+        assert_eq!(
+            writes[3],
+            pass_everything_entry_request(4, CAN1_RESOURCE_ROUTE, CanIdFormat::Standard)
+        );
+        assert!(writes.iter().all(|write| write[8..10] != [0x08, 0x00]));
+        assert_eq!(capture.receive_filters.len(), E);
+        assert!(capture.receive_filters.iter().all(|entry| entry.accepted()));
     }
 
     #[test]
@@ -263,7 +298,7 @@ mod tests {
         assert!(!capture.truncated);
         assert!(capture.listened >= Duration::from_millis(30));
         assert_eq!(capture.route.obd_pins, &[3, 11]);
-        assert_eq!(writes.lock().unwrap().len(), 4);
+        assert_eq!(writes.lock().unwrap().len(), 4 + E);
         assert_eq!(
             writes.lock().unwrap()[1],
             open_channel_request(2, CAN2_RESOURCE_ROUTE, 125_000)
@@ -306,13 +341,15 @@ mod tests {
         // The script ends without a close response: after the frame the
         // transport reports closed (a zero-length read), which the device
         // surfaces instead of returning half a capture as if it were whole.
-        let (transport, _writes) = ScriptedTransport::new(vec![
+        let mut steps = vec![
             Step::Bytes(firmware_board_info(1)),
             Step::Bytes(command_response(CHANNEL, OPEN_CHANNEL_RESPONSE, 2, 0)),
             Step::Bytes(command_response(CHANNEL, SET_PIN_RESPONSE, 3, 0)),
-            Step::Bytes(inbound_can_frame(CHANNEL, 0, 10, 0x321, &[1])),
-            Step::Bytes(Vec::new()),
-        ]);
+        ];
+        steps.extend(entry_steps(CHANNEL));
+        steps.push(Step::Bytes(inbound_can_frame(CHANNEL, 0, 10, 0x321, &[1])));
+        steps.push(Step::Bytes(Vec::new()));
+        let (transport, _writes) = ScriptedTransport::new(steps);
         let mut device = MongooseJlrDevice::open(transport);
 
         let result = device.capture_route(

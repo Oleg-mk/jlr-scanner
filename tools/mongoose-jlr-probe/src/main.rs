@@ -15,7 +15,15 @@ enum Mode {
     BoardInfo,
     Routes,
     PassiveRoute(VehicleRouteId),
+    /// Listen-only opens and closes of one route on one connection, each with
+    /// its pass entries and no listening (ADR-0043's gate on the bare
+    /// adapter): whether every entry is accepted, and whether the firmware's
+    /// table holds up over many channels.
+    FilterCycles(VehicleRouteId, u32),
 }
+
+/// More cycles than a whole "Check all modules" opens are not needed.
+const MAXIMUM_FILTER_CYCLES: u32 = 200;
 
 fn parse_mode(arguments: &[String]) -> Result<Mode, String> {
     match arguments {
@@ -25,8 +33,17 @@ fn parse_mode(arguments: &[String]) -> Result<Mode, String> {
         [argument, route] if argument == "--passive-route" => {
             Ok(Mode::PassiveRoute(route.parse()?))
         }
+        [argument, route, cycles] if argument == "--filter-cycles" => {
+            let cycles = cycles
+                .parse::<u32>()
+                .map_err(|_| format!("cycles must be a number, got {cycles}"))?;
+            if !(1..=MAXIMUM_FILTER_CYCLES).contains(&cycles) {
+                return Err(format!("cycles must be 1..={MAXIMUM_FILTER_CYCLES}"));
+            }
+            Ok(Mode::FilterCycles(route.parse()?, cycles))
+        }
         _ => Err(
-            "usage: mongoose-jlr-probe (--enumerate | --board-info | --routes | --passive-route <route>)"
+            "usage: mongoose-jlr-probe (--enumerate | --board-info | --routes | --passive-route <route> | --filter-cycles <route> <count>)"
                 .into(),
         ),
     }
@@ -49,6 +66,7 @@ fn run(mode: Mode) -> Result<(), String> {
         Mode::BoardInfo => board_info(),
         Mode::Routes => routes(),
         Mode::PassiveRoute(route) => passive_route(route),
+        Mode::FilterCycles(route, cycles) => filter_cycles(route, cycles),
     }
 }
 
@@ -133,6 +151,9 @@ fn passive_route(route: VehicleRouteId) -> Result<(), String> {
     println!("route: {}", opened.route.id);
     println!("network: {}", opened.route.network_name);
     println!("device_channel_id: 0x{:04X}", opened.device_channel_id);
+    for entry in &mongoose.exchange_trace().receive_filters {
+        println!("receive_filter: {entry}");
+    }
     println!("application_can_tx: 0");
 
     let started = Instant::now();
@@ -182,6 +203,45 @@ fn passive_route(route: VehicleRouteId) -> Result<(), String> {
     Ok(())
 }
 
+/// Opens and closes one route's listen-only channel `cycles` times on one
+/// connection, printing each open's pass entries as the firmware answered
+/// them; stops at the first open that fails, with the firmware's words.
+fn filter_cycles(route: VehicleRouteId, cycles: u32) -> Result<(), String> {
+    let device = discover_mongoose_jlr().map_err(|error| error.to_string())?;
+    print_device(&device);
+    let transport = SerialTransport::open(&device).map_err(|error| error.to_string())?;
+    let mut mongoose = MongooseJlrDevice::open(transport);
+    println!("route: {route}");
+    println!("application_can_tx: 0");
+    let mut accepted = 0_u32;
+    let mut outcome = Ok(());
+    for cycle in 1..=cycles {
+        let opened = mongoose.open_receive_route(route);
+        let entries = mongoose
+            .exchange_trace()
+            .receive_filters
+            .iter()
+            .map(ToString::to_string)
+            .collect::<Vec<_>>()
+            .join(", ");
+        println!("cycle {cycle}: {entries}");
+        if let Err(error) = opened {
+            outcome = Err(format!("cycle {cycle}: {error}"));
+            break;
+        }
+        if let Err(error) = mongoose.close_route() {
+            outcome = Err(format!("cycle {cycle}: close failed: {error}"));
+            break;
+        }
+        accepted += 1;
+    }
+    let transport_close = mongoose.close();
+    println!("cycles_completed: {accepted} of {cycles}");
+    println!("application_can_tx: 0");
+    outcome?;
+    transport_close.map_err(|error| error.to_string())
+}
+
 fn print_device(device: &transport_serial::SerialDevice) {
     println!("usb_vid: {:04X}", device.usb_vid);
     println!("usb_pid: {:04X}", device.usb_pid);
@@ -217,6 +277,13 @@ mod tests {
             parse_mode(&args(&["--passive-route", "hs-can"])),
             Ok(Mode::PassiveRoute(VehicleRouteId::HsCan))
         );
+        assert_eq!(
+            parse_mode(&args(&["--filter-cycles", "ms-can", "25"])),
+            Ok(Mode::FilterCycles(VehicleRouteId::MsCan, 25))
+        );
+        assert!(parse_mode(&args(&["--filter-cycles", "hs-can", "0"])).is_err());
+        assert!(parse_mode(&args(&["--filter-cycles", "hs-can", "201"])).is_err());
+        assert!(parse_mode(&args(&["--filter-cycles", "hs-can"])).is_err());
         assert!(parse_mode(&args(&["--raw"])).is_err());
         assert!(parse_mode(&args(&["--opcode", "0109"])).is_err());
         assert!(parse_mode(&args(&["--firmware"])).is_err());

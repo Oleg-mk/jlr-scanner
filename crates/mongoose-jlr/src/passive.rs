@@ -39,6 +39,28 @@ pub(crate) const INDICATION: u16 = 0x000A;
 pub(crate) const OUTBOUND_DATA_RESPONSE: u16 = 0x8008;
 pub(crate) const SET_PIN: u16 = 0x0012;
 pub(crate) const SET_PIN_RESPONSE: u16 = 0x8012;
+/// `cTableAddEntry` (ADR-0043): the one table command this crate sends, and
+/// only ever as the pass entry `pass_everything_entry_request` builds. The
+/// table's other commands (remove, modify, clear), its BLOCK rule and its
+/// periodic-message type are deliberately absent.
+pub(crate) const TABLE_ADD_ENTRY: u16 = 0x000D;
+pub(crate) const TABLE_ADD_ENTRY_RESPONSE: u16 = 0x800D;
+/// The filter table's PASS subtype and rule, as the vendor library's own
+/// PASS/BLOCK path writes them and the bare adapter accepted them on
+/// 2026-11-14 (`docs/evidence/mongoose-probe-2026-11-14/`).
+const PASS_TABLE_SUBTYPE: u32 = 0;
+const PASS_RULE: u8 = 1;
+/// The entry's flag for a 29-bit identifier, at the same bit as the 29-bit
+/// flag of an inbound record's status word.
+const PASS_ENTRY_29BIT_FLAG: u16 = 0x0100;
+/// A zero mask passes every identifier; the reads choose their module's
+/// frames by identifier and format themselves (ADR-0043, decision 1).
+const PASS_EVERYTHING_MASK: [u8; 4] = [0; 4];
+const PASS_EVERYTHING_PATTERN: [u8; 4] = [0; 4];
+/// The identifier formats every CAN channel gets a pass entry for, in the
+/// order they are added (ADR-0043, decision 1).
+pub(crate) const PASS_ENTRY_FORMATS: &[CanIdFormat] =
+    &[CanIdFormat::Standard, CanIdFormat::Extended];
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum VehicleRouteId {
@@ -304,6 +326,92 @@ pub(crate) fn set_pin_request(sequence: u16, channel_id: u16, route: VehicleRout
 
 pub(crate) fn close_channel_request(sequence: u16, channel_id: u16) -> Vec<u8> {
     command(channel_id, CLOSE_CHANNEL, sequence, &[])
+}
+
+/// The pass entry that lets the firmware hand a channel's frames to the host
+/// (ADR-0043): after the command header, the table subtype (PASS), the flags
+/// (the 29-bit flag for an extended entry), the rule (PASS), the pattern
+/// length, then the mask and the pattern — zero, so that every identifier of
+/// the format passes. The record the bare adapter accepted on 2026-11-14,
+/// unchanged; nothing about it is a parameter but the format.
+pub(crate) fn pass_everything_entry_request(
+    sequence: u16,
+    channel_id: u16,
+    format: CanIdFormat,
+) -> Vec<u8> {
+    let flags = match format {
+        CanIdFormat::Standard => 0,
+        CanIdFormat::Extended => PASS_ENTRY_29BIT_FLAG,
+    };
+    let mut body = Vec::with_capacity(16);
+    body.extend_from_slice(&PASS_TABLE_SUBTYPE.to_le_bytes());
+    body.extend_from_slice(&flags.to_le_bytes());
+    body.push(PASS_RULE);
+    body.push(PASS_EVERYTHING_PATTERN.len() as u8);
+    body.extend_from_slice(&PASS_EVERYTHING_MASK);
+    body.extend_from_slice(&PASS_EVERYTHING_PATTERN);
+    command(channel_id, TABLE_ADD_ENTRY, sequence, &body)
+}
+
+/// The firmware's answer to a table entry, as it came: the status word, the
+/// firmware's words when it gave any, and the four bytes an accepted entry
+/// carries after the tick (`CC 04 00 00` and `90 02 00 00` on the bare
+/// adapter; their meaning is unknown). Judged by the device, not here.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct TableEntryAnswer {
+    pub status: u32,
+    pub message: String,
+    pub word: Option<u32>,
+}
+
+pub(crate) fn parse_table_entry_answer(
+    frame: &Frame,
+    expected_sequence: u16,
+    channel_id: u16,
+) -> Result<TableEntryAnswer, ProtocolError> {
+    let payload = frame.payload();
+    if payload.len() < COMMAND_HEADER_LENGTH + 4 {
+        return Err(ProtocolError::PayloadTooShort(payload.len()));
+    }
+    let actual_command = read_u16(payload, 4).expect("header length checked");
+    if actual_command != TABLE_ADD_ENTRY_RESPONSE {
+        return Err(ProtocolError::UnexpectedCommand {
+            expected: TABLE_ADD_ENTRY_RESPONSE,
+            actual: actual_command,
+        });
+    }
+    let actual_sequence = read_u16(payload, 6).expect("header length checked");
+    if actual_sequence != expected_sequence {
+        return Err(ProtocolError::SequenceMismatch {
+            expected: expected_sequence,
+            actual: actual_sequence,
+        });
+    }
+    let actual_channel = read_u16(payload, 2).expect("header length checked");
+    if actual_channel != channel_id {
+        return Err(ProtocolError::RouteMismatch {
+            expected: channel_id,
+            actual: actual_channel,
+        });
+    }
+    let body = &payload[COMMAND_HEADER_LENGTH..];
+    let status = read_u32(body, 0).expect("response length checked");
+    // An accepted entry is exactly status, tick and the word; anything
+    // longer, or any other status, is read for the firmware's words.
+    let accepted_shape = status == 0 && body.len() == 12;
+    Ok(TableEntryAnswer {
+        status,
+        message: if accepted_shape {
+            String::new()
+        } else {
+            firmware_message(body)
+        },
+        word: if accepted_shape {
+            read_u32(body, 8)
+        } else {
+            None
+        },
+    })
 }
 
 pub(crate) fn parse_open_response(
@@ -628,6 +736,28 @@ pub(crate) fn outbound_acknowledgement(channel_id: u16, sequence: u16, tick: u32
 /// The status word every transmit acknowledgement has carried so far.
 pub(crate) const TRANSMIT_ACKNOWLEDGED_STATUS: u32 = 0x0000_0100;
 
+/// The answer to an accepted table entry as the bare adapter gave it on
+/// 2026-11-14: status 0, the tick, four more bytes. The bench answers with
+/// this; the tests replay it.
+pub(crate) fn table_entry_accepted(
+    channel_id: u16,
+    sequence: u16,
+    tick: u32,
+    word: u32,
+) -> Vec<u8> {
+    let mut payload = Vec::with_capacity(24);
+    payload.extend_from_slice(&0_u16.to_le_bytes());
+    payload.extend_from_slice(&channel_id.to_le_bytes());
+    payload.extend_from_slice(&TABLE_ADD_ENTRY_RESPONSE.to_le_bytes());
+    payload.extend_from_slice(&sequence.to_le_bytes());
+    payload.extend_from_slice(&0_u16.to_le_bytes());
+    payload.extend_from_slice(&0_u16.to_le_bytes());
+    payload.extend_from_slice(&0_u32.to_le_bytes());
+    payload.extend_from_slice(&tick.to_le_bytes());
+    payload.extend_from_slice(&word.to_le_bytes());
+    outer_frame(&payload)
+}
+
 /// A `cIndication` record as the bench emits it and the tests replay it:
 /// the response shape — zero, channel, the word, the sequence it refers to,
 /// the status, the tick. **The layout is the hypothesis of ADR-0042**: no
@@ -815,6 +945,75 @@ mod tests {
             acknowledgement.message,
             "cOutboundData: channel is not open"
         );
+    }
+
+    /// ADR-0043, decision 7: the pass entry the bare adapter accepted on
+    /// 2026-11-14 (`mongoose-probe-2026-11-14/pass_filter_hs.txt`), byte for
+    /// byte, and its answer — status 0, the tick, `CC 04 00 00`.
+    #[test]
+    fn the_pass_entry_and_its_recorded_answer_are_golden() {
+        assert_eq!(
+            pass_everything_entry_request(4, CAN1_RESOURCE_ROUTE, CanIdFormat::Standard),
+            [
+                0x1C, 0x00, 0xFA, 0x51, 0x01, 0x05, 0x00, 0x00, 0x0D, 0x00, 0x04, 0x00, 0x00, 0x00,
+                0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x04, 0x00, 0x00, 0x00, 0x00,
+                0x00, 0x00, 0x00, 0x00,
+            ]
+        );
+        // The 29-bit entry differs in the flags word alone.
+        let extended = pass_everything_entry_request(5, CAN2_RESOURCE_ROUTE, CanIdFormat::Extended);
+        assert_eq!(extended.len(), 32);
+        assert_eq!(&extended[4..6], &CAN2_RESOURCE_ROUTE.to_le_bytes());
+        assert_eq!(&extended[16..20], &0_u32.to_le_bytes());
+        assert_eq!(&extended[20..22], &[0x00, 0x01]);
+        assert_eq!(&extended[22..24], &[0x01, 0x04]);
+        assert_eq!(&extended[24..32], &[0; 8]);
+
+        let recorded = [
+            0x00, 0x00, 0x01, 0x05, 0x0D, 0x80, 0x04, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x9C, 0x04, 0x34, 0x03, 0xCC, 0x04, 0x00, 0x00,
+        ];
+        let answer =
+            parse_table_entry_answer(&decode(&outer_frame(&recorded)), 4, CAN1_RESOURCE_ROUTE)
+                .unwrap();
+        assert_eq!(
+            answer,
+            TableEntryAnswer {
+                status: 0,
+                message: String::new(),
+                word: Some(0x0000_04CC),
+            }
+        );
+        assert_eq!(
+            table_entry_accepted(CAN1_RESOURCE_ROUTE, 4, 0x0334_049C, 0x04CC),
+            outer_frame(&recorded)
+        );
+    }
+
+    /// The firmware's refusal of a malformed entry, as the type sweep of
+    /// 2026-11-14 recorded it: the status and the words, no word after them.
+    #[test]
+    fn a_refused_entry_parses_with_the_firmware_words() {
+        let mut recorded = vec![
+            0x00, 0x00, 0x01, 0x05, 0x0D, 0x80, 0x04, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0x02,
+            0x00, 0x00, 0x50, 0x1D, 0xDA, 0x03,
+        ];
+        recorded.extend_from_slice(b"FilterAdd: Invalid Filter type\0");
+        let answer =
+            parse_table_entry_answer(&decode(&outer_frame(&recorded)), 4, CAN1_RESOURCE_ROUTE)
+                .unwrap();
+        assert_eq!(answer.status, 0x202);
+        assert_eq!(answer.message, "FilterAdd: Invalid Filter type");
+        assert_eq!(answer.word, None);
+        // Another sequence or channel is not this entry's answer.
+        assert!(matches!(
+            parse_table_entry_answer(&decode(&outer_frame(&recorded)), 5, CAN1_RESOURCE_ROUTE),
+            Err(ProtocolError::SequenceMismatch { .. })
+        ));
+        assert!(matches!(
+            parse_table_entry_answer(&decode(&outer_frame(&recorded)), 4, CAN2_RESOURCE_ROUTE),
+            Err(ProtocolError::RouteMismatch { .. })
+        ));
     }
 
     #[test]

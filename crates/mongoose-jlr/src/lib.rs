@@ -10,6 +10,7 @@ mod j1979_live;
 pub mod kline;
 mod kline_live;
 mod passive;
+mod status;
 mod uds_live;
 
 pub use capture::{CapturedFrame, RouteCapture, CAPTURE_IDLE_TIMEOUT, CAPTURE_MAX_FRAMES};
@@ -19,7 +20,8 @@ pub use codec::{
 };
 pub use device::{
     ExchangeTrace, MongooseCalibrationIdentificationResult, MongooseDiagnosticError,
-    MongooseJlrDevice, TransmitAcknowledgement, UnsolicitedFrame, TRANSMIT_ACK_TIMEOUT,
+    MongooseJlrDevice, ReceiveFilterEntry, TransmitAcknowledgement, UnsolicitedFrame,
+    TRANSMIT_ACK_TIMEOUT,
 };
 pub use error::ProtocolError;
 pub use j1979_live::{MongooseJ1979ReadResult, J1979_PENDING_TIMEOUT};
@@ -28,4 +30,5 @@ pub use passive::{
     list_vehicle_routes, CanIdFormat, NetworkType, OpenReceiveRoute, PassiveCapability,
     RawCanFrame, VehicleRoute, VehicleRouteId,
 };
+pub use status::{status_name, status_words};
 pub use uds_live::{MongooseUdsReadResult, MongooseUdsServiceResult, UDS_PENDING_TIMEOUT};

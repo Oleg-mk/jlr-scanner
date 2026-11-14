@@ -61,7 +61,7 @@ GitHub `Baseline validation` run `33293377659` is green for corrective commit `0
 
 `APPLICATION CAN TX API EXISTS: NO`
 
-The probe accepts only `--enumerate`, `--board-info`, `--routes`, and `--passive-route <route>`. It rejects raw, send/TX, ISO-TP, UDS, and diagnostic modes. A passive capture prints `application_can_tx: 0` before and after the session.
+The probe accepts only `--enumerate`, `--board-info`, `--routes`, `--passive-route <route>`, and, since `ADR-0043`, `--filter-cycles <route> <count>` — listen-only opens and closes of one route on one connection, each with its pass entries and no listening, at most 200. It rejects raw, send/TX, ISO-TP, UDS, and diagnostic modes. A passive capture prints `application_can_tx: 0` before and after the session, and the pass entries the channel got, as the firmware answered them.
 
 ## F2B physical test plan — deferred and not executed
 

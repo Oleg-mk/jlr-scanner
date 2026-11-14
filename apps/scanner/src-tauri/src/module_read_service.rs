@@ -660,17 +660,21 @@ mod tests {
             recorded.acknowledgement_status.as_deref(),
             Some("0x00000100")
         );
+        assert_eq!(
+            recorded.acknowledgement_status_name.as_deref(),
+            Some("eMsgQueued")
+        );
         assert_eq!(recorded.acknowledgement_message, None);
         assert_eq!(recorded.acknowledgement_wait_ms, Some(3));
         assert_eq!(recorded.inbound_frames, 0);
         assert_eq!(recorded.indications, 1);
         assert_eq!(
             recorded.last_indication.as_deref(),
-            Some("0x000A sequence 4 status 0x00000000")
+            Some("0x000A sequence 4 status 0x00000000 eSuccess")
         );
         let words = report.error_message.expect("the error in words");
         assert!(
-            words.starts_with("No response from ECU: no response from ECU before timeout; adapter: transmit acknowledged with status 0x00000100 after 3 ms; 0 inbound frames; 1 indication(s)"),
+            words.starts_with("No response from ECU: no response from ECU before timeout; adapter: transmit acknowledged with status 0x00000100 eMsgQueued after 3 ms; 0 inbound frames; 1 indication(s)"),
             "{words}"
         );
     }

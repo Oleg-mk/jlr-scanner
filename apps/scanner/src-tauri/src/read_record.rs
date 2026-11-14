@@ -13,7 +13,7 @@ use app_contracts::{
     AdapterInfo, AdapterTrace, DiagnosticError, DiagnosticExecutionStage, ModuleReadReport,
     VehicleContextInput,
 };
-use mongoose_jlr::{ExchangeTrace, MongooseUdsReadResult};
+use mongoose_jlr::{status_name, status_words, ExchangeTrace, MongooseUdsReadResult};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
 use uds_execution::PreparedUdsTransaction;
@@ -39,12 +39,16 @@ pub enum ReadOutcome<'a> {
 }
 
 /// The adapter's trace in the record's shape (`ADR-0042`): the words of the
-/// status and of the frames, the counts as they are.
+/// status and of the frames, the counts as they are; the pass entries and
+/// the status words' names since `ADR-0043`.
 pub fn adapter_trace(trace: &ExchangeTrace) -> AdapterTrace {
     let acknowledgement = trace.last_acknowledgement.as_ref();
     AdapterTrace {
         transmits: trace.transmits,
         acknowledgement_status: acknowledgement.map(|value| format!("{:#010X}", value.status)),
+        acknowledgement_status_name: acknowledgement
+            .and_then(|value| status_name(value.status))
+            .map(str::to_string),
         acknowledgement_message: acknowledgement
             .map(|value| value.message.clone())
             .filter(|message| !message.is_empty()),
@@ -57,6 +61,19 @@ pub fn adapter_trace(trace: &ExchangeTrace) -> AdapterTrace {
         dropped_frames: trace.dropped_frames,
         dropped_bytes: trace.dropped_bytes,
         close_error: trace.close_error.clone(),
+        receive_filters: trace
+            .receive_filters
+            .iter()
+            .map(ToString::to_string)
+            .collect(),
+        indications_by_status: trace
+            .indications_by_status
+            .iter()
+            .map(|(status, count)| match status {
+                Some(status) => format!("{count} with {}", status_words(*status)),
+                None => format!("{count} with no status word"),
+            })
+            .collect(),
     }
 }
 

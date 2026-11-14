@@ -10,6 +10,12 @@
 //! recorded (`docs/evidence/F2_MONGOOSE_FIRMWARE_STATE_2026-09-06.md`),
 //! refusals included, so the application cannot tell the bench from the
 //! adapter by the bytes — only by what it says about itself.
+//!
+//! A channel hands the application its frames only once a pass entry is on
+//! it (ADR-0043, decision 7): the reading of the third real-car session — the
+//! firmware forwards nothing without one — made executable and labelled as
+//! such, as ADR-0042 did with the indication. The entry is answered as the
+//! bare adapter answered it on 2026-11-14.
 
 use crate::codec::{encode_board_info_response, Frame, FrameDecoder, MongoosePacket};
 use crate::passive::{
@@ -49,6 +55,23 @@ struct Channel {
     route: BenchRoute,
     listen_only: bool,
     pins_selected: bool,
+    /// The pass entries on the channel: (29-bit, mask, pattern).
+    pass_entries: Vec<(bool, u32, u32)>,
+}
+
+impl Channel {
+    /// Whether a pass entry lets this frame through to the host: the
+    /// entry's format, and the identifier under its mask matching the
+    /// pattern under the same mask (a zero mask passes every identifier).
+    fn passes(&self, frame: &CanFrame) -> bool {
+        let extended = frame.id.is_extended();
+        let id = frame.id.value();
+        self.pass_entries
+            .iter()
+            .any(|&(entry_extended, mask, pattern)| {
+                entry_extended == extended && id & mask == pattern & mask
+            })
+    }
 }
 
 /// The stand-in adapter. One per connection; the vehicle behind it is shared.
@@ -60,6 +83,9 @@ pub struct BenchTransport {
     channels: BTreeMap<u16, Channel>,
     read_timeout: Duration,
     clock_us: u64,
+    /// The word an accepted entry's answer carries; the bench's means nothing,
+    /// as the adapter's is not known to.
+    entry_words: u32,
     closed: bool,
 }
 
@@ -74,6 +100,7 @@ impl BenchTransport {
             channels: BTreeMap::new(),
             read_timeout: Duration::from_millis(100),
             clock_us: 0,
+            entry_words: 0x0290,
             closed: false,
         }
     }
@@ -174,6 +201,7 @@ impl BenchTransport {
                 self.accept(route, passive::CLOSE_CHANNEL_RESPONSE, sequence);
             }
             passive::OUTBOUND_DATA => self.outbound(route, sequence, &body),
+            passive::TABLE_ADD_ENTRY => self.table_entry(route, sequence, &body),
             _ => self.refuse(
                 route,
                 response,
@@ -207,6 +235,7 @@ impl BenchTransport {
                 route: bench_route,
                 listen_only: flags & passive::DT_LISTEN_ONLY != 0,
                 pins_selected: false,
+                pass_entries: Vec::new(),
             },
         );
         self.accept(route, passive::OPEN_CHANNEL_RESPONSE, sequence);
@@ -279,6 +308,63 @@ impl BenchTransport {
         }
     }
 
+    /// The filter table, as the firmware answered the bare adapter on
+    /// 2026-11-14: a PASS entry — subtype 0, rule 1, a four-byte mask and
+    /// pattern — accepted with status 0 and a word; the filter subtypes with
+    /// another rule refused with the firmware's "FilterAdd: Invalid Filter
+    /// type"; any other subtype with "CanTableAdd: Unsupported or Invalid
+    /// table type". The bench takes the PASS entry alone, the only one this
+    /// crate sends.
+    fn table_entry(&mut self, route: u16, sequence: u16, body: &[u8]) {
+        if !self.channels.contains_key(&route) {
+            // The bench's own words: the firmware's for this case are unknown.
+            self.refuse(
+                route,
+                passive::TABLE_ADD_ENTRY_RESPONSE,
+                sequence,
+                2,
+                "CanTableAdd: channel is not open",
+            );
+            return;
+        }
+        let subtype = read_u32(body, 0);
+        if !matches!(subtype, Some(0 | 1)) {
+            self.refuse(
+                route,
+                passive::TABLE_ADD_ENTRY_RESPONSE,
+                sequence,
+                0x200,
+                "CanTableAdd: Unsupported or Invalid table type",
+            );
+            return;
+        }
+        let flags = body
+            .get(4..6)
+            .map(|bytes| u16::from_le_bytes([bytes[0], bytes[1]]));
+        let (rule, length) = (body.get(6).copied(), body.get(7).copied());
+        let pass = subtype == Some(0) && rule == Some(1) && length == Some(4) && body.len() == 16;
+        let (Some(flags), true) = (flags, pass) else {
+            self.refuse(
+                route,
+                passive::TABLE_ADD_ENTRY_RESPONSE,
+                sequence,
+                0x202,
+                "FilterAdd: Invalid Filter type",
+            );
+            return;
+        };
+        let mask = u32::from_be_bytes([body[8], body[9], body[10], body[11]]);
+        let pattern = u32::from_be_bytes([body[12], body[13], body[14], body[15]]);
+        if let Some(channel) = self.channels.get_mut(&route) {
+            channel
+                .pass_entries
+                .push((flags & 0x0100 != 0, mask, pattern));
+        }
+        self.entry_words += 1;
+        let (tick, word) = (self.tick(), self.entry_words);
+        self.emit(passive::table_entry_accepted(route, sequence, tick, word));
+    }
+
     fn outbound(&mut self, route: u16, sequence: u16, body: &[u8]) {
         let Some(channel) = self.channels.get(&route) else {
             self.refuse(
@@ -331,7 +417,16 @@ impl BenchTransport {
         }
     }
 
+    /// A frame of the vehicle's, handed to the application only through a
+    /// pass entry on the channel (ADR-0043, decision 7).
     fn emit_inbound(&mut self, route: u16, frame: &CanFrame) {
+        let passes = self
+            .channels
+            .get(&route)
+            .is_some_and(|channel| channel.passes(frame));
+        if !passes {
+            return;
+        }
         let flags = if frame.id.is_extended() {
             CAN_29BIT_ID
         } else {
@@ -595,6 +690,16 @@ mod tests {
         assert_eq!(result.trace.indications, 2);
         assert_eq!(result.trace.inbound_frames, 3);
         assert_eq!(result.trace.stale_frames, 0);
+        // The pass entries before it, every one accepted (ADR-0043).
+        assert_eq!(
+            result.trace.receive_filters.len(),
+            passive::PASS_ENTRY_FORMATS.len()
+        );
+        assert!(result
+            .trace
+            .receive_filters
+            .iter()
+            .all(|entry| entry.accepted()));
         // The vehicle saw the padded request and the tester's flow control.
         let guard = bus.lock().unwrap();
         let _ = guard.describe();
@@ -621,6 +726,124 @@ mod tests {
         let read = transport.read(&mut buffer).unwrap();
         let text = String::from_utf8_lossy(&buffer[..read]).to_string();
         assert!(text.contains("channel is not open"), "{text}");
+    }
+
+    /// Everything the bench has to say, as command words with their status
+    /// words, once it has gone quiet.
+    fn drain(transport: &mut BenchTransport) -> Vec<(u16, u32)> {
+        transport
+            .set_read_timeout(Duration::from_millis(1))
+            .unwrap();
+        let mut decoder = FrameDecoder::default();
+        let mut buffer = [0_u8; 512];
+        while let Ok(read) = transport.read(&mut buffer) {
+            decoder.push(&buffer[..read]);
+        }
+        let mut words = Vec::new();
+        while let Ok(Some(frame)) = decoder.next_frame() {
+            let payload = frame.payload();
+            words.push((
+                passive::read_u16(payload, 4).unwrap(),
+                passive::read_u32(payload, passive::COMMAND_HEADER_LENGTH).unwrap_or(0),
+            ));
+        }
+        words
+    }
+
+    /// ADR-0043, decision 7: a channel without a pass entry hands the host
+    /// nothing — the request acknowledged and completed, no frame of the
+    /// vehicle's, as on the tester's car — and with the entry the same
+    /// request draws the vehicle's answer.
+    #[test]
+    fn a_channel_hands_up_the_vehicles_frames_only_through_a_pass_entry() {
+        let bus = share_bus(Box::new(OneModule {
+            seen: Vec::new(),
+            pending: Vec::new(),
+        }));
+        let mut transport = BenchTransport::new(bus);
+        transport.in_bootloader = false;
+        let route = passive::route_by_id(VehicleRouteId::HsCan);
+        let request = [0x03, 0x22, 0x19, 0x45, 0, 0, 0, 0];
+        for bytes in [
+            passive::diagnostic_open_channel_request(1, CAN1_RESOURCE_ROUTE, 500_000),
+            passive::set_pin_request(2, CAN1_RESOURCE_ROUTE, *route),
+            passive::outbound_data_request(3, CAN1_RESOURCE_ROUTE, 0x7E0, false, &request),
+        ] {
+            transport.write_all(&bytes).unwrap();
+        }
+        let words = drain(&mut transport);
+        assert!(words.contains(&(passive::INDICATION, 0)), "{words:?}");
+        assert!(
+            !words
+                .iter()
+                .any(|(command, _)| *command == passive::INBOUND_DATA),
+            "no frame without an entry: {words:?}"
+        );
+
+        transport
+            .write_all(&passive::pass_everything_entry_request(
+                4,
+                CAN1_RESOURCE_ROUTE,
+                passive::CanIdFormat::Standard,
+            ))
+            .unwrap();
+        transport
+            .write_all(&passive::outbound_data_request(
+                5,
+                CAN1_RESOURCE_ROUTE,
+                0x7E0,
+                false,
+                &request,
+            ))
+            .unwrap();
+        let words = drain(&mut transport);
+        assert!(
+            words.contains(&(passive::TABLE_ADD_ENTRY_RESPONSE, 0)),
+            "{words:?}"
+        );
+        assert!(
+            words
+                .iter()
+                .any(|(command, _)| *command == passive::INBOUND_DATA),
+            "the vehicle's frame through the entry: {words:?}"
+        );
+    }
+
+    /// The firmware's own refusals of a table entry, as the type sweep of
+    /// 2026-11-14 recorded them: a filter subtype with a rule it does not
+    /// take, and a table type it does not have.
+    #[test]
+    fn a_malformed_table_entry_draws_the_firmware_words() {
+        let bus = share_bus(Box::new(transport_api::EmptyBench));
+        let mut transport = BenchTransport::new(bus);
+        transport.in_bootloader = false;
+        transport
+            .write_all(&passive::open_channel_request(
+                1,
+                CAN1_RESOURCE_ROUTE,
+                500_000,
+            ))
+            .unwrap();
+        let _ = drain(&mut transport);
+        let mut buffer = [0_u8; 256];
+        for (sequence, subtype, text) in [
+            (2_u16, 0_u32, "FilterAdd: Invalid Filter type"),
+            (3, 7, "CanTableAdd: Unsupported or Invalid table type"),
+        ] {
+            let mut body = subtype.to_le_bytes().to_vec();
+            body.extend_from_slice(&[0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0]);
+            transport
+                .write_all(&passive::command(
+                    CAN1_RESOURCE_ROUTE,
+                    passive::TABLE_ADD_ENTRY,
+                    sequence,
+                    &body,
+                ))
+                .unwrap();
+            let read = transport.read(&mut buffer).unwrap();
+            let answer = String::from_utf8_lossy(&buffer[..read]).to_string();
+            assert!(answer.contains(text), "{answer}");
+        }
     }
 
     #[test]

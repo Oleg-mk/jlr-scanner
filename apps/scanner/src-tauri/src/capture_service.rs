@@ -205,6 +205,21 @@ pub fn summarise(capture: &RouteCapture, requested: Duration) -> CaptureSnapshot
     }
 }
 
+/// The pass entries the channel listened through (`ADR-0043`), in words, for
+/// the fixture's provenance.
+fn receive_filter_words(capture: &RouteCapture) -> String {
+    if capture.receive_filters.is_empty() {
+        "none".into()
+    } else {
+        capture
+            .receive_filters
+            .iter()
+            .map(ToString::to_string)
+            .collect::<Vec<_>>()
+            .join(", ")
+    }
+}
+
 /// The artifact: a `captured` replay fixture with the provenance a reviewer
 /// needs — route, pins, rate, adapter identity, how the vehicle was described —
 /// and a validation tag that says what it is not.
@@ -234,7 +249,7 @@ fn fixture_from(
             variant: optional(&context.variant),
             market: optional(&context.market),
             evidence: Some(format!(
-                "listen-only capture on route {route_id}, J1962 pins {}, {} bit/s, via {} serial {}; SDD breakpoint marker {}; no frame was transmitted or acknowledged",
+                "listen-only capture on route {route_id}, J1962 pins {}, {} bit/s, via {} serial {}; SDD breakpoint marker {}; receive filter {}; no frame was transmitted or acknowledged",
                 pins_text(capture.route.obd_pins),
                 capture
                     .route
@@ -243,7 +258,8 @@ fn fixture_from(
                     .unwrap_or_else(|| "unknown".into()),
                 adapter.name,
                 adapter.serial_number.as_deref().unwrap_or("unknown"),
-                optional(&context.year_breakpoint).unwrap_or_else(|| "not stated".into())
+                optional(&context.year_breakpoint).unwrap_or_else(|| "not stated".into()),
+                receive_filter_words(capture)
             )),
             validation: Some("captured_listen_only_bus_activity_not_module_confirmed".into()),
             ..MetadataEnvelope::default()
@@ -298,6 +314,7 @@ mod tests {
             listened: Duration::from_millis(2000),
             dropped_frames: 0,
             truncated: false,
+            receive_filters: Vec::new(),
         }
     }
 

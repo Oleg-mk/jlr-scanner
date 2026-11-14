@@ -1,11 +1,12 @@
+use crate::status::status_words;
 use crate::{
-    list_vehicle_routes, passive, NetworkType, OpenReceiveRoute, PassiveCapability, RawCanFrame,
-    VehicleRoute, VehicleRouteId,
+    list_vehicle_routes, passive, CanIdFormat, NetworkType, OpenReceiveRoute, PassiveCapability,
+    RawCanFrame, VehicleRoute, VehicleRouteId,
 };
 use crate::{BoardInfoResponse, FrameDecoder, MongoosePacket, ProtocolError, SequenceCounter};
 use diagnostic_execution::{PreparedDiagnosticTransaction, TransactionSafetyClass};
 use obd_j1979::{decode_calibration_identification, J1979Error, J1979Request};
-use std::collections::VecDeque;
+use std::collections::{BTreeMap, VecDeque};
 use std::fmt;
 use std::time::{Duration, Instant};
 use transport_api::{ByteTransport, CanId, TransportError};
@@ -60,9 +61,54 @@ impl fmt::Display for UnsolicitedFrame {
             self.command, self.sequence
         )?;
         match self.status {
-            Some(status) => write!(formatter, " status {status:#010X}"),
+            Some(status) => write!(formatter, " status {}", status_words(status)),
             None => formatter.write_str(" (no status word)"),
         }
+    }
+}
+
+/// One pass entry put on a CAN channel after its pins (ADR-0043, decision 5):
+/// the identifier format it passes, the firmware's status word and words, and
+/// the four bytes an accepted entry's answer carries — their meaning unknown,
+/// kept as they came.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ReceiveFilterEntry {
+    pub format: CanIdFormat,
+    pub status: u32,
+    pub message: String,
+    pub word: Option<u32>,
+}
+
+impl ReceiveFilterEntry {
+    /// Accepted: status zero and no words, as the bare adapter answered.
+    pub fn accepted(&self) -> bool {
+        self.status == 0 && self.message.is_empty()
+    }
+}
+
+impl fmt::Display for ReceiveFilterEntry {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            formatter,
+            "{} pass {}",
+            format_words(self.format),
+            status_words(self.status)
+        )?;
+        if let Some(word) = self.word {
+            write!(formatter, " (word {word:#010X})")?;
+        }
+        if !self.message.is_empty() {
+            write!(formatter, ": {}", self.message)?;
+        }
+        Ok(())
+    }
+}
+
+/// An identifier format as the records say it.
+pub(crate) fn format_words(format: CanIdFormat) -> &'static str {
+    match format {
+        CanIdFormat::Standard => "11-bit",
+        CanIdFormat::Extended => "29-bit",
     }
 }
 
@@ -72,6 +118,9 @@ impl fmt::Display for UnsolicitedFrame {
 /// read's record.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct ExchangeTrace {
+    /// The pass entries the channel got before it listened, in order
+    /// (ADR-0043): accepted ones, and the refused one that ended the open.
+    pub receive_filters: Vec<ReceiveFilterEntry>,
     /// Outbound records acknowledged.
     pub transmits: u32,
     pub last_acknowledgement: Option<TransmitAcknowledgement>,
@@ -80,6 +129,10 @@ pub struct ExchangeTrace {
     /// `cIndication` records, and the last of them.
     pub indications: u32,
     pub last_indication: Option<UnsolicitedFrame>,
+    /// The same indications counted by their status word (ADR-0043,
+    /// decision 5), so a lost-frame word (`0x119` iMsgRxQueueOvflw) shows
+    /// even when the last indication is a completed transmit.
+    pub indications_by_status: BTreeMap<Option<u32>, u32>,
     /// Command-class frames that were not the answer awaited, and the last.
     pub stale_frames: u32,
     pub last_stale_frame: Option<UnsolicitedFrame>,
@@ -96,11 +149,22 @@ pub struct ExchangeTrace {
 impl fmt::Display for ExchangeTrace {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut parts: Vec<String> = Vec::new();
+        if !self.receive_filters.is_empty() {
+            parts.push(format!(
+                "receive filter {}",
+                self.receive_filters
+                    .iter()
+                    .map(ToString::to_string)
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            ));
+        }
         match &self.last_acknowledgement {
             Some(acknowledgement) => {
                 let mut text = format!(
-                    "transmit acknowledged with status {:#010X} after {} ms",
-                    acknowledgement.status, acknowledgement.waited_ms
+                    "transmit acknowledged with status {} after {} ms",
+                    status_words(acknowledgement.status),
+                    acknowledgement.waited_ms
                 );
                 if !acknowledgement.message.is_empty() {
                     text.push_str(": ");
@@ -115,10 +179,26 @@ impl fmt::Display for ExchangeTrace {
         }
         parts.push(format!("{} inbound frames", self.inbound_frames));
         if let Some(indication) = &self.last_indication {
-            parts.push(format!(
-                "{} indication(s), last {indication}",
-                self.indications
-            ));
+            let by_status = self
+                .indications_by_status
+                .iter()
+                .map(|(status, count)| match status {
+                    Some(status) => format!("{count} with {}", status_words(*status)),
+                    None => format!("{count} with no status word"),
+                })
+                .collect::<Vec<_>>()
+                .join(", ");
+            if by_status.is_empty() {
+                parts.push(format!(
+                    "{} indication(s), last {indication}",
+                    self.indications
+                ));
+            } else {
+                parts.push(format!(
+                    "{} indication(s), {by_status}, last {indication}",
+                    self.indications
+                ));
+            }
         }
         if let Some(stale) = &self.last_stale_frame {
             parts.push(format!(
@@ -713,6 +793,11 @@ impl<T: ByteTransport> MongooseJlrDevice<T> {
 
     fn record_indication(&mut self, frame: UnsolicitedFrame) {
         self.trace.indications += 1;
+        *self
+            .trace
+            .indications_by_status
+            .entry(frame.status)
+            .or_default() += 1;
         self.trace.last_indication = Some(frame);
     }
 
@@ -780,22 +865,59 @@ impl<T: ByteTransport> MongooseJlrDevice<T> {
 
         let pin_sequence = self.sequences.allocate();
         let set_pin_request = passive::set_pin_request(pin_sequence, channel, opened.route);
-        match self.command_exchange(
+        if let Err(error) = self.command_exchange(
             &set_pin_request,
             passive::SET_PIN_RESPONSE,
             pin_sequence,
             COMMAND_READ_TIMEOUT,
             |frame| passive::parse_set_pin_response(frame, pin_sequence, channel),
         ) {
-            Ok(_) => {
-                self.open_route = Some(opened);
-                Ok(opened)
-            }
-            Err(error) => {
-                let _ = self.close_channel(channel);
-                Err(error)
+            let _ = self.close_channel(channel);
+            return Err(error);
+        }
+        // Without a pass entry the firmware hands the host nothing from the
+        // channel (ADR-0043); a refused entry closes it rather than leaving a
+        // read to time out on a channel that cannot be heard.
+        if let Err(error) = self.add_pass_entries(channel) {
+            let _ = self.close_channel(channel);
+            return Err(error);
+        }
+        self.open_route = Some(opened);
+        Ok(opened)
+    }
+
+    /// The pass entries every CAN channel gets after its pins (ADR-0043,
+    /// decisions 1, 4 and 5): one per identifier format, each recorded in the
+    /// trace as the firmware answered it. Status zero with no words is
+    /// accepted; anything else ends the open with the firmware's words.
+    fn add_pass_entries(&mut self, channel: u16) -> Result<(), ProtocolError> {
+        for &format in passive::PASS_ENTRY_FORMATS {
+            let sequence = self.sequences.allocate();
+            let request = passive::pass_everything_entry_request(sequence, channel, format);
+            let answer = self.command_exchange(
+                &request,
+                passive::TABLE_ADD_ENTRY_RESPONSE,
+                sequence,
+                COMMAND_READ_TIMEOUT,
+                |frame| passive::parse_table_entry_answer(frame, sequence, channel),
+            )?;
+            let entry = ReceiveFilterEntry {
+                format,
+                status: answer.status,
+                message: answer.message,
+                word: answer.word,
+            };
+            let accepted = entry.accepted();
+            self.trace.receive_filters.push(entry.clone());
+            if !accepted {
+                return Err(ProtocolError::ReceiveFilterRefused {
+                    format: format_words(format),
+                    status: entry.status,
+                    message: entry.message,
+                });
             }
         }
+        Ok(())
     }
 
     fn execute_calibration_inner(
@@ -999,10 +1121,42 @@ mod tests {
     use crate::codec::encode_board_info_response;
     use crate::passive::{
         command_response, command_response_with_text, inbound_can_frame, indication,
-        outbound_acknowledgement, CAN1_RESOURCE_ROUTE, CAN2_RESOURCE_ROUTE, CLOSE_CHANNEL_RESPONSE,
-        DEVICE_ROUTE, JUMP_TO_FIRMWARE_RESPONSE, OPEN_CHANNEL_RESPONSE, OUTBOUND_DATA_RESPONSE,
-        SET_PIN_RESPONSE, TRANSMIT_ACKNOWLEDGED_STATUS,
+        outbound_acknowledgement, pass_everything_entry_request, table_entry_accepted,
+        CAN1_RESOURCE_ROUTE, CAN2_RESOURCE_ROUTE, CLOSE_CHANNEL_RESPONSE, DEVICE_ROUTE,
+        JUMP_TO_FIRMWARE_RESPONSE, OPEN_CHANNEL_RESPONSE, OUTBOUND_DATA_RESPONSE,
+        PASS_ENTRY_FORMATS, SET_PIN_RESPONSE, TABLE_ADD_ENTRY_RESPONSE,
+        TRANSMIT_ACKNOWLEDGED_STATUS,
     };
+
+    /// The pass entries every CAN open adds after its pins (ADR-0043). The
+    /// scripts count with it, so they hold whichever formats the gate keeps.
+    const ENTRIES: u16 = PASS_ENTRY_FORMATS.len() as u16;
+    const E: usize = PASS_ENTRY_FORMATS.len();
+    /// The first sequence after the first open's board-info, open, pins and
+    /// entries.
+    const NEXT: u16 = 4 + ENTRIES;
+
+    /// The firmware's answers to one open's pass entries, the first at
+    /// sequence `first`, as the bare adapter gave them on 2026-11-14.
+    fn entries_accepted(channel: u16, first: u16) -> Vec<Vec<u8>> {
+        (0..ENTRIES)
+            .map(|index| {
+                table_entry_accepted(
+                    channel,
+                    first + index,
+                    0x50 + u32::from(index),
+                    0x04CC + u32::from(index),
+                )
+            })
+            .collect()
+    }
+
+    fn entry_steps(channel: u16, first: u16) -> Vec<Step> {
+        entries_accepted(channel, first)
+            .into_iter()
+            .map(Step::Bytes)
+            .collect()
+    }
 
     /// Board-info as the running firmware answers it: a non-zero tick at
     /// body offset 4. The first exchange of every route open.
@@ -1097,14 +1251,16 @@ mod tests {
         }
     }
 
-    /// Board-info, open and pins for one channel, as the firmware answers
-    /// them: the start of every operation's script.
+    /// Board-info, open, pins and the pass entries for one channel, as the
+    /// firmware answers them: the start of every operation's script.
     fn opened(channel: u16) -> Vec<Step> {
-        vec![
+        let mut steps = vec![
             Step::Bytes(firmware_board_info(1)),
             Step::Bytes(command_response(channel, OPEN_CHANNEL_RESPONSE, 2, 0)),
             Step::Bytes(command_response(channel, SET_PIN_RESPONSE, 3, 0)),
-        ]
+        ];
+        steps.extend(entry_steps(channel, 4));
+        steps
     }
 
     #[test]
@@ -1219,30 +1375,31 @@ mod tests {
     fn a_close_the_adapter_does_not_answer_releases_the_route_and_is_retried_before_the_next_open()
     {
         let mut steps = opened(CAN1_RESOURCE_ROUTE);
-        // The close (sequence 4) is not answered: a silence ends at the
+        // The close (sequence NEXT) is not answered: a silence ends at the
         // close's own write, so a second one keeps the adapter quiet until
         // the next command is written.
         steps.push(Step::Silent);
         steps.push(Step::Silent);
-        // The stale channel's close before the next open (sequence 5).
+        // The stale channel's close before the next open.
         steps.push(Step::Bytes(command_response(
             CAN1_RESOURCE_ROUTE,
             CLOSE_CHANNEL_RESPONSE,
-            5,
+            NEXT + 1,
             0,
         )));
         steps.push(Step::Bytes(command_response(
             CAN2_RESOURCE_ROUTE,
             OPEN_CHANNEL_RESPONSE,
-            6,
+            NEXT + 2,
             0,
         )));
         steps.push(Step::Bytes(command_response(
             CAN2_RESOURCE_ROUTE,
             SET_PIN_RESPONSE,
-            7,
+            NEXT + 3,
             0,
         )));
+        steps.extend(entry_steps(CAN2_RESOURCE_ROUTE, NEXT + 4));
         let (transport, state) = MockTransport::scripted(steps);
         let mut device = MongooseJlrDevice::open(transport);
 
@@ -1266,11 +1423,12 @@ mod tests {
             "a new operation starts with a clean trace"
         );
         let writes = &state.lock().unwrap().writes;
-        // Board-info, open, pins, the close that failed, the stale close, open, pins.
-        assert_eq!(writes.len(), 7);
+        // Board-info, open, pins, entries, the close that failed, the stale
+        // close, open, pins, entries.
+        assert_eq!(writes.len(), 7 + 2 * E);
         assert_eq!(
-            writes[4],
-            passive::close_channel_request(5, CAN1_RESOURCE_ROUTE),
+            writes[4 + E],
+            passive::close_channel_request(NEXT + 1, CAN1_RESOURCE_ROUTE),
             "the stale channel is closed before a new one is opened"
         );
     }
@@ -1283,7 +1441,7 @@ mod tests {
         steps.push(Step::Bytes(command_response(
             CAN1_RESOURCE_ROUTE,
             CLOSE_CHANNEL_RESPONSE,
-            4,
+            NEXT,
             0,
         )));
         let (transport, state) = MockTransport::scripted(steps);
@@ -1294,21 +1452,29 @@ mod tests {
 
         assert!(device.open_route.is_none());
         let state = state.lock().unwrap();
-        assert_eq!(state.writes.len(), 4, "board-info, open, pins, close");
+        assert_eq!(
+            state.writes.len(),
+            4 + E,
+            "board-info, open, pins, entries, close"
+        );
         assert_eq!(state.closes, 1);
     }
 
     #[test]
     fn passive_open_receive_close_and_reopen_are_production_path() {
-        let responses = vec![
+        let mut responses = vec![
             firmware_board_info(1),
             command_response(CAN1_RESOURCE_ROUTE, OPEN_CHANNEL_RESPONSE, 2, 0),
             command_response(CAN1_RESOURCE_ROUTE, SET_PIN_RESPONSE, 3, 0),
-            inbound_can_frame(CAN1_RESOURCE_ROUTE, 0, 1234, 0x321, &[1, 2, 3]),
-            command_response(CAN1_RESOURCE_ROUTE, CLOSE_CHANNEL_RESPONSE, 4, 0),
-            command_response(CAN2_RESOURCE_ROUTE, OPEN_CHANNEL_RESPONSE, 5, 0),
-            command_response(CAN2_RESOURCE_ROUTE, SET_PIN_RESPONSE, 6, 0),
         ];
+        responses.extend(entries_accepted(CAN1_RESOURCE_ROUTE, 4));
+        responses.extend([
+            inbound_can_frame(CAN1_RESOURCE_ROUTE, 0, 1234, 0x321, &[1, 2, 3]),
+            command_response(CAN1_RESOURCE_ROUTE, CLOSE_CHANNEL_RESPONSE, NEXT, 0),
+            command_response(CAN2_RESOURCE_ROUTE, OPEN_CHANNEL_RESPONSE, NEXT + 1, 0),
+            command_response(CAN2_RESOURCE_ROUTE, SET_PIN_RESPONSE, NEXT + 2, 0),
+        ]);
+        responses.extend(entries_accepted(CAN2_RESOURCE_ROUTE, NEXT + 3));
         let (transport, state) = MockTransport::new(responses);
         let mut device = MongooseJlrDevice::open(transport);
 
@@ -1326,23 +1492,24 @@ mod tests {
         let reopened = device.open_receive_route(VehicleRouteId::MsCan).unwrap();
         assert_eq!(reopened.device_channel_id, CAN2_RESOURCE_ROUTE);
         let writes = &state.lock().unwrap().writes;
-        // Board-info once, then open, pins, close, open, pins.
-        assert_eq!(writes.len(), 6);
+        // Board-info once, then open, pins, entries, close, open, pins,
+        // entries.
+        assert_eq!(writes.len(), 6 + 2 * E);
         assert_eq!(&writes[0][8..10], &[0x09, 0x01]);
         assert_eq!(&writes[1][4..6], &CAN1_RESOURCE_ROUTE.to_le_bytes());
         assert_eq!(&writes[1][16..20], &0x1000_0000_u32.to_le_bytes());
         assert_eq!(&writes[1][20..24], &500_000_u32.to_le_bytes());
         assert_eq!(&writes[2][20..24], &6_u32.to_le_bytes());
         assert_eq!(&writes[2][24..28], &14_u32.to_le_bytes());
-        assert_eq!(&writes[4][4..6], &CAN2_RESOURCE_ROUTE.to_le_bytes());
-        assert_eq!(&writes[4][20..24], &125_000_u32.to_le_bytes());
-        assert_eq!(&writes[5][20..24], &3_u32.to_le_bytes());
-        assert_eq!(&writes[5][24..28], &11_u32.to_le_bytes());
+        assert_eq!(&writes[4 + E][4..6], &CAN2_RESOURCE_ROUTE.to_le_bytes());
+        assert_eq!(&writes[4 + E][20..24], &125_000_u32.to_le_bytes());
+        assert_eq!(&writes[5 + E][20..24], &3_u32.to_le_bytes());
+        assert_eq!(&writes[5 + E][24..28], &11_u32.to_le_bytes());
     }
 
     #[test]
     fn a_bootloader_answer_is_followed_by_the_firmware_jump() {
-        let responses = vec![
+        let responses: Vec<Vec<u8>> = vec![
             bootloader_board_info(1),
             command_response(DEVICE_ROUTE, JUMP_TO_FIRMWARE_RESPONSE, 2, 0),
             // The firmware is still starting: the first poll gets the
@@ -1351,12 +1518,15 @@ mod tests {
             firmware_board_info(4),
             command_response(CAN1_RESOURCE_ROUTE, OPEN_CHANNEL_RESPONSE, 5, 0),
             command_response(CAN1_RESOURCE_ROUTE, SET_PIN_RESPONSE, 6, 0),
-        ];
+        ]
+        .into_iter()
+        .chain(entries_accepted(CAN1_RESOURCE_ROUTE, 7))
+        .collect();
         let (transport, state) = MockTransport::new(responses);
         let mut device = MongooseJlrDevice::open(transport);
         device.open_receive_route(VehicleRouteId::HsCan).unwrap();
         let writes = &state.lock().unwrap().writes;
-        assert_eq!(writes.len(), 6);
+        assert_eq!(writes.len(), 6 + E);
         // The jump: device route, command word 0x0103 (wire 03 01), no body.
         assert_eq!(&writes[1][4..6], &DEVICE_ROUTE.to_le_bytes());
         assert_eq!(&writes[1][8..10], &[0x03, 0x01]);
@@ -1407,7 +1577,7 @@ mod tests {
             .unwrap_err();
         assert_eq!(
             error.to_string(),
-            "cSetPin failed with device status 0x00000206: SetPins: MongoosePro JLR board only supports CAN on pins 6 and 14"
+            "cSetPin failed with device status 0x00000206 ePinNotSupported: SetPins: MongoosePro JLR board only supports CAN on pins 6 and 14"
         );
     }
 
@@ -1420,6 +1590,9 @@ mod tests {
         let mut first_read = firmware_board_info(1);
         first_read.extend_from_slice(&open);
         first_read.extend_from_slice(&pin);
+        for entry in entries_accepted(CAN1_RESOURCE_ROUTE, 4) {
+            first_read.extend_from_slice(&entry);
+        }
         first_read.extend_from_slice(&inbound_a[..7]);
         let mut second_read = inbound_a[7..].to_vec();
         second_read.extend_from_slice(&inbound_b);
@@ -1452,7 +1625,7 @@ mod tests {
         let mut steps = opened(CAN1_RESOURCE_ROUTE);
         steps.push(Step::Bytes(outbound_acknowledgement(
             CAN1_RESOURCE_ROUTE,
-            4,
+            NEXT,
             0x07F9_6350,
         )));
         let (transport, state) = MockTransport::scripted(steps);
@@ -1489,7 +1662,7 @@ mod tests {
         steps.push(Step::Bytes(command_response_with_text(
             CAN1_RESOURCE_ROUTE,
             OUTBOUND_DATA_RESPONSE,
-            4,
+            NEXT,
             2,
             77,
             "cOutboundData: channel is not open",
@@ -1505,7 +1678,7 @@ mod tests {
             .unwrap_err();
         assert_eq!(
             error.to_string(),
-            "cOutboundData failed with device status 0x00000002: cOutboundData: channel is not open"
+            "cOutboundData failed with device status 0x00000002 eInvalidChannelId: cOutboundData: channel is not open"
         );
         let acknowledgement = device
             .exchange_trace()
@@ -1528,15 +1701,15 @@ mod tests {
         let mut steps = opened(CAN1_RESOURCE_ROUTE);
         steps.push(Step::Bytes(outbound_acknowledgement(
             CAN1_RESOURCE_ROUTE,
-            4,
+            NEXT,
             10,
         )));
         // The indication arrives while the close's answer is awaited.
-        steps.push(Step::Bytes(indication(CAN1_RESOURCE_ROUTE, 4, 0, 11)));
+        steps.push(Step::Bytes(indication(CAN1_RESOURCE_ROUTE, NEXT, 0, 11)));
         steps.push(Step::Bytes(command_response(
             CAN1_RESOURCE_ROUTE,
             CLOSE_CHANNEL_RESPONSE,
-            5,
+            NEXT + 1,
             0,
         )));
         let (transport, _) = MockTransport::scripted(steps);
@@ -1556,7 +1729,7 @@ mod tests {
             trace.last_indication,
             Some(UnsolicitedFrame {
                 command: 0x000A,
-                sequence: 4,
+                sequence: NEXT,
                 status: Some(0),
             })
         );
@@ -1571,10 +1744,10 @@ mod tests {
         let mut steps = opened(CAN1_RESOURCE_ROUTE);
         steps.push(Step::Bytes(outbound_acknowledgement(
             CAN1_RESOURCE_ROUTE,
-            4,
+            NEXT,
             10,
         )));
-        steps.push(Step::Bytes(indication(CAN1_RESOURCE_ROUTE, 4, 0, 11)));
+        steps.push(Step::Bytes(indication(CAN1_RESOURCE_ROUTE, NEXT, 0, 11)));
         steps.push(Step::Bytes(inbound_can_frame(
             CAN1_RESOURCE_ROUTE,
             0,
@@ -1613,16 +1786,16 @@ mod tests {
         // transmit's write, the second lasts until the close is written.
         steps.push(Step::Silent);
         steps.push(Step::Silent);
-        // Then, while the close (5) is awaited, the acknowledgement of 4.
+        // Then, while the close is awaited, the transmit's acknowledgement.
         steps.push(Step::Bytes(outbound_acknowledgement(
             CAN1_RESOURCE_ROUTE,
-            4,
+            NEXT,
             10,
         )));
         steps.push(Step::Bytes(command_response(
             CAN1_RESOURCE_ROUTE,
             CLOSE_CHANNEL_RESPONSE,
-            5,
+            NEXT + 1,
             0,
         )));
         let (transport, _) = MockTransport::scripted(steps);
@@ -1644,7 +1817,7 @@ mod tests {
             trace.last_stale_frame,
             Some(UnsolicitedFrame {
                 command: OUTBOUND_DATA_RESPONSE,
-                sequence: 4,
+                sequence: NEXT,
                 status: Some(TRANSMIT_ACKNOWLEDGED_STATUS),
             })
         );
@@ -1661,7 +1834,7 @@ mod tests {
         steps.push(Step::Bytes(command_response(
             CAN1_RESOURCE_ROUTE,
             CLOSE_CHANNEL_RESPONSE,
-            4,
+            NEXT,
             0,
         )));
         let (transport, state) = MockTransport::scripted(steps);
@@ -1700,7 +1873,7 @@ mod tests {
         )));
         steps.push(Step::Bytes(outbound_acknowledgement(
             CAN1_RESOURCE_ROUTE,
-            4,
+            NEXT,
             10,
         )));
         steps.push(Step::Bytes(inbound_can_frame(
@@ -1712,27 +1885,28 @@ mod tests {
         )));
         steps.push(Step::Bytes(outbound_acknowledgement(
             CAN1_RESOURCE_ROUTE,
-            5,
+            NEXT + 1,
             12,
         )));
         steps.push(Step::Bytes(command_response(
             CAN1_RESOURCE_ROUTE,
             CLOSE_CHANNEL_RESPONSE,
-            6,
+            NEXT + 2,
             0,
         )));
         steps.push(Step::Bytes(command_response(
             CAN1_RESOURCE_ROUTE,
             OPEN_CHANNEL_RESPONSE,
-            7,
+            NEXT + 3,
             0,
         )));
         steps.push(Step::Bytes(command_response(
             CAN1_RESOURCE_ROUTE,
             SET_PIN_RESPONSE,
-            8,
+            NEXT + 4,
             0,
         )));
+        steps.extend(entry_steps(CAN1_RESOURCE_ROUTE, NEXT + 5));
         steps.push(Step::Silent);
         let (transport, _) = MockTransport::scripted(steps);
         let mut device = MongooseJlrDevice::open(transport);
@@ -1802,6 +1976,20 @@ mod tests {
     #[test]
     fn the_trace_says_in_words_what_the_adapter_did() {
         let trace = ExchangeTrace {
+            receive_filters: vec![
+                ReceiveFilterEntry {
+                    format: CanIdFormat::Standard,
+                    status: 0,
+                    message: String::new(),
+                    word: Some(0x04CC),
+                },
+                ReceiveFilterEntry {
+                    format: CanIdFormat::Extended,
+                    status: 0,
+                    message: String::new(),
+                    word: Some(0x04CD),
+                },
+            ],
             transmits: 1,
             last_acknowledgement: Some(TransmitAcknowledgement {
                 status: 0x100,
@@ -1809,12 +1997,13 @@ mod tests {
                 waited_ms: 3,
             }),
             inbound_frames: 0,
-            indications: 1,
+            indications: 2,
             last_indication: Some(UnsolicitedFrame {
                 command: 0x000A,
                 sequence: 5,
-                status: Some(0),
+                status: Some(0x106),
             }),
+            indications_by_status: BTreeMap::from([(Some(0x106), 1), (Some(0x119), 1)]),
             stale_frames: 0,
             last_stale_frame: None,
             dropped_frames: 0,
@@ -1823,7 +2012,7 @@ mod tests {
         };
         assert_eq!(
             trace.to_string(),
-            "transmit acknowledged with status 0x00000100 after 3 ms; 0 inbound frames; 1 indication(s), last 0x000A sequence 5 status 0x00000000; close failed: transport read timed out"
+            "receive filter 11-bit pass 0x00000000 eSuccess (word 0x000004CC), 29-bit pass 0x00000000 eSuccess (word 0x000004CD); transmit acknowledged with status 0x00000100 eMsgQueued after 3 ms; 0 inbound frames; 2 indication(s), 1 with 0x00000106 iMsgTxDone, 1 with 0x00000119 iMsgRxQueueOvflw, last 0x000A sequence 5 status 0x00000106 iMsgTxDone; close failed: transport read timed out"
         );
         assert_eq!(
             ExchangeTrace::default().to_string(),
@@ -1847,17 +2036,20 @@ mod tests {
         let frames = isotp::segment(&response, None).unwrap();
         assert_eq!(frames.len(), 3);
 
-        let reads = vec![
+        let mut reads = vec![
             firmware_board_info(1),
             command_response(CAN1_RESOURCE_ROUTE, OPEN_CHANNEL_RESPONSE, 2, 0),
             command_response(CAN1_RESOURCE_ROUTE, SET_PIN_RESPONSE, 3, 0),
-            outbound_acknowledgement(CAN1_RESOURCE_ROUTE, 4, 10),
+        ];
+        reads.extend(entries_accepted(CAN1_RESOURCE_ROUTE, 4));
+        reads.extend([
+            outbound_acknowledgement(CAN1_RESOURCE_ROUTE, NEXT, 10),
             inbound_can_frame(CAN1_RESOURCE_ROUTE, 0, 10, 0x7e8, &frames[0]),
-            outbound_acknowledgement(CAN1_RESOURCE_ROUTE, 5, 20),
+            outbound_acknowledgement(CAN1_RESOURCE_ROUTE, NEXT + 1, 20),
             inbound_can_frame(CAN1_RESOURCE_ROUTE, 0, 20, 0x7e8, &frames[1]),
             inbound_can_frame(CAN1_RESOURCE_ROUTE, 0, 30, 0x7e8, &frames[2]),
-            command_response(CAN1_RESOURCE_ROUTE, CLOSE_CHANNEL_RESPONSE, 6, 0),
-        ];
+            command_response(CAN1_RESOURCE_ROUTE, CLOSE_CHANNEL_RESPONSE, NEXT + 2, 0),
+        ]);
         let (transport, state) = MockTransport::new(reads);
         let mut device = MongooseJlrDevice::open(transport);
         let result = device
@@ -1873,11 +2065,146 @@ mod tests {
         assert!(result.trace.close_error.is_none());
 
         let writes = &state.lock().unwrap().writes;
-        assert_eq!(writes.len(), 6);
+        assert_eq!(writes.len(), 6 + E);
         assert_eq!(&writes[1][16..20], &0_u32.to_le_bytes());
         assert_eq!(&writes[2][20..24], &6_u32.to_le_bytes());
         assert_eq!(&writes[2][24..28], &14_u32.to_le_bytes());
-        assert!(writes[3].ends_with(&[0x00, 0x00, 0x07, 0xE0, 0x02, 0x09, 0x04]));
-        assert!(writes[4].ends_with(&[0x00, 0x00, 0x07, 0xE0, 0x30, 0x00, 0x00]));
+        assert!(writes[3 + E].ends_with(&[0x00, 0x00, 0x07, 0xE0, 0x02, 0x09, 0x04]));
+        assert!(writes[4 + E].ends_with(&[0x00, 0x00, 0x07, 0xE0, 0x30, 0x00, 0x00]));
+    }
+
+    /// ADR-0043, decisions 1 and 5: after the pins, one pass entry per
+    /// identifier format, the record the bare adapter accepted; each answer
+    /// is in the trace with its word.
+    #[test]
+    fn every_can_channel_gets_its_pass_entries_after_the_pins_and_they_are_in_the_trace() {
+        let (transport, state) = MockTransport::scripted(opened(CAN2_RESOURCE_ROUTE));
+        let mut device = MongooseJlrDevice::open(transport);
+        device
+            .open_route_internal(VehicleRouteId::MsCan, false)
+            .unwrap();
+
+        let writes = &state.lock().unwrap().writes;
+        assert_eq!(writes.len(), 3 + E);
+        for (index, format) in PASS_ENTRY_FORMATS.iter().enumerate() {
+            assert_eq!(
+                writes[3 + index],
+                pass_everything_entry_request(4 + index as u16, CAN2_RESOURCE_ROUTE, *format)
+            );
+        }
+        let filters = &device.exchange_trace().receive_filters;
+        assert_eq!(filters.len(), E);
+        assert!(filters.iter().all(ReceiveFilterEntry::accepted));
+        assert_eq!(filters[0].format, CanIdFormat::Standard);
+        assert_eq!(filters[0].word, Some(0x04CC));
+    }
+
+    /// ADR-0043, decision 4: a refused entry closes the channel and ends the
+    /// open in the firmware's words — here the type sweep's own refusal.
+    #[test]
+    fn a_refused_pass_entry_closes_the_channel_and_says_so_in_the_firmware_words() {
+        let steps = vec![
+            Step::Bytes(firmware_board_info(1)),
+            Step::Bytes(command_response(
+                CAN1_RESOURCE_ROUTE,
+                OPEN_CHANNEL_RESPONSE,
+                2,
+                0,
+            )),
+            Step::Bytes(command_response(
+                CAN1_RESOURCE_ROUTE,
+                SET_PIN_RESPONSE,
+                3,
+                0,
+            )),
+            Step::Bytes(command_response_with_text(
+                CAN1_RESOURCE_ROUTE,
+                TABLE_ADD_ENTRY_RESPONSE,
+                4,
+                0x202,
+                0x03DA_1D50,
+                "FilterAdd: Invalid Filter type",
+            )),
+            Step::Bytes(command_response(
+                CAN1_RESOURCE_ROUTE,
+                CLOSE_CHANNEL_RESPONSE,
+                5,
+                0,
+            )),
+        ];
+        let (transport, state) = MockTransport::scripted(steps);
+        let mut device = MongooseJlrDevice::open(transport);
+
+        let error = device
+            .open_receive_route(VehicleRouteId::HsCan)
+            .unwrap_err();
+        assert_eq!(
+            error.to_string(),
+            "the adapter refused the receive filter (11-bit pass entry, cTableAddEntry status 0x00000202 eInvalidValue): FilterAdd: Invalid Filter type"
+        );
+        assert!(device.open_route.is_none());
+        let writes = &state.lock().unwrap().writes;
+        assert_eq!(writes.len(), 5, "board-info, open, pins, one entry, close");
+        assert_eq!(
+            writes[4],
+            passive::close_channel_request(5, CAN1_RESOURCE_ROUTE)
+        );
+        let filters = &device.exchange_trace().receive_filters;
+        assert_eq!(filters.len(), 1);
+        assert!(!filters[0].accepted());
+        assert_eq!(filters[0].status, 0x202);
+    }
+
+    /// The third real-car session's shape (2026-11-13) with the entries in
+    /// place: the transmit queued, completed, and nothing received. The
+    /// trace says all of it, the indication counted by its word.
+    #[test]
+    fn the_third_sessions_shape_with_the_entries_says_queued_completed_and_nothing_received() {
+        let mut steps = opened(CAN1_RESOURCE_ROUTE);
+        steps.push(Step::Bytes(outbound_acknowledgement(
+            CAN1_RESOURCE_ROUTE,
+            NEXT,
+            10,
+        )));
+        steps.push(Step::Bytes(indication(
+            CAN1_RESOURCE_ROUTE,
+            NEXT,
+            0x106,
+            11,
+        )));
+        steps.push(Step::Silent);
+        steps.push(Step::Bytes(command_response(
+            CAN1_RESOURCE_ROUTE,
+            CLOSE_CHANNEL_RESPONSE,
+            NEXT + 1,
+            0,
+        )));
+        let (transport, _) = MockTransport::scripted(steps);
+        let mut device = MongooseJlrDevice::open(transport);
+        device
+            .open_route_internal(VehicleRouteId::HsCan, false)
+            .unwrap();
+        device
+            .transmit_diagnostic_frame(CanId::Standard(0x7E0), &[0x02, 0x10, 0x01])
+            .unwrap();
+        assert!(device
+            .receive_frame(Duration::from_millis(5))
+            .unwrap()
+            .is_none());
+        device.close_route().unwrap();
+
+        let trace = device.exchange_trace();
+        assert_eq!(trace.receive_filters.len(), E);
+        assert_eq!(trace.inbound_frames, 0);
+        assert_eq!(
+            trace.indications_by_status,
+            BTreeMap::from([(Some(0x106), 1)])
+        );
+        let words = trace.to_string();
+        assert!(
+            words.contains("transmit acknowledged with status 0x00000100 eMsgQueued"),
+            "{words}"
+        );
+        assert!(words.contains("1 with 0x00000106 iMsgTxDone"), "{words}");
     }
 }

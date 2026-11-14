@@ -1,3 +1,4 @@
+use crate::status::status_words;
 use std::fmt;
 use transport_api::TransportError;
 
@@ -21,6 +22,15 @@ pub enum ProtocolError {
         message: String,
     },
     InvalidChannel(u16),
+    /// The firmware refused the pass entry a CAN channel gets before it
+    /// listens (ADR-0043, decision 4). Without it nothing can be heard on the
+    /// channel, so the open fails in the firmware's own words.
+    ReceiveFilterRefused {
+        /// `11-bit` or `29-bit`.
+        format: &'static str,
+        status: u32,
+        message: String,
+    },
     /// The adapter acknowledged the jump from its bootloader but its
     /// firmware never answered board-info within the start timeout.
     FirmwareNotStarted,
@@ -79,16 +89,30 @@ impl fmt::Display for ProtocolError {
                 status,
                 message,
             } => {
+                let status = status_words(*status);
                 if message.is_empty() {
-                    write!(
-                        formatter,
-                        "{operation} failed with device status {status:#010X}"
-                    )
+                    write!(formatter, "{operation} failed with device status {status}")
                 } else {
                     write!(
                         formatter,
-                        "{operation} failed with device status {status:#010X}: {message}"
+                        "{operation} failed with device status {status}: {message}"
                     )
+                }
+            }
+            Self::ReceiveFilterRefused {
+                format,
+                status,
+                message,
+            } => {
+                write!(
+                    formatter,
+                    "the adapter refused the receive filter ({format} pass entry, cTableAddEntry status {})",
+                    status_words(*status)
+                )?;
+                if message.is_empty() {
+                    Ok(())
+                } else {
+                    write!(formatter, ": {message}")
                 }
             }
             Self::InvalidChannel(channel) => {

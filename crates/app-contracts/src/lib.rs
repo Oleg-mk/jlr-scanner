@@ -223,6 +223,10 @@ pub struct AdapterTrace {
     pub transmits: u32,
     /// The status word of the last acknowledgement, as `0x00000100`.
     pub acknowledgement_status: Option<String>,
+    /// That word's name in the vendor library's table (`ADR-0043`), as
+    /// `eMsgQueued`; absent for a word the table does not have.
+    #[serde(default)]
+    pub acknowledgement_status_name: Option<String>,
     /// The firmware's words after that status, when it gave any.
     pub acknowledgement_message: Option<String>,
     /// From the write to the acknowledgement, in milliseconds.
@@ -239,6 +243,14 @@ pub struct AdapterTrace {
     pub dropped_bytes: u64,
     /// The close's failure in words, when the route's close failed.
     pub close_error: Option<String>,
+    /// The pass entries the channel got before it listened (`ADR-0043`), in
+    /// words: format, status word and name, the word the answer carried.
+    #[serde(default)]
+    pub receive_filters: Vec<String>,
+    /// The indications counted by their status word, in words
+    /// (`ADR-0043`): `45 with 0x00000106 iMsgTxDone`.
+    #[serde(default)]
+    pub indications_by_status: Vec<String>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]

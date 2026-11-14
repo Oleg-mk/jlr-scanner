@@ -291,6 +291,53 @@ for (const path of transmitRuleFiles) {
   }
 }
 
+// ADR-0043, decision 9: the filter table's one command is the pass entry.
+// `cTableAddEntry` is built in one function of passive.rs, with its subtype,
+// rule, mask and pattern fixed; nothing in the adapter crate or the bench
+// names the table's other commands, its BLOCK rule or its periodic-message
+// type, which would be a transmit the firmware repeats on its own. Test code
+// (after `#[cfg(test)]`) may write malformed entries to the bench.
+const productionPart = (source) => source.split("#[cfg(test)]")[0];
+let tableEntryBuilders = 0;
+for (const path of transmitRuleFiles) {
+  const source = productionPart(await readFile(path, "utf8"))
+    .split(String.fromCharCode(10))
+    .filter((line) => !line.trim().startsWith("//"))
+    .join(String.fromCharCode(10));
+  const builders = source.match(/command\([^;]*?\bTABLE_ADD_ENTRY\b(?!_)/g) ?? [];
+  if (builders.length > 0 && !path.replace(/\\/g, "/").endsWith("crates/mongoose-jlr/src/passive.rs")) {
+    failures.push(`${path} builds a cTableAddEntry outside passive.rs (ADR-0043)`);
+  }
+  tableEntryBuilders += builders.length;
+  for (const forbidden of [
+    /TABLE_(REMOVE|MODIFY|CLEAR)/,
+    /cTable(Remove|Modify|Clear)/,
+    /PERIODIC_(TABLE|ENTRY|MESSAGE|SUBTYPE)/,
+    /fn\s+\w*periodic\w*\s*\(/i,
+    /BLOCK_(RULE|TABLE|SUBTYPE|ENTRY)/,
+    /fn\s+\w*block\w*_entry\w*\s*\(/i,
+  ]) {
+    if (forbidden.test(source)) {
+      failures.push(`${path} names a filter-table command, rule or type outside ADR-0043`);
+    }
+  }
+}
+if (tableEntryBuilders !== 1) {
+  failures.push(`cTableAddEntry must be built exactly once, in passive.rs (found ${tableEntryBuilders}; ADR-0043)`);
+}
+const passiveSource = await readFile(new URL("crates/mongoose-jlr/src/passive.rs", root), "utf8");
+for (const required of [
+  /const PASS_TABLE_SUBTYPE: u32 = 0;/,
+  /const PASS_RULE: u8 = 1;/,
+  /const PASS_EVERYTHING_MASK: \[u8; 4\] = \[0; 4\];/,
+  /const PASS_EVERYTHING_PATTERN: \[u8; 4\] = \[0; 4\];/,
+  /pub\(crate\) fn pass_everything_entry_request\(\s*sequence: u16,\s*channel_id: u16,\s*format: CanIdFormat,?\s*\) -> Vec<u8>/,
+]) {
+  if (!required.test(passiveSource)) {
+    failures.push(`the pass entry is not the fixed record of ADR-0043 (${required})`);
+  }
+}
+
 const mongooseDeviceSource = await readFile(
   new URL("crates/mongoose-jlr/src/device.rs", root),
   "utf8",

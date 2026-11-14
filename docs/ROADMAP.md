@@ -187,10 +187,15 @@ vehicle.
   (`0x100`, eMsgQueued) and completed on the bus (`0x106`, iMsgTxDone, by
   the library's own status table, 2026-11-14) — and showed the firmware
   handing the host no frame on either bus, even to a listen-only channel.
-  The filter table entry
-  (`cTableAddEntry`) is the next work, by its own record: the vendor
-  library's builder read, the entry tried on the owner's bare adapter, then
-  a build. The first answer from a real car is still ahead.
+  The filter table's PASS entry, accepted by the owner's bare adapter on
+  2026-11-14, is on every CAN channel since `ADR-0043` (built the same day,
+  `FIXTURE_TESTED`; on the bare adapter 450 listen-only opens on both
+  buses, every entry accepted): next the installer's module read on the
+  bare adapter; then the tester's car,
+  where a listen-only capture with frames in it settles whether the entry
+  was the missing piece. If it was not, the vendor library's own session
+  on a Windows 10 machine is the next evidence. The first answer from a
+  real car is still ahead.
 - **Knowledge.** The whole SDD 169 corpus exported: 45 programme documents,
   126,706 records — addressing, buses, 15,281 identifier definitions with
   units, 93,521 fault-code descriptions. The application loads it as a data
