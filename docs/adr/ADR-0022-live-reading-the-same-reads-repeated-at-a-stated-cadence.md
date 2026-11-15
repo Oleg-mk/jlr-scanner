@@ -333,3 +333,63 @@ In the live read panel, with the dials' entries resolved by
 `dialEntries` in the controller module; tested in the interface — the seed,
 the start on the adapter's arrival, once per survey, the switch during a
 run — and nowhere on hardware.
+
+## Amendment, 2026-11-15: the identifiers SDD qualifies to the car come first, and only they start the dials
+
+- Status: **Accepted, 2026-11-15** — on the owner's word («робимо 1.2.9 за
+  твоїм планом»), the morning after the first car answered.
+
+### What the car showed
+
+The first tester's L319 of MY10, V8 petrol, 2026-11-14 (`CURRENT_STATE.md`):
+the two dials started themselves, as the amendment of 2026-09-19 says, on
+the first identifiers the survey named "Vehicle speed" and "Engine speed" —
+`0xDA02` and `0xDA48` of the PCM — and the PCM declined both, six times,
+`RequestOutOfRange`. The survey offered that PCM 104 identifiers; most come
+from SDD's module-qualified catalogue, which lists a parameter for every
+PCM of every car, and a further 5,687 bit-packed parameters SDD qualifies
+to a programme, a year and an engine had been exported as if qualified to
+the module alone (F9, corrected the same morning). SDD's own data for that
+car names twelve PCM identifiers. The interface showed all 104 alike.
+
+### What changes
+
+1. **Every readable identifier says who SDD qualified it to.** The
+   resolver marks an identifier `vehicle` when a record behind it is
+   qualified to a programme, a year marker, an engine or a sub-type — SDD's
+   own statement that this car has it — and `module` when every record
+   behind it is qualified to the module type alone. Nothing is dropped:
+   a module-wide identifier is still offered, labelled. The mark travels in
+   the survey's readable list (`ReadableIdentifierSummary.qualification`),
+   read as `module` from older session files.
+2. **The chooser offers the car's own first.** In every module's table the
+   identifiers SDD qualifies to this car come first, under their label,
+   the module-wide ones after; the module's count says how many of each;
+   *Choose these* fills the set in that order, so the sixteen places go to
+   the car's own before the catalogue's generalities.
+3. **Only the car's own start the dials.** The run of the two dials
+   (amendment of 2026-09-19) picks the speed and the engine speed among the
+   `vehicle` identifiers alone. Where none names them, the dials rest and
+   the panel says so; the person can still choose any identifier by hand.
+   A request a module may well decline is not sent unasked.
+4. **Nothing else moves.** The floor, the cap, the lock, the report, the
+   spreadsheet and the visual layer are as they were; no operation, no
+   safety class, no byte on the bus changes. The qualification is read
+   from the records' applicability as the exporter wrote it; it is
+   knowledge, not protocol.
+
+### What this does not decide
+
+Whether SDD's module-wide parameters are served by a given module is still
+a question only the module answers; the mark says what SDD states, not what
+the car does. How SDD's own runtime chooses among its catalogues is not
+documented anywhere this project has read (`docs/research/sdd/MODEL_YEAR_BREAKPOINTS.md`),
+and is not asserted here.
+
+### Validation
+
+`IMPLEMENTED` / `FIXTURE_TESTED`: the resolver marks a programme-qualified
+record `vehicle` and a module-only one `module`; the interface orders and
+labels, fills in order, starts the dials from `vehicle` alone and rests
+them where none qualifies. `VEHICLE_CONFIRMED` when the tester's next live
+run on the twelve answers.

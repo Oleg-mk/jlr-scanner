@@ -605,6 +605,13 @@ const uk: Record<string, string> = {
     "Ваші межі, зберігаються на цій машині. Норми SDD не тримає.",
   Quantities: "Величини",
   Everything: "Усе",
+  "Qualified to": "За SDD — для",
+  "this car": "цього авто",
+  "every {module}": "будь-якого {module}",
+  "{own} SDD qualifies to this car, {wide} to every {module}.":
+    "{own} SDD відносить саме до цього авто, {wide} — до будь-якого {module}.",
+  "SDD names a speed or an engine speed for this module type in general, not for this car itself, so the dials rest. Choose a parameter by hand.":
+    "Швидкість або оберти SDD називає для цього типу модуля загалом, а не для цього авто, тому стрілки стоять. Оберіть параметр вручну.",
   "Which parameters": "Які параметри",
   "Numbers with a unit — engine speed, road speed, temperatures, voltages, pressures, counters of time and distance. Addresses: {count}, in modules: {modules}.":
     "Числа з одиницею — оберти, швидкість, температури, напруги, тиски, лічильники часу й відстані. Адрес: {count}, у модулях: {modules}.",
@@ -1927,6 +1934,13 @@ const ru: Record<string, string> = {
     "Ваши пределы, хранятся на этой машине. Нормы SDD не хранит.",
   Quantities: "Величины",
   Everything: "Всё",
+  "Qualified to": "По SDD — для",
+  "this car": "этого авто",
+  "every {module}": "любого {module}",
+  "{own} SDD qualifies to this car, {wide} to every {module}.":
+    "{own} SDD относит именно к этому авто, {wide} — к любому {module}.",
+  "SDD names a speed or an engine speed for this module type in general, not for this car itself, so the dials rest. Choose a parameter by hand.":
+    "Скорость или обороты SDD называет для этого типа модуля в целом, а не для этого авто, поэтому стрелки стоят. Выберите параметр вручную.",
   "Which parameters": "Какие параметры",
   "Numbers with a unit — engine speed, road speed, temperatures, voltages, pressures, counters of time and distance. Addresses: {count}, in modules: {modules}.":
     "Числа с единицей — обороты, скорость, температуры, напряжения, давления, счётчики времени и расстояния. Адресов: {count}, в модулях: {modules}.",

@@ -98,16 +98,22 @@ function module(ecuFamily: string, identifiers: string[]): ModuleSurveyEntry {
 }
 
 /** A module whose identifiers carry the library's own parameter names, every one a quantity. */
-function namedModule(ecuFamily: string, entries: Array<[string, string]>): ModuleSurveyEntry {
+function namedModule(
+  ecuFamily: string,
+  entries: Array<[string, string] | [string, string, "vehicle" | "module"]>,
+): ModuleSurveyEntry {
   return {
     ...module(
       ecuFamily,
       entries.map(([identifier]) => identifier),
     ),
-    readableIdentifiers: entries.map(([identifier, name]) => ({
+    // SDD's own qualification to the car unless the test says otherwise
+    // (ADR-0022, amended 2026-11-15).
+    readableIdentifiers: entries.map(([identifier, name, qualification]) => ({
       identifier,
       parameters: [name],
       quantity: true,
+      qualification: qualification ?? "vehicle",
     })),
   };
 }
@@ -420,6 +426,49 @@ describe("live reading", () => {
    * comes later, the run starts without a click and the panel shows - once
    * per survey, so a run the person stopped stays stopped.
    */
+  /**
+   * ADR-0022, amended 2026-11-15: the identifiers SDD qualifies to the car
+   * come first in a module's table, the module-wide ones after, each row
+   * saying which; the dials start from the car's own alone and rest, with a
+   * word, where only a module-wide speed exists - the first tester's PCM
+   * declined exactly that pair.
+   */
+  it("puts the car's own identifiers first and starts the dials from them alone", () => {
+    const modules = [
+      namedModule("PCM", [
+        ["0xDA02", "Vehicle speed", "module"],
+        ["0xDA48", "Engine speed", "module"],
+        ["0x035A", "Barometric pressure sensor", "vehicle"],
+      ]),
+    ];
+    expect(dialEntries(modules)).toEqual({ speed: null, engine: null });
+    expect(dialEntries(modules, "any")).toEqual({
+      speed: { ecuFamily: "PCM", identifier: "0xDA02" },
+      engine: { ecuFamily: "PCM", identifier: "0xDA48" },
+    });
+    window.localStorage.setItem("prowlone.liveDashboard", "on");
+    const { container } = render(
+      <LiveReadPanel
+        snapshot={createLiveReadSnapshot()}
+        set={[]}
+        modules={modules}
+        running={false}
+        busy={false}
+        adapterReady={true}
+        {...idleHandlers}
+      />,
+    );
+    const rows = Array.from(container.querySelectorAll("tbody tr")).map((row) => row.textContent ?? "");
+    expect(rows).toHaveLength(3);
+    expect(rows[0]).toContain("0x035A");
+    expect(rows[0]).toContain("this car");
+    expect(rows[1]).toContain("0xDA02");
+    expect(rows[1]).toContain("every PCM");
+    expect(container.textContent).toContain("1 SDD qualifies to this car, 2 to every PCM.");
+    expect(container.textContent).toContain("so the dials rest");
+    window.localStorage.removeItem("prowlone.liveDashboard");
+  });
+
   it("starts the dials' run by itself once the survey names them and the adapter is there", () => {
     const modules = [
       namedModule("PCM", [

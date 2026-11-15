@@ -49,14 +49,30 @@ export interface DialEntries {
  * any module that declares the parameter under exactly that name; null
  * where the survey names none.
  */
-export function dialEntries(modules: ModuleSurveyEntry[]): DialEntries {
+/** SDD qualified this identifier to the car itself, not to the module type alone (ADR-0022, amended 2026-11-15). */
+export const isVehicleQualified = (identifier: { qualification?: string }) =>
+  identifier.qualification === "vehicle";
+
+/**
+ * The two dials' entries. By default only identifiers SDD qualifies to the
+ * car are considered (ADR-0022, amended 2026-11-15): a request the module may
+ * well decline is not sent unasked. `"any"` looks among every identifier,
+ * which is how the panel knows a module-wide speed exists when the car's own
+ * does not.
+ */
+export function dialEntries(
+  modules: ModuleSurveyEntry[],
+  scope: "vehicle" | "any" = "vehicle",
+): DialEntries {
   const ordered = [...modules].sort(
     (a, b) => Number(b.ecuFamily === "PCM") - Number(a.ecuFamily === "PCM"),
   );
   const find = (pattern: RegExp): LiveReadEntryRequest | null => {
     for (const module of ordered) {
-      const entry = module.readableIdentifiers.find((identifier) =>
-        identifier.parameters.some((name) => pattern.test(name)),
+      const entry = module.readableIdentifiers.find(
+        (identifier) =>
+          (scope === "any" || isVehicleQualified(identifier)) &&
+          identifier.parameters.some((name) => pattern.test(name)),
       );
       if (entry !== undefined) return { ecuFamily: module.ecuFamily, identifier: entry.identifier };
     }

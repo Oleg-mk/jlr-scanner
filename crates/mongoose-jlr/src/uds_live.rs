@@ -582,6 +582,7 @@ mod tests {
             parameters: Vec::new(),
             evidence: Vec::new(),
             validation_state: ValidationState::SourceBacked,
+            qualification: diagnostic_environment::ReadableQualification::Module,
         };
         prepare_read_only_transaction(
             &plan(READ_DATA_BY_IDENTIFIER_CAPABILITY, addressing, backend),
@@ -1274,6 +1275,7 @@ mod tests {
             parameters: Vec::new(),
             evidence: Vec::new(),
             validation_state: ValidationState::Unverified,
+            qualification: diagnostic_environment::ReadableQualification::Module,
         };
         let transaction = prepare_read_only_transaction(
             &DiagnosticEnvironmentResolution::Resolved(fixed),

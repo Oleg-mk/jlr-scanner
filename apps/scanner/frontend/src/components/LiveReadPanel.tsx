@@ -16,7 +16,7 @@ import { decimalsOf, withDecimals } from "../liveFormat";
 import { withUnit } from "../units";
 import { LiveChart } from "./LiveChart";
 import { LiveDashboard, type DialControl, type Odometer } from "./LiveDashboard";
-import { dialEntries } from "../useLiveReadController";
+import { dialEntries, isVehicleQualified } from "../useLiveReadController";
 import { LiveTiles } from "./LiveTiles";
 import { StatusBadge } from "./StatusBadge";
 
@@ -123,6 +123,13 @@ export function LiveReadPanel({
   // stays stopped. The caption under a dial is its switch; during a run a
   // click stops the run and starts it again with the set as it now is.
   const dials = dialEntries(modules);
+  // A speed or an engine speed SDD lists for the module type but not for
+  // this car: the dials rest rather than ask for it unasked (ADR-0022,
+  // amended 2026-11-15), and the panel says why.
+  const dialsAnywhere = dialEntries(modules, "any");
+  const dialsHeld =
+    (dials.speed === null && dialsAnywhere.speed !== null) ||
+    (dials.engine === null && dialsAnywhere.engine !== null);
   const dialList = [dials.speed, dials.engine].filter(
     (entry): entry is LiveReadEntryRequest => entry !== null,
   );
@@ -180,8 +187,14 @@ export function LiveReadPanel({
   const allCount = offered.reduce((total, module) => total + module.readableIdentifiers.length, 0);
   const anyQuantities = quantityModules > 0;
   const filtering = onlyQuantities && anyQuantities;
+  // The identifiers SDD qualifies to this car come first, the module-wide
+  // ones after, each group in the catalogue's order (ADR-0022, amended
+  // 2026-11-15); "Choose these" fills the set in that order.
   const listed = (module: ModuleSurveyEntry) =>
-    module.readableIdentifiers.filter((identifier) => !filtering || isQuantity(identifier));
+    module.readableIdentifiers
+      .filter((identifier) => !filtering || isQuantity(identifier))
+      .sort((a, b) => Number(isVehicleQualified(b)) - Number(isVehicleQualified(a)));
+  const ownCount = (module: ModuleSurveyEntry) => listed(module).filter(isVehicleQualified).length;
   // What a module's button will actually put in: the listed addresses
   // not yet chosen, as many as the set has room for. The button says
   // that number, not the module's - on the owner's X250 the PCM offers
@@ -359,12 +372,20 @@ export function LiveReadPanel({
                     )}
                   </span>
                 ) : null}
+                <span className="button-hint">
+                  {t("{own} SDD qualifies to this car, {wide} to every {module}.", {
+                    own: ownCount(module),
+                    wide: listed(module).length - ownCount(module),
+                    module: module.ecuFamily,
+                  })}
+                </span>
               </div>
               <table className="live-read-identifiers">
                 <thead>
                   <tr>
                     <th scope="col" aria-label={t("Choose")} />
                     <th scope="col">{t("Address")}</th>
+                    <th scope="col">{t("Qualified to")}</th>
                     <th scope="col">{t("Description")}</th>
                   </tr>
                 </thead>
@@ -392,6 +413,11 @@ export function LiveReadPanel({
                           <label htmlFor={id}>
                             <code>{identifier.identifier}</code>
                           </label>
+                        </td>
+                        <td className="live-read-qualified">
+                          {isVehicleQualified(identifier)
+                            ? t("this car")
+                            : t("every {module}", { module: module.ecuFamily })}
                         </td>
                         <td>
                           <label htmlFor={id}>
@@ -520,6 +546,13 @@ export function LiveReadPanel({
         </div>
       ) : null}
 
+      {dashboard && dialsHeld ? (
+        <p className="button-hint">
+          {t(
+            "SDD names a speed or an engine speed for this module type in general, not for this car itself, so the dials rest. Choose a parameter by hand.",
+          )}
+        </p>
+      ) : null}
       {dashboard && (snapshot.values.length > 0 || dials.speed !== null || dials.engine !== null) ? (
         <LiveDashboard
           values={snapshot.values}

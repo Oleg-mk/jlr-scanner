@@ -247,7 +247,9 @@ function entry([family, requestId, responseId, bus, identifier, parameter]: Row)
     identifierRead: summary,
     dtcRead: summary,
     readableIdentifiers:
-      identifier && parameter ? [{ identifier, parameters: [parameter] }] : [],
+      identifier && parameter
+        ? [{ identifier, parameters: [parameter], qualification: "vehicle" as const }]
+        : [],
     selfTests: DEMO_SELF_TESTS[family] ?? [],
     acceptedOperations: DEMO_ACCEPTED_OPERATIONS[family] ?? [],
   };

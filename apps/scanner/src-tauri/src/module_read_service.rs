@@ -594,6 +594,7 @@ mod tests {
             parameters: Vec::new(),
             evidence: Vec::new(),
             validation_state: ValidationState::SourceBacked,
+            qualification: diagnostic_environment::ReadableQualification::Module,
         };
         PreparedModuleRead {
             transaction: prepare_read_only_transaction(

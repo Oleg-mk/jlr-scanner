@@ -1209,6 +1209,20 @@ pub struct ReadableIdentifier {
     pub parameters: Vec<ReadableParameter>,
     pub evidence: Vec<PlanEvidenceTrace>,
     pub validation_state: ValidationState,
+    /// Who SDD qualified it to (ADR-0022, amended 2026-11-15).
+    pub qualification: ReadableQualification,
+}
+
+/// Who SDD qualified a readable identifier to (ADR-0022, amended 2026-11-15):
+/// `Vehicle` when a record behind it names a programme, a year marker, an
+/// engine or a sub-type — SDD's own statement that this car has it —
+/// `Module` when every record behind it names the module type alone. What
+/// the mark says is what SDD states; whether the module serves the
+/// identifier is still the module's answer.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub enum ReadableQualification {
+    Module,
+    Vehicle,
 }
 
 impl DiagnosticEnvironmentResolver {
@@ -1325,7 +1339,11 @@ impl DiagnosticEnvironmentResolver {
                 parameters: Vec::new(),
                 evidence: Vec::new(),
                 validation_state: entry.record.validation_state,
+                qualification: ReadableQualification::Module,
             });
+            if qualified_to_vehicle(&entry.record.applicability) {
+                item.qualification = ReadableQualification::Vehicle;
+            }
             let mut name_texts = BTreeMap::new();
             let mut encoding_texts = BTreeMap::new();
             if let Some(languages) = record_tail(&entry.record.id).and_then(|tail| texts.get(tail))
@@ -1350,6 +1368,18 @@ impl DiagnosticEnvironmentResolver {
         }
         found.into_values().collect()
     }
+}
+
+/// Whether SDD qualified a record to the car rather than to the module type
+/// alone (ADR-0022, amended 2026-11-15): a programme, an engine, a sub-type
+/// or a marker of its own (the year breakpoint) named in its applicability.
+fn qualified_to_vehicle(applicability: &knowledge::Applicability) -> bool {
+    let named =
+        |constraint: &DimensionConstraint| matches!(constraint, DimensionConstraint::OneOf { .. });
+    named(&applicability.vehicle_program)
+        || named(&applicability.powertrain)
+        || named(&applicability.variant)
+        || applicability.other.values().any(named)
 }
 
 /// The claim namespace prefix `sdd-ingest` writes a language pack's parameter

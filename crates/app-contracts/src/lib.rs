@@ -419,6 +419,18 @@ pub struct RouteSummary {
     pub reasons: Vec<String>,
 }
 
+/// Who SDD qualified a readable identifier to (ADR-0022, amended 2026-11-15):
+/// `Vehicle` when a record behind it names a programme, a year marker, an
+/// engine or a sub-type; `Module` when every record names the module type
+/// alone. Older session files carry no mark and read as `Module`.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum IdentifierQualification {
+    #[default]
+    Module,
+    Vehicle,
+}
+
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ReadableIdentifierSummary {
@@ -436,6 +448,10 @@ pub struct ReadableIdentifierSummary {
     /// and blocks are offered too, under "everything" (2026-09-19).
     #[serde(default)]
     pub quantity: bool,
+    /// Who SDD qualified it to: the car, or the module type alone
+    /// (ADR-0022, amended 2026-11-15).
+    #[serde(default)]
+    pub qualification: IdentifierQualification,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]

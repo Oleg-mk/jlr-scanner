@@ -82,6 +82,14 @@ export interface ReadableIdentifierSummary {
   parameterTexts?: Record<string, string[]>;
   /** The catalogue reads this one as a number with a real unit: not a state, not a raw count. */
   quantity?: boolean;
+  /**
+   * Who SDD qualified it to (ADR-0022, amended 2026-11-15): "vehicle" when a
+   * record behind it names a programme, a year marker, an engine or a
+   * sub-type - SDD's own statement that this car has it; "module" when every
+   * record names the module type alone. Absent in older session files, read
+   * as "module".
+   */
+  qualification?: "vehicle" | "module";
 }
 
 export interface ModuleSurveyEntry {

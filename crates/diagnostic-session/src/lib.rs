@@ -1722,6 +1722,14 @@ pub fn survey_vehicle(
                     ReadableIdentifierSummary {
                         identifier: format!("0x{:04X}", identifier.identifier),
                         quantity: reads_as_quantity(&identifier.parameters),
+                        qualification: match identifier.qualification {
+                            diagnostic_environment::ReadableQualification::Vehicle => {
+                                app_contracts::IdentifierQualification::Vehicle
+                            }
+                            diagnostic_environment::ReadableQualification::Module => {
+                                app_contracts::IdentifierQualification::Module
+                            }
+                        },
                         parameter_texts,
                         parameters: identifier
                             .parameters
