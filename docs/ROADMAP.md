@@ -221,8 +221,11 @@ that day.
   ReadDTCInformation answered by 28 modules of an L319 MY10 on both buses,
   seven fault codes in five of them, `VEHICLE_CONFIRMED` for those
   modules. ReadDataByIdentifier reached the PCM the same day and was
-  declined (RequestOutOfRange) for the two identifiers chosen: the module
-  answers, the identifier choice is the data's question. The F8 J1979
+  declined (RequestOutOfRange) for the two identifiers the dials chose:
+  the module answers, and the data's question was answered on 2026-11-15 —
+  the catalogue over-generalised 5,687 parameters, corrected, and the
+  chooser now tells SDD's own identifiers for the car from the module-wide
+  ones (`ADR-0022` amended). The F8 J1979
   calibration read on the X250 profile, the mileage survey, the passport,
   the configuration file and the battery read have still met only the
   bench.
@@ -279,6 +282,16 @@ the same night, before its manifest is placed in any library. 1.2.9
 carries that fix, the qualified identifiers told apart if the owner says so, and the
 tester's record of the reads only the bench has seen: configuration file,
 passports, mileage, battery, the live run on the twelve, standard OBD.
+
+Status on 2026-11-15: 1.2.9 prepared (`CURRENT_STATE.md`). The owner's rule
+for the tester — one task that closes many questions, one reinstall — so
+the build and the re-issued library travel together. Underneath, the F9
+catalogue was corrected: SDD's "Fully Qualified Bit" parameters carry their
+programme, year and engine on the parameter, and the export had read them
+as valid everywhere since 2026-09-02; the tester's PCM now offers 92
+identifiers, sixteen qualified to his car, where it offered 104 with
+diesel rows among them. `ADR-0022` amended: the qualification travels with
+every readable identifier, the car's own first, the dials from them alone.
 
 **M1 — an application a tester can use without knowing SDD (F11, size L).**
 Today the vehicle is described by typing SDD's programme name and breakpoint

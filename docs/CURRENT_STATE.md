@@ -4,7 +4,9 @@ This file records what is done. `ROADMAP.md` records what is next and why in tha
 order, including the owner-only gates. Keep both current; neither may live only
 in a chat session.
 
-Status: **2026-11-14, evening — the first answers from a car. Build 1.2.8 on the first tester's Discovery 4 (L319 MY10): frames on both buses in the listen-only captures — 20,259 in ten seconds of HS-CAN, 5,399 of MS-CAN — and 28 of 39 modules answering "Check all modules" on their own identifiers, 13 on HS-CAN and 15 on MS-CAN, with seven fault codes in five of them that the tester found to agree with SDD and his Autel on the same car. The pass entry of `ADR-0043` was the missing piece; the read path is `VEHICLE_CONFIRMED` on an L319 of MY10 for the modules that answered, and four of the nine MOST modules of `ADR-0039` answered by their own address. Eleven modules were silent — a question to the data, not a refutation; the PCM declined the two live-read identifiers the catalogue chose (RequestOutOfRange); the report intake, run that night against the tester's library, confirmed 30 reads and recorded 11 attempts, and showed one defect — the adapter's serial copied into a bus-activity note — fixed the same night, the manifest clean on re-run and placed in the export set, the owner's copy (`E108-FA14`) and the tester's (`DB0A-F4F3`), where the L319 MY10 survey now shows 39 modules reachable and no hypothesis. The file read to the end: the data cannot say which of the eleven are fitted (the CCF read and the tester's SDD can); SDD's twelve identifiers qualified to L319 MY10 V8NA are the live set for the next session; six of the seven codes have SDD's description in the index and P1806 its help screen. Next: build 1.2.9.**
+Status: **2026-11-15 — 1.2.9 prepared: every readable identifier says who SDD qualified it to, the car's own come first in the live set and alone start the dials (`ADR-0022` amended), and the catalogue underneath was corrected — 5,687 bit-packed parameters SDD qualifies to a programme, year and engine had been exported since September as enabled for every car; re-exported, the first tester's PCM offers 92 identifiers instead of 104, sixteen of them SDD's own for L319 MY10 V8NA. Both libraries issued again from the corrected export with the first captured manifest (`F6F2-80CA`, `3BE6-F4AE`). The tester gets one message: the build, the library, one session that covers the reads only the bench has seen.**
+
+Earlier — **2026-11-14, evening — the first answers from a car. Build 1.2.8 on the first tester's Discovery 4 (L319 MY10): frames on both buses in the listen-only captures — 20,259 in ten seconds of HS-CAN, 5,399 of MS-CAN — and 28 of 39 modules answering "Check all modules" on their own identifiers, 13 on HS-CAN and 15 on MS-CAN, with seven fault codes in five of them that the tester found to agree with SDD and his Autel on the same car. The pass entry of `ADR-0043` was the missing piece; the read path is `VEHICLE_CONFIRMED` on an L319 of MY10 for the modules that answered, and four of the nine MOST modules of `ADR-0039` answered by their own address. Eleven modules were silent — a question to the data, not a refutation; the PCM declined the two live-read identifiers the catalogue chose (RequestOutOfRange); the report intake, run that night against the tester's library, confirmed 30 reads and recorded 11 attempts, and showed one defect — the adapter's serial copied into a bus-activity note — fixed the same night, the manifest clean on re-run and placed in the export set, the owner's copy (`E108-FA14`) and the tester's (`DB0A-F4F3`), where the L319 MY10 survey now shows 39 modules reachable and no hypothesis. The file read to the end: the data cannot say which of the eleven are fitted (the CCF read and the tester's SDD can); SDD's twelve identifiers qualified to L319 MY10 V8NA are the live set for the next session; six of the seven codes have SDD's description in the index and P1806 its help screen. Next: build 1.2.9.**
 
 Earlier — **2026-11-14, afternoon — the pass filter on every CAN channel (`ADR-0043`), accepted and built: after its pins every channel the application opens gets the PASS entry the owner's bare adapter accepted that morning — an 11-bit and a 29-bit one, zero mask, zero pattern — recorded with the firmware's answer in every read record; a refused entry ends the open in the firmware's words; every status word is said with its name from the library's table. `IMPLEMENTED` / `FIXTURE_TESTED`, and on the owner's bare adapter 450 listen-only opens on both buses and build 1.2.8's 29 reads on diagnostic channels of both buses with every entry accepted; the tester's car is next, where frames in a listen-only capture settle whether the entry was the missing piece.** Earlier — **2026-11-14 — the firmware's status words named from the vendor library's own table (`docs/evidence/MONGOOSE_STATUS_WORDS_2026-11-14.md`): `0x100` is eMsgQueued and the `0x106` the tester's car returned after all 45 transmits of 2026-11-13 is iMsgTxDone — every frame completed on his buses, HS-CAN and MS-CAN alike, and the firmware handed no received frame to the host; the filter table entry is the next work, by its own record, and the library's own session on the owner's bench is the way to its bytes.** Earlier — **2026-11-13 — the transmit path, audited and rebuilt (`ADR-0042`): the first tester's two sessions on his Discovery 4 drew zero answers from 91 requests, and the second session file — ignition on — showed the code, not the car: the adapter's acknowledgement of every transmit (`0x8008`, status `0x100`, no text) was being taken for a refusal a few milliseconds after the write, and one frame the code did not expect then put every later command one answer behind for the whole session. The audit is `docs/evidence/TRANSMIT_PATH_AUDIT_2026-11-12.md`; the record is `ADR-0042`: the acknowledgement recorded, not judged; every answer matched by command word and sequence, indications and late answers skipped and counted; every wait with its own deadline, five seconds for the acknowledgement; what the adapter did around every read written into the read's record. Built and fixture-tested on both sessions' shapes; the gate before the tester's build is the owner's bare adapter; the first answer from a real car is still ahead.** Earlier — **2026-11-12 — builds 1.2.5 and 1.2.6: the cable on SDD's own driver (`ADR-0041`): the first tester's SDD laptop could not see his MongoosePro because SDD's package binds it to its own kernel driver and the application listed COM ports only; a second Windows transport opens that driver's device interface and the panel says which driver holds the cable — hardware-confirmed on the first tester's SDD laptop the same day (his Windows 10 Toughbook loads the driver; the owner's Windows 11 refuses it outright). His first session reached his Discovery 4 and drew no answer — read that day as the bus not acknowledging, which the next day's audit corrected: the code abandoned each request on the adapter's acknowledgement — and a close the adapter did not answer then blocked the session, fixed in 1.2.6 with the report defects his document showed.** Earlier — **2026-11-08 — build 1.2.4: the library is read one manifest at a time, and a 32-bit Windows installer joins the 64-bit one (`ADR-0040`), for the first tester from the forum, whose workshop laptop runs 32-bit Windows 10; his copy is cut to the Discovery 4 in English.** Earlier — **2026-10-12 — the testers' line is 1.2.x (`ADR-0036`, decision 8 amended at the owner's word).** No report has come from the club since September and the owner's car is not a test car, so he looks for testers beyond the club and gives them the current build, the service mode included, with his warning that a write to the car is at the tester's own risk; the tester guide describes the mode. Earlier — **2026-10-03 — the parameter and state names come in SDD's own Russian beside the English (`ADR-0034`, amended before the code), joined by the structure both language packs share, and the library is re-issued for it: `2AFF-199F`, 533,208 records.** Under the switch the help already follows, a Ukrainian or Russian reader sees SDD's own Russian name for a parameter and a decoded state where we have no wording of our own; nothing new is drawn. Later the same day the passport, mileage and battery rows followed: the mileage from the catalogue's twins; the battery through a twin the platform adapter writes from the Russian name the exporter joins to the formatting row by structure, since the platform document has no Russian of its own; the passport with none to show, because SDD names the identification identifiers in the platform document alone, in English — our own wording stands there, and nothing is invented. The library is re-issued again: `0807-B35C`, 533,775 records, 38 battery rows named in Russian. Build 1.2.2 carries the Mac fix of 2026-10-01 and all of this — the third build of stage 2, to the owner alone; build 1.2.3, the same evening, adds the header lamp beating as his own car's Start/Stop button does, measured from his video, and replaces 1.2.2 on his desk. Earlier — **2026-10-01 — the macOS build found the MongoosePro on the owner's Intel Mac, and listed it twice.** macOS gives one USB serial adapter two port names, the call-out `/dev/cu.…` and the dial-in `/dev/tty.…`; the serial library returns both and the enumeration passed both on, so the adapter panel asked him to choose between two names of one adapter. The dial-in twin is dropped now and a Mac shows one adapter. What he reported is discovery: that the adapter connects and reads on a Mac is not yet reported. Build 1.2.1 carries the fix, with step 2 of `ADR-0036` and `ADR-0039` — the second build of stage 2, to the owner alone.
 
@@ -169,6 +171,73 @@ On 2026-11-11 the tester received the 32-bit installer's name, the
 Discovery 4 copy by a private link, the step to load it, and a request for
 whatever happens — a crash included, his being the first run of this
 product on a real 32-bit machine. Waiting for his report.
+
+## 2026-11-15 — 1.2.9: the identifiers SDD qualifies to the car, told apart, and the catalogue corrected underneath
+
+The owner's rule for the day, stated before the work («не хотів би грузити
+тестера напівзавданнями … максимально доробити тут, а йому надавати
+завдання, яке закриє не одне питання, а потім перевстановка максимум»):
+one task to the tester that closes many questions, one reinstall. So the
+library and the build travel to him together, and everything the next
+session needs is in 1.2.9.
+
+**The finding underneath.** Answering «how does SDD do it» led into the
+corpus: SDD's identifier catalogue is six documents, and the one named
+"Fully Qualified Bit DID Formatting" puts its model, year, engine and
+sub-type tests on each `<ReadParameter>`, not on the record — all 5,687
+of them. The F9 adapter read the record level alone, so those 5,687
+parameters had been exported since 2026-09-02 as enabled for every
+programme and engine; the module-qualified catalogue, qualified to the
+module type by design, added its own. That is why the first tester's V8
+petrol PCM was offered 104 identifiers with glow-plug duty and particulate
+filter pressure among them, and why the two dials asked it for `0xDA02`
+and `0xDA48`. Corrected in `did.rs` the same morning: each parameter's own
+tests join the record's, a contradiction between them is refused as every
+widening is, the synthetic fixture carries the shape, F9 records it.
+Re-exported from the twelve roots: 533,775 records, as before; the bit
+records now qualified; the L319 English cut falls from 118,743 to 113,447
+records, and the tester's PCM from 104 readable identifiers to 92, sixteen
+of them qualified by SDD to L319 MY10 V8NA (the twelve of yesterday, plus
+`0xDD06` power mode, `0xF403` calculated load, `0xF434`/`0xF438` lambda).
+
+**`ADR-0022` amended, at the owner's word («робимо 1.2.9 за твоїм
+планом»).** Every readable identifier now says who SDD qualified it to:
+`vehicle` when a record behind it names a programme, a year marker, an
+engine or a sub-type; `module` when every record names the module type
+alone (`ReadableIdentifierSummary.qualification`, read as `module` from
+older session files). The chooser lists the car's own first in every
+module's table, each row labelled «this car» or «every PCM», the module's
+count split in two, *Choose these* filling the set in that order; the two
+dials start from the car's own alone and rest, with a sentence saying why,
+where only a module-wide speed exists — the first tester's pair exactly.
+Nothing on the bus changes. `IMPLEMENTED` / `FIXTURE_TESTED`: the
+resolver's mark from the records' applicability, the interface's order,
+labels, counts and the dials' gate (153 frontend tests, the workspace,
+clippy, the formatting and the guard clean).
+
+**How SDD itself chooses among its catalogues** is not written anywhere
+this project has read (`docs/research/sdd/MODEL_YEAR_BREAKPOINTS.md`); the
+mark says what SDD states for the car, not what SDD's screen would show,
+and the tester's SDD datalogger, opened on his PCM, is the only check.
+
+**The libraries, issued again** from the corrected export, the first
+captured manifest among the bundles of each: the owner's, code
+`F6F2-80CA`, 365 days, at `Desktop\prowlone-library-Oleg-F6F2-80CA`;
+the tester's L319 English cut, code `3BE6-F4AE`, 90 days, zipped beside
+yesterday's. Both check as the application loads them; the L319 MY10
+survey shows 39 modules reachable and no hypothesis on both. Yesterday's
+`E108-FA14` and `DB0A-F4F3` were never handed out and are superseded.
+
+**Build 1.2.9** carries the amendment and the intake fix of 2026-11-14;
+the library it is handed out with carries the corrected catalogue.
+What the tester is asked, in one message with the installer and the
+library: install 1.2.9 over 1.2.8, point it at the new library folder,
+and with the ignition on run the car configuration read, the module
+passports, the mileage survey, the battery, "Check all modules", a live
+run of the sixteen the panel now lists first for the PCM, and the standard
+OBD read; then save the session file. Two questions beside it: which
+modules his SDD lists on the car (the eleven silent ones), and how many
+rows SDD's datalogger shows for the PCM.
 
 ## 2026-11-14, evening — the first answers from a car
 
