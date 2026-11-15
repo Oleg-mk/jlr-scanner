@@ -200,9 +200,18 @@ impl DidFormattingAdapter {
             .and_then(|value| value.parse::<i64>().ok())
             .filter(|size| *size > 0);
 
-        let applicability = match child_element(properties, "enable") {
-            Some(enable) => applicability_from_enable(enable, keyed_id, self.timeline.as_ref())?,
-            None => Applicability::default(),
+        // SDD qualifies a record in one of two places: the "Fully Qualified"
+        // catalogue tests model, year and engine on the <KeyedData>, the
+        // "Fully Qualified Bit" catalogue tests only the module there and
+        // puts model, year and engine on each <ReadParameter>. Both are read:
+        // the record's tests are collected here and each parameter's own are
+        // added to them below. Until 2026-11-15 the parameter's were skipped,
+        // and 5,687 bit-packed parameters of the real corpus were exported as
+        // enabled for every programme and engine.
+        let keyed_enable = child_element(properties, "enable");
+        let keyed_tests = match keyed_enable {
+            Some(enable) => enable_tests(enable, keyed_id, &BTreeMap::new())?,
+            None => BTreeMap::new(),
         };
 
         let keyed_slug = slugify(keyed_id, "KeyedData id")?;
@@ -238,6 +247,19 @@ impl DidFormattingAdapter {
                 .and_then(|shortcut| shortcut.attribute("id"))
                 .map(str::trim)
                 .filter(|value| !value.is_empty());
+            let parameter_enable = child_element(parameter, "Properties")
+                .and_then(|properties| child_element(properties, "enable"));
+            let applicability = match (keyed_enable, parameter_enable) {
+                (None, None) => Applicability::default(),
+                (_, Some(enable)) => {
+                    let scope = format!("{keyed_id}'/ReadParameter '{parameter_id}");
+                    let tests = enable_tests(enable, &scope, &keyed_tests)?;
+                    applicability_from_tests(&tests, &scope, self.timeline.as_ref())?
+                }
+                (Some(_), None) => {
+                    applicability_from_tests(&keyed_tests, keyed_id, self.timeline.as_ref())?
+                }
+            };
 
             let record_id = format!(
                 "{}.did.{keyed_slug}.p{}",
@@ -393,23 +415,21 @@ fn escape_state_name(name: &str) -> String {
         .replace('=', "%3D")
 }
 
-/// Build applicability from an SDD `enable` expression.
+/// The string equality tests of an SDD `enable` expression, by tactic, added
+/// to the tests already in force (`inherited`: the record's, when the
+/// expression is a parameter's).
 ///
 /// Only a conjunction of string equality tests is understood. Any other
 /// operator or an unrecognised tactic is rejected, because silently ignoring a
-/// qualification would widen applicability beyond what the source states.
-fn applicability_from_enable(
+/// qualification would widen applicability beyond what the source states. A
+/// tactic tested twice with different values is rejected for the same reason:
+/// the source would be contradicting itself, and either reading widens it.
+fn enable_tests(
     enable: roxmltree::Node<'_, '_>,
     keyed_id: &str,
-    timeline: Option<&ModelYearTimeline>,
-) -> Result<Applicability, KnowledgeError> {
-    let mut applicability = qualified_applicability();
-    let mut module = None;
-    let mut model = None;
-    let mut powertrain = None;
-    let mut variant = None;
-    let mut breakpoint = None;
-
+    inherited: &BTreeMap<&'static str, String>,
+) -> Result<BTreeMap<&'static str, String>, KnowledgeError> {
+    let mut tests = inherited.clone();
     for node in enable.descendants().filter(|node| node.is_element()) {
         match node.tag_name().name() {
             "OR" | "NOT" | "XOR" => {
@@ -427,31 +447,48 @@ fn applicability_from_enable(
                             "tactic '{tactic}' of '{keyed_id}' has no comparison value"
                         ))
                     })?;
-                let slot = match tactic {
-                    "module" => &mut module,
-                    "model" => &mut model,
-                    "type" => &mut powertrain,
-                    "subType" => &mut variant,
-                    "year" => &mut breakpoint,
+                let tactic: &'static str = match tactic {
+                    "module" => "module",
+                    "model" => "model",
+                    "type" => "type",
+                    "subType" => "subType",
+                    "year" => "year",
                     other => {
                         return Err(KnowledgeError::Parse(format!(
                         "<KeyedData id='{keyed_id}'> uses an unrecognised qualification '{other}'"
                     )))
                     }
                 };
-                match slot {
-                    Some(existing) if existing == &value => {}
+                match tests.get(tactic) {
+                    Some(existing) if existing == value => {}
                     Some(_) => {
                         return Err(KnowledgeError::Parse(format!(
                             "<KeyedData id='{keyed_id}'> qualifies '{tactic}' twice with different values"
                         )))
                     }
-                    None => *slot = Some(value),
+                    None => {
+                        tests.insert(tactic, value.to_string());
+                    }
                 }
             }
             _ => {}
         }
     }
+    Ok(tests)
+}
+
+/// Applicability from the tests in force on a record or a parameter.
+fn applicability_from_tests(
+    tests: &BTreeMap<&'static str, String>,
+    keyed_id: &str,
+    timeline: Option<&ModelYearTimeline>,
+) -> Result<Applicability, KnowledgeError> {
+    let mut applicability = qualified_applicability();
+    let module = tests.get("module");
+    let model = tests.get("model");
+    let powertrain = tests.get("type");
+    let variant = tests.get("subType");
+    let breakpoint = tests.get("year");
 
     if let Some(value) = module {
         applicability.ecu_family = DimensionConstraint::one_of([value.to_string()])?;
@@ -484,7 +521,9 @@ fn applicability_from_enable(
     if breakpoint.is_none() {
         applicability.model_year = YearConstraint::Any;
     }
-    applicability.validate()?;
+    applicability
+        .validate()
+        .map_err(|error| KnowledgeError::Parse(format!("<KeyedData id='{keyed_id}'>: {error}")))?;
     Ok(applicability)
 }
 

@@ -106,6 +106,21 @@ it; see `F11_TESTER_APPLICATION.md` for what is applied and what is withheld.
 SDD qualifies a DID with a flat `AND` of string equality tests. All 3,220 fully
 qualified entries use exactly that shape, with no disjunction anywhere.
 
+**Two places, read since 2026-11-15.** The "Fully Qualified" catalogue puts
+the whole conjunction on the `<KeyedData>`; the "Fully Qualified Bit"
+catalogue tests only the module there and puts model, year, engine and
+sub-type on each `<ReadParameter>` — all 5,687 of them, in the real corpus,
+each with its own `<enable>`. Until 2026-11-15 the adapter read the
+`<KeyedData>` level alone, so those 5,687 parameters were exported as
+enabled for every programme and engine: a pedal-voltage row qualified to
+L319 MY05 V6DIESEL was offered to the PCM of every car, which is how a
+V8 petrol Discovery 4 came to be offered glow-plug duty and particulate
+filter pressure on 2026-11-14. The adapter now collects the record's tests
+and adds each parameter's own; a parameter that re-tests a tactic against
+another value is a contradiction in the source and is refused, as every
+other widening is. The module-qualified and unqualified catalogues carry no
+parameter-level tests, so their records are unchanged.
+
 | SDD tactic | Applicability dimension |
 | --- | --- |
 | `module` | `ecu_family` |

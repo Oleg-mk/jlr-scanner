@@ -699,18 +699,22 @@ fn the_catalogue_offers_the_programmes_markers_years_and_engines_the_data_is_qua
     assert_eq!(marker.marker, "MY10");
     assert_eq!(marker.model_year_from, Some(2010));
     assert_eq!(marker.model_year_to, Some(2011));
-    // The DID catalogue qualifies one entry by engine.
-    assert_eq!(programme.powertrains, vec!["SYNTHENGINE".to_string()]);
-    // One pairing per engine, empty where the data splits it into nothing.
-    assert_eq!(programme.variants_by_powertrain.len(), 1);
+    // The DID catalogue qualifies entries by two engines: the fully
+    // qualified record's SYNTHENGINE, and the bit catalogue's SYNTHDIESEL,
+    // read from a parameter's own tests since 2026-11-15.
     assert_eq!(
-        programme.variants_by_powertrain[0].powertrain,
-        "SYNTHENGINE"
+        programme.powertrains,
+        vec!["SYNTHDIESEL".to_string(), "SYNTHENGINE".to_string()]
     );
-    assert_eq!(
-        programme.variants_by_powertrain[0].variants,
-        programme.variants
-    );
+    // One pairing per engine, empty where the data splits it into nothing:
+    // the sub-type 2.7L belongs to SYNTHENGINE alone.
+    assert_eq!(programme.variants_by_powertrain.len(), 2);
+    let diesel = &programme.variants_by_powertrain[0];
+    let engine = &programme.variants_by_powertrain[1];
+    assert_eq!(diesel.powertrain, "SYNTHDIESEL");
+    assert!(diesel.variants.is_empty());
+    assert_eq!(engine.powertrain, "SYNTHENGINE");
+    assert_eq!(engine.variants, programme.variants);
     // Built-in data alone describes no vehicle.
     assert!(KnowledgeLibrary::built_in()
         .catalogue()

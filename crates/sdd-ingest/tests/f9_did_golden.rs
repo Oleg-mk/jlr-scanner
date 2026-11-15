@@ -160,6 +160,61 @@ fn qualification_maps_onto_applicability_without_inventing_a_year_range() {
     );
 }
 
+/// SDD's "Fully Qualified Bit" catalogue tests the module on the KeyedData
+/// and model, year and engine on each ReadParameter. Each parameter's own
+/// tests join the record's; two parameters of one record can therefore
+/// apply to different cars, and neither applies to every car (2026-11-15:
+/// until then the parameter's tests were skipped and 5,687 real parameters
+/// were exported as enabled everywhere).
+#[test]
+fn a_parameters_own_tests_join_the_records() {
+    let store = ingest(SourceType::Documented);
+    let first = store
+        .get_record("f9-did.did.did-0x0914-synthmod.p1")
+        .unwrap();
+    assert_eq!(
+        first.applicability.ecu_family,
+        DimensionConstraint::one_of(["SYNTHMOD".to_string()]).unwrap()
+    );
+    assert_eq!(
+        first.applicability.vehicle_program,
+        DimensionConstraint::one_of(["SYNTHA".to_string()]).unwrap()
+    );
+    assert_eq!(
+        first.applicability.powertrain,
+        DimensionConstraint::one_of(["SYNTHDIESEL".to_string()]).unwrap()
+    );
+    assert_eq!(first.applicability.variant, DimensionConstraint::Any);
+    assert_eq!(
+        first.applicability.other.get(YEAR_BREAKPOINT_DIMENSION),
+        Some(&DimensionConstraint::one_of(["MY05".to_string()]).unwrap())
+    );
+
+    let second = store
+        .get_record("f9-did.did.did-0x0914-synthmod.p2")
+        .unwrap();
+    assert_eq!(
+        second.applicability.powertrain,
+        DimensionConstraint::one_of(["SYNTHENGINE".to_string()]).unwrap()
+    );
+    assert_eq!(
+        second.applicability.variant,
+        DimensionConstraint::one_of(["2.7L".to_string()]).unwrap()
+    );
+    assert_eq!(
+        second.applicability.other.get(YEAR_BREAKPOINT_DIMENSION),
+        Some(&DimensionConstraint::one_of(["MY10".to_string()]).unwrap())
+    );
+
+    // A parameter that re-tests the module against another value contradicts
+    // its record; either reading would widen the claim, so it is refused.
+    let contradiction = FORMATTING.replace(
+        "<string2>SYNTHDIESEL</string2>",
+        "<string2>SYNTHDIESEL</string2></Properties></STRING-TEST-TACTIC><STRING-TEST-TACTIC id=\"module\"><Properties><string1/><string2>OTHERMOD</string2>",
+    );
+    assert!(reject(&contradiction).contains("twice with different values"));
+}
+
 #[test]
 fn unsupported_qualification_and_non_read_access_are_rejected() {
     // An unrecognised tactic would silently widen applicability if ignored.
@@ -232,11 +287,12 @@ fn every_parameter_is_recorded_and_ingestion_is_idempotent() {
     let second = store.ingest(&adapter, FORMATTING).unwrap();
     assert_eq!(first, second);
     // Five formatting parameters, plus the two on 0xDD01 that the mileage
-    // survey reads: the distance itself and the lamp counter beside it.
-    assert_eq!(first.record_ids.len(), 7);
+    // survey reads: the distance itself and the lamp counter beside it, plus
+    // the two parameter-qualified ones on 0x0914.
+    assert_eq!(first.record_ids.len(), 9);
 
     let all = store.query(&KnowledgeQuery::default().include_indeterminate(true));
-    assert_eq!(all.records.len(), 7);
+    assert_eq!(all.records.len(), 9);
 }
 
 /// ADR-0034, amended 2026-10-03: the same catalogue in Russian writes the

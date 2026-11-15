@@ -11,7 +11,10 @@
     * a fully qualified DID whose AND of string tests maps onto applicability,
       including a model-year breakpoint that must not become a year range;
     * a parameter whose converter is absent, which must still be recorded but
-      without an invented unit.
+      without an invented unit;
+    * a bit-catalogue DID whose KeyedData tests only the module and whose two
+      ReadParameters each carry their own model, year and engine tests, as
+      SDD's "Fully Qualified Bit" catalogue does (2026-11-15).
 -->
 <COMPONENT xmlns:xlink="http://www.w3.org/1999/xlink" langcode="en">
 <KeyedDataRecordContainer id="Synthetic DIDs">
@@ -138,6 +141,87 @@
 <ReadParameter id="1" mask="65535" lsbNumber="0" msbNumber="1">
 <Properties>
 <name><![CDATA[Synthetic fully qualified value]]></name>
+</Properties>
+<SHORTCUT id="CVT_SYNTH_VOLT" xlink:href="../Converters/CVT_SYNTH_VOLT.xml#CVT_SYNTH_VOLT"/>
+</ReadParameter>
+</KeyedData>
+
+<KeyedData id="DID 0x0914 SYNTHMOD">
+<Properties>
+<enable>
+<STRING-TEST-TACTIC id="module">
+<Properties>
+<string1 xlink:href="../snapshot.xml#ModuleId"/>
+<string2>SYNTHMOD</string2>
+</Properties>
+</STRING-TEST-TACTIC>
+</enable>
+<keySize>2324</keySize>
+<dataSize>4</dataSize>
+</Properties>
+<ReadParameter id="1" mask="65535" lsbNumber="0" msbNumber="1">
+<Properties>
+<name><![CDATA[Synthetic pedal voltage]]></name>
+<enable>
+<EXPRESSION id="enable test">
+<AND id="Row1">
+<STRING-TEST-TACTIC id="model">
+<Properties>
+<string1><VDATA-QUALIFIER id="CM_MODEL"/></string1>
+<string2>SYNTHA</string2>
+</Properties>
+</STRING-TEST-TACTIC>
+<STRING-TEST-TACTIC id="year">
+<Properties>
+<string1><VDATA-QUALIFIER id="CM_YEAR_BREAKPOINT"/></string1>
+<string2>MY05</string2>
+</Properties>
+</STRING-TEST-TACTIC>
+<STRING-TEST-TACTIC id="type">
+<Properties>
+<string1><VDATA-QUALIFIER id="CM_TYPE"/></string1>
+<string2>SYNTHDIESEL</string2>
+</Properties>
+</STRING-TEST-TACTIC>
+</AND>
+</EXPRESSION>
+</enable>
+</Properties>
+<SHORTCUT id="CVT_SYNTH_VOLT" xlink:href="../Converters/CVT_SYNTH_VOLT.xml#CVT_SYNTH_VOLT"/>
+</ReadParameter>
+<ReadParameter id="2" mask="65535" lsbNumber="0" msbNumber="1">
+<Properties>
+<name><![CDATA[Synthetic pedal voltage]]></name>
+<enable>
+<EXPRESSION id="enable test">
+<AND id="Row1">
+<STRING-TEST-TACTIC id="model">
+<Properties>
+<string1><VDATA-QUALIFIER id="CM_MODEL"/></string1>
+<string2>SYNTHA</string2>
+</Properties>
+</STRING-TEST-TACTIC>
+<STRING-TEST-TACTIC id="year">
+<Properties>
+<string1><VDATA-QUALIFIER id="CM_YEAR_BREAKPOINT"/></string1>
+<string2>MY10</string2>
+</Properties>
+</STRING-TEST-TACTIC>
+<STRING-TEST-TACTIC id="type">
+<Properties>
+<string1><VDATA-QUALIFIER id="CM_TYPE"/></string1>
+<string2>SYNTHENGINE</string2>
+</Properties>
+</STRING-TEST-TACTIC>
+<STRING-TEST-TACTIC id="subType">
+<Properties>
+<string1><VDATA-QUALIFIER id="CM_SUBTYPE"/></string1>
+<string2>2.7L</string2>
+</Properties>
+</STRING-TEST-TACTIC>
+</AND>
+</EXPRESSION>
+</enable>
 </Properties>
 <SHORTCUT id="CVT_SYNTH_VOLT" xlink:href="../Converters/CVT_SYNTH_VOLT.xml#CVT_SYNTH_VOLT"/>
 </ReadParameter>
