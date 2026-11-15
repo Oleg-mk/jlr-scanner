@@ -51,6 +51,14 @@ MOST modules of the L319, L320 and L322 of MY10 by their own address
 (`ADR-0039`), and a Mac that shows one adapter instead of its two port
 names. To the owner alone, as 1.2.0.
 
+**Publishing, decided 2026-10-12 and settled 2026-11-15.** Since 1.2.3 every
+build goes to the public repository's Releases page as a pre-release, the
+library never with it. On 2026-11-15 the owner closed the per-release
+question: the decision to publish was taken once, so a release is published
+as soon as CI has built it and its sizes and SHA-256 are recorded in
+`CURRENT_STATE.md`, without asking again. What still waits for his word is
+the release itself - the version bump.
+
 ## Scope, decided 2026-09-01
 
 The owner selected staged scope. Later stages are **declared direction, not

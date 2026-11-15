@@ -239,6 +239,23 @@ OBD read; then save the session file. Two questions beside it: which
 modules his SDD lists on the car (the eleven silent ones), and how many
 rows SDD's datalogger shows for the PCM.
 
+Build 1.2.9, the same morning, on the owner's word («Так, коміть і пуш»):
+commit 40f325b, the preflight passed on that commit before the push (its
+first run stopped on Docker Desktop not running, the second passed), tag
+`v1.2.9` pushed by name, run 43669891336, all five jobs green. Windows x64
+ProwlOne_1.2.9_x64-setup.exe, 5,921,341 bytes, SHA-256
+cf81a9754755da37f0669da1c7f03361424cdcd8dc4707150ccfc7fa9ea4bf5f; Windows x86
+ProwlOne_1.2.9_x86-setup.exe, 5,643,675 bytes, SHA-256
+206ca8589744ce37eba39bbf132bfd88283db70064470bcad121dce3aba5e4a7; macOS
+ProwlOne_1.2.9_universal.dmg, 16,080,051 bytes, SHA-256
+28bb95dc27d5c9d79f9b22251799bc4f017a7135aa47406ab059d9c36e2f9079. All three in
+`Desktop\ProwlOne-1.2.9` beside the owner's library zip `F6F2-80CA`; the
+1.2.8 folder moved to `Downloads\prowlone-superseded\ProwlOne-1.2.8`.
+Published on the Releases page as a pre-release the same morning — the
+first release published without a separate word, under the rule the owner
+set that day («публікуй кожний реліз сам після запису хешів»; `ROADMAP.md`,
+version numbers).
+
 ## 2026-11-14, evening — the first answers from a car
 
 Build 1.2.8 read a real vehicle for the first time. The tester ran it on
