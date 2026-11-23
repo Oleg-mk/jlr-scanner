@@ -27,7 +27,28 @@ export type NodeState =
   | "answered"
   | "declined"
   | "silent"
+  | "optional_silent"
+  | "needs_wakeup"
   | "failed";
+
+/**
+ * The platform document marks a module `optional` when the car may be built
+ * without it. SDD draws such a module, silent, as not fitted — neutral, not
+ * a fault — and only a silent `mandatory` one in red. `dealer` and an
+ * unstated fitment stay faults: what SDD draws for them is not known.
+ */
+export function isOptional(module: ModuleSurveyEntry): boolean {
+  return module.fitment === "optional";
+}
+
+/**
+ * SDD connects this module through another before reading it (the VIM
+ * through the BCM); this read-only stage sends no such command, so the
+ * module's silence is expected - it is fitted, not reached.
+ */
+export function needsWakeup(module: ModuleSurveyEntry): boolean {
+  return module.wake !== undefined && module.wake !== null;
+}
 
 export interface NodeStatus {
   state: NodeState;
@@ -78,6 +99,25 @@ export function nodeStatus(
   }
   if (outcome !== undefined && outcome.state === "FAILED") {
     if (outcome.error?.category === "NO_RESPONSE_FROM_ECU") {
+      if (module.wake !== undefined && module.wake !== null) {
+        return {
+          state: "needs_wakeup",
+          label: t("Not woken"),
+          detail: t(
+            "No answer. SDD connects this module through {module} ({method}) before reading it; this read-only stage sends no such command, so its silence is expected.",
+            { module: module.wake.module, method: module.wake.method },
+          ),
+        };
+      }
+      if (isOptional(module)) {
+        return {
+          state: "optional_silent",
+          label: t("Optional, not fitted?"),
+          detail: t(
+            "No answer. SDD lists this module as optional on this car, and shows it silent as not fitted rather than as a fault.",
+          ),
+        };
+      }
       return {
         state: "silent",
         label: t("No answer"),

@@ -202,6 +202,7 @@ impl BenchTransport {
             }
             passive::OUTBOUND_DATA => self.outbound(route, sequence, &body),
             passive::TABLE_ADD_ENTRY => self.table_entry(route, sequence, &body),
+            passive::GET_VALUE => self.get_value(route, sequence, &body),
             _ => self.refuse(
                 route,
                 response,
@@ -315,6 +316,32 @@ impl BenchTransport {
     /// type"; any other subtype with "CanTableAdd: Unsupported or Invalid
     /// table type". The bench takes the PASS entry alone, the only one this
     /// crate sends.
+    /// The value read of ADR-0030 (amended 2026-11-15): the rail the vehicle
+    /// on the bench reads, in millivolts, for value id 3; a refusal in the
+    /// library's words for the value the vehicle does not give, and for any
+    /// other value id.
+    fn get_value(&mut self, route: u16, sequence: u16, body: &[u8]) {
+        let value_id = passive::requested_value_id(body);
+        let millivolts = self
+            .bus
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .connector_millivolts();
+        match (value_id, millivolts) {
+            (Some(3), Some(millivolts)) if route == DEVICE_ROUTE => {
+                let tick = self.tick();
+                self.emit(passive::value_answer(sequence, tick, 3, millivolts));
+            }
+            _ => self.refuse(
+                route,
+                passive::GET_VALUE_RESPONSE,
+                sequence,
+                1,
+                "Parameter not supported by this device",
+            ),
+        }
+    }
+
     fn table_entry(&mut self, route: u16, sequence: u16, body: &[u8]) {
         if !self.channels.contains_key(&route) {
             // The bench's own words: the firmware's for this case are unknown.
@@ -637,6 +664,74 @@ mod tests {
         }));
         let device = MongooseJlrDevice::open(BenchTransport::new(bus.clone()));
         (bus, device)
+    }
+
+    /// A vehicle whose rail is the one the test names, or whose firmware
+    /// refuses the value.
+    struct Rail(Option<u32>);
+
+    impl BenchBus for Rail {
+        fn on_frame(&mut self, _route: BenchRoute, _frame: &CanFrame) -> Vec<CanFrame> {
+            Vec::new()
+        }
+
+        fn connector_millivolts(&self) -> Option<u32> {
+            self.0
+        }
+
+        fn describe(&self) -> String {
+            "a rail".into()
+        }
+    }
+
+    /// ADR-0030, amended 2026-11-15: the voltage at the connector through the
+    /// whole stack — the jump from the bootloader, the value read, the answer
+    /// in millivolts — and the operation's trace left as it was.
+    #[test]
+    fn the_connector_voltage_is_read_between_operations_and_leaves_the_trace_alone() {
+        let (_, mut device) = bench();
+        // An empty bench is an adapter with nothing on its OBD side: zero.
+        let reading = device.read_connector_voltage().unwrap();
+        assert!(reading.measured());
+        assert_eq!(reading.millivolts, Some(0));
+        assert_eq!(reading.status_name, Some("eSuccess"));
+
+        device
+            .execute_prepared_uds_read(&did_transaction(), Duration::from_millis(500))
+            .unwrap();
+        let before = device.exchange_trace().clone();
+        assert!(before.transmits > 0);
+        device.read_connector_voltage().unwrap();
+        assert_eq!(device.exchange_trace(), &before);
+
+        let mut rail =
+            MongooseJlrDevice::open(BenchTransport::new(share_bus(Box::new(Rail(Some(12_640))))));
+        assert_eq!(
+            rail.read_connector_voltage().unwrap().millivolts,
+            Some(12_640)
+        );
+    }
+
+    /// A refusal is said in the firmware's words, and no reading is made of
+    /// it; a channel held open refuses the read before anything is sent.
+    #[test]
+    fn a_refused_value_and_an_open_channel_are_said_not_guessed() {
+        let mut device =
+            MongooseJlrDevice::open(BenchTransport::new(share_bus(Box::new(Rail(None)))));
+        let refused = device.read_connector_voltage().unwrap();
+        assert!(!refused.measured());
+        assert_eq!(refused.status, 1);
+        assert_eq!(refused.message, "Parameter not supported by this device");
+        assert_eq!(refused.millivolts, None);
+
+        let (_, mut device) = bench();
+        device.open_receive_route(VehicleRouteId::HsCan).unwrap();
+        assert!(matches!(
+            device.read_connector_voltage(),
+            Err(crate::ProtocolError::ActiveRoute)
+        ));
+        device.close_route().unwrap();
+        assert!(device.read_connector_voltage().unwrap().measured());
     }
 
     #[test]

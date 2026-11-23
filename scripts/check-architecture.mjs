@@ -338,6 +338,46 @@ for (const required of [
   }
 }
 
+// ADR-0030, amended 2026-11-15, decision 3: the one value command is the
+// read of the battery voltage at the connector. `cGetValue` is built in one
+// function of passive.rs with the value id a constant 3; nothing in the
+// adapter crate or the bench names `cSetValue` (0x000B) or the programming
+// voltage, and no other value id is built.
+let valueReadBuilders = 0;
+for (const path of transmitRuleFiles) {
+  const source = productionPart(await readFile(path, "utf8"))
+    .split(String.fromCharCode(10))
+    .filter((line) => !line.trim().startsWith("//"))
+    .join(String.fromCharCode(10));
+  const builders = source.match(/\bGET_VALUE\b(?!_)\s*,/g) ?? [];
+  if (builders.length > 0 && !path.replace(/\\/g, "/").endsWith("crates/mongoose-jlr/src/passive.rs")) {
+    failures.push(`${path} builds a cGetValue outside passive.rs (ADR-0030)`);
+  }
+  valueReadBuilders += builders.length;
+  for (const forbidden of [
+    /SET_VALUE/,
+    /cSetValue/,
+    /\b0x000[bB]\b/,
+    /PROG(RAMMING)?_VOLTAGE/i,
+    /VALUE_ID\s*:\s*u32\s*=\s*(?!\s|3;)/,
+  ]) {
+    if (forbidden.test(source)) {
+      failures.push(`${path} names a value command or value outside ADR-0030 (${forbidden})`);
+    }
+  }
+}
+if (valueReadBuilders !== 1) {
+  failures.push(`cGetValue must be built exactly once, in passive.rs (found ${valueReadBuilders}; ADR-0030)`);
+}
+for (const required of [
+  /const CONNECTOR_VOLTAGE_VALUE_ID: u32 = 3;/,
+  /pub\(crate\) fn connector_voltage_request\(sequence: u16\) -> Vec<u8>/,
+]) {
+  if (!required.test(passiveSource)) {
+    failures.push(`the value read is not the fixed record of ADR-0030 (${required})`);
+  }
+}
+
 const mongooseDeviceSource = await readFile(
   new URL("crates/mongoose-jlr/src/device.rs", root),
   "utf8",
@@ -538,21 +578,30 @@ for (const file of await rustFiles(knowledgeRoot)) {
   }
 }
 
+// Knowledge never carries protocol, transport or programming code. The
+// patterns test the code, not the prose: a comment saying that VBF names
+// or flash lists are not read is the rule kept, not broken. Until
+// 2026-11-15 every pattern here was wrapped in a backspace character
+// instead of a word boundary (a tool's escaping, since the first public
+// snapshot), so the rule matched nothing and checked nothing.
 const sddIngestRoot = fileURLToPath(new URL("crates/sdd-ingest/src/", root));
 for (const file of await rustFiles(sddIngestRoot)) {
-  const source = await readFile(file, "utf8");
+  const source = (await readFile(file, "utf8"))
+    .split(String.fromCharCode(10))
+    .filter((line) => !line.trim().startsWith("//"))
+    .join(String.fromCharCode(10));
   for (const forbidden of [
-    /CanFrame/,
-    /MongooseJlr/,
-    /cOpenChannel/,
-    /send_can_frame/,
-    /send_isotp/,
-    /send_uds/,
-    /SecurityAccess/,
-    /RequestDownload/,
-    /TransferData/,
-    /vbf/i,
-    /flash/i,
+    /\bCanFrame\b/,
+    /\bMongooseJlr\b/,
+    /\bcOpenChannel\b/,
+    /\bsend_can_frame\b/,
+    /\bsend_isotp\b/,
+    /\bsend_uds\b/,
+    /\bSecurityAccess\b/,
+    /\bRequestDownload\b/,
+    /\bTransferData\b/,
+    /\bvbf\b/i,
+    /\bflash\b/i,
   ]) {
     if (forbidden.test(source)) {
       failures.push(`${file} contains protocol, transport, or firmware-programming logic`);

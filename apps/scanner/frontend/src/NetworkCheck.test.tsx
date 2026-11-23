@@ -126,6 +126,9 @@ const surveyed: ModuleSurveyEntry[] = [
 ];
 
 class SurveyingLibraryClient implements LibraryClient {
+  getGenericIdentifiers() {
+    return Promise.resolve([]);
+  }
   getLibrary(): Promise<LibrarySnapshot> {
     return Promise.resolve({ ...createLibrarySnapshot(), state: "LOADED" });
   }
@@ -316,5 +319,45 @@ describe("network check", () => {
         false,
       ),
     ).toMatchObject({ state: "declined", label: "Declined" });
+  });
+
+  it("draws a silent optional module as not fitted, and only a silent mandatory one as a fault", () => {
+    const silent = (ecuFamily: string): ModuleReadSnapshot => ({
+      ...createModuleReadSnapshot(),
+      state: "FAILED",
+      ecuFamily,
+      error: {
+        category: "NO_RESPONSE_FROM_ECU",
+        message: `No answer from ${ecuFamily}`,
+        technicalDetails: null,
+        stage: "TRANSPORT",
+      },
+    });
+    // The CCM of an L319 of MY10: optional in its platform document.
+    const ccm: ModuleSurveyEntry = { ...documented("CCM", "CAN_HS"), fitment: "optional" };
+    expect(nodeStatus(ccm, silent("CCM"), false)).toMatchObject({
+      state: "optional_silent",
+      label: "Optional, not fitted?",
+    });
+    // The BCM of the same car: mandatory, so its silence stays a fault.
+    const bcm: ModuleSurveyEntry = { ...documented("BCM", "CAN_HS"), fitment: "mandatory" };
+    expect(nodeStatus(bcm, silent("BCM"), false)).toMatchObject({ state: "silent", label: "No answer" });
+    // A library issued before the fitment was exported, or a `dealer`
+    // module: what SDD draws is not known, so the silence stays a fault.
+    expect(nodeStatus(documented("RBM", "CAN_HS"), silent("RBM"), false).state).toBe("silent");
+    const dealer: ModuleSurveyEntry = { ...documented("RBM", "CAN_HS"), fitment: "dealer" };
+    expect(nodeStatus(dealer, silent("RBM"), false).state).toBe("silent");
+    // The VIM of the same car: optional too, but SDD connects it through
+    // the BCM before reading it, and this stage does not - so its silence
+    // is expected, not "not fitted" and not a fault.
+    const vim: ModuleSurveyEntry = {
+      ...documented("VIM", "CAN_HS"),
+      fitment: "optional",
+      wake: { module: "BCM_SYSTEM_A", method: "VIM_CONNECT_01" },
+    };
+    const status = nodeStatus(vim, silent("VIM"), false);
+    expect(status.state).toBe("needs_wakeup");
+    expect(status.detail).toContain("BCM_SYSTEM_A");
+    expect(status.detail).toContain("VIM_CONNECT_01");
   });
 });

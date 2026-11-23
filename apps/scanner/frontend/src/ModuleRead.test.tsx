@@ -170,6 +170,9 @@ const surveyed: ModuleSurveyEntry[] = [
 ];
 
 class SurveyingLibraryClient implements LibraryClient {
+  getGenericIdentifiers() {
+    return Promise.resolve([]);
+  }
   getLibrary(): Promise<LibrarySnapshot> {
     return Promise.resolve({ ...createLibrarySnapshot(), state: "LOADED" });
   }

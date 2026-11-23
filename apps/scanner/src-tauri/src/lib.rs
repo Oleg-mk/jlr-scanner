@@ -17,15 +17,18 @@ mod session_report_service;
 mod session_service;
 mod standard_obd_service;
 
-use adapter_service::{lock_service, shared_service, SharedAdapterService};
+use adapter_service::{
+    lock_service, shared_service, SharedAdapterService, CONNECTOR_VOLTAGE_UNSUPPORTED,
+};
 use app_contracts::{
-    AdapterSnapshot, AdapterState, BatteryReadRequest, BatteryReadSnapshot, CaptureSnapshot,
-    CcfReadRequest, CcfReadSnapshot, DiagnosticError, DiagnosticSnapshot, DtcClearRequest,
-    DtcClearSnapshot, DtcClearState, LibrarySnapshot, LiveReadRequest, LiveReadSnapshot,
-    MileageSurveyRequest, MileageSurveySnapshot, ModulePassportRequest, ModulePassportSnapshot,
-    ModuleReadKind, ModuleReadRequest, ModuleReadSnapshot, ModuleReadState, RoutineRunRequest,
-    RoutineRunSnapshot, SessionReportSnapshot, StandardObdRequest, StandardObdSnapshot,
-    VehicleCatalogueSnapshot, VehicleContextInput, VehicleSurveySnapshot, VinDecodeSnapshot,
+    AdapterSnapshot, AdapterState, AdapterVoltageSnapshot, AdapterVoltageState, BatteryReadRequest,
+    BatteryReadSnapshot, CaptureSnapshot, CcfReadRequest, CcfReadSnapshot, DiagnosticError,
+    DiagnosticSnapshot, DtcClearRequest, DtcClearSnapshot, DtcClearState, LibrarySnapshot,
+    LiveReadRequest, LiveReadSnapshot, MileageSurveyRequest, MileageSurveySnapshot,
+    ModulePassportRequest, ModulePassportSnapshot, ModuleReadKind, ModuleReadRequest,
+    ModuleReadSnapshot, ModuleReadState, RoutineRunRequest, RoutineRunSnapshot,
+    SessionReportSnapshot, StandardObdRequest, StandardObdSnapshot, VehicleCatalogueSnapshot,
+    VehicleContextInput, VehicleSurveySnapshot, VinDecodeSnapshot,
 };
 use battery_service::{BatteryService, BATTERY_READ_TIMEOUT};
 use bench_vehicle::BenchVehicle;
@@ -43,7 +46,7 @@ use module_read_service::{
     adapter_unavailable, map_live_error, map_live_error_with_trace, ModuleReadService,
 };
 use mongoose_jlr::bench::{share_bus, SharedBenchBus};
-use mongoose_jlr::{MongooseDiagnosticError, VehicleRouteId};
+use mongoose_jlr::{status_name, MongooseDiagnosticError, VehicleRouteId};
 use passport_service::{PassportService, PASSPORT_READ_TIMEOUT};
 use routine_run_service::{RoutineDue, RoutineRunService, ROUTINE_STEP_TIMEOUT};
 use session_report_service::SessionReportService;
@@ -423,6 +426,22 @@ async fn get_vehicle_catalogue(
     Ok(lock_session(&state).catalogue())
 }
 
+/// SDD's generic identifiers (ADR-0044): the catalogue's entries qualified
+/// to no module and no car, offered to every module as SDD offers them.
+/// Knowledge, not a claim: the module declines what it does not hold.
+#[tauri::command]
+async fn get_generic_identifiers(
+    state: State<'_, SharedSessionService>,
+) -> Result<Vec<app_contracts::ReadableIdentifierSummary>, String> {
+    Ok(lock_session(&state)
+        .library()
+        .generic_identifiers()
+        .iter()
+        .cloned()
+        .map(diagnostic_session::identifier_summary)
+        .collect())
+}
+
 #[tauri::command]
 async fn decode_vin(
     state: State<'_, SharedSessionService>,
@@ -773,19 +792,57 @@ async fn save_text_file(
         Some("html") => ("Web page", "html"),
         _ => ("JSON", "json"),
     };
-    let Some(chosen) = app
+    // The dialog opens in Downloads, not wherever the last dialog was: that
+    // was the library's folder after choosing it, and a report saved there
+    // stopped the library loading (the owner, 2026-11-15).
+    let mut dialog = app
         .dialog()
         .file()
         .set_file_name(&suggested_name)
-        .add_filter(label, &[extension])
-        .blocking_save_file()
-    else {
+        .add_filter(label, &[extension]);
+    if let Some(folder) = app
+        .path()
+        .download_dir()
+        .ok()
+        .or_else(|| app.path().home_dir().ok())
+    {
+        dialog = dialog.set_directory(folder);
+    }
+    let Some(chosen) = dialog.blocking_save_file() else {
         return Ok(None);
     };
     let path = chosen.into_path().map_err(|error| error.to_string())?;
+    // Every JSON file in the library's folder is read as a manifest, and a
+    // stamped copy accepts no file it was not issued with: nothing this
+    // application writes may land there.
+    let library_folder = app
+        .state::<SharedSessionService>()
+        .inner()
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+        .library()
+        .snapshot()
+        .directory
+        .clone();
+    if let (Some(folder), Some(parent)) = (library_folder, path.parent()) {
+        if same_folder(std::path::Path::new(&folder), parent) {
+            return Err(format!(
+                "not saved: {} is the library's folder, and a file saved there stops the library loading; choose another folder, such as Downloads",
+                parent.display()
+            ));
+        }
+    }
     std::fs::write(&path, contents)
         .map_err(|error| format!("could not write {}: {error}", path.display()))?;
     Ok(Some(path.display().to_string()))
+}
+
+/// Whether two paths name the same folder, however they are spelled.
+fn same_folder(left: &std::path::Path, right: &std::path::Path) -> bool {
+    match (std::fs::canonicalize(left), std::fs::canonicalize(right)) {
+        (Ok(left), Ok(right)) => left == right,
+        _ => left == right,
+    }
 }
 
 /// Show a file the application has just written in the system's own file
@@ -2187,6 +2244,95 @@ async fn finish_ccf_read(
 // judged, and nothing is written.
 // ---------------------------------------------------------------------------
 
+/// The battery voltage at the connector, as the adapter measures it
+/// (ADR-0030, amended 2026-11-15). Between operations by construction: an
+/// operation holds the adapter's lock for its whole length, and this asks
+/// only when the lock is free, answering `BUSY` otherwise rather than
+/// waiting. Every answer the adapter gave joins the session bundle.
+#[tauri::command]
+async fn read_adapter_voltage(
+    adapter_state: State<'_, SharedAdapterService>,
+    report_state: State<'_, SharedSessionReportService>,
+) -> Result<AdapterVoltageSnapshot, String> {
+    let snapshot = read_adapter_voltage_now(adapter_state.inner());
+    if matches!(
+        snapshot.state,
+        AdapterVoltageState::Measured
+            | AdapterVoltageState::Refused
+            | AdapterVoltageState::Unsupported
+            | AdapterVoltageState::Failed
+    ) && snapshot.read_unix_ms > 0
+    {
+        if let Ok(json) = serde_json::to_string(&snapshot) {
+            let _ = lock_session_report(&report_state).add_adapter_voltage_read(&json);
+        }
+    }
+    Ok(snapshot)
+}
+
+fn read_adapter_voltage_now(adapter: &SharedAdapterService) -> AdapterVoltageSnapshot {
+    let mut service = match adapter.try_lock() {
+        Ok(service) => service,
+        Err(std::sync::TryLockError::WouldBlock) => {
+            return AdapterVoltageSnapshot {
+                state: AdapterVoltageState::Busy,
+                ..AdapterVoltageSnapshot::default()
+            }
+        }
+        Err(std::sync::TryLockError::Poisoned(poisoned)) => poisoned.into_inner(),
+    };
+    if service.connected_adapter().is_none() {
+        return AdapterVoltageSnapshot::default();
+    }
+    let synthetic = service.is_bench();
+    let read_unix_ms = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|elapsed| u64::try_from(elapsed.as_millis()).unwrap_or(u64::MAX))
+        .unwrap_or(0);
+    let words = |status: u32| {
+        (
+            format!("0x{status:08X}"),
+            status_name(status).map(str::to_string),
+        )
+    };
+    match service.read_connector_voltage() {
+        None => AdapterVoltageSnapshot::default(),
+        // Said not supported earlier on this connection: nothing asked.
+        Some(None) => AdapterVoltageSnapshot {
+            state: AdapterVoltageState::Unsupported,
+            synthetic,
+            ..AdapterVoltageSnapshot::default()
+        },
+        Some(Some(Ok(voltage))) => {
+            let (status, status_name) = words(voltage.status);
+            let state = if voltage.measured() {
+                AdapterVoltageState::Measured
+            } else if voltage.status == CONNECTOR_VOLTAGE_UNSUPPORTED {
+                AdapterVoltageState::Unsupported
+            } else {
+                AdapterVoltageState::Refused
+            };
+            AdapterVoltageSnapshot {
+                state,
+                millivolts: voltage.millivolts,
+                status: Some(status),
+                status_name,
+                message: (!voltage.message.is_empty()).then_some(voltage.message),
+                word: voltage.word.map(|word| format!("0x{word:08X}")),
+                read_unix_ms,
+                synthetic,
+            }
+        }
+        Some(Some(Err(error))) => AdapterVoltageSnapshot {
+            state: AdapterVoltageState::Failed,
+            message: Some(error.to_string()),
+            read_unix_ms,
+            synthetic,
+            ..AdapterVoltageSnapshot::default()
+        },
+    }
+}
+
 #[tauri::command]
 async fn get_battery_state(
     state: State<'_, SharedBatteryService>,
@@ -2361,6 +2507,7 @@ pub fn run() {
             survey_vehicle,
             get_vehicle_catalogue,
             decode_vin,
+            get_generic_identifiers,
             get_capture_state,
             capture_bus,
             get_capture_json,
@@ -2381,6 +2528,7 @@ pub fn run() {
             start_module_passport,
             module_passport_step,
             finish_module_passport,
+            read_adapter_voltage,
             get_battery_state,
             start_battery_read,
             battery_read_step,

@@ -45,6 +45,16 @@ pub(crate) const SET_PIN_RESPONSE: u16 = 0x8012;
 /// periodic-message type are deliberately absent.
 pub(crate) const TABLE_ADD_ENTRY: u16 = 0x000D;
 pub(crate) const TABLE_ADD_ENTRY_RESPONSE: u16 = 0x800D;
+/// `cGetValue` (ADR-0030, amended 2026-11-15): the one value command this
+/// crate sends, and only ever for the value `connector_voltage_request`
+/// names. `cSetValue` (`0x000B`) and every other value id are deliberately
+/// absent.
+pub(crate) const GET_VALUE: u16 = 0x000C;
+pub(crate) const GET_VALUE_RESPONSE: u16 = 0x800C;
+/// The battery voltage at the connector, the vendor library's `READ_VBATT`
+/// (`docs/evidence/MONGOOSE_VBATT_2026-11-15.md`): value id 3, answered in
+/// millivolts. Value id 2, the programming voltage, is never asked for.
+const CONNECTOR_VOLTAGE_VALUE_ID: u32 = 3;
 /// The filter table's PASS subtype and rule, as the vendor library's own
 /// PASS/BLOCK path writes them and the bare adapter accepted them on
 /// 2026-11-14 (`docs/evidence/mongoose-probe-2026-11-14/`).
@@ -351,6 +361,100 @@ pub(crate) fn pass_everything_entry_request(
     body.extend_from_slice(&PASS_EVERYTHING_MASK);
     body.extend_from_slice(&PASS_EVERYTHING_PATTERN);
     command(channel_id, TABLE_ADD_ENTRY, sequence, &body)
+}
+
+/// The adapter's own measurement of the battery rail at the connector, as
+/// the vendor library asks for it (ADR-0030, amended 2026-11-15): one
+/// `cGetValue` on the device route, value id 3. It opens no channel and
+/// sends nothing on a bus.
+pub(crate) fn connector_voltage_request(sequence: u16) -> Vec<u8> {
+    command(
+        DEVICE_ROUTE,
+        GET_VALUE,
+        sequence,
+        &CONNECTOR_VOLTAGE_VALUE_ID.to_le_bytes(),
+    )
+}
+
+/// The firmware's answer to a value read, as it came: the status word, the
+/// firmware's words when it gave any, the word at body +8 (its meaning is
+/// unknown) and the value at body +12, where the vendor library reads it.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct ValueAnswer {
+    pub status: u32,
+    pub message: String,
+    pub word: Option<u32>,
+    pub value: Option<u32>,
+}
+
+pub(crate) fn parse_value_answer(
+    frame: &Frame,
+    expected_sequence: u16,
+) -> Result<ValueAnswer, ProtocolError> {
+    let payload = frame.payload();
+    if payload.len() < COMMAND_HEADER_LENGTH + 4 {
+        return Err(ProtocolError::PayloadTooShort(payload.len()));
+    }
+    let actual_command = read_u16(payload, 4).expect("header length checked");
+    if actual_command != GET_VALUE_RESPONSE {
+        return Err(ProtocolError::UnexpectedCommand {
+            expected: GET_VALUE_RESPONSE,
+            actual: actual_command,
+        });
+    }
+    let actual_sequence = read_u16(payload, 6).expect("header length checked");
+    if actual_sequence != expected_sequence {
+        return Err(ProtocolError::SequenceMismatch {
+            expected: expected_sequence,
+            actual: actual_sequence,
+        });
+    }
+    let body = &payload[COMMAND_HEADER_LENGTH..];
+    let status = read_u32(body, 0).expect("response length checked");
+    if status == 0 {
+        // The library takes the value at body +12 and nothing after it; an
+        // answer that stops short of it carries no value.
+        let value = read_u32(body, 12);
+        if value.is_none() {
+            return Err(ProtocolError::PayloadTooShort(payload.len()));
+        }
+        return Ok(ValueAnswer {
+            status,
+            message: String::new(),
+            word: read_u32(body, 8),
+            value,
+        });
+    }
+    Ok(ValueAnswer {
+        status,
+        message: firmware_message(body),
+        word: None,
+        value: None,
+    })
+}
+
+/// The answer to a value read in the layout the vendor library reads it
+/// from: status 0, the tick, the word at +8, the value at +12. The bench
+/// answers with this; its word is the value id, a guess labelled as one.
+pub(crate) fn value_answer(sequence: u16, tick: u32, word: u32, value: u32) -> Vec<u8> {
+    let mut payload = Vec::with_capacity(28);
+    payload.extend_from_slice(&0_u16.to_le_bytes());
+    payload.extend_from_slice(&DEVICE_ROUTE.to_le_bytes());
+    payload.extend_from_slice(&GET_VALUE_RESPONSE.to_le_bytes());
+    payload.extend_from_slice(&sequence.to_le_bytes());
+    payload.extend_from_slice(&0_u16.to_le_bytes());
+    payload.extend_from_slice(&0_u16.to_le_bytes());
+    payload.extend_from_slice(&0_u32.to_le_bytes());
+    payload.extend_from_slice(&tick.to_le_bytes());
+    payload.extend_from_slice(&word.to_le_bytes());
+    payload.extend_from_slice(&value.to_le_bytes());
+    outer_frame(&payload)
+}
+
+/// The value id a value read asks for, read back from the request's body;
+/// for the bench, which answers only the one the crate sends.
+pub(crate) fn requested_value_id(body: &[u8]) -> Option<u32> {
+    read_u32(body, 0)
 }
 
 /// The firmware's answer to a table entry, as it came: the status word, the
@@ -945,6 +1049,66 @@ mod tests {
             acknowledgement.message,
             "cOutboundData: channel is not open"
         );
+    }
+
+    /// ADR-0030, amended 2026-11-15: the value read the vendor library makes
+    /// for `READ_VBATT`, byte for byte as the evidence reads it from the
+    /// library's code — the device route, `cGetValue`, value id 3 — and the
+    /// answer read where the library reads it.
+    #[test]
+    fn the_connector_voltage_request_and_answer_are_as_the_library_builds_them() {
+        assert_eq!(
+            connector_voltage_request(7),
+            [
+                0x10, 0x00, 0xF6, 0x51, 0x01, 0x00, 0x00, 0x00, 0x0C, 0x00, 0x07, 0x00, 0x00, 0x00,
+                0x00, 0x00, 0x03, 0x00, 0x00, 0x00,
+            ]
+        );
+        let answer =
+            parse_value_answer(&decode(&value_answer(7, 0x0334_049C, 3, 12_640)), 7).unwrap();
+        assert_eq!(
+            answer,
+            ValueAnswer {
+                status: 0,
+                message: String::new(),
+                word: Some(3),
+                value: Some(12_640),
+            }
+        );
+        assert_eq!(requested_value_id(&3_u32.to_le_bytes()), Some(3));
+        // Another answer's sequence is not this one's.
+        assert!(matches!(
+            parse_value_answer(&decode(&value_answer(8, 0, 3, 12_640)), 7),
+            Err(ProtocolError::SequenceMismatch {
+                expected: 7,
+                actual: 8
+            })
+        ));
+        // A status-0 answer that stops before the value carries none.
+        assert!(matches!(
+            parse_value_answer(
+                &decode(&command_response(DEVICE_ROUTE, GET_VALUE_RESPONSE, 7, 0)),
+                7
+            ),
+            Err(ProtocolError::PayloadTooShort(_))
+        ));
+    }
+
+    /// A refusal is the status and the firmware's words, no value.
+    #[test]
+    fn a_refused_value_read_carries_the_firmware_words() {
+        let refused = command_response_with_text(
+            DEVICE_ROUTE,
+            GET_VALUE_RESPONSE,
+            9,
+            1,
+            0x0102_0304,
+            "Parameter not supported by this device",
+        );
+        let answer = parse_value_answer(&decode(&refused), 9).unwrap();
+        assert_eq!(answer.status, 1);
+        assert_eq!(answer.message, "Parameter not supported by this device");
+        assert_eq!(answer.value, None);
     }
 
     /// ADR-0043, decision 7: the pass entry the bare adapter accepted on

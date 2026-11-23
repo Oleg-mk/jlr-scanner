@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { dataText, decimalText, liveReadReason, parameterNote, t, useLanguage } from "../i18n";
 import { readLimits, writeLimits, type LiveLimits } from "../liveLimits";
 import { parameterName, parameterTexts, stateName } from "../parameterNames";
-import type { ModuleSurveyEntry } from "../library";
+import type { ModuleSurveyEntry, ReadableIdentifierSummary } from "../library";
 import {
   LIVE_READ_MAX_ENTRIES,
   entryKey,
@@ -25,6 +25,12 @@ interface LiveReadPanelProps {
   /** The set as chosen, before a run turns it into entries. */
   set: LiveReadEntryRequest[];
   modules: ModuleSurveyEntry[];
+  /**
+   * SDD's generic identifiers (ADR-0044): tied to no module and no car,
+   * offered to every module as SDD offers them, found by name. The module
+   * declines what it does not hold, at read time, as it does in SDD.
+   */
+  generic?: ReadableIdentifierSummary[];
   running: boolean;
   busy: boolean;
   adapterReady: boolean;
@@ -101,6 +107,7 @@ export function LiveReadPanel({
   snapshot,
   set,
   modules,
+  generic = [],
   running,
   busy,
   adapterReady,
@@ -195,6 +202,49 @@ export function LiveReadPanel({
       .filter((identifier) => !filtering || isQuantity(identifier))
       .sort((a, b) => Number(isVehicleQualified(b)) - Number(isVehicleQualified(a)));
   const ownCount = (module: ModuleSurveyEntry) => listed(module).filter(isVehicleQualified).length;
+  // SDD's generic values (ADR-0044): the catalogue's entries tied to no
+  // module, offered to every module as SDD's datalogger offers them - a list
+  // to scroll, alphabetical, ticked as the module's own are, with a filter
+  // for speed. The list is drawn only while its fold is open or a filter is
+  // typed: a thousand rows under every module would weigh on a small laptop.
+  const [queries, setQueries] = useState<Record<string, string>>({});
+  const [opened, setOpened] = useState<Record<string, boolean>>({});
+  const genericByIdentifier = new Map(generic.map((identifier) => [identifier.identifier, identifier]));
+  const genericLabel = (identifier: ReadableIdentifierSummary) =>
+    identifier.parameters
+      .map((name, index) => parameterName(name, parameterTexts(identifier, index)))
+      .join(", ");
+  const genericSorted = [...generic].sort((a, b) => genericLabel(a).localeCompare(genericLabel(b)));
+  const chosenGeneric = (module: ModuleSurveyEntry) =>
+    set
+      .filter(
+        (entry) =>
+          entry.ecuFamily === module.ecuFamily &&
+          !module.readableIdentifiers.some((identifier) => identifier.identifier === entry.identifier),
+      )
+      .map((entry) => genericByIdentifier.get(entry.identifier))
+      .filter((identifier): identifier is ReadableIdentifierSummary => identifier !== undefined);
+  const others = (module: ModuleSurveyEntry) => {
+    const own = new Set(module.readableIdentifiers.map((identifier) => identifier.identifier));
+    return genericSorted.filter(
+      (identifier) =>
+        !own.has(identifier.identifier) &&
+        !chosen.has(entryKey({ ecuFamily: module.ecuFamily, identifier: identifier.identifier })),
+    );
+  };
+  const filtered = (module: ModuleSurveyEntry) => {
+    const query = (queries[module.ecuFamily] ?? "").trim().toLowerCase();
+    const all = others(module);
+    if (query === "") return { query, rows: all };
+    return {
+      query,
+      rows: all.filter(
+        (identifier) =>
+          identifier.identifier.toLowerCase().includes(query) ||
+          genericLabel(identifier).toLowerCase().includes(query),
+      ),
+    };
+  };
   // What a module's button will actually put in: the listed addresses
   // not yet chosen, as many as the set has room for. The button says
   // that number, not the module's - on the owner's X250 the PCM offers
@@ -429,8 +479,107 @@ export function LiveReadPanel({
                       </tr>
                     );
                   })}
+                  {chosenGeneric(module).map((identifier) => {
+                    const entry = { ecuFamily: module.ecuFamily, identifier: identifier.identifier };
+                    const id = `live-${module.ecuFamily}-${identifier.identifier}`;
+                    return (
+                      <tr key={identifier.identifier} className="live-read-generic">
+                        <td>
+                          <input
+                            id={id}
+                            type="checkbox"
+                            checked
+                            disabled={running}
+                            onChange={() => onToggle(entry)}
+                          />
+                        </td>
+                        <td>
+                          <label htmlFor={id}>
+                            <code>{identifier.identifier}</code>
+                          </label>
+                        </td>
+                        <td className="live-read-qualified">{t("no module in SDD")}</td>
+                        <td>
+                          <label htmlFor={id}>
+                            {identifier.parameters
+                              .map((name, index) => parameterName(name, parameterTexts(identifier, index)))
+                              .join(", ")}
+                          </label>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
+              {generic.length > 0 ? (
+                <details
+                  className="live-read-search"
+                  onToggle={(event) => {
+                    // Read the element now: the event is gone by the time
+                    // the state updater runs.
+                    const open = (event.currentTarget as HTMLDetailsElement).open;
+                    setOpened((known) => ({ ...known, [module.ecuFamily]: open }));
+                  }}
+                >
+                  <summary>
+                    {t("Other values SDD describes ({count})", { count: others(module).length })}
+                  </summary>
+                  <p className="module-validation">
+                    {t(
+                      "SDD ties these values to no module and offers them as this does; a module declines what it does not hold when it is read. Tick one as you tick the module's own.",
+                    )}
+                  </p>
+                  <label className="field">
+                    <span>{t("Filter by name or address")}</span>
+                    <input
+                      type="search"
+                      value={queries[module.ecuFamily] ?? ""}
+                      onChange={(event) =>
+                        setQueries((known) => ({ ...known, [module.ecuFamily]: event.target.value }))
+                      }
+                    />
+                  </label>
+                  {(() => {
+                    const { query, rows } = filtered(module);
+                    if (!(opened[module.ecuFamily] === true || query !== "")) return null;
+                    if (rows.length === 0) {
+                      return <p className="button-hint">{t("No value matches.")}</p>;
+                    }
+                    return (
+                      <table className="live-read-identifiers">
+                        <tbody>
+                          {rows.map((identifier) => {
+                            const entry = { ecuFamily: module.ecuFamily, identifier: identifier.identifier };
+                            const id = `live-${module.ecuFamily}-${identifier.identifier}`;
+                            return (
+                              <tr key={identifier.identifier}>
+                                <td>
+                                  <input
+                                    id={id}
+                                    type="checkbox"
+                                    checked={false}
+                                    disabled={running || full}
+                                    onChange={() => onToggle(entry)}
+                                  />
+                                </td>
+                                <td>
+                                  <label htmlFor={id}>
+                                    <code>{identifier.identifier}</code>
+                                  </label>
+                                </td>
+                                <td className="live-read-qualified">{t("no module in SDD")}</td>
+                                <td>
+                                  <label htmlFor={id}>{genericLabel(identifier)}</label>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    );
+                  })()}
+                </details>
+              ) : null}
             </details>
           ))}
         </div>

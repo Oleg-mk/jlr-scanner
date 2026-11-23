@@ -41,6 +41,9 @@ class NoAdapter implements AdapterClient {
 }
 
 class RecordingLibrary implements LibraryClient {
+  getGenericIdentifiers() {
+    return Promise.resolve([]);
+  }
   asked: string[] = [];
 
   getLibrary(): Promise<LibrarySnapshot> {

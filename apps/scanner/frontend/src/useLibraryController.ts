@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { pickDirectory } from "./files";
 import {
+  type ReadableIdentifierSummary,
   createLibrarySnapshot,
   createVehicleDescription,
   type LibraryClient,
@@ -77,6 +78,9 @@ export function useLibraryController(client: LibraryClient) {
   const [vehicle, setVehicle] = useState<VehicleDescription>(createVehicleDescription);
   const [survey, setSurvey] = useState<VehicleSurveySnapshot | null>(null);
   const [catalogue, setCatalogue] = useState<VehicleCatalogueSnapshot>({ programmes: [] });
+  // SDD's generic identifiers (ADR-0044): one list per loaded library,
+  // read once with the catalogue and again after a load.
+  const [generic, setGeneric] = useState<ReadableIdentifierSummary[]>([]);
   const [busy, setBusy] = useState(false);
   /**
    * True while the modules are being surveyed. It is deliberately not
@@ -113,6 +117,14 @@ export function useLibraryController(client: LibraryClient) {
       .catch(() => {
         if (active) setCatalogue({ programmes: [] });
       });
+    void client
+      .getGenericIdentifiers()
+      .then((next) => {
+        if (active) setGeneric(next);
+      })
+      .catch(() => {
+        if (active) setGeneric([]);
+      });
     return () => {
       active = false;
     };
@@ -136,6 +148,8 @@ export function useLibraryController(client: LibraryClient) {
         setSurvey(null);
         const next = await client.getCatalogue();
         if (ticket === request.current) setCatalogue(next);
+        const generics = await client.getGenericIdentifiers().catch(() => []);
+        if (ticket === request.current) setGeneric(generics);
       } catch (error) {
         if (ticket === request.current) setLibrary(failedLibrary(error));
       } finally {
@@ -236,6 +250,7 @@ export function useLibraryController(client: LibraryClient) {
   return {
     library,
     catalogue,
+    generic,
     vin,
     setVin,
     vinDecode,

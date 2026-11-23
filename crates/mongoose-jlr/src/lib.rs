@@ -19,9 +19,9 @@ pub use codec::{
     BOARD_INFO_RESPONSE_COMMAND, GET_BOARD_INFO_COMMAND, MAX_PAYLOAD_LENGTH,
 };
 pub use device::{
-    ExchangeTrace, MongooseCalibrationIdentificationResult, MongooseDiagnosticError,
-    MongooseJlrDevice, ReceiveFilterEntry, TransmitAcknowledgement, UnsolicitedFrame,
-    TRANSMIT_ACK_TIMEOUT,
+    ConnectorVoltage, ExchangeTrace, MongooseCalibrationIdentificationResult,
+    MongooseDiagnosticError, MongooseJlrDevice, ReceiveFilterEntry, TransmitAcknowledgement,
+    UnsolicitedFrame, TRANSMIT_ACK_TIMEOUT,
 };
 pub use error::ProtocolError;
 pub use j1979_live::{MongooseJ1979ReadResult, J1979_PENDING_TIMEOUT};

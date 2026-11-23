@@ -8,7 +8,11 @@ use kline_execution::{PreparedKlineService, PreparedKlineTransaction};
 use mongoose_jlr::bench::{BenchTransport, SharedBenchBus};
 use mongoose_jlr::MongooseJ1979ReadResult;
 use mongoose_jlr::MongooseKlineReadResult;
-use mongoose_jlr::{list_vehicle_routes, MongooseJlrDevice, VehicleRouteId};
+use mongoose_jlr::{list_vehicle_routes, ConnectorVoltage, MongooseJlrDevice, VehicleRouteId};
+
+/// The status the vendor library words as "Parameter not supported by this
+/// device" (`docs/evidence/MONGOOSE_VBATT_2026-11-15.md`).
+pub const CONNECTOR_VOLTAGE_UNSUPPORTED: u32 = 1;
 use mongoose_jlr::{
     ExchangeTrace, MongooseUdsReadResult, MongooseUdsServiceResult, ProtocolError, RouteCapture,
     CAPTURE_IDLE_TIMEOUT, CAPTURE_MAX_FRAMES,
@@ -119,6 +123,11 @@ impl Link {
         on_link!(self, device => device.exchange_trace().clone())
     }
 
+    /// The voltage at the connector (ADR-0030, amended 2026-11-15).
+    fn read_connector_voltage(&mut self) -> Result<ConnectorVoltage, ProtocolError> {
+        on_link!(self, device => device.read_connector_voltage())
+    }
+
     fn execute_prepared_calibration_identification(
         &mut self,
         transaction: &PreparedDiagnosticTransaction,
@@ -190,6 +199,9 @@ impl Link {
 
 pub struct SystemConnection {
     device: Link,
+    /// The firmware said the voltage at the connector is not supported:
+    /// not asked again on this connection (ADR-0030, amended 2026-11-15).
+    connector_voltage_unsupported: bool,
 }
 
 fn bench_summary() -> AdapterSummary {
@@ -260,6 +272,7 @@ impl AdapterBackend for SystemAdapterBackend {
             return Ok((
                 SystemConnection {
                     device: Link::Bench(mongoose),
+                    connector_voltage_unsupported: false,
                 },
                 evidence,
             ));
@@ -276,6 +289,7 @@ impl AdapterBackend for SystemAdapterBackend {
             return Ok((
                 SystemConnection {
                     device: Link::PassThru(mongoose),
+                    connector_voltage_unsupported: false,
                 },
                 evidence,
             ));
@@ -292,6 +306,7 @@ impl AdapterBackend for SystemAdapterBackend {
         Ok((
             SystemConnection {
                 device: Link::Serial(mongoose),
+                connector_voltage_unsupported: false,
             },
             evidence,
         ))
@@ -664,6 +679,25 @@ impl AdapterService<SystemAdapterBackend> {
 }
 
 impl AdapterService<SystemAdapterBackend> {
+    /// The battery voltage at the connector, as the adapter measures it
+    /// (ADR-0030, amended 2026-11-15): `None` without a connection, and
+    /// `Some(None)` once the firmware has said the value is not supported on
+    /// this connection, so it is not asked again.
+    pub fn read_connector_voltage(
+        &mut self,
+    ) -> Option<Option<Result<ConnectorVoltage, ProtocolError>>> {
+        self.connection.as_mut().map(|connection| {
+            if connection.connector_voltage_unsupported {
+                return None;
+            }
+            let reading = connection.device.read_connector_voltage();
+            if matches!(&reading, Ok(voltage) if voltage.status == CONNECTOR_VOLTAGE_UNSUPPORTED) {
+                connection.connector_voltage_unsupported = true;
+            }
+            Some(reading)
+        })
+    }
+
     /// Listen-only capture on one route. Receive-only by construction: the
     /// device method opens the route with the listen-only flag and never
     /// exposes a transmit primitive.

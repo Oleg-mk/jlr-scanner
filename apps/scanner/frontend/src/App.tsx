@@ -31,6 +31,7 @@ import { BatteryCard } from "./components/BatteryCard";
 import { BatteryPrecondition } from "./components/BatteryPrecondition";
 import { batteryPreconditionText } from "./batteryFormat";
 import { latestVoltage } from "./voltage";
+import { useConnectorVoltage } from "./useConnectorVoltage";
 import { BatteryPanel } from "./components/BatteryPanel";
 import { CcfPanel } from "./components/CcfPanel";
 import { StandardObdPanel } from "./components/StandardObdPanel";
@@ -204,6 +205,15 @@ export function App({
   const ccf = useCcfController(ccfClient, library.vehicle);
   const battery = useBatteryController(batteryClient, library.vehicle);
   const session = useSessionReportController(sessionReportClient);
+  // The voltage at the connector, the whole time an adapter is connected
+  // (ADR-0030, amended 2026-11-15): never during a live run or a capture,
+  // and again as soon as a recorded operation ends.
+  const connectorVoltage = useConnectorVoltage(
+    client,
+    adapterReady,
+    liveRead.running || capture.busy,
+    session.snapshot,
+  );
   // The bench (ADR-0020): a virtual vehicle behind a stand-in adapter. The
   // whole screen says so, and the session is bench-only or real-only.
   const bench = isBench(controller.snapshot);
@@ -382,6 +392,7 @@ export function App({
     obdRouteValidation: standardObd.snapshot.routeValidation,
     live: liveRead.snapshot,
     liveStartedAtMs: liveRead.startedAtMs,
+    adapter: connectorVoltage.reading,
   });
   const batteryNotice = batteryPreconditionText(
     voltage,
@@ -783,6 +794,7 @@ export function App({
                     snapshot={liveRead.snapshot}
                     set={liveRead.set}
                     modules={surveyModules}
+                    generic={library.generic}
                     running={liveRead.running}
                     busy={liveRead.busy}
                     adapterReady={adapterReady}

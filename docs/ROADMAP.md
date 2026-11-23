@@ -590,6 +590,16 @@ prepared-transaction model from one target to many.
 The architecture check must keep rejecting active and programming request
 constructors. Read services only.
 
+*2026-11-23, built (`FIXTURE_TESTED`, verified on the first tester's files):* the
+platform document's `<fitment>` on every surveyed module — a silent optional
+module drawn as SDD draws it, not as a fault (0 red on his last session, 11
+before) — and its `<method type="connect">` on the modules SDD connects through
+another before reading them (the VIM through the BCM): drawn as "not woken",
+nothing sent. The configuration decoder reads an enumeration's options in place,
+as SDD writes them, shifted only where a parameter's own options say so (110 bare
+numbers on his configuration read, now 4; three values corrected). Next: a car
+reads both — the tester's, on the next build he is given, or the owner's X250.
+
 ### F11 — application shell for real use (parallelisable with F9 and F10)
 
 M1 done 2026-09-04; see `F11_TESTER_APPLICATION.md` for what is in and what
@@ -652,6 +662,14 @@ monitor declares no voltage of its own, the voltage is the freshest of three
 reads — the battery read's headline, the legislated `0x42`, a live supply
 voltage — and stands on the cell of the key; the bench's rail follows the
 scenario on all three.
+
+*2026-11-15, amendment accepted and built (`FIXTURE_TESTED`):* the voltage at the connector, measured by
+the adapter as SDD shows it — one `cGetValue`, value id 3, read from the
+vendor library's `READ_VBATT` (`docs/evidence/MONGOOSE_VBATT_2026-11-15.md`)
+— always on while the adapter is connected, first in freshness. The
+tester asked for it; the record's own two unanalysed lines were why it was
+missing. Next: the gate on the owner's bare adapter, then a tester's
+session.
 
 ### F22 — what a module will accept, listed and not sent (2026-09-16, `ADR-0035`)
 
@@ -885,6 +903,14 @@ bench writes a reading a car could show through the parameter's own
 converter (`ADR-0020`, amendment of 2026-09-17). `IMPLEMENTED /
 FIXTURE_TESTED`; `ADR-0022`, amendment of 2026-09-17. Nothing of F15 is
 open. What outranks it is unchanged: the first real tester report.
+
+*2026-11-23, built (`FIXTURE_TESTED`, `ADR-0044`):* SDD's generic identifiers —
+the catalogue's 1,140 entries qualified to no module and no car, where every
+signal of his SDD's engine datalogger comes from — are offered under every module
+of the live read as SDD offers them: behind a fold with a filter, ticked as the
+module's own are, marked, declined by the module at read time. No grouping by
+system: it is not in the data. Next: a car; and, if a tester wants the engine's
+list in one place, the question of a grouping is his to raise.
 
 ### F16 — the odometer, read from every module (decided 2026-09-11, `ADR-0024`)
 

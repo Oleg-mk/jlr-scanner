@@ -4,6 +4,7 @@ import { codeText, dataText, t, useLanguage } from "../i18n";
 import { useHelpLanguage } from "../helpLanguage";
 import { FAULT_CODE_OPERATIONS, type ModuleReadSnapshot } from "../moduleRead";
 import type { ModuleSurveyEntry } from "../library";
+import { isOptional, needsWakeup } from "../networkMap";
 import type { ClearSequence } from "../useServiceModeController";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { StatusBadge } from "./StatusBadge";
@@ -78,6 +79,16 @@ export function FaultSummary({
   const clean = answered.length - withCodes.length;
   const failed = read.length - answered.length;
   const codes = withCodes.reduce((total, outcome) => total + outcome.dtcs.length, 0);
+  const silentWhere = (test: (module: ModuleSurveyEntry) => boolean) =>
+    read.filter(
+      (outcome) =>
+        outcome.state === "FAILED" &&
+        outcome.error?.category === "NO_RESPONSE_FROM_ECU" &&
+        modules.some((module) => module.ecuFamily === outcome.ecuFamily && test(module)),
+    ).length;
+  // A module SDD would have woken first is counted as that, not as optional.
+  const needingWakeup = silentWhere(needsWakeup);
+  const optionalSilent = silentWhere((module) => isOptional(module) && !needsWakeup(module));
 
   const nameOf = (ecuFamily: string) => {
     const module = modules.find((entry) => entry.ecuFamily === ecuFamily);
@@ -117,6 +128,16 @@ export function FaultSummary({
           clean,
           failed,
         })}
+        {optionalSilent > 0
+          ? ` ${t("{count} of the silent are optional on this car: SDD shows them as not fitted, not as faults.", {
+              count: optionalSilent,
+            })}`
+          : null}
+        {needingWakeup > 0
+          ? ` ${t("{count} of the silent SDD would first connect through another module; this stage does not.", {
+              count: needingWakeup,
+            })}`
+          : null}
       </p>
 
       {serviceMode && onClearAll !== undefined && codes > 0 ? (

@@ -91,6 +91,27 @@ export interface AdapterSnapshot {
   benchScenario?: number | null;
 }
 
+/** What became of one ask for the voltage at the connector (ADR-0030, amended 2026-11-15). */
+export type AdapterVoltageState =
+  | "NO_ADAPTER"
+  | "BUSY"
+  | "MEASURED"
+  | "REFUSED"
+  | "UNSUPPORTED"
+  | "FAILED";
+
+/** The battery voltage at the connector, as the adapter measures it. */
+export interface AdapterVoltageSnapshot {
+  state: AdapterVoltageState;
+  millivolts: number | null;
+  status: string | null;
+  statusName: string | null;
+  message: string | null;
+  word: string | null;
+  readUnixMs: number;
+  synthetic: boolean;
+}
+
 export interface AdapterClient {
   getState(): Promise<AdapterSnapshot>;
   discover(): Promise<AdapterSnapshot>;
@@ -98,6 +119,11 @@ export interface AdapterClient {
   disconnect(): Promise<AdapterSnapshot>;
   /** The bench (ADR-0020): a virtual vehicle behind a stand-in adapter, no port. */
   connectBench(scenario: number): Promise<AdapterSnapshot>;
+  /**
+   * The voltage at the connector, asked between operations (ADR-0030,
+   * amended 2026-11-15). Optional: a client without it shows none.
+   */
+  readVoltage?(): Promise<AdapterVoltageSnapshot>;
 }
 
 export const createEmptySnapshot = (): AdapterSnapshot => ({
@@ -170,6 +196,10 @@ class TauriAdapterClient implements AdapterClient {
 
   connectBench(scenario: number) {
     return invoke<AdapterSnapshot>("connect_bench", { scenario });
+  }
+
+  readVoltage() {
+    return invoke<AdapterVoltageSnapshot>("read_adapter_voltage");
   }
 }
 

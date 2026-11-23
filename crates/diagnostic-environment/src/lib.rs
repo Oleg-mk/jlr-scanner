@@ -1223,6 +1223,9 @@ pub struct ReadableIdentifier {
 pub enum ReadableQualification {
     Module,
     Vehicle,
+    /// Qualified to nothing (ADR-0044): SDD's generic formatting, offered
+    /// only where the module itself answered it.
+    Generic,
 }
 
 impl DiagnosticEnvironmentResolver {
@@ -1271,103 +1274,128 @@ impl DiagnosticEnvironmentResolver {
                 .with_ecu_family(ecu_family)
                 .include_indeterminate(true),
         );
-
-        // Another language's names for these parameters (ADR-0034, amended
-        // 2026-10-03): written by the same adapters from the same documents
-        // in that language, under `sdd_parameter.<lang>`, with the same
-        // record id tail - the join is the structure both packs share.
-        let mut texts: BTreeMap<String, BTreeMap<String, String>> = BTreeMap::new();
-        for entry in &result.records {
-            if entry.applicability_resolution != ApplicabilityResolution::Applicable
-                || entry.record.entity.kind != knowledge::EntityKind::IdentifierParameter
-                || !record_mentions_ecu(entry, ecu_family)
-            {
-                continue;
-            }
-            let (
-                ClaimKey::IdentifierDefinition { namespace },
-                KnowledgeValue::IdentifierDefinition {
-                    encoding: Some(encoding),
-                    ..
-                },
-            ) = (&entry.record.key, &entry.record.value)
-            else {
-                continue;
-            };
-            let Some(language) = namespace.strip_prefix(PARAMETER_TEXT_NAMESPACE_PREFIX) else {
-                continue;
-            };
-            let Some(tail) = record_tail(&entry.record.id) else {
-                continue;
-            };
-            // The catalogue's twins share the English record's id; the
-            // platform document's battery twins carry it with the language
-            // appended (ADR-0034, amended 2026-10-03).
-            let tail = tail.strip_suffix(&format!(".{language}")).unwrap_or(tail);
-            texts
-                .entry(tail.to_string())
-                .or_default()
-                .insert(language.to_string(), encoding.clone());
-        }
-
-        let mut found: BTreeMap<u16, ReadableIdentifier> = BTreeMap::new();
-        for entry in &result.records {
-            if entry.applicability_resolution != ApplicabilityResolution::Applicable
-                || entry.record.entity.kind != knowledge::EntityKind::IdentifierParameter
-                || !record_mentions_ecu(entry, ecu_family)
-            {
-                continue;
-            }
-            let (
-                KnowledgeValue::IdentifierDefinition {
-                    identifier,
-                    encoding,
-                    unit,
-                },
-                ClaimKey::ParameterDefinition { parameter },
-            ) = (&entry.record.value, &entry.record.key)
-            else {
-                continue;
-            };
-            // An identifier that cannot be expressed as a 16-bit DID cannot be
-            // requested, so it is not readable by this application.
-            let Some(number) = parse_identifier(identifier) else {
-                continue;
-            };
-            let item = found.entry(number).or_insert_with(|| ReadableIdentifier {
-                identifier: number,
-                parameters: Vec::new(),
-                evidence: Vec::new(),
-                validation_state: entry.record.validation_state,
-                qualification: ReadableQualification::Module,
-            });
-            if qualified_to_vehicle(&entry.record.applicability) {
-                item.qualification = ReadableQualification::Vehicle;
-            }
-            let mut name_texts = BTreeMap::new();
-            let mut encoding_texts = BTreeMap::new();
-            if let Some(languages) = record_tail(&entry.record.id).and_then(|tail| texts.get(tail))
-            {
-                for (language, text) in languages {
-                    if let Some(name) = descriptor_field(text, "name") {
-                        name_texts.insert(language.clone(), name);
-                    }
-                    encoding_texts.insert(language.clone(), text.clone());
-                }
-            }
-            item.parameters.push(ReadableParameter {
-                name: parameter.clone(),
-                encoding: encoding.clone(),
-                unit: unit.clone(),
-                name_texts,
-                encoding_texts,
-            });
-            item.evidence.extend(traces(std::slice::from_ref(entry)));
-            item.validation_state =
-                weakest_validation(vec![item.validation_state, entry.record.validation_state]);
-        }
-        found.into_values().collect()
+        collect_readable(&result.records, |entry| {
+            entry.applicability_resolution == ApplicabilityResolution::Applicable
+                && record_mentions_ecu(entry, ecu_family)
+        })
     }
+
+    /// The catalogue's identifiers qualified to nothing — no module, no car
+    /// (ADR-0044): SDD's generic formatting. Not evidence that any module
+    /// holds them; a module is asked, and its answer is the evidence. The
+    /// list depends on no car, so a library builds it once.
+    pub fn generic_identifiers(store: &KnowledgeStore) -> Vec<ReadableIdentifier> {
+        let result = store.query(
+            &KnowledgeQuery::for_vehicle(VehicleContext::default()).include_indeterminate(true),
+        );
+        let mut found = collect_readable(&result.records, |entry| {
+            // Qualified to nothing: SDD tests no module, car or engine, so
+            // the store can say nothing either way - only that nothing
+            // excludes it.
+            entry.applicability_resolution != ApplicabilityResolution::NotApplicable
+                && entry.record.applicability == knowledge::Applicability::default()
+        });
+        for identifier in &mut found {
+            identifier.qualification = ReadableQualification::Generic;
+        }
+        found
+    }
+}
+
+/// The identifiers among `records` that `keep` admits, with their
+/// parameters, their names in SDD's other languages and their evidence.
+fn collect_readable(
+    records: &[ResolvedKnowledge],
+    keep: impl Fn(&ResolvedKnowledge) -> bool,
+) -> Vec<ReadableIdentifier> {
+    // Another language's names for these parameters (ADR-0034, amended
+    // 2026-10-03): written by the same adapters from the same documents
+    // in that language, under `sdd_parameter.<lang>`, with the same
+    // record id tail - the join is the structure both packs share.
+    let mut texts: BTreeMap<String, BTreeMap<String, String>> = BTreeMap::new();
+    for entry in records {
+        if entry.record.entity.kind != knowledge::EntityKind::IdentifierParameter || !keep(entry) {
+            continue;
+        }
+        let (
+            ClaimKey::IdentifierDefinition { namespace },
+            KnowledgeValue::IdentifierDefinition {
+                encoding: Some(encoding),
+                ..
+            },
+        ) = (&entry.record.key, &entry.record.value)
+        else {
+            continue;
+        };
+        let Some(language) = namespace.strip_prefix(PARAMETER_TEXT_NAMESPACE_PREFIX) else {
+            continue;
+        };
+        let Some(tail) = record_tail(&entry.record.id) else {
+            continue;
+        };
+        // The catalogue's twins share the English record's id; the
+        // platform document's battery twins carry it with the language
+        // appended (ADR-0034, amended 2026-10-03).
+        let tail = tail.strip_suffix(&format!(".{language}")).unwrap_or(tail);
+        texts
+            .entry(tail.to_string())
+            .or_default()
+            .insert(language.to_string(), encoding.clone());
+    }
+
+    let mut found: BTreeMap<u16, ReadableIdentifier> = BTreeMap::new();
+    for entry in records {
+        if entry.record.entity.kind != knowledge::EntityKind::IdentifierParameter || !keep(entry) {
+            continue;
+        }
+        let (
+            KnowledgeValue::IdentifierDefinition {
+                identifier,
+                encoding,
+                unit,
+            },
+            ClaimKey::ParameterDefinition { parameter },
+        ) = (&entry.record.value, &entry.record.key)
+        else {
+            continue;
+        };
+        // An identifier that cannot be expressed as a 16-bit DID cannot be
+        // requested, so it is not readable by this application.
+        let Some(number) = parse_identifier(identifier) else {
+            continue;
+        };
+        let item = found.entry(number).or_insert_with(|| ReadableIdentifier {
+            identifier: number,
+            parameters: Vec::new(),
+            evidence: Vec::new(),
+            validation_state: entry.record.validation_state,
+            qualification: ReadableQualification::Module,
+        });
+        if qualified_to_vehicle(&entry.record.applicability) {
+            item.qualification = ReadableQualification::Vehicle;
+        }
+        let mut name_texts = BTreeMap::new();
+        let mut encoding_texts = BTreeMap::new();
+        if let Some(languages) = record_tail(&entry.record.id).and_then(|tail| texts.get(tail)) {
+            for (language, text) in languages {
+                if let Some(name) = descriptor_field(text, "name") {
+                    name_texts.insert(language.clone(), name);
+                }
+                encoding_texts.insert(language.clone(), text.clone());
+            }
+        }
+        item.parameters.push(ReadableParameter {
+            name: parameter.clone(),
+            encoding: encoding.clone(),
+            unit: unit.clone(),
+            name_texts,
+            encoding_texts,
+        });
+        item.evidence.extend(traces(std::slice::from_ref(entry)));
+        item.validation_state =
+            weakest_validation(vec![item.validation_state, entry.record.validation_state]);
+    }
+    found.into_values().collect()
 }
 
 /// Whether SDD qualified a record to the car rather than to the module type

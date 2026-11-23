@@ -25,6 +25,10 @@ fn main() {
     for failure in &snapshot.failures {
         println!("  ! {}: {}", failure.file, failure.message);
     }
+    println!(
+        "generic identifiers offered to every module (ADR-0044): {}",
+        library.generic_identifiers().len()
+    );
 
     let input = VehicleContextInput {
         vehicle_program: program.clone(),
@@ -45,8 +49,14 @@ fn main() {
             RouteStatus::NotApplicable => "n/a",
         };
         println!(
-            "  {:<10} bus={:<14} route={:<8} pins={:<6} rx/tx={}/{} ids={:<13} dtc={:<13} readable={}",
+            "  {:<10} fit={:<9} wake={:<24} bus={:<14} route={:<8} pins={:<6} rx/tx={}/{} ids={:<13} dtc={:<13} readable={}",
             module.ecu_family,
+            module.fitment.as_deref().unwrap_or("-"),
+            module
+                .wake
+                .as_ref()
+                .map(|wake| format!("{}/{}", wake.module, wake.method))
+                .unwrap_or_else(|| "-".to_string()),
             module.logical_network.as_deref().unwrap_or("?"),
             module.backend_route.as_deref().unwrap_or("-"),
             module.pins.as_deref().unwrap_or("-"),

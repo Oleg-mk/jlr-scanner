@@ -1,6 +1,7 @@
 import { headline, type BatteryReadSnapshot } from "./battery";
 import type { LiveReadSnapshot } from "./liveRead";
 import type { StandardObdValue } from "./standardObd";
+import type { ConnectorVoltageReading } from "./useConnectorVoltage";
 
 /**
  * The rail's voltage, from whichever read last brought one (ADR-0030,
@@ -11,9 +12,15 @@ import type { StandardObdValue } from "./standardObd";
  * the battery read's headline voltage where a car has one, the legislated
  * OBD control-module voltage (PID 0x42), and a live read of a module's
  * supply voltage. The freshest of them is the voltage, with the time it
- * was taken and where it came from. The adapter measures nothing itself.
+ * was taken and where it came from.
+ *
+ * Since 2026-11-15 (ADR-0030, amended) a fourth: the adapter's own
+ * measurement at the connector, as SDD shows it, asked every few seconds
+ * while the adapter is connected — so it is the freshest whenever there is
+ * one. The earlier "the adapter measures nothing" was written without
+ * looking; the vendor library reads it with one value command.
  */
-export type VoltageSource = "battery" | "obd" | "live";
+export type VoltageSource = "battery" | "obd" | "live" | "adapter";
 
 export interface VoltageReading {
   volts: number;
@@ -37,6 +44,22 @@ export interface VoltageInputs {
   obdRouteValidation: string;
   live: LiveReadSnapshot;
   liveStartedAtMs: number | null;
+  /** The adapter's measurement at the connector, when it has given one. */
+  adapter?: ConnectorVoltageReading | null;
+}
+
+function fromAdapter(reading: ConnectorVoltageReading | null | undefined): VoltageReading | null {
+  if (reading === null || reading === undefined) return null;
+  // As the vendor library gives it: to the nearest tenth of a volt.
+  const volts = Math.round(reading.millivolts / 100) / 10;
+  return {
+    volts,
+    text: volts.toFixed(1),
+    source: "adapter",
+    module: null,
+    atMs: reading.atMs,
+    synthetic: reading.synthetic,
+  };
 }
 
 function fromBattery(snapshot: BatteryReadSnapshot): VoltageReading | null {
@@ -98,6 +121,7 @@ export function latestVoltage(inputs: VoltageInputs): VoltageReading | null {
     fromBattery(inputs.battery),
     fromObd(inputs.obdValues, inputs.obdAtMs, inputs.obdRouteValidation),
     fromLive(inputs.live, inputs.liveStartedAtMs),
+    fromAdapter(inputs.adapter),
   ].filter((reading): reading is VoltageReading => reading !== null);
   let best: VoltageReading | null = null;
   for (const reading of candidates) {

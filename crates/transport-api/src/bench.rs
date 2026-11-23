@@ -75,6 +75,14 @@ pub trait BenchBus: Send {
         false
     }
 
+    /// The voltage the stand-in adapter measures at the connector, in
+    /// millivolts (ADR-0030, amended 2026-11-15); `None` is the firmware's
+    /// refusal of the value. Zero by default: a bench with no vehicle is an
+    /// adapter with nothing on its OBD side.
+    fn connector_millivolts(&self) -> Option<u32> {
+        Some(0)
+    }
+
     /// One line about what is on the bench, for the adapter panel and the
     /// board-info evidence: the vehicle described, or that none is.
     fn describe(&self) -> String;

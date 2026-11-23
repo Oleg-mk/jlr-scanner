@@ -94,6 +94,10 @@ const OBD_CONTROL_MODULE_VOLTAGE: u8 = 0x42;
 /// a module's supply. One rail, one number, as on a car (`ADR-0030`,
 /// amendment of 2026-09-19, later).
 const LOW_BATTERY_VOLTS: f64 = 11.2;
+/// The rail at the connector as the stand-in adapter measures it: the
+/// 14.0 V PID `0x42` reads by default, 11.2 V on a low-battery scenario.
+const CONNECTOR_MILLIVOLTS: u32 = 14_000;
+const CONNECTOR_LOW_BATTERY_MILLIVOLTS: u32 = 11_200;
 /// The same 11.2 V as PID `0x42` writes it: 11 200 mV.
 const OBD_LOW_BATTERY_VOLTAGE: &[u8] = &[0x2B, 0xC0];
 /// The scenario on which every module is healthy and reports nothing.
@@ -172,6 +176,8 @@ pub struct BenchVehicle {
     label: String,
     vin: String,
     modules: Vec<ModuleResponder>,
+    /// The scenario put the rail in SDD's low band (`ADR-0030`).
+    low_battery: bool,
 }
 
 impl BenchVehicle {
@@ -202,10 +208,27 @@ impl BenchVehicle {
             ) else {
                 continue;
             };
-            let readable = DiagnosticEnvironmentResolver::readable_identifiers(
+            let mut readable = DiagnosticEnvironmentResolver::readable_identifiers(
                 store,
                 &context,
                 &entry.ecu_family,
+            );
+            // A seeded few of SDD's generic identifiers (ADR-0044) - the
+            // lowest, and one in forty of the rest - so asking a bench module
+            // finds something, as asking a car's does; the same few every
+            // time for the same module.
+            let own: BTreeSet<u16> = readable.iter().map(|item| item.identifier).collect();
+            let generic = library.generic_identifiers();
+            let first = generic.iter().map(|item| item.identifier).min();
+            readable.extend(
+                generic
+                    .iter()
+                    .filter(|item| {
+                        !own.contains(&item.identifier)
+                            && (Some(item.identifier) == first
+                                || bench_holds_generic(&entry.ecu_family, item.identifier))
+                    })
+                    .cloned(),
             );
             let texts: BTreeSet<u16> = readable
                 .iter()
@@ -268,6 +291,7 @@ impl BenchVehicle {
                 .unwrap_or(BENCH_VIN)
                 .to_string(),
             modules,
+            low_battery: low_battery_scenario(scenario),
         }
     }
 
@@ -736,6 +760,17 @@ impl BenchBus for BenchVehicle {
         }
     }
 
+    /// The rail at the connector is the rail PID `0x42` reads on the same
+    /// bench, 14.0 V, or 11.2 V on a low-battery scenario: one rail, one
+    /// number (`ADR-0030`, amended 2026-11-15).
+    fn connector_millivolts(&self) -> Option<u32> {
+        Some(if self.low_battery {
+            CONNECTOR_LOW_BATTERY_MILLIVOLTS
+        } else {
+            CONNECTOR_MILLIVOLTS
+        })
+    }
+
     fn describe(&self) -> String {
         format!(
             "{}: {} module(s) answer on the bench; every value is synthetic",
@@ -1091,6 +1126,20 @@ fn synthetic_battery(identifier: u16, length: usize, low_battery: bool) -> Optio
     let mut bytes = vec![0u8; length.max(1)];
     write_number(&mut bytes, 0, raw);
     Some(bytes)
+}
+
+/// One generic identifier in this many a bench module holds (ADR-0044).
+const BENCH_GENERIC_ONE_IN: u64 = 40;
+
+/// Whether a bench module holds one of SDD's generic identifiers: a fixed
+/// hash of the module and the identifier, so the answer never changes.
+fn bench_holds_generic(family: &str, identifier: u16) -> bool {
+    let mut hash: u64 = 0xcbf2_9ce4_8422_2325;
+    for byte in family.bytes().chain(identifier.to_be_bytes()) {
+        hash ^= u64::from(byte);
+        hash = hash.wrapping_mul(0x0100_0000_01b3);
+    }
+    hash % BENCH_GENERIC_ONE_IN == 0
 }
 
 fn synthetic_bytes(family: &str, identifier: u16, length: usize, tick: u32) -> Vec<u8> {

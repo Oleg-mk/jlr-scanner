@@ -138,6 +138,9 @@ const twoSurveyed: ModuleSurveyEntry[] = [
 ];
 
 class SurveyingLibraryClient implements LibraryClient {
+  getGenericIdentifiers() {
+    return Promise.resolve([]);
+  }
   constructor(private readonly modules: ModuleSurveyEntry[] = surveyed) {}
   getLibrary(): Promise<LibrarySnapshot> {
     return Promise.resolve({ ...createLibrarySnapshot(), state: "LOADED" });

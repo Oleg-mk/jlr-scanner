@@ -130,6 +130,8 @@
 			<data_identifier_set type="NET">synth_net</data_identifier_set>
 			<data_identifier_set type="PDI">synth_undefined</data_identifier_set>
 			<fitment>optional</fitment>
+			<method pwr_module="SYNTHMOD_SYSTEM_A" type="connect">OTHERMOD_CONNECT_01</method>
+			<method pwr_module="SYNTHMOD_SYSTEM_A" type="disconnect">OTHERMOD_DISCONNECT_01</method>
 		</module>
 		<module>
 			<module_code_name acronym="LEGACYMOD" ISOName="LEGACYMOD">LEGACYMOD_SYSTEM_A</module_code_name>

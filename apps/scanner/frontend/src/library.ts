@@ -87,9 +87,10 @@ export interface ReadableIdentifierSummary {
    * record behind it names a programme, a year marker, an engine or a
    * sub-type - SDD's own statement that this car has it; "module" when every
    * record names the module type alone. Absent in older session files, read
-   * as "module".
+   * as "module". "generic" (ADR-0044): SDD's generic formatting, qualified
+   * to no module and no car, offered to every module as SDD offers it.
    */
-  qualification?: "vehicle" | "module";
+  qualification?: "vehicle" | "module" | "generic";
 }
 
 export interface ModuleSurveyEntry {
@@ -125,6 +126,18 @@ export interface ModuleSurveyEntry {
   acceptedOperations?: AcceptedOperationSummary[];
   /** The gateway in front of the module's sub-network, as SDD states it (ADR-0039); absent on a main bus. */
   gateway?: GatewaySummary | null;
+  /**
+   * The platform document's `<fitment>` for this module, verbatim:
+   * `mandatory`, `optional` or `dealer`; absent where the data states none
+   * or the library was issued before it was exported.
+   */
+  fitment?: string | null;
+  /**
+   * The module SDD connects this one through before it reads it, and the
+   * method it runs there (the VIM through the BCM). This read-only stage
+   * sends no such command, so silence is expected and is not a fault.
+   */
+  wake?: { module: string; method: string } | null;
 }
 
 /**
@@ -252,6 +265,12 @@ export interface LibraryClient {
   getCatalogue(): Promise<VehicleCatalogueSnapshot>;
   surveyVehicle(vehicle: VehicleDescription): Promise<VehicleSurveySnapshot>;
   decodeVin(vin: string): Promise<VinDecodeSnapshot>;
+  /**
+   * SDD's generic identifiers (ADR-0044): the catalogue's entries tied to no
+   * module and no car, one list for the whole library. Offered to every
+   * module as SDD offers them; the module declines what it does not hold.
+   */
+  getGenericIdentifiers(): Promise<ReadableIdentifierSummary[]>;
 }
 
 export const createLibrarySnapshot = (): LibrarySnapshot => ({
@@ -295,6 +314,10 @@ class TauriLibraryClient implements LibraryClient {
   decodeVin(vin: string) {
     return invoke<VinDecodeSnapshot>("decode_vin", { vin });
   }
+
+  getGenericIdentifiers() {
+    return invoke<ReadableIdentifierSummary[]>("get_generic_identifiers");
+  }
 }
 
 /** The browser preview has no file system and no data; it says so. */
@@ -319,6 +342,27 @@ class BrowserLibraryClient implements LibraryClient {
   getCatalogue(): Promise<VehicleCatalogueSnapshot> {
     if (!browserDemoEnabled()) return Promise.resolve({ programmes: [] });
     return Promise.resolve(demoCatalogue);
+  }
+
+  /** A few of SDD's generic values for the preview; nothing behind them. */
+  getGenericIdentifiers(): Promise<ReadableIdentifierSummary[]> {
+    if (!browserDemoEnabled()) return Promise.resolve([]);
+    return Promise.resolve(
+      (
+        [
+          ["0xF40C", "Engine speed", true],
+          ["0xF411", "Absolute throttle position", true],
+          ["0xF443", "Absolute load value", true],
+          ["0x032F", "Actual variable valve timing position  -  Exhaust valve  -  Bank 1", true],
+          ["0x0412", "Accelerator pedal  -  Stored maximum pedal depression", false],
+        ] as const
+      ).map(([identifier, name, quantity]) => ({
+        identifier,
+        parameters: [name],
+        quantity,
+        qualification: "generic" as const,
+      })),
+    );
   }
 
   surveyVehicle(vehicle: VehicleDescription): Promise<VehicleSurveySnapshot> {

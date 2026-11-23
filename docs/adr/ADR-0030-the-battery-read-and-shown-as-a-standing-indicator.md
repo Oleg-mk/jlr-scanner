@@ -405,3 +405,147 @@ module's supply voltage, which the owner read himself the day before —
   while the pointer is over the cell or the focus is on it, so the key
   still says what it does. A cell that cannot read keeps the voltage.
   Where the reading came from stays on the cell's tooltip.
+
+## Amendment, 2026-11-15: the voltage at the connector, from the adapter, always on
+
+- Status: **Accepted, 2026-11-15** — written at the owner's word («Так,
+  пиши») after the research he ordered («Так, починай»), accepted the same
+  afternoon («Приймаю, будуй»).
+
+### What the tester asked, and what this record had got wrong
+
+The first tester, after his second session on build 1.2.9 (2026-11-15),
+asked for "a battery voltage indicator similar to SDD". The product has one
+— the battery key of this record — and in his session it stayed empty: it
+fills only from a battery read, the legislated `0x42` or a live supply
+voltage, and his session ran none of them. Two lines of this record made
+that so, and neither was analysed when it was written:
+
+- "The adapter itself measures nothing: the Mongoose stack has no such
+  read, and this record does not invent one" (2026-09-19, later). Nobody
+  had looked. The vendor library reads the voltage at the connector with
+  one value command (`docs/evidence/MONGOOSE_VBATT_2026-11-15.md`).
+- "Any automatic re-read to keep the line current: the person's click, as
+  before" — written under *What this does not decide*, an open question,
+  and later read back as a rule. It was never weighed against what SDD does
+  or against the owner's own word that opens this record: the battery is a
+  critical reading, especially while working with a scanner.
+
+### The analysis
+
+- **What SDD does.** It shows the voltage at the connector the whole time
+  the adapter is on the car, without asking a module. That is the J2534
+  `READ_VBATT` the adapter answers from its own measurement of pin 16.
+- **What the goal needs.** The product replaces SDD; every read it makes
+  depends on the rail, and a module that falls silent because the battery
+  sagged looks, without the rail beside it, like a module that is not
+  there — the tester's own reason for asking, on a day he had run the
+  engine because the battery was low.
+- **What it costs.** One value command, `cGetValue` with value id 3, on
+  the device route: no channel, nothing on the bus, nothing asked of a
+  module. A read of a value the adapter already holds.
+- **What could go wrong.** The record is read from the library's code, not
+  seen on a wire; a wrong record draws the firmware's refusal in words, as
+  every wrong record has (`ADR-0043`). A command that is answered late on a
+  busy link (the tester's engine-running minutes, 2026-11-15) must not hold
+  up a read: the voltage is asked between operations, never inside one.
+
+### Decision
+
+1. **A fourth source, the adapter, first in freshness.** While the adapter
+   is connected the product asks it for value id 3 (`cGetValue`, route
+   `01 00`/`00 00`, body `03 00 00 00`) and shows the answer, in volts to
+   one decimal as the library rounds it, on the battery key, with the time
+   it was read. The three sources of the amendment of 2026-09-19 stay; the
+   freshest still wins, and the adapter's is the freshest whenever there is
+   one. The tooltip and the precondition line say "measured by the adapter
+   at the connector".
+2. **Always on, between operations.** Once after the connect, then every
+   five seconds while no operation holds the adapter, and once after every
+   operation ends. Never inside an operation, never during a capture or a
+   live run (the live run's own supply voltage is the reading then). The
+   person does nothing to keep it current.
+3. **Read only, one value.** The command is built in one function, its
+   value id a constant `3`. No constructor names `cSetValue` (`0x000B`),
+   value id 2 (the programming voltage) or any other value id. The
+   architecture guard gets that rule in the commit that adds the command.
+4. **Refusal and silence are said, not guessed.** A status other than 0 is
+   shown as the firmware's words with its name from the status table, the
+   key keeps the last good reading with its age, and the source is dropped
+   for the session after the firmware says the parameter is not supported.
+   A wait that times out leaves the reading as it was, with its age.
+5. **The record carries it.** Each adapter reading goes into the session
+   bundle with its time and status, like the other three sources; the
+   report intake ignores it as it ignores the battery read (the state of
+   one car on one day).
+6. **The bench answers as the firmware is read to.** 12.6 V by default,
+   11.2 V on a scenario ending in nine, as the other sources do; "not
+   supported" on a scenario the tests choose.
+
+### Validation
+
+- `IMPLEMENTED` / `FIXTURE_TESTED`: the record byte for byte against the
+  evidence, the answer's status and value, the rounding, the cadence and
+  its pauses, the refusal and the timeout, the guard's rule shown failing
+  on a `cSetValue` put in its place.
+- `HARDWARE_CONFIRMED` — **the gate before a tester gets the build**, on
+  the owner's adapter in USB, nothing on the OBD side, when he says so: the
+  command answered with status 0, and a value at or near zero with no
+  voltage on pin 16. Body +8 of the answer recorded, whatever it is.
+- `VEHICLE_CONFIRMED`: a tester's session — the key showing a voltage from
+  the connect on, and the same rail within a few tenths of a volt as the
+  legislated `0x42`, read in the same session.
+
+### What this does not decide
+
+- The other voltages the library names (`READ_CH1_VOLTAGE`…,
+  `DT_READ_V_VEHICLE`, `READ_V_J1962PIN1`): not needed for this, not read.
+- A warning sound, a colour beyond the precondition line's: the key judges
+  nothing, as decision 5 of this record says.
+
+### Built, 2026-11-15 — `IMPLEMENTED` / `FIXTURE_TESTED`
+
+Accepted the same afternoon on the owner's word («Приймаю, будуй») and built
+in one change:
+
+- *The command.* `passive.rs` builds the one value read,
+  `connector_voltage_request`, its value id the constant 3, and reads the
+  answer where the library reads it (status at body +0, the word at +8, the
+  value at +12); a golden test holds the request byte for byte against the
+  evidence. `read_connector_voltage` asks it on the device route, refuses
+  while a channel is open, and leaves the last operation's trace as it
+  found it.
+- *Between operations by construction.* The shell's `read_adapter_voltage`
+  takes the adapter only with `try_lock`: while an operation holds it the
+  answer is `BUSY` at once and nothing is asked. A status of 1 — the
+  library's "not supported" — ends the asking for the connection.
+- *The interface.* `useConnectorVoltage` asks on the connect, every five
+  seconds, and again when a recorded operation ends; not during a live run
+  or a capture. The reading is the fourth source of `voltage.ts`, said as
+  "measured by the adapter at the connector" in the three languages; a
+  refusal or a silence keeps the last good reading with its age, a
+  disconnect forgets it.
+- *The record.* Every answer the adapter gave joins the session bundle as
+  `adapter_voltage_reads` (the last 5,000), which never makes a report
+  available by itself; the intake ignores it.
+- *The bench.* `BenchBus::connector_millivolts`: zero for an empty bench —
+  an adapter with nothing on its OBD side — and, for the vehicle, the rail
+  PID `0x42` reads on the same bench, 14.0 V or 11.2 V on a scenario ending
+  in nine. Decision 6 above said 12.6 V; the bench's `0x42` is 14.0 V, and
+  one rail is one number, so the bench follows `0x42`.
+- *The guard.* `cGetValue` built once, in `passive.rs`, with value id 3; no
+  `cSetValue`, no `0x000B`, no programming voltage, no other value id — the
+  rule shown failing on value id 2 and on a `cSetValue` constant.
+
+Building it found a defect older than this record: the guard's rule that
+keeps protocol, transport and programming code out of `sdd-ingest` had
+every pattern wrapped in a backspace character instead of a word boundary
+since the first public snapshot (2026-09-06), so it matched nothing. The
+same tool escaping did it to this rule's first draft. Both corrected; the
+revived rule tests code, not comments (the two comments it found say VBF
+names and flash lists are *not* read), and was shown failing on a forbidden
+word put in the crate's code. No other tracked file carries a control
+character.
+
+What the bench cannot show is the adapter's own answer: the gate on the
+owner's adapter, USB only, comes next.

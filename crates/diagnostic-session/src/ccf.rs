@@ -170,7 +170,7 @@ pub fn decode(parameter: &CcfParameter, block: &[u8]) -> CcfValue {
     let span = &block[parameter.start_byte..=parameter.stop_byte];
     match parameter.kind.as_str() {
         "ENUM" | "BOOL" => {
-            let raw = number(span, parameter.mask);
+            let raw = option_value(span, parameter);
             value.raw = Some(raw);
             match parameter.options.iter().find(|option| option.value == raw) {
                 Some(option) => {
@@ -246,6 +246,46 @@ pub fn decode(parameter: &CcfParameter, block: &[u8]) -> CcfValue {
 
 /// The number a span holds under a mask: one byte masked and shifted down
 /// to its first set bit, several bytes read big-endian whole.
+/// The value an enumeration's or a boolean's options are matched against.
+///
+/// SDD writes most options IN PLACE — the field's bits where they sit in the
+/// byte: speed control at mask `0xE0` lists `0x20`, `0x40`, `0x60`. A few
+/// parameters list them SHIFTED down to bit 0 instead: the coolant warning
+/// of the L319 and L320 of MY10 at mask `0xF0` lists `0x01`, `0x02`, …
+/// Across SDD's configuration documents 15,240 one-byte fields read in
+/// place, 23 shifted, and the rest the same either way. Which form a
+/// parameter uses is read from its own options: the form more of its
+/// non-zero options fit, and in place when as many fit both. An option
+/// neither form can hold — SDD's `0xFF` error sentinel under a nibble mask —
+/// simply never matches.
+fn option_value(span: &[u8], parameter: &CcfParameter) -> u64 {
+    if span.len() != 1 {
+        return number(span, parameter.mask);
+    }
+    let mask = (parameter.mask & 0xFF) as u8;
+    if mask == 0 {
+        return u64::from(span[0]);
+    }
+    let in_place = u64::from(span[0] & mask);
+    let shift = mask.trailing_zeros();
+    if shift == 0 {
+        return in_place;
+    }
+    let mask = u64::from(mask);
+    let options = parameter.options.iter().filter(|option| option.value != 0);
+    let (fit_in_place, fit_shifted) = options.fold((0usize, 0usize), |(here, down), option| {
+        (
+            here + usize::from(option.value & !mask == 0),
+            down + usize::from(option.value <= mask >> shift),
+        )
+    });
+    if fit_shifted > fit_in_place {
+        in_place >> shift
+    } else {
+        in_place
+    }
+}
+
 fn number(span: &[u8], mask: u64) -> u64 {
     if span.len() == 1 {
         let mask = (mask & 0xFF) as u8;
@@ -356,6 +396,43 @@ mod tests {
             decode(&trim, &[0, 0b0000_0010]).option_name.as_deref(),
             Some("MID")
         );
+
+        // Options written in place, as SDD writes most of them: the shape of
+        // speed control at mask 0xE0. The field's bits, unshifted, pick the
+        // option; bits outside the mask do not.
+        let speed = parse_parameter(
+            "CCF-CCF-PARAM_SYNTH_SPEED",
+            "block=CCF;bytes=0..0;bits=5..7;mask=0x0E0;type=ENUM;display=false;edit=false;scope=base;group=G;group_title=;group_title_ru=;title=;title_ru=;options=0x00=UNDEF===|0x20=NONE===|0x40=FIXED===|0x60=ADAPTIVE===|0xE0=ERR===",
+        )
+        .unwrap();
+        let fixed = decode(&speed, &[0b0101_1011]);
+        assert_eq!(fixed.option_name.as_deref(), Some("FIXED"));
+        assert_eq!(fixed.raw, Some(0x40));
+        assert_eq!(fixed.note, None);
+        assert_eq!(decode(&speed, &[0xFF]).option_name.as_deref(), Some("ERR"));
+
+        // Two fields in one byte, one in place and one shifted, as the coolant
+        // warning of an L319 of MY10 sits: the low nibble's options start at
+        // 0x01 under mask 0x0F, the high nibble's at 0x01 under mask 0xF0 -
+        // only a shift down fits them, so they are read shifted.
+        let high = parse_parameter(
+            "CCF-CCF-PARAM_SYNTH_HIGH",
+            "block=CCF;bytes=0..0;bits=4..7;mask=0xF0;type=ENUM;display=false;edit=false;scope=base;group=G;group_title=;group_title_ru=;title=;title_ru=;options=0x00=OFF===|0x01=ONE===|0x02=TWO===",
+        )
+        .unwrap();
+        assert_eq!(decode(&high, &[0x2F]).option_name.as_deref(), Some("TWO"));
+        // An error sentinel outside a nibble mask never decides the form,
+        // and never matches.
+        let display = parse_parameter(
+            "CCF-CCF-PARAM_SYNTH_DISPLAY",
+            "block=CCF;bytes=0..0;bits=0..3;mask=0x0F;type=ENUM;display=false;edit=false;scope=base;group=G;group_title=;group_title_ru=;title=;title_ru=;options=0x00=UNDEF===|0x02=TEXT===|0x03=GRAPHIC===|0xFF=ERR===",
+        )
+        .unwrap();
+        assert_eq!(
+            decode(&display, &[0xF3]).option_name.as_deref(),
+            Some("GRAPHIC")
+        );
+        assert_eq!(decode(&display, &[0xFF]).option_name, None);
 
         let code = parse_parameter(
             "CCF-CCF-PARAM_SYNTH_CODE",

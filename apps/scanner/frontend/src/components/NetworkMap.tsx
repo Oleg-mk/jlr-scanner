@@ -99,6 +99,16 @@ function NodeIcon({ state }: { state: NodeState }) {
           <path d="M6.5 6.5l7 7M13.5 6.5l-7 7" fill="none" strokeWidth="2.2" strokeLinecap="round" />
         </svg>
       );
+    case "optional_silent":
+    case "needs_wakeup":
+      // SDD's own square for an optional module that did not answer; the
+      // same neutral square for one SDD would have woken first.
+      return (
+        <svg viewBox="0 0 20 20" aria-hidden="true">
+          <rect x="2" y="2" width="16" height="16" rx="2" />
+          <path d="M6 10h8" fill="none" strokeWidth="2.2" strokeLinecap="round" />
+        </svg>
+      );
     default:
       return (
         <svg viewBox="0 0 20 20" aria-hidden="true">
@@ -115,6 +125,8 @@ const legend: Array<{ state: NodeState; text: string }> = [
   { state: "unreachable", text: "not reachable from the adapter; the reason is shown" },
   { state: "answered", text: "answered a read-only request" },
   { state: "silent", text: "no answer within the timeout" },
+  { state: "optional_silent", text: "optional on this car and silent: likely not fitted" },
+  { state: "needs_wakeup", text: "silent until another module connects it, which this stage does not do" },
   { state: "declined", text: "negative response or failed read" },
 ];
 

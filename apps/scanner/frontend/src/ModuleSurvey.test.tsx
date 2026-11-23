@@ -119,6 +119,9 @@ const surveyOf = (vehicle: VehicleDescription): VehicleSurveySnapshot => ({
 });
 
 class ControlledLibraryClient implements LibraryClient {
+  getGenericIdentifiers() {
+    return Promise.resolve([]);
+  }
   loadedDirectory: string | null = null;
   surveyedVehicle: VehicleDescription | null = null;
 

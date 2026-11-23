@@ -20,7 +20,14 @@ enum Mode {
     /// adapter): whether every entry is accepted, and whether the firmware's
     /// table holds up over many channels.
     FilterCycles(VehicleRouteId, u32),
+    /// The voltage at the connector asked `count` times, a second apart, on
+    /// one connection (ADR-0030, amended 2026-11-15, its gate on the bare
+    /// adapter): every answer's status, value and the word at body +8.
+    ConnectorVoltage(u32),
 }
+
+/// A minute of readings is enough to see the answer settle.
+const MAXIMUM_VOLTAGE_READS: u32 = 60;
 
 /// More cycles than a whole "Check all modules" opens are not needed.
 const MAXIMUM_FILTER_CYCLES: u32 = 200;
@@ -42,8 +49,17 @@ fn parse_mode(arguments: &[String]) -> Result<Mode, String> {
             }
             Ok(Mode::FilterCycles(route.parse()?, cycles))
         }
+        [argument, count] if argument == "--connector-voltage" => {
+            let count = count
+                .parse::<u32>()
+                .map_err(|_| format!("count must be a number, got {count}"))?;
+            if !(1..=MAXIMUM_VOLTAGE_READS).contains(&count) {
+                return Err(format!("count must be 1..={MAXIMUM_VOLTAGE_READS}"));
+            }
+            Ok(Mode::ConnectorVoltage(count))
+        }
         _ => Err(
-            "usage: mongoose-jlr-probe (--enumerate | --board-info | --routes | --passive-route <route> | --filter-cycles <route> <count>)"
+            "usage: mongoose-jlr-probe (--enumerate | --board-info | --routes | --passive-route <route> | --filter-cycles <route> <count> | --connector-voltage <count>)"
                 .into(),
         ),
     }
@@ -67,6 +83,7 @@ fn run(mode: Mode) -> Result<(), String> {
         Mode::Routes => routes(),
         Mode::PassiveRoute(route) => passive_route(route),
         Mode::FilterCycles(route, cycles) => filter_cycles(route, cycles),
+        Mode::ConnectorVoltage(count) => connector_voltage(count),
     }
 }
 
@@ -242,6 +259,49 @@ fn filter_cycles(route: VehicleRouteId, cycles: u32) -> Result<(), String> {
     transport_close.map_err(|error| error.to_string())
 }
 
+fn connector_voltage(count: u32) -> Result<(), String> {
+    let device = discover_mongoose_jlr().map_err(|error| error.to_string())?;
+    print_device(&device);
+    let transport = SerialTransport::open(&device).map_err(|error| error.to_string())?;
+    let mut mongoose = MongooseJlrDevice::open(transport);
+    println!("application_can_tx: 0");
+    let mut answered = 0_u32;
+    let mut outcome = Ok(());
+    for read in 1..=count {
+        if read > 1 {
+            std::thread::sleep(Duration::from_secs(1));
+        }
+        match mongoose.read_connector_voltage() {
+            Ok(voltage) => {
+                answered += 1;
+                println!(
+                    "read {read}: status 0x{:08X} {} | millivolts {} | word {} | words {:?}",
+                    voltage.status,
+                    voltage.status_name.unwrap_or("unnamed"),
+                    voltage
+                        .millivolts
+                        .map(|value| value.to_string())
+                        .unwrap_or_else(|| "none".into()),
+                    voltage
+                        .word
+                        .map(|word| format!("0x{word:08X}"))
+                        .unwrap_or_else(|| "none".into()),
+                    voltage.message,
+                );
+            }
+            Err(error) => {
+                outcome = Err(format!("read {read}: {error}"));
+                break;
+            }
+        }
+    }
+    let transport_close = mongoose.close();
+    println!("reads_answered: {answered} of {count}");
+    println!("application_can_tx: 0");
+    outcome?;
+    transport_close.map_err(|error| error.to_string())
+}
+
 fn print_device(device: &transport_serial::SerialDevice) {
     println!("usb_vid: {:04X}", device.usb_vid);
     println!("usb_pid: {:04X}", device.usb_pid);
@@ -284,6 +344,12 @@ mod tests {
         assert!(parse_mode(&args(&["--filter-cycles", "hs-can", "0"])).is_err());
         assert!(parse_mode(&args(&["--filter-cycles", "hs-can", "201"])).is_err());
         assert!(parse_mode(&args(&["--filter-cycles", "hs-can"])).is_err());
+        assert_eq!(
+            parse_mode(&args(&["--connector-voltage", "10"])),
+            Ok(Mode::ConnectorVoltage(10))
+        );
+        assert!(parse_mode(&args(&["--connector-voltage", "0"])).is_err());
+        assert!(parse_mode(&args(&["--connector-voltage", "61"])).is_err());
         assert!(parse_mode(&args(&["--raw"])).is_err());
         assert!(parse_mode(&args(&["--opcode", "0109"])).is_err());
         assert!(parse_mode(&args(&["--firmware"])).is_err());

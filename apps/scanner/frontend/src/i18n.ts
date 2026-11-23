@@ -269,6 +269,13 @@ const uk: Record<string, string> = {
   "not reachable from the adapter; the reason is shown": "недосяжний з адаптера; причину показано",
   "answered a read-only request": "відповів на запит читання",
   "no answer within the timeout": "немає відповіді за час очікування",
+  "optional on this car and silent: likely not fitted":
+    "опційний на цьому авто й мовчить: імовірно, не встановлений",
+  "Optional, not fitted?": "Опційний, не встановлений?",
+  "{count} of the silent are optional on this car: SDD shows them as not fitted, not as faults.":
+    "З тих, що мовчать, {count} — опційні на цьому авто: SDD показує їх як не встановлені, а не як несправні.",
+  "No answer. SDD lists this module as optional on this car, and shows it silent as not fitted rather than as a fault.":
+    "Немає відповіді. SDD зазначає цей модуль як опційний на цьому авто й показує його мовчання як «не встановлений», а не як несправність.",
   "negative response or failed read": "негативна відповідь або невдале читання",
   "No bus": "Без шини",
   "bus not recorded in the data": "шина не записана в даних",
@@ -603,11 +610,26 @@ const uk: Record<string, string> = {
   "Clear limits": "Прибрати межі",
   "Your limits, kept on this machine. SDD records no normal range.":
     "Ваші межі, зберігаються на цій машині. Норми SDD не тримає.",
+  "measured by the adapter at the connector": "виміряно адаптером на роз'ємі",
   Quantities: "Величини",
   Everything: "Усе",
   "Qualified to": "За SDD — для",
   "this car": "цього авто",
   "every {module}": "будь-якого {module}",
+  "no module in SDD": "без модуля в SDD",
+  "Other values SDD describes ({count})": "Інші значення, які описує SDD ({count})",
+  "SDD ties these values to no module and offers them as this does; a module declines what it does not hold when it is read. Tick one as you tick the module's own.":
+    "SDD не прив'язує ці значення до модуля й пропонує їх так само, як тут; модуль відмовляє в тому, чого не має, під час читання. Позначайте їх так само, як власні значення модуля.",
+  "Filter by name or address": "Фільтр за назвою або адресою",
+  "Not woken": "Не розбуджений",
+  "No answer. SDD connects this module through {module} ({method}) before reading it; this read-only stage sends no such command, so its silence is expected.":
+    "Немає відповіді. SDD під'єднує цей модуль через {module} ({method}), перш ніж читати його; ця стадія лише читає й такої команди не надсилає, тому мовчання очікуване.",
+  "silent until another module connects it, which this stage does not do": "мовчить, доки інший модуль його не під'єднає, чого ця стадія не робить",
+  "SDD connects this module through {module} first ({method}); this read-only stage does not, so expect no answer until a later stage sends that command.":
+    "SDD спершу під'єднує цей модуль через {module} ({method}); ця стадія лише читає й цього не робить, тому відповіді не буде, доки пізніша стадія не надішле ту команду.",
+  "{count} of the silent SDD would first connect through another module; this stage does not.":
+    "{count} з тих, що мовчать, SDD спершу під'єднав би через інший модуль; ця стадія цього не робить.",
+  "No value matches.": "Збігів немає.",
   "{own} SDD qualifies to this car, {wide} to every {module}.":
     "{own} SDD відносить саме до цього авто, {wide} — до будь-якого {module}.",
   "SDD names a speed or an engine speed for this module type in general, not for this car itself, so the dials rest. Choose a parameter by hand.":
@@ -1598,6 +1620,13 @@ const ru: Record<string, string> = {
   "not reachable from the adapter; the reason is shown": "недостижим с адаптера; причина показана",
   "answered a read-only request": "ответил на запрос чтения",
   "no answer within the timeout": "нет ответа за время ожидания",
+  "optional on this car and silent: likely not fitted":
+    "опциональный на этом авто и молчит: вероятно, не установлен",
+  "Optional, not fitted?": "Опциональный, не установлен?",
+  "{count} of the silent are optional on this car: SDD shows them as not fitted, not as faults.":
+    "Из молчащих {count} — опциональные на этом авто: SDD показывает их как не установленные, а не как неисправные.",
+  "No answer. SDD lists this module as optional on this car, and shows it silent as not fitted rather than as a fault.":
+    "Нет ответа. SDD отмечает этот модуль как опциональный на этом авто и показывает его молчание как «не установлен», а не как неисправность.",
   "negative response or failed read": "отрицательный ответ или неудачное чтение",
   "No bus": "Без шины",
   "bus not recorded in the data": "шина не записана в данных",
@@ -1932,11 +1961,26 @@ const ru: Record<string, string> = {
   "Clear limits": "Убрать пределы",
   "Your limits, kept on this machine. SDD records no normal range.":
     "Ваши пределы, хранятся на этой машине. Нормы SDD не хранит.",
+  "measured by the adapter at the connector": "измерено адаптером на разъёме",
   Quantities: "Величины",
   Everything: "Всё",
   "Qualified to": "По SDD — для",
   "this car": "этого авто",
   "every {module}": "любого {module}",
+  "no module in SDD": "без модуля в SDD",
+  "Other values SDD describes ({count})": "Другие значения, которые описывает SDD ({count})",
+  "SDD ties these values to no module and offers them as this does; a module declines what it does not hold when it is read. Tick one as you tick the module's own.":
+    "SDD не привязывает эти значения к модулю и предлагает их так же, как здесь; модуль отказывает в том, чего у него нет, при чтении. Отмечайте их так же, как собственные значения модуля.",
+  "Filter by name or address": "Фильтр по названию или адресу",
+  "Not woken": "Не разбужен",
+  "No answer. SDD connects this module through {module} ({method}) before reading it; this read-only stage sends no such command, so its silence is expected.":
+    "Нет ответа. SDD подключает этот модуль через {module} ({method}), прежде чем читать его; эта стадия только читает и такой команды не посылает, поэтому молчание ожидаемо.",
+  "silent until another module connects it, which this stage does not do": "молчит, пока другой модуль его не подключит, чего эта стадия не делает",
+  "SDD connects this module through {module} first ({method}); this read-only stage does not, so expect no answer until a later stage sends that command.":
+    "SDD сначала подключает этот модуль через {module} ({method}); эта стадия только читает и этого не делает, поэтому ответа не будет, пока более поздняя стадия не пошлёт ту команду.",
+  "{count} of the silent SDD would first connect through another module; this stage does not.":
+    "{count} из молчащих SDD сначала подключил бы через другой модуль; эта стадия этого не делает.",
+  "No value matches.": "Совпадений нет.",
   "{own} SDD qualifies to this car, {wide} to every {module}.":
     "{own} SDD относит именно к этому авто, {wide} — к любому {module}.",
   "SDD names a speed or an engine speed for this module type in general, not for this car itself, so the dials rest. Choose a parameter by hand.":

@@ -35,6 +35,8 @@ export function voltageSourceText(reading: VoltageReading): string {
       return t("from the battery monitor");
     case "obd":
       return t("from the OBD read");
+    case "adapter":
+      return t("measured by the adapter at the connector");
     default:
       return reading.module === null
         ? t("from the live read")

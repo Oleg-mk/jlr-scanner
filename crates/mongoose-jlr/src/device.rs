@@ -330,6 +330,26 @@ fn classify(frame: crate::Frame) -> Incoming {
     }
 }
 
+/// The adapter's own measurement of the battery rail at the connector
+/// (ADR-0030, amended 2026-11-15): the firmware's status word with its name,
+/// its words when it refused, the value in millivolts when it gave one, and
+/// the word at body +8 of the answer, whose meaning is unknown.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ConnectorVoltage {
+    pub status: u32,
+    pub status_name: Option<&'static str>,
+    pub message: String,
+    pub millivolts: Option<u32>,
+    pub word: Option<u32>,
+}
+
+impl ConnectorVoltage {
+    /// Whether the firmware gave a value.
+    pub fn measured(&self) -> bool {
+        self.status == 0 && self.millivolts.is_some()
+    }
+}
+
 pub struct MongooseJlrDevice<T: ByteTransport> {
     transport: T,
     decoder: FrameDecoder,
@@ -411,6 +431,38 @@ impl<T: ByteTransport> MongooseJlrDevice<T> {
 
     pub fn list_vehicle_routes(&self) -> &'static [VehicleRoute] {
         list_vehicle_routes()
+    }
+
+    /// The battery voltage at the connector, as the adapter measures it
+    /// (ADR-0030, amended 2026-11-15): one `cGetValue`, value id 3, on the
+    /// device route. Between operations only — refused while a channel is
+    /// open — and outside every operation's trace, which it leaves as it
+    /// found it.
+    pub fn read_connector_voltage(&mut self) -> Result<ConnectorVoltage, ProtocolError> {
+        self.require_open_transport()?;
+        if self.open_route.is_some() {
+            return Err(ProtocolError::ActiveRoute);
+        }
+        self.ensure_firmware()?;
+        let kept = std::mem::take(&mut self.trace);
+        let sequence = self.sequences.allocate();
+        let request = passive::connector_voltage_request(sequence);
+        let answer = self.command_exchange(
+            &request,
+            passive::GET_VALUE_RESPONSE,
+            sequence,
+            COMMAND_READ_TIMEOUT,
+            |frame| passive::parse_value_answer(frame, sequence),
+        );
+        self.trace = kept;
+        let answer = answer?;
+        Ok(ConnectorVoltage {
+            status: answer.status,
+            status_name: crate::status_name(answer.status),
+            message: answer.message,
+            millivolts: answer.value,
+            word: answer.word,
+        })
     }
 
     /// Sends exactly one allowlisted cGetBoardInfo request and waits for its

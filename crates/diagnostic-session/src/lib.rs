@@ -37,10 +37,12 @@ use app_contracts::{
     ModuleApplicability, ModuleSurveyEntry, PassportReading, PowertrainVariants, ProgrammeEntry,
     ReadableIdentifierSummary, RouteStatus, RouteSummary, SelfTestSummary,
     VehicleCatalogueSnapshot, VehicleContextInput, VehicleSurveySnapshot, VinDecodeSnapshot,
+    WakeSummary,
 };
 use diagnostic_environment::{
     DiagnosticEnvironmentPlan, DiagnosticEnvironmentResolution, DiagnosticEnvironmentResolver,
-    EnvironmentField, PartialDiagnosticEnvironment, QueryError, ReadableParameter,
+    EnvironmentField, PartialDiagnosticEnvironment, QueryError, ReadableIdentifier,
+    ReadableParameter,
 };
 use knowledge::{
     manifest_file, ApplicabilityResolution, ClaimKey, DimensionConstraint, EntityKind,
@@ -90,6 +92,12 @@ const ODST_SCREEN_ITEMS_CLAIM_PREFIX: &str = "sdd_odst_screen_items.";
 /// The gateway in front of a module's sub-network, as `sdd-ingest` records
 /// it per module (ADR-0039).
 const GATEWAY_CLAIM: &str = "sdd_gateway";
+/// The platform document's `<fitment>` per module, verbatim (`sdd-ingest`'s
+/// `FITMENT_CLAIM`): `mandatory`, `optional` or `dealer`.
+const FITMENT_CLAIM: &str = "sdd_fitment";
+/// The module SDD connects another through before reading it (`sdd-ingest`'s
+/// `CONNECT_METHOD_CLAIM`): `module=BCM_SYSTEM_A;method=VIM_CONNECT_01`.
+const CONNECT_METHOD_CLAIM: &str = "sdd_connect_method";
 
 /// Manifests that ship with the application: the documented adapter route
 /// bindings (ADR-0013), the X250 CCP connector route, the relayed-route
@@ -322,6 +330,9 @@ struct Indexes {
     /// the earlier text family only where the former has none.
     module_names: BTreeMap<String, BTreeMap<String, String>>,
     vin_tables: VinTables,
+    /// The catalogue's identifiers qualified to nothing (ADR-0044): what a
+    /// module may be asked for beyond its own list. They depend on no car.
+    generic_identifiers: Vec<ReadableIdentifier>,
 }
 
 /// The loaded knowledge and an honest account of how it was loaded.
@@ -1066,6 +1077,13 @@ impl KnowledgeLibrary {
         sources
     }
 
+    /// The catalogue's identifiers qualified to nothing (ADR-0044): SDD's
+    /// generic formatting, built once when the library loaded. What a module
+    /// may be asked for beyond its own list; never offered until it answers.
+    pub fn generic_identifiers(&self) -> &[ReadableIdentifier] {
+        &self.indexes.generic_identifiers
+    }
+
     /// The layout of this car's configuration: every parameter of every
     /// block the loaded data describes, in block and byte order.
     pub fn ccf_layout(&self, context: &VehicleContext) -> Vec<ccf::CcfParameter> {
@@ -1561,11 +1579,16 @@ fn build_indexes(store: &KnowledgeStore) -> Indexes {
             )
             .collect(),
     };
+    // SDD's generic identifiers (ADR-0044), after the pass above has let
+    // its copy of the store go.
+    drop(result);
+    let generic_identifiers = DiagnosticEnvironmentResolver::generic_identifiers(store);
     Indexes {
         catalogue,
         dtc_index,
         module_names,
         vin_tables,
+        generic_identifiers,
     }
 }
 
@@ -1596,8 +1619,9 @@ pub fn survey_vehicle(
     // The words the self tests are shown with belong to their screens, not
     // to a module, so they are read once here rather than once per module.
     let screens = self_test_screens(store, &context);
-    // The gateway in front of each sub-network, once per survey (ADR-0039).
-    let gateways = gateways_for(store, &context);
+    // The gateway in front of each sub-network (ADR-0039) and each
+    // module's fitment, once per survey.
+    let facts = module_facts_for(store, &context);
 
     let mut modules = Vec::new();
     for presence in families {
@@ -1630,7 +1654,9 @@ pub fn survey_vehicle(
             readable_identifiers: Vec::new(),
             self_tests: Vec::new(),
             accepted_operations: Vec::new(),
-            gateway: gateways.get(&presence.ecu_family).cloned(),
+            gateway: facts.gateways.get(&presence.ecu_family).cloned(),
+            fitment: facts.fitments.get(&presence.ecu_family).cloned(),
+            wake: facts.wakes.get(&presence.ecu_family).cloned(),
         };
 
         if applicability != ModuleApplicability::Applicable {
@@ -1691,53 +1717,7 @@ pub fn survey_vehicle(
         entry.readable_identifiers =
             DiagnosticEnvironmentResolver::readable_identifiers(store, &context, family)
                 .into_iter()
-                .map(|identifier| {
-                    // The names in SDD's other languages, one list per language
-                    // in the parameters' order, English where a name is missing
-                    // (ADR-0034, amended 2026-10-03).
-                    let languages: BTreeSet<&String> = identifier
-                        .parameters
-                        .iter()
-                        .flat_map(|parameter| parameter.name_texts.keys())
-                        .collect();
-                    let parameter_texts = languages
-                        .into_iter()
-                        .map(|language| {
-                            (
-                                language.clone(),
-                                identifier
-                                    .parameters
-                                    .iter()
-                                    .map(|parameter| {
-                                        parameter
-                                            .name_texts
-                                            .get(language)
-                                            .cloned()
-                                            .unwrap_or_else(|| parameter.name.clone())
-                                    })
-                                    .collect(),
-                            )
-                        })
-                        .collect();
-                    ReadableIdentifierSummary {
-                        identifier: format!("0x{:04X}", identifier.identifier),
-                        quantity: reads_as_quantity(&identifier.parameters),
-                        qualification: match identifier.qualification {
-                            diagnostic_environment::ReadableQualification::Vehicle => {
-                                app_contracts::IdentifierQualification::Vehicle
-                            }
-                            diagnostic_environment::ReadableQualification::Module => {
-                                app_contracts::IdentifierQualification::Module
-                            }
-                        },
-                        parameter_texts,
-                        parameters: identifier
-                            .parameters
-                            .into_iter()
-                            .map(|parameter| parameter.name)
-                            .collect(),
-                    }
-                })
+                .map(identifier_summary)
                 .collect();
         modules.push(entry);
     }
@@ -2288,16 +2268,78 @@ fn k_line_read_capabilities(protocol: Option<&str>) -> Option<(&'static str, &'s
     }
 }
 
-/// The gateway in front of each module's sub-network, as the platform
-/// document states it (ADR-0039), by module: one pass over the records
-/// per survey, as the self tests' screens are read.
-fn gateways_for(
-    store: &KnowledgeStore,
-    context: &VehicleContext,
-) -> BTreeMap<String, GatewaySummary> {
+/// What the interface is told about one readable identifier: SDD's names
+/// in every language it has, one list per language in the parameters'
+/// order, English where a name is missing (ADR-0034, amended 2026-10-03),
+/// and who qualified it (ADR-0022, amended 2026-11-15; ADR-0044).
+pub fn identifier_summary(identifier: ReadableIdentifier) -> ReadableIdentifierSummary {
+    let languages: BTreeSet<&String> = identifier
+        .parameters
+        .iter()
+        .flat_map(|parameter| parameter.name_texts.keys())
+        .collect();
+    let parameter_texts = languages
+        .into_iter()
+        .map(|language| {
+            (
+                language.clone(),
+                identifier
+                    .parameters
+                    .iter()
+                    .map(|parameter| {
+                        parameter
+                            .name_texts
+                            .get(language)
+                            .cloned()
+                            .unwrap_or_else(|| parameter.name.clone())
+                    })
+                    .collect(),
+            )
+        })
+        .collect();
+    ReadableIdentifierSummary {
+        identifier: format!("0x{:04X}", identifier.identifier),
+        quantity: reads_as_quantity(&identifier.parameters),
+        qualification: match identifier.qualification {
+            diagnostic_environment::ReadableQualification::Vehicle => {
+                app_contracts::IdentifierQualification::Vehicle
+            }
+            diagnostic_environment::ReadableQualification::Module => {
+                app_contracts::IdentifierQualification::Module
+            }
+            // SDD's generic formatting, offered to every module (ADR-0044).
+            diagnostic_environment::ReadableQualification::Generic => {
+                app_contracts::IdentifierQualification::Generic
+            }
+        },
+        parameter_texts,
+        parameters: identifier
+            .parameters
+            .into_iter()
+            .map(|parameter| parameter.name)
+            .collect(),
+    }
+}
+
+/// What the platform document states per module and the survey shows
+/// beside the route: the gateway in front of its sub-network (ADR-0039)
+/// and its `<fitment>`, by module.
+#[derive(Default)]
+struct ModuleFacts {
+    gateways: BTreeMap<String, GatewaySummary>,
+    fitments: BTreeMap<String, String>,
+    wakes: BTreeMap<String, WakeSummary>,
+}
+
+/// One pass over the records per survey, as the self tests' screens are
+/// read. Where the rows of one module that may apply to this car disagree
+/// on its fitment (a qualifier the description does not settle), none is
+/// shown rather than a guess.
+fn module_facts_for(store: &KnowledgeStore, context: &VehicleContext) -> ModuleFacts {
     let result =
         store.query(&KnowledgeQuery::for_vehicle(context.clone()).include_indeterminate(true));
-    let mut found = BTreeMap::new();
+    let mut facts = ModuleFacts::default();
+    let mut fitments: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
     for entry in &result.records {
         if entry.applicability_resolution == ApplicabilityResolution::NotApplicable
             || entry.record.entity.kind != EntityKind::EcuFamily
@@ -2309,9 +2351,36 @@ fn gateways_for(
         else {
             continue;
         };
+        if name == FITMENT_CLAIM {
+            fitments
+                .entry(entry.record.entity.id.clone())
+                .or_default()
+                .insert(value.trim().to_string());
+            continue;
+        }
+        if name == CONNECT_METHOD_CLAIM {
+            let fields = parse_fields(value);
+            if let (Some(module), Some(method)) = (
+                fields
+                    .get("module")
+                    .cloned()
+                    .filter(|text| !text.is_empty()),
+                fields
+                    .get("method")
+                    .cloned()
+                    .filter(|text| !text.is_empty()),
+            ) {
+                facts
+                    .wakes
+                    .entry(entry.record.entity.id.clone())
+                    .or_insert(WakeSummary { module, method });
+            }
+            continue;
+        }
         if name != GATEWAY_CLAIM {
             continue;
         }
+        let found = &mut facts.gateways;
         let fields = parse_fields(value);
         let field = |name: &str| fields.get(name).cloned().filter(|text| !text.is_empty());
         let (Some(module), Some(access_method)) = (field("gateway"), field("access")) else {
@@ -2337,7 +2406,17 @@ fn gateways_for(
                 layout: (!layout.is_empty()).then(|| layout.join(";")),
             });
     }
-    found
+    facts.fitments = fitments
+        .into_iter()
+        .filter_map(|(module, values)| {
+            let mut values = values.into_iter();
+            match (values.next(), values.next()) {
+                (Some(only), None) => Some((module, only)),
+                _ => None,
+            }
+        })
+        .collect();
+    facts
 }
 
 /// Why a route is a hypothesis, in the words of the decision it rests on:

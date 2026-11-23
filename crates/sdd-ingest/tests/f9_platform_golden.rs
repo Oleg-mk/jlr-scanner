@@ -11,8 +11,8 @@ use knowledge::{
     SourceRecord, SourceType, ValidationState, YearConstraint,
 };
 use sdd_ingest::{
-    BatteryFormatting, ModelYearTimeline, PlatformAdapter, GATEWAY_CLAIM, NETWORK_CLAIM,
-    PARAMETER_TEXT_NAMESPACE,
+    BatteryFormatting, ModelYearTimeline, PlatformAdapter, CONNECT_METHOD_CLAIM, FITMENT_CLAIM,
+    GATEWAY_CLAIM, NETWORK_CLAIM, PARAMETER_TEXT_NAMESPACE,
 };
 
 const FIXTURE: &str = include_str!("../../../fixtures/knowledge/synthetic/f9_platform.xml");
@@ -125,6 +125,47 @@ fn a_module_carries_its_diagnostic_route_and_its_bus() {
             value: "CAN_HS".into()
         }
     );
+
+    // The module's <fitment> is recorded verbatim, as SDD's screen reads it.
+    let fitment = |id: &str| store.get_record(id).map(|record| record.value.clone());
+    assert_eq!(
+        fitment("f9-plat.module.SYNTHMOD.fitment"),
+        Some(KnowledgeValue::Text {
+            value: "mandatory".into()
+        })
+    );
+    assert_eq!(
+        store
+            .get_record("f9-plat.module.OTHERMOD.fitment")
+            .map(|record| (record.key.clone(), record.value.clone())),
+        Some((
+            ClaimKey::Custom {
+                name: FITMENT_CLAIM.into()
+            },
+            KnowledgeValue::Text {
+                value: "optional".into()
+            }
+        ))
+    );
+
+    // The module SDD connects OTHERMOD through before reading it, and the
+    // method: recorded as text, never run. SYNTHMOD needs none.
+    assert_eq!(
+        store
+            .get_record("f9-plat.module.OTHERMOD.connect")
+            .map(|record| (record.key.clone(), record.value.clone())),
+        Some((
+            ClaimKey::Custom {
+                name: CONNECT_METHOD_CLAIM.into()
+            },
+            KnowledgeValue::Text {
+                value: "module=SYNTHMOD_SYSTEM_A;method=OTHERMOD_CONNECT_01".into()
+            }
+        ))
+    );
+    assert!(store
+        .get_record("f9-plat.module.SYNTHMOD.connect")
+        .is_none());
 
     // A module on the slower bus inherits that bus's width, not the first one's.
     let other = store

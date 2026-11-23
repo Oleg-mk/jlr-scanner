@@ -16,6 +16,17 @@ const PLATFORM_PARSER_VERSION: &str = "1.0.0";
 
 /// Claim key under which a module's SDD network membership is recorded.
 pub const NETWORK_CLAIM: &str = "sdd_network";
+/// Claim key under which a module's `<fitment>` is recorded verbatim —
+/// `mandatory`, `optional` or `dealer`. SDD's own module screen draws a
+/// silent `optional` module as not fitted, and only a silent `mandatory`
+/// one as a fault.
+pub const FITMENT_CLAIM: &str = "sdd_fitment";
+/// Claim key under which a module's `<method type="connect">` is recorded:
+/// the module SDD runs it through (`pwr_module`) and the method's name, as
+/// `module=BCM_SYSTEM_A;method=VIM_CONNECT_01`. SDD connects such a module
+/// through the other one before it reads it; a read-only stage sends no
+/// such command, so the module's silence is expected, not a fault.
+pub const CONNECT_METHOD_CLAIM: &str = "sdd_connect_method";
 /// The gateway in front of a module's sub-network, as the platform document
 /// states it (`ADR-0039`): `main_net`, `sub_net`, `gateway`, `access` and, for
 /// an `enhanced` bus, the `prefix`, the masks and the network addresses of
@@ -1064,6 +1075,57 @@ impl PlatformAdapter {
                     evidence,
                     records,
                 )?;
+            }
+            if let Some(fitment) = child_text(module, "fitment")
+                .map(str::trim)
+                .filter(|text| !text.is_empty())
+            {
+                self.push(
+                    format!("{}.module.{segment}.fitment{suffix}", self.source.id.0),
+                    format!("module_fitment/module[module_code_name/@acronym='{acronym}']/fitment"),
+                    format!("{program} {acronym} fitment {fitment}"),
+                    entity.clone(),
+                    ClaimKey::Custom {
+                        name: FITMENT_CLAIM.to_string(),
+                    },
+                    KnowledgeValue::Text {
+                        value: fitment.to_string(),
+                    },
+                    base.clone(),
+                    evidence,
+                    records,
+                )?;
+            }
+            // The module SDD connects this one through before reading it, and
+            // the method it runs there: recorded, never run (ADR-0044's VIM).
+            if let Some(method) = module.children().find(|node| {
+                node.is_element()
+                    && node.tag_name().name() == "method"
+                    && node.attribute("type") == Some("connect")
+            }) {
+                if let (Some(power), Some(name)) = (
+                    method
+                        .attribute("pwr_module")
+                        .map(str::trim)
+                        .filter(|v| !v.is_empty()),
+                    method.text().map(str::trim).filter(|v| !v.is_empty()),
+                ) {
+                    self.push(
+                        format!("{}.module.{segment}.connect{suffix}", self.source.id.0),
+                        format!("module_fitment/module[module_code_name/@acronym='{acronym}']/method[@type='connect']"),
+                        format!("{program} {acronym} connected through {power} by {name} before SDD reads it"),
+                        entity.clone(),
+                        ClaimKey::Custom {
+                            name: CONNECT_METHOD_CLAIM.to_string(),
+                        },
+                        KnowledgeValue::Text {
+                            value: format!("module={power};method={name}"),
+                        },
+                        base.clone(),
+                        evidence,
+                        records,
+                    )?;
+                }
             }
             // The gateway in front of the module's sub-network (ADR-0039):
             // recorded per module, as the bus facts are below, so the survey

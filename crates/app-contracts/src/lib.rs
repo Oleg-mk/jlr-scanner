@@ -429,6 +429,10 @@ pub enum IdentifierQualification {
     #[default]
     Module,
     Vehicle,
+    /// SDD's generic formatting, qualified to no module and no car
+    /// (`ADR-0044`): offered to every module as SDD offers it, and the
+    /// module declines what it does not hold.
+    Generic,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -492,6 +496,30 @@ pub struct ModuleSurveyEntry {
     /// (`ADR-0039`); none for a module on a main bus.
     #[serde(default)]
     pub gateway: Option<GatewaySummary>,
+    /// The platform document's `<fitment>` for this module on this car,
+    /// verbatim: `mandatory`, `optional` or `dealer`; none where the data
+    /// states none or its rows disagree. SDD draws a silent `optional`
+    /// module as not fitted, not as a fault.
+    #[serde(default)]
+    pub fitment: Option<String>,
+    /// The module SDD connects this one through before it reads it, and the
+    /// method it runs there (`<method type="connect">`): the VIM through the
+    /// BCM, for one. This read-only stage sends no such command, so the
+    /// module's silence is expected and is not drawn as a fault.
+    #[serde(default)]
+    pub wake: Option<WakeSummary>,
+}
+
+/// How SDD reaches a module that answers nothing until another module
+/// connects it (`<method type="connect">`): knowledge about why it is
+/// silent, never an instruction to wake it.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WakeSummary {
+    /// The module SDD runs the method through, as SDD names it: `BCM_SYSTEM_A`.
+    pub module: String,
+    /// The method's name, verbatim: `VIM_CONNECT_01`.
+    pub method: String,
 }
 
 /// The gateway in front of a sub-network, as the platform document states
@@ -1494,6 +1522,49 @@ pub struct BatteryReading {
     pub note: Option<String>,
     /// Why the module said nothing.
     pub reason: Option<String>,
+}
+
+/// What became of one ask for the voltage at the connector (ADR-0030,
+/// amended 2026-11-15).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum AdapterVoltageState {
+    /// No adapter is connected.
+    #[default]
+    NoAdapter,
+    /// An operation holds the adapter; nothing was asked.
+    Busy,
+    /// The adapter gave a value.
+    Measured,
+    /// The firmware refused the read with another status, in its words.
+    Refused,
+    /// The firmware said the value is not supported; not asked again this
+    /// connection.
+    Unsupported,
+    /// The ask went unanswered or the answer was not a value answer.
+    Failed,
+}
+
+/// The battery voltage at the connector, as the adapter measures it
+/// (ADR-0030, amended 2026-11-15): the answer to one `cGetValue`, value id
+/// 3, asked between operations.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AdapterVoltageSnapshot {
+    pub state: AdapterVoltageState,
+    pub millivolts: Option<u32>,
+    /// The firmware's status word, `0x00000000` for a value.
+    pub status: Option<String>,
+    /// Its name from the library's table, where the table has one.
+    pub status_name: Option<String>,
+    /// The firmware's words, or why the ask failed.
+    pub message: Option<String>,
+    /// The word at body +8 of the answer, recorded because its meaning is
+    /// unknown.
+    pub word: Option<String>,
+    pub read_unix_ms: u64,
+    /// The bench answered, not an adapter on a car.
+    pub synthetic: bool,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]

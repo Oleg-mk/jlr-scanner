@@ -1250,8 +1250,15 @@ summary:focus-visible {
 }
 
 .node--unreachable .node-icon svg,
-.node--not_applicable .node-icon svg {
+.node--not_applicable .node-icon svg,
+.node--optional_silent .node-icon svg,
+.node--needs_wakeup .node-icon svg {
   stroke: var(--border-strong);
+}
+
+.node.node--optional_silent,
+.node.node--needs_wakeup {
+  opacity: 0.75;
 }
 
 .node--not_applicable {

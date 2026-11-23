@@ -362,6 +362,58 @@ fn the_bench_refuses_at_once_while_the_session_is_busy_rather_than_waiting_for_i
 /// voltage, inside SDD's low band, and the snapshot carries SDD's own edge;
 /// the default scenario reads 12.6 V. This is the read the precondition
 /// line stands on, so the line is provable without a car.
+/// ADR-0030, amended 2026-11-15: the voltage at the connector through the
+/// whole shell — the bench's rail, 14.0 V, or 11.2 V on a scenario ending in
+/// nine, the same rail PID `0x42` reads — and a `BUSY` answer at once, with
+/// nothing asked, while an operation holds the adapter.
+#[test]
+fn the_voltage_at_the_connector_is_read_between_operations_and_never_waits() {
+    fn measured(scenario: u32) -> super::AdapterVoltageSnapshot {
+        let bench = share_bus(Box::new(EmptyBench));
+        let adapter = Mutex::new(AdapterService::new(SystemAdapterBackend::new(
+            bench.clone(),
+        )));
+        let mut session = SessionService::with_library(library());
+        session.survey(&vehicle());
+        let built = BenchBuild(Mutex::new(None));
+        assert!(refresh_bench(&bench, &built, &session, scenario));
+
+        // No adapter yet: nothing to ask.
+        let none = super::read_adapter_voltage_now(&adapter);
+        assert_eq!(none.state, app_contracts::AdapterVoltageState::NoAdapter);
+
+        let connected = adapter.lock().unwrap().connect_bench(scenario);
+        assert_eq!(connected.state, AdapterState::Connected, "{connected:?}");
+
+        // An operation holds the adapter: the answer is BUSY, at once.
+        let held = adapter.lock().unwrap();
+        let busy = super::read_adapter_voltage_now(&adapter);
+        assert_eq!(busy.state, app_contracts::AdapterVoltageState::Busy);
+        assert_eq!(busy.read_unix_ms, 0);
+        drop(held);
+
+        super::read_adapter_voltage_now(&adapter)
+    }
+
+    let healthy = measured(bench_vehicle::SCENARIO_DEFAULT);
+    assert_eq!(healthy.state, app_contracts::AdapterVoltageState::Measured);
+    assert_eq!(healthy.millivolts, Some(14_000));
+    assert_eq!(healthy.status.as_deref(), Some("0x00000000"));
+    assert_eq!(healthy.status_name.as_deref(), Some("eSuccess"));
+    assert!(healthy.synthetic);
+    assert!(healthy.read_unix_ms > 0);
+
+    let low = measured(9);
+    assert_eq!(low.millivolts, Some(11_200));
+
+    // The bundle keeps the answers and is not made available by them.
+    let mut report = SessionReportService::new();
+    report
+        .add_adapter_voltage_read(&serde_json::to_string(&healthy).unwrap())
+        .unwrap();
+    assert!(!report.snapshot().report_available);
+}
+
 #[test]
 fn a_scenario_ending_in_nine_reads_a_low_battery_through_the_whole_stack() {
     fn headline_voltage(scenario: u32) -> (String, Option<String>, u32, f64) {
@@ -1673,6 +1725,78 @@ fn the_bench_connects_without_a_port_reads_the_surveyed_vehicle_and_marks_everyt
 // The cadence on the bench (ADR-0022, decision 3)
 // ---------------------------------------------------------------------------
 
+/// ADR-0044: SDD's generic identifiers - the catalogue's entries qualified to
+/// nothing - are offered to every module and read as any identifier is; the
+/// bench module holds the lowest of them and answers it, and an identifier
+/// the catalogue does not define is still refused before anything is sent.
+#[test]
+fn a_generic_identifier_is_offered_to_every_module_and_read_as_any_other() {
+    let bench = share_bus(Box::new(EmptyBench));
+    let mut adapter = AdapterService::new(SystemAdapterBackend::new(bench.clone()));
+    assert_eq!(
+        adapter.connect_bench(bench_vehicle::SCENARIO_DEFAULT).state,
+        AdapterState::Connected
+    );
+    let mut session = SessionService::with_library(library());
+    let _ = session.survey(&vehicle());
+    let _ = refresh_bench(
+        &bench,
+        &BenchBuild(Mutex::new(None)),
+        &session,
+        bench_vehicle::SCENARIO_DEFAULT,
+    );
+    // The fixture's catalogue qualifies 0x0301 and 0x0343 to nothing; the
+    // library lists them once, marked generic, for every module.
+    let generic: Vec<(u16, app_contracts::IdentifierQualification)> = session
+        .library()
+        .generic_identifiers()
+        .iter()
+        .map(|entry| {
+            (
+                entry.identifier,
+                diagnostic_session::identifier_summary(entry.clone()).qualification,
+            )
+        })
+        .collect();
+    assert_eq!(
+        generic,
+        vec![
+            (0x0301, app_contracts::IdentifierQualification::Generic),
+            (0x0343, app_contracts::IdentifierQualification::Generic),
+        ]
+    );
+    // Not in the module's own survey list: offered, not claimed.
+    let synthmod = session
+        .survey(&vehicle())
+        .modules
+        .into_iter()
+        .find(|module| module.ecu_family == "SYNTHMOD")
+        .unwrap();
+    assert!(synthmod
+        .readable_identifiers
+        .iter()
+        .all(|entry| entry.identifier != "0x0301"));
+
+    let request = ModuleReadRequest {
+        ecu_family: "SYNTHMOD".into(),
+        kind: ModuleReadKind::Identifier,
+        identifier: Some("0x0301".into()),
+        context: vehicle(),
+    };
+    let prepared = ModuleReadService::prepare(session.library(), &request).unwrap();
+    let answer = adapter
+        .execute_uds_read(&prepared.transaction, Duration::from_millis(500))
+        .expect("the bench is connected")
+        .unwrap();
+    assert_eq!(&answer.raw_diagnostic_response[..3], &[0x62, 0x03, 0x01]);
+    // An identifier the catalogue does not define is still refused.
+    let unknown = ModuleReadRequest {
+        identifier: Some("0x7777".into()),
+        ..request
+    };
+    assert!(ModuleReadService::prepare(session.library(), &unknown).is_err());
+}
+
 fn env_or(key: &str, default: &str) -> String {
     std::env::var(key).unwrap_or_else(|_| default.to_string())
 }
@@ -1840,4 +1964,20 @@ fn cadence_on_the_bench() {
         1,
         rounds_for(&mut adapter, &mut reads, &info, session.library(), one, 3),
     );
+}
+
+/// A report is never written into the library's folder (2026-11-15): the
+/// folder is recognised however its path is spelled, and a folder beside it
+/// is not taken for it.
+#[test]
+fn the_library_folder_is_recognised_however_it_is_spelled() {
+    let root = std::env::temp_dir().join(format!("prowlone-same-folder-{}", std::process::id()));
+    let library = root.join("library");
+    let other = root.join("other");
+    std::fs::create_dir_all(&library).unwrap();
+    std::fs::create_dir_all(&other).unwrap();
+    let spelled = root.join("other").join("..").join("library");
+    assert!(super::same_folder(&library, &spelled));
+    assert!(!super::same_folder(&library, &other));
+    let _ = std::fs::remove_dir_all(&root);
 }

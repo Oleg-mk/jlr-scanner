@@ -19,6 +19,9 @@ pub const SESSION_REPORT_SCHEMA_VERSION: u32 = 1;
 pub const SESSION_MODE_BENCH: &str = "bench";
 pub const SESSION_MODE_REAL: &str = "real";
 
+/// How many answers about the voltage at the connector a bundle keeps.
+pub const ADAPTER_VOLTAGE_READS_KEPT: usize = 5_000;
+
 pub struct SessionReportService {
     started_unix_ms: u128,
     captures: Vec<Value>,
@@ -43,6 +46,10 @@ pub struct SessionReportService {
     /// Runs of a routine a module declares (`ADR-0036`, step 2), each with
     /// every exchange and the result as the module wrote it.
     routine_runs: Vec<Value>,
+    /// The voltage at the connector, each answer the adapter gave
+    /// (ADR-0030, amended 2026-11-15). Not a record of the car: it never
+    /// makes a report available by itself, and the intake ignores it.
+    adapter_voltage_reads: Vec<Value>,
     /// The service mode (`ADR-0036`): on for this session after the person's
     /// consent, off on every start and every new session, never remembered.
     service_mode: bool,
@@ -67,6 +74,7 @@ impl SessionReportService {
             battery_reads: Vec::new(),
             dtc_clears: Vec::new(),
             routine_runs: Vec::new(),
+            adapter_voltage_reads: Vec::new(),
             service_mode: false,
             mode: None,
             bench_scenario: None,
@@ -188,6 +196,18 @@ impl SessionReportService {
     }
 
     /// One run of a routine, with every exchange and its result (`ADR-0036`, step 2).
+    /// One answer about the voltage at the connector. The oldest are let go
+    /// past `ADAPTER_VOLTAGE_READS_KEPT`: a reading every five seconds is a
+    /// few thousand in an afternoon.
+    pub fn add_adapter_voltage_read(&mut self, json: &str) -> Result<(), String> {
+        self.adapter_voltage_reads.push(parse(json)?);
+        if self.adapter_voltage_reads.len() > ADAPTER_VOLTAGE_READS_KEPT {
+            let excess = self.adapter_voltage_reads.len() - ADAPTER_VOLTAGE_READS_KEPT;
+            self.adapter_voltage_reads.drain(..excess);
+        }
+        Ok(())
+    }
+
     pub fn add_routine_run(&mut self, json: &str) -> Result<(), String> {
         self.routine_runs.push(parse(json)?);
         Ok(())
@@ -235,6 +255,7 @@ impl SessionReportService {
             "battery_reads": self.battery_reads,
             "dtc_clears": self.dtc_clears,
             "routine_runs": self.routine_runs,
+            "adapter_voltage_reads": self.adapter_voltage_reads,
         });
         serde_json::to_string_pretty(&bundle).map_err(|error| error.to_string())
     }

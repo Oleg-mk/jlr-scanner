@@ -941,6 +941,50 @@ fn a_module_behind_a_network_addressed_gateway_is_a_hypothesis_on_its_main_bus()
         .any(|reason| reason.contains("ADR-0039")));
 }
 
+/// The platform document's `<fitment>` reaches each surveyed module
+/// verbatim, so a silent optional module can be drawn as SDD draws it -
+/// not fitted - and only a silent mandatory one as a fault.
+#[test]
+fn every_surveyed_module_carries_the_fitment_its_platform_document_states() {
+    let survey = library().survey(&vehicle());
+    let fitment = |family: &str| {
+        survey
+            .modules
+            .iter()
+            .find(|module| module.ecu_family == family)
+            .unwrap_or_else(|| panic!("{family} surveyed"))
+            .fitment
+            .clone()
+    };
+    assert_eq!(fitment("SYNTHMOD").as_deref(), Some("mandatory"));
+    assert_eq!(fitment("TVMOD").as_deref(), Some("optional"));
+}
+
+/// The module SDD connects another through before reading it reaches the
+/// survey as what it is - the module and the method, by name - so a silent
+/// OTHERMOD is drawn as waiting for a wake-up this stage does not send.
+#[test]
+fn a_module_sdd_connects_through_another_says_so_in_the_survey() {
+    let survey = library().survey(&vehicle());
+    let wake = |family: &str| {
+        survey
+            .modules
+            .iter()
+            .find(|module| module.ecu_family == family)
+            .unwrap_or_else(|| panic!("{family} surveyed"))
+            .wake
+            .clone()
+    };
+    assert_eq!(
+        wake("OTHERMOD"),
+        Some(app_contracts::WakeSummary {
+            module: "SYNTHMOD_SYSTEM_A".into(),
+            method: "OTHERMOD_CONNECT_01".into(),
+        })
+    );
+    assert_eq!(wake("SYNTHMOD"), None);
+}
+
 /// ADR-0034, amended 2026-10-03: the parameter names come in SDD's Russian
 /// beside the English, joined by the structure both packs share, one list
 /// per language in the parameters' order.

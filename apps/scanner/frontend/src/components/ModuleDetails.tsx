@@ -333,6 +333,14 @@ export function ModuleDetails({
               )}
             </p>
           ) : null}
+          {module.wake !== undefined && module.wake !== null ? (
+            <p className="button-hint" role="note">
+              {t(
+                "SDD connects this module through {module} first ({method}); this read-only stage does not, so expect no answer until a later stage sends that command.",
+                { module: module.wake.module, method: module.wake.method },
+              )}
+            </p>
+          ) : null}
           {!adapterReady ? (
             <p className="button-hint">{t("Connect and verify MongoosePro JLR to enable reads.")}</p>
           ) : null}

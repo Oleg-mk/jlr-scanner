@@ -82,42 +82,8 @@ impl ModuleReadService {
                 ),
             ),
         };
-        let resolution = DiagnosticEnvironmentResolver::resolve_ecu_family(
-            library.store(),
-            &context,
-            &request.ecu_family,
-            capability,
-        )
-        .map_err(|error| preparation_error(error.to_string()))?;
-        let route_validation = match &resolution {
-            DiagnosticEnvironmentResolution::Resolved(plan) => {
-                validation_label(plan.validation_state).to_string()
-            }
-            DiagnosticEnvironmentResolution::Indeterminate {
-                unresolved_facts, ..
-            } => {
-                let facts: Vec<String> = unresolved_facts
-                    .iter()
-                    .map(|fact| format!("{:?}: {}", fact.field, fact.reason))
-                    .collect();
-                return Err(preparation_error(format!(
-                    "the route to {} cannot be resolved from the loaded data: {}",
-                    request.ecu_family,
-                    facts.join("; ")
-                )));
-            }
-            DiagnosticEnvironmentResolution::Conflict { conflicts, .. } => {
-                let fields: Vec<String> = conflicts
-                    .iter()
-                    .map(|conflict| format!("{:?}", conflict.field))
-                    .collect();
-                return Err(preparation_error(format!(
-                    "the loaded data disagrees about {} for {}",
-                    fields.join(", "),
-                    request.ecu_family
-                )));
-            }
-        };
+        let (resolution, route_validation) =
+            resolve_route(library, &context, &request.ecu_family, capability)?;
 
         let target = DiagnosticTargetIdentity::family(&request.ecu_family)
             .map_err(|error| preparation_error(error.to_string()))?;
@@ -130,11 +96,7 @@ impl ModuleReadService {
                 ReadOnlyUdsIntent::read_data_by_identifier(target, identifier)
             }
         };
-        let readable = DiagnosticEnvironmentResolver::readable_identifiers(
-            library.store(),
-            &context,
-            &request.ecu_family,
-        );
+        let readable = readable_for(library, &context, &request.ecu_family);
         let transaction = prepare_read_only_transaction(&resolution, intent, &readable)
             .map_err(|error| preparation_error(error.to_string()))?;
         Ok(PreparedModuleRead {
@@ -143,7 +105,78 @@ impl ModuleReadService {
             route_validation,
         })
     }
+}
 
+/// What a module may be read by on this car: its own list, then SDD's
+/// generic identifiers it does not already hold (ADR-0044) - offered as SDD
+/// offers them, and declined by the module at read time when it lacks one.
+fn readable_for(
+    library: &KnowledgeLibrary,
+    context: &diagnostic_session::VehicleContext,
+    ecu_family: &str,
+) -> Vec<diagnostic_environment::ReadableIdentifier> {
+    let mut readable =
+        DiagnosticEnvironmentResolver::readable_identifiers(library.store(), context, ecu_family);
+    let own: std::collections::BTreeSet<u16> =
+        readable.iter().map(|entry| entry.identifier).collect();
+    readable.extend(
+        library
+            .generic_identifiers()
+            .iter()
+            .filter(|entry| !own.contains(&entry.identifier))
+            .cloned(),
+    );
+    readable
+}
+
+/// The module's route for `capability`, resolved, with its validation
+/// label; every refusal is a preparation error in the resolver's words.
+fn resolve_route(
+    library: &KnowledgeLibrary,
+    context: &diagnostic_session::VehicleContext,
+    ecu_family: &str,
+    capability: &str,
+) -> Result<(DiagnosticEnvironmentResolution, String), DiagnosticError> {
+    let resolution = DiagnosticEnvironmentResolver::resolve_ecu_family(
+        library.store(),
+        context,
+        ecu_family,
+        capability,
+    )
+    .map_err(|error| preparation_error(error.to_string()))?;
+    let route_validation = match &resolution {
+        DiagnosticEnvironmentResolution::Resolved(plan) => {
+            validation_label(plan.validation_state).to_string()
+        }
+        DiagnosticEnvironmentResolution::Indeterminate {
+            unresolved_facts, ..
+        } => {
+            let facts: Vec<String> = unresolved_facts
+                .iter()
+                .map(|fact| format!("{:?}: {}", fact.field, fact.reason))
+                .collect();
+            return Err(preparation_error(format!(
+                "the route to {} cannot be resolved from the loaded data: {}",
+                ecu_family,
+                facts.join("; ")
+            )));
+        }
+        DiagnosticEnvironmentResolution::Conflict { conflicts, .. } => {
+            let fields: Vec<String> = conflicts
+                .iter()
+                .map(|conflict| format!("{:?}", conflict.field))
+                .collect();
+            return Err(preparation_error(format!(
+                "the loaded data disagrees about {} for {}",
+                fields.join(", "),
+                ecu_family
+            )));
+        }
+    };
+    Ok((resolution, route_validation))
+}
+
+impl ModuleReadService {
     pub fn finish(
         &mut self,
         request: &ModuleReadRequest,

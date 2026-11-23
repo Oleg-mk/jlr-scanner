@@ -80,6 +80,9 @@ class IdleDiagnosticClient implements DiagnosticClient {
 }
 
 class IdleLibraryClient implements LibraryClient {
+  getGenericIdentifiers() {
+    return Promise.resolve([]);
+  }
   getLibrary(): Promise<LibrarySnapshot> {
     return Promise.resolve(createLibrarySnapshot());
   }
