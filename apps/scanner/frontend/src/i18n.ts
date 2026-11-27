@@ -237,6 +237,7 @@ const uk: Record<string, string> = {
   "The battery reads {volts} V, in SDD's low band, under {limit} V ({source}, {age}). Connect an external power supply before reading modules.":
     "Акумулятор показує {volts} В, це низька смуга за SDD, нижче {limit} В ({source}, {age}). Підключіть зовнішнє живлення, перш ніж читати модулі.",
   "from the battery monitor": "з монітора акумулятора",
+  "from {year}": "з {year}",
   "from the OBD read": "зі стандартного читання OBD",
   "from the live read": "з живого читання",
   "from the live read of {module}": "з живого читання {module}",
@@ -1588,6 +1589,7 @@ const ru: Record<string, string> = {
   "The battery reads {volts} V, in SDD's low band, under {limit} V ({source}, {age}). Connect an external power supply before reading modules.":
     "Аккумулятор показывает {volts} В, это низкая полоса по SDD, ниже {limit} В ({source}, {age}). Подключите внешнее питание, прежде чем читать модули.",
   "from the battery monitor": "с монитора аккумулятора",
+  "from {year}": "с {year}",
   "from the OBD read": "из стандартного чтения OBD",
   "from the live read": "из живого чтения",
   "from the live read of {module}": "из живого чтения {module}",

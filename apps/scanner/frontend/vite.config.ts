@@ -23,5 +23,9 @@ export default defineConfig({
   test: {
     environment: "jsdom",
     setupFiles: "./src/test/setup.ts",
+    // Two workers, not one per core: on the owner's 24-core PC a full-width
+    // run beside the app, Docker and a build froze the machine (2026-11-27).
+    // The cap lives here so that it does not depend on who types the command.
+    maxWorkers: 2,
   },
 });

@@ -404,4 +404,52 @@ describe("data library and module survey", () => {
     expect(screen.getByRole("combobox", { name: "Engine" })).toHaveValue("SYNTHENGINE");
     expect(screen.getByRole("button", { name: "Survey modules" })).toBeEnabled();
   });
+
+  it("a VIN past the last breakpoint's year picks that breakpoint, shown as open", async () => {
+    class LateVinLibraryClient extends ControlledLibraryClient {
+      getCatalogue(): Promise<VehicleCatalogueSnapshot> {
+        return Promise.resolve({
+          programmes: [
+            {
+              program: "SYNTHA",
+              markers: [
+                { marker: "MY08", modelYearFrom: 2008, modelYearTo: 2009 },
+                // The programme's last breakpoint: nothing closes it.
+                { marker: "MY10", modelYearFrom: 2010, modelYearTo: null },
+              ],
+              powertrains: ["SYNTHENGINE"],
+              variants: [],
+            },
+          ],
+        });
+      }
+      decodeVin(): Promise<VinDecodeSnapshot> {
+        return Promise.resolve({
+          vin: "SYNA102XC9AB12345",
+          valid: true,
+          message: "SDD's VIN tables read this as SYNTHA, model year 2012.",
+          decodeModel: 1,
+          candidates: [1],
+          program: "SYNTHA",
+          modelYear: 2012,
+          attributes: [],
+          tableVersion: "SDD table version: issue 1",
+          suggestedPowertrain: null,
+          suggestedVariant: null,
+        });
+      }
+    }
+    renderApp(new LateVinLibraryClient());
+    await screen.findByRole("combobox", { name: "Programme" });
+    fireEvent.change(screen.getByLabelText("VIN"), { target: { value: "SYNA102XC9AB12345" } });
+    fireEvent.click(screen.getByRole("button", { name: "Decode VIN" }));
+    expect(
+      await screen.findByText("SDD's VIN tables read this as SYNTHA, model year 2012."),
+    ).toBeVisible();
+    // 2012 lies past the last breakpoint's year, inside its open range.
+    expect(screen.getByRole("combobox", { name: "Model years" })).toHaveValue("MY10");
+    // The open marker is said as "from 2010", the closed one as its years.
+    expect(screen.getByRole("option", { name: "from 2010 (MY10)" })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "2008–2009 (MY08)" })).toBeInTheDocument();
+  });
 });

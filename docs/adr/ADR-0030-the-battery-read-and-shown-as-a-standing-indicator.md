@@ -492,6 +492,14 @@ that so, and neither was analysed when it was written:
   the owner's adapter in USB, nothing on the OBD side, when he says so: the
   command answered with status 0, and a value at or near zero with no
   voltage on pin 16. Body +8 of the answer recorded, whatever it is.
+  *Measured 2026-11-15 and 2026-11-27, 128 reads over two sessions:*
+  *status 0 every time, body +8 always `0x00000003` (the value id, as*
+  *guessed above — now an observation, still not a meaning), and the value*
+  *not near zero but wandering 0–7.9 V, every raw value a whole multiple of*
+  *35.44 mV. The exchange is confirmed; the value on a bare adapter is*
+  *noise, and nothing was proven about its scale either way. The owner's*
+  *decision (2026-11-27): shown as the firmware gives it, no hedging note;*
+  *the tester's car session decides.*
 - `VEHICLE_CONFIRMED`: a tester's session — the key showing a voltage from
   the connect on, and the same rail within a few tenths of a volt as the
   legislated `0x42`, read in the same session.

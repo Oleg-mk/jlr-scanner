@@ -216,7 +216,8 @@ export function useLibraryController(client: LibraryClient) {
                 (entry) =>
                   entry.modelYearFrom !== null &&
                   entry.modelYearFrom <= decoded.modelYear! &&
-                  (entry.modelYearTo ?? entry.modelYearFrom) >= decoded.modelYear!,
+                  // The last breakpoint's range is open above (no to-year).
+                  (entry.modelYearTo ?? Number.POSITIVE_INFINITY) >= decoded.modelYear!,
               );
         setVehicle((current) => ({
           ...current,

@@ -1,6 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { demoCatalogue, demoSurvey } from "./demoVehicle";
 import { browserDemoEnabled } from "./adapter";
+import { t } from "./i18n";
 
 export type LibraryState = "NOT_LOADED" | "LOADED" | "PARTIALLY_LOADED" | "FAILED";
 
@@ -423,12 +424,17 @@ export const defaultLibraryClient: LibraryClient = hasTauriRuntime()
   ? new TauriLibraryClient()
   : new BrowserLibraryClient();
 
-/** The model years a catalogue marker stands for, as shown to the user. */
+/**
+ * The model years a catalogue marker stands for, as shown to the user. The
+ * programme's last breakpoint has no later one to close it, so the data
+ * leaves its range open above; it is said as "from <year>", not as that one
+ * year (an L322 of 2012 belongs to MY10, SDD's last L322 breakpoint).
+ */
 export function markerLabel(marker: { marker: string; modelYearFrom: number | null; modelYearTo: number | null }) {
   if (marker.modelYearFrom === null) return marker.marker;
-  const to =
-    marker.modelYearTo !== null && marker.modelYearTo !== marker.modelYearFrom
-      ? `–${marker.modelYearTo}`
-      : "";
+  if (marker.modelYearTo === null) {
+    return `${t("from {year}", { year: marker.modelYearFrom })} (${marker.marker})`;
+  }
+  const to = marker.modelYearTo !== marker.modelYearFrom ? `–${marker.modelYearTo}` : "";
   return `${marker.modelYearFrom}${to} (${marker.marker})`;
 }
