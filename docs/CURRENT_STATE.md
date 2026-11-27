@@ -178,6 +178,56 @@ Discovery 4 copy by a private link, the step to load it, and a request for
 whatever happens — a crash included, his being the first run of this
 product on a real 32-bit machine. Waiting for his report.
 
+## 2026-11-27 — the bare adapter's voltage said as it is, the L322's last breakpoint read as open, build 1.2.10
+
+**The connector voltage, measured on the bench and closed there.** Two
+sessions of the owner's adapter in USB with nothing known on the OBD side
+(2026-11-15, 108 reads; 2026-11-27, 20 reads): the `cGetValue` of value
+id 3 answered every time with status `0x00000000` (`eSuccess`), body +8
+always `0x00000003`, and a value wandering between 0 and 7.9 V with no
+pattern — every one of the 29 distinct raw values a whole multiple of
+35.44 mV. That is all the bench says: the exchange works, the value on a
+bare adapter is noise. The figure "12.45 V read as ~36 V", carried in the
+2026-11-23 status from another session's note, was never seen by the owner
+and is withdrawn. He also closed the bench itself: a value the adapter
+measures is calibrated from a tester's session on a car, where the adapter
+sits in the J1962 socket, not from a battery on a desk; the value is shown
+as the firmware gives it, with no hedging note in the interface
+(«для того і є тестери, які не знають нашу кухню»), and the first car
+session decides. `ADR-0030`'s hardware gate is annotated accordingly; the
+scale stays `NOT_YET_VALIDATED`.
+
+**The programme's last breakpoint.** A tester candidate with an L322 of
+model year 2012 (issue #1) got no breakpoint from the catalogue: SDD's
+L322 data ends with `MY10`, whose range the timeline leaves open above
+(`model_year_to` null), and the interface read that open end as the one
+year 2010 — the label said "2010 (MY10)" and a VIN of 2012 matched
+nothing. The marker is now said as "from 2010" (uk «з 2010», ru «с 2010»)
+and a VIN past the last breakpoint's year pre-selects it; one frontend
+test covers both (`ModuleSurvey.test.tsx`). The library needs no re-export.
+
+**The test run capped.** A full-width frontend test run (one worker per
+core, beside the app, Docker and a build) froze the development PC; the cap
+of two workers now lives in `vite.config.ts`, so it does not depend on who
+types the command.
+
+Build 1.2.10, the same day, on the owner's word («пуш після зеленого
+preflight»): commit 89dab28, the preflight passed on that commit before the
+push, tag `v1.2.10` pushed by name, run 46003774603, all five jobs green.
+Windows x64 ProwlOne_1.2.10_x64-setup.exe, 5,952,672 bytes, SHA-256
+e2266639cb0c96598ec0ca147afcfcc0cef0b93898e27ea73544be2f9e0be5c0; Windows
+x86 ProwlOne_1.2.10_x86-setup.exe, 5,659,011 bytes, SHA-256
+42c3dcf474a31029e0c25588f41379742d92a5c78e62e430b037cb4050b76fe5; macOS
+ProwlOne_1.2.10_universal.dmg, 16,179,411 bytes, SHA-256
+3c3990af606733c3777da7008a8acf2ead41b50906c15759c12c73409a15f425. All three
+in `Desktop\ProwlOne-1.2.10` beside the owner's library zip `CBBC-3BEE`;
+the 1.2.9 folder moved to `Downloads\prowlone-superseded\ProwlOne-1.2.9`.
+Published on the Releases page as a pre-release under the standing rule.
+Libraries for the testers: the Discovery 4 tester's `3556-4E52` (90 days,
+cut 2026-11-23) and, cut the same day on the owner's word, the L322
+tester's copy with the Russian pack kept, 60 days to 2027-01-26; both go
+by email, neither handed over yet.
+
 ## 2026-11-23 — fitment, the configuration decoder, SDD's generic identifiers; the sweep withdrawn
 
 Three corrections the first tester's files of 2026-11-15 and his SDD screens exposed, each built, verified
