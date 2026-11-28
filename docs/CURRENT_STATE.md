@@ -178,6 +178,42 @@ Discovery 4 copy by a private link, the step to load it, and a request for
 whatever happens — a crash included, his being the first run of this
 product on a real 32-bit machine. Waiting for his report.
 
+## 2026-11-28 — the cable on Apple silicon, confirmed by a tester; reading on the move allowed with a passenger
+
+**The L322 tester's first report (issue #1, his words, no session file yet).**
+On 1.2.10 with his library: the copy loaded (8,812 manifests, the
+issued-to line shown), his VIN decoded as L322, 2012, 4.4 V8 diesel, and
+`MY10` was pre-selected on its own — the open-breakpoint fix of 2026-11-27
+confirmed in a tester's hands. The virtual vehicle answered: 46 modules,
+36 reachable, scenario 1's codes with their descriptions. **His clone
+MongoosePro JLR arrived and is seen on his Mac with no driver: macOS
+27.0.1, Apple silicon, the system lists it as "Drew Technologies Inc."
+`18E1:0104` on a `/dev/cu.usbmodem…` port; the application found it,
+connected, verified the board link (board-info answered), transport USB
+CDC/Serial; listening with no car: silence, no error.** This is the first
+Apple-silicon and macOS 27 confirmation in writing, and the first cheap
+clone other than the owner's own that reports the same USB identity. State:
+`HARDWARE_CONFIRMED` by his words; `VEHICLE_CONFIRMED` waits for his car,
+at a workshop, first real read expected in about two weeks with a session
+file.
+
+**Reading on the move, decided.** He asked for live reading while driving
+— a converter lock-up shudder on a cold ZF 8HP70 at 22–25 km/h, climate
+regulation on the move, boost on a climb — with a passenger at the laptop.
+The owner allowed it on 2026-11-28: the standing-car rule of `ADR-0022`
+(2026-09-17) is reversed, the condition is that a passenger runs the
+application and the driver only drives; the mechanism is unchanged (ten
+requests a second at most, one at a time, ten minutes a run, every value
+timed in the report). Both tester guides and the ADR say so in this
+commit. His other questions, answered from the data: the TCM of the L322
+from 2010 has SDD's routine `Clear adaption values` (`0x4013`, service
+`0x31`) — stage 2 material, after the fault-code clear, no date; SDD ties
+no lock-up clutch parameter to the L322's TCM itself, only to TCMs in
+general (`0xD90D`, `0xDA11`, `0xDA31`) and to the generic catalogue
+(`0x1E24`, `0xDA07`, `0xDA50`…), all of which 1.2.10 offers under the TCM
+for the module to answer or decline; a measured solenoid current or
+measured slip for this gearbox SDD does not name.
+
 ## 2026-11-27 — the bare adapter's voltage said as it is, the L322's last breakpoint read as open, build 1.2.10
 
 **The connector voltage, measured on the bench and closed there.** Two

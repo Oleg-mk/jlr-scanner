@@ -466,8 +466,12 @@ than ten minutes a run, one request at a time, and Stop gets through between
 two requests. An entry that is silent or refused three rounds running is
 dropped from the set, with its reason. All of it is read-only.
 
-**The vehicle must be standing**, engine running or not. This is a
-diagnostic instrument for a stationary car, not for driving.
+**Reading while driving is allowed on one condition: a passenger runs
+the application.** The driver drives and never touches the laptop. Some
+faults show only on the move — a shudder at a given speed, boost on a
+climb — and a run of a few parameters, each read a few times a second,
+catches them; the report keeps every value with its time. With the engine
+running or not and the car standing, nothing changes.
 
 The whole run joins the session report: every value with the milliseconds
 since the run began, the raw bytes, and the library's own decode.

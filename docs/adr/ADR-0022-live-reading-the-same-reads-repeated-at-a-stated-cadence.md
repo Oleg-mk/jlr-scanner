@@ -160,9 +160,16 @@ that runs for minutes while a person watches.
 - **Bus error counters** (TEC, REC): those belong to the adapter, and
   whether the MongoosePro exposes them is unverified. Bus load computed
   from the product's own capture is a small matter and is not held back.
-- **Use in a moving car.** The live view is a diagnostic instrument for a
-  standing vehicle, engine running or not. Both tester guides will say so
-  in the same change that ships it.
+- **Use in a moving car.** Decided on 2026-09-17 as "a diagnostic
+  instrument for a standing vehicle"; **reversed by the owner on
+  2026-11-28** at a tester's question (the L322 tester, issue #1: a
+  converter lock-up shudder at 22–25 km/h on a cold ZF 8HP70, climate
+  regulation on the move, boost on a climb — faults that show only while
+  driving): reading on the move is allowed when a passenger runs the
+  application and the driver only drives. Nothing in the mechanism changes
+  — the same cadence floor, the same one-request-at-a-time, the same
+  ten-minute cap, every value with its time in the report. Both tester
+  guides say so in the same change.
 
 ## Consequences
 
