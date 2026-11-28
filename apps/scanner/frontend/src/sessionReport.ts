@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import { browserDemoState } from "./browserDemoState";
 import { saveTextFile } from "./files";
 import { t } from "./i18n";
 
@@ -64,7 +65,9 @@ class TauriSessionReportClient implements SessionReportClient {
 /** The browser preview records nothing, so there is never a report to save. */
 class BrowserSessionReportClient implements SessionReportClient {
   getState(): Promise<SessionReportSnapshot> {
-    return Promise.resolve(createSessionReportSnapshot());
+    // The one thing the preview's session knows: whether the service mode
+    // is on, as the preview's service client set it.
+    return Promise.resolve({ ...createSessionReportSnapshot(), serviceMode: browserDemoState.serviceMode });
   }
 
   getReportJson(): Promise<string> {

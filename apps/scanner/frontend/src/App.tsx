@@ -749,6 +749,7 @@ export function App({
                       routineRun={routine.snapshot}
                       routineBusy={routine.busy}
                       onRunTest={(ecuFamily, testId) => void routine.start(ecuFamily, testId)}
+                      onRunReset={(ecuFamily, identifier) => void routine.start(ecuFamily, "", identifier)}
                       onStopTest={() => void routine.stop()}
                     />
                   </div>

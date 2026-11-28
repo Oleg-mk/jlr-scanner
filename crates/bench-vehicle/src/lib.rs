@@ -428,6 +428,20 @@ impl BenchVehicle {
                         vec![0x71, sub, 0x02, 0x02]
                     }
                 }
+                // A reset (ADR-0036, amendment of 2026-11-28): 0x0406 "Reset
+                // All Adaptions", in the extended session only. The start's
+                // answer carries its one status byte and is the result; a
+                // request for results or a stop afterwards is out of
+                // sequence, as a module that keeps no result says.
+                (Some(&sub), Some([0x04, 0x06])) if (0x01..=0x03).contains(&sub) => {
+                    if module.session != EXTENDED_SESSION {
+                        vec![0x7F, 0x31, 0x7F]
+                    } else if sub == 0x01 {
+                        vec![0x71, 0x01, 0x04, 0x06, 0x00]
+                    } else {
+                        vec![0x7F, 0x31, 0x24]
+                    }
+                }
                 (Some(_), Some(_)) => vec![0x7F, 0x31, 0x31],
                 _ => vec![0x7F, 0x31, 0x13],
             },

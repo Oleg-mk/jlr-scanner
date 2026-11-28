@@ -147,15 +147,18 @@ const MY14_ROWS: Row[] = [
 const DEMO_ACCEPTED_OPERATIONS: Record<string, AcceptedOperationSummary[]> = {
   PCM: [
     {
+      // A reset of the reviewed table (ADR-0036, 2026-11-28), under a name
+      // SDD writes it with, marked runnable as the survey marks it.
       kind: "ROUTINE",
       identifier: "0x0406",
-      name: "Synthetic clear adaption values",
+      name: "Clear adaption values",
       service: "0x31",
       sessions: ["03"],
       security: null,
-      maxRunTime: "30",
+      maxRunTime: null,
       restartWhileRunning: "no",
       safetyClass: "SERVICE_ROUTINE",
+      runnable: "LEARNED_VALUES",
     },
     {
       kind: "WRITE",

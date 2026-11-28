@@ -122,6 +122,32 @@ const surveyed: ModuleSurveyEntry[] = [
         restartWhileRunning: null,
         safetyClass: "SERVICE_ROUTINE",
       },
+      // A reset of the reviewed table (ADR-0036, 2026-11-28), marked by the
+      // survey; and one the table does not cover, listed as before.
+      {
+        kind: "ROUTINE",
+        identifier: "0x0406",
+        name: "Clear adaption values",
+        service: "0x31",
+        sessions: ["03"],
+        security: null,
+        maxRunTime: null,
+        restartWhileRunning: "no",
+        safetyClass: "SERVICE_ROUTINE",
+        runnable: "LEARNED_VALUES",
+      },
+      {
+        kind: "ROUTINE",
+        identifier: "0x0404",
+        name: "VIN learn",
+        service: "0x31",
+        sessions: ["03"],
+        security: null,
+        maxRunTime: null,
+        restartWhileRunning: "no",
+        safetyClass: "SERVICE_ROUTINE",
+        runnable: null,
+      },
     ],
   },
 ];
@@ -295,26 +321,50 @@ class RecordingRoutineClient implements RoutineRunClient {
   }
   start(request: RoutineRunRequest) {
     this.starts.push(request);
+    const reset = request.routine ?? null;
     this.last = {
       ...createRoutineRunSnapshot(),
       state: "RUNNING",
       ecuFamily: request.ecuFamily,
+      routine: reset ?? "0x0202",
       testId: request.testId,
-      testName: "ODST_0202_PCM_HLP",
+      testName: reset === null ? "ODST_0202_PCM_HLP" : "Clear adaption values",
+      kind: reset === null ? "SELF_TEST" : "LEARNED_VALUES",
+      screen: reset === null,
       routeId: "hs-can",
       routeValidation: "SYNTHETIC",
       session: "0x03",
-      timeMs: 3000,
-      timeoutMs: 5000,
+      timeMs: reset === null ? 3000 : 0,
+      timeoutMs: reset === null ? 5000 : 0,
+      resultHex: reset === null ? null : "00",
       exchanges: [
         ["10 03", "50 03 00 32 01 F4"],
-        ["31 01 02 02", "71 01 02 02"],
+        reset === null ? ["31 01 02 02", "71 01 02 02"] : ["31 01 04 06", "71 01 04 06 00"],
       ],
     };
     return Promise.resolve(this.last);
   }
   step() {
     this.steps += 1;
+    if (this.last.state === "RUNNING" && !this.last.screen) {
+      // A reset: the start answered, the results request is out of sequence.
+      this.last = {
+        ...this.last,
+        state: "COMPLETED",
+        refusal: "RequestSequenceError",
+        elapsedMs: 120,
+        codesAfter: [],
+        codesFound: [],
+        exchanges: [
+          ...this.last.exchanges,
+          ["3E 00", "7E 00"],
+          ["31 03 04 06", "7F 31 24"],
+          ["10 01", "50 01 00 32 01 F4"],
+        ],
+        reportAvailable: true,
+      };
+      return Promise.resolve(this.last);
+    }
     if (this.last.state === "RUNNING" && this.steps >= 2) {
       this.last = {
         ...this.last,
@@ -595,6 +645,53 @@ describe("the service mode (ADR-0036)", () => {
     expect(
       screen.getByText("The result is shown as the module answers it; this library does not describe it."),
     ).toBeVisible();
+  });
+
+  /**
+   * A reset of the reviewed table (ADR-0036, amendment of 2026-11-28):
+   * listed under what the module will accept as before while the mode is
+   * off; in the mode, one key under the entry the survey marked runnable
+   * and none under the one it did not, one plain question saying what the
+   * reset does, then the start, the one step that ends it, and the answer
+   * as the module gave it.
+   */
+  it("runs a reviewed reset after one plain question and shows the start's answer as the result", async () => {
+    const session = new RecordingSessionClient();
+    const service = new RecordingServiceClient(session);
+    const routine = new RecordingRoutineClient();
+    renderApp(service, session, new TwoCodesClient(), undefined, surveyed, routine);
+    await screen.findByRole("button", { name: "Service mode" });
+    fireEvent.change(screen.getByLabelText("Programme"), { target: { value: "L405" } });
+    fireEvent.click(screen.getByRole("button", { name: "Survey modules" }));
+    fireEvent.click(await screen.findByRole("button", { name: "PCM: Reachable" }));
+    await screen.findByRole("heading", { name: "PCM" });
+    fireEvent.click(screen.getByText("What this module will accept"));
+    expect(screen.getByText("Clear adaption values")).toBeInTheDocument();
+    expect(screen.getByText("VIN learn")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Run the routine" })).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "Service mode" }));
+    fireEvent.click(screen.getByRole("button", { name: "Turn the service mode on" }));
+    // One key: under the reset the table covers, none under the VIN learn.
+    const keys = await screen.findAllByRole("button", { name: "Run the routine" });
+    expect(keys).toHaveLength(1);
+    fireEvent.click(keys[0]);
+    const question = screen.getByRole("dialog", { name: "Run Clear adaption values on PCM" });
+    expect(
+      within(question).getByText(
+        "The module forgets what it has learned and learns it again as the car is driven; until then it may behave differently.",
+      ),
+    ).toBeVisible();
+    expect(within(question).getByText(/SERVICE_ROUTINE/)).toBeVisible();
+    fireEvent.click(within(question).getByRole("button", { name: "Run Clear adaption values on PCM" }));
+
+    await waitFor(() => expect(routine.starts).toHaveLength(1));
+    expect(routine.starts[0]).toMatchObject({ ecuFamily: "PCM", testId: "", routine: "0x0406" });
+    // The start's answer is the result; the results request's refusal is
+    // said beside it, not against it.
+    expect(await screen.findByText(/The module answered: 00/)).toBeVisible();
+    expect(screen.getByText(/the module keeps no result to ask for: RequestSequenceError/)).toBeVisible();
+    expect(screen.getByText("No new code after the routine; the module holds 0 code(s).")).toBeVisible();
   });
 
   it("repeats the low-battery line in the clear's confirmation (ADR-0030, 2026-09-19)", async () => {

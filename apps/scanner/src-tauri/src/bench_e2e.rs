@@ -549,9 +549,11 @@ fn the_bench_connects_without_a_port_reads_the_surveyed_vehicle_and_marks_everyt
         .find(|module| module.ecu_family == "SYNTHMOD")
         .expect("SYNTHMOD is surveyed");
     // What this module declares it will accept, on the bench, in the order
-    // and the words the panel shows (`ADR-0035`). Six rows over the two
+    // and the words the panel shows (`ADR-0035`). Seven rows over the two
     // sections of the index: two identifiers it takes a value for, one output
-    // it lets be driven, three routines it runs itself.
+    // it lets be driven, four routines it runs itself - one of them, 0x0406
+    // under the name "Reset All Adaptions", in the reviewed table of
+    // ADR-0036 (2026-11-28) and so marked runnable; the others not.
     let accepted = &synthmod.accepted_operations;
     let listed: Vec<(&str, &str, &str)> = accepted
         .iter()
@@ -569,6 +571,7 @@ fn the_bench_connects_without_a_port_reads_the_surveyed_vehicle_and_marks_everyt
             ("CONTROL", "0x0300", "VOLATILE_CONTROL"),
             ("ROUTINE", "0x0202", "SERVICE_ROUTINE"),
             ("ROUTINE", "0x0400", "SERVICE_ROUTINE"),
+            ("ROUTINE", "0x0406", "SERVICE_ROUTINE"),
             ("ROUTINE", "0x0500", "SERVICE_ROUTINE"),
             ("WRITE", "0x0200", "PERSISTENT_CHANGE"),
             ("WRITE", "0x0500", "PERSISTENT_CHANGE"),
@@ -596,6 +599,23 @@ fn the_bench_connects_without_a_port_reads_the_surveyed_vehicle_and_marks_everyt
     assert_eq!(clear_adaptions.service.as_deref(), Some("0x31"));
     assert_eq!(clear_adaptions.max_run_time.as_deref(), Some("30"));
     assert_eq!(clear_adaptions.restart_while_running.as_deref(), Some("no"));
+    assert_eq!(
+        clear_adaptions.runnable, None,
+        "0x0400 'Synthetic clear adaptions' is no line of the reviewed table"
+    );
+    let reset = accepted
+        .iter()
+        .find(|operation| operation.identifier == "0x0406")
+        .expect("the reset is listed");
+    assert_eq!(reset.name.as_deref(), Some("Reset All Adaptions"));
+    assert_eq!(reset.runnable.as_deref(), Some("LEARNED_VALUES"));
+    assert!(
+        accepted
+            .iter()
+            .filter(|operation| operation.identifier != "0x0406")
+            .all(|operation| operation.runnable.is_none()),
+        "{accepted:?}"
+    );
     // A module that declares none of this is given none of it.
     let othermod = survey
         .modules
@@ -1477,6 +1497,7 @@ fn the_bench_connects_without_a_port_reads_the_surveyed_vehicle_and_marks_everyt
     let routine_request = RoutineRunRequest {
         ecu_family: "SYNTHMOD".into(),
         test_id: "202".into(),
+        routine: None,
         context: vehicle(),
     };
     let routine_prepared =
@@ -1606,13 +1627,110 @@ fn the_bench_connects_without_a_port_reads_the_surveyed_vehicle_and_marks_everyt
     let cold = RoutineRunRequest {
         ecu_family: "SYNTHMOD".into(),
         test_id: "14".into(),
+        routine: None,
         context: vehicle(),
     };
     assert!(
         RoutineRunService::prepare(session.library(), synthmod, &cold).is_err(),
-        "only the self test is run in this step"
+        "only the self test is run through a screen"
     );
     let _ = RoutineDue::KeepAlive;
+
+    // A reset of the reviewed table (ADR-0036, amendment of 2026-11-28):
+    // 0x0406 "Reset All Adaptions", declared by SYNTHMOD's index under a name
+    // the table covers. No screen and no time: the start opens the extended
+    // session and its answer is the result; the request for results that
+    // follows at once is refused as out of sequence, which ends the run
+    // complete and brings the module back.
+    let reset_request = RoutineRunRequest {
+        ecu_family: "SYNTHMOD".into(),
+        test_id: String::new(),
+        routine: Some("0x0406".into()),
+        context: vehicle(),
+    };
+    let reset_prepared = RoutineRunService::prepare(session.library(), synthmod, &reset_request)
+        .expect("the index declares 0x0406 under a reviewed name");
+    assert!(!reset_prepared.screen);
+    assert_eq!(
+        reset_prepared.routine.kind(),
+        uds_execution::RoutineKind::LearnedValues
+    );
+    assert_eq!(reset_prepared.routine.name(), "Reset All Adaptions");
+    assert_eq!(
+        reset_prepared.start.transaction().encoded_payload(),
+        [0x31, 0x01, 0x04, 0x06]
+    );
+    let mut reset = RoutineRunService::new();
+    let started = adapter
+        .execute_uds_service(&reset_prepared.start, ROUTINE_STEP_TIMEOUT)
+        .expect("the bench is connected");
+    let before_reset = reads.last_fault_codes("SYNTHMOD").cloned();
+    let running = reset.start(
+        &reset_request,
+        reset_prepared,
+        Some(&info),
+        before_reset.as_ref(),
+        true,
+        started,
+    );
+    assert_eq!(running.state, RoutineRunState::Running, "{running:?}");
+    assert_eq!(running.routine, "0x0406");
+    assert_eq!(running.kind, "LEARNED_VALUES");
+    assert!(!running.screen);
+    assert_eq!(
+        running.result_hex.as_deref(),
+        Some("00"),
+        "the start's answer is the result"
+    );
+    // No time to wait through: the request for results is due at once.
+    assert_eq!(reset.next_due(), Some(RoutineDue::RequestResults));
+    let results = adapter
+        .execute_uds_service(reset.prepared_results().unwrap(), reset.results_timeout())
+        .expect("the bench is connected");
+    let done = reset.record_results(results);
+    assert_eq!(done.state, RoutineRunState::Completed, "{done:?}");
+    assert_eq!(done.result_hex.as_deref(), Some("00"));
+    assert_eq!(done.refusal.as_deref(), Some("RequestSequenceError"));
+    let requests: Vec<&str> = done
+        .exchanges
+        .iter()
+        .map(|(request, _)| request.as_str())
+        .collect();
+    assert_eq!(
+        requests,
+        ["10 03", "31 01 04 06", "3E 00", "31 03 04 06", "10 01"],
+        "the session opened, the start, the keep-alive, the results refused, the way back"
+    );
+    let reset_json = reset
+        .take_report_json()
+        .expect("the record of a run that ended");
+    assert!(
+        reset_json.contains("\"kind\": \"LEARNED_VALUES\""),
+        "{reset_json}"
+    );
+    assert!(reset_json.contains("\"screen\": false"), "{reset_json}");
+    assert!(
+        reset_json.contains("\"test_name\": \"Reset All Adaptions\""),
+        "{reset_json}"
+    );
+    assert!(
+        reset_json.contains("\"routine\": \"0x0406\""),
+        "{reset_json}"
+    );
+    // A routine the index declares under a name outside the table is not
+    // run, nor is one the index does not declare at all.
+    for asked in ["0x0400", "0x4013"] {
+        let unlisted = RoutineRunRequest {
+            ecu_family: "SYNTHMOD".into(),
+            test_id: String::new(),
+            routine: Some(asked.into()),
+            context: vehicle(),
+        };
+        assert!(
+            RoutineRunService::prepare(session.library(), synthmod, &unlisted).is_err(),
+            "{asked} is not run"
+        );
+    }
 
     // The session is a bench session: it says so in the bundle, it refuses a
     // real adapter once it holds records, and the intake refuses the bundle.

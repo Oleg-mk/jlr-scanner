@@ -541,3 +541,191 @@ day; the library never is. And the version column of decision 1 was a plan:
 1.2.2 and 1.2.3 went out on 2026-10-03 carrying other work (SDD's Russian
 names in every row; the lamp beating as the owner's car's button does), so
 steps 3 and 4 take the numbers after them.
+
+## Amendment, 2026-11-28: step 2 widened — the resets a module declares, from a reviewed list
+
+- Status: **Accepted, 2026-11-28** — written first, on the owner's word
+  («так, починай з поправки до ADR-0036»), before any code, as decision 10
+  asks; accepted the same day («приймаю»), with his reading confirmed: the
+  table is returned to as the work needs — an entry added or removed is one
+  line of it with its date, not a new record.
+
+### Context
+
+The L322 tester (issue #1) asked, with his car at a workshop and a session
+on it two weeks away, whether the product will run SDD's `Clear adaption
+values` on his gearbox's TCM. The owner's reasoning the same day: nothing
+stops stage 2 from going on at the desk, and a car to correct on arrives in
+two weeks. Step 2 as built runs one routine, `0x0202`, and only where the
+ODST pack gives it a screen. This amendment widens it by one class of
+routine — the ones that make a module forget a learned value, a counter or
+a record — and nothing else.
+
+What the data holds, read on 2026-11-28 from the current export
+(535,920 records): **8,095 routine declarations over 1,610 module contexts,
+253 distinct identifiers, 323 distinct names**, every one `service=0x31`;
+`session=03` in 8,089 of them and `01` in six (gearbox routines of a few
+TCMs); **no security level on any** (`mdx.rs` found none in the corpus);
+**no run time on any** — `MAX_ROUTINE_RUN_TIME` is empty in every record,
+so the only routine the data times is the self test, through its ODST
+screen; `restart_while_running=yes` on 47. And one fact that shapes the
+rule: **an identifier alone names nothing.** `0x4013` is `Clear adaption
+values` on a TCM and `Oil change reset` on a PCM; `0x400D` is an air
+conditioning adaption clear on a PCM and a compressor protection counter on
+an HVAC; `0xDC02` is `Voltage Override` on one module and `Oil change
+reset` on another; `0xF001` is `Open tailgate` on a tailgate module and
+`Telematics operational mode` on a TCU; `0xF002` is `Close tailgate` and,
+on one TCM, `Clear Adaptations`. The name in the module's own record is
+what identifies a routine; the number is its address.
+
+The 253 include what this product must never send: `VIN learn` (`0x0404`,
+1,308 declarations), key programming and erasure, immobilisation,
+security initialisation and PATS access (`0x0401`, `0x301E`, `0x301F`,
+`0x716B`–`0x717E`, `0x8004`, `0x2022`, `0x2044`, `0x2045`, `0x6045`–`0x6049`,
+`0x800D`), software update and programming (`0x2036`, `0x020D`, `0x716E`),
+EEPROM and data-flash erasure (`0x0408`, `0x3003`, `0xDC01`), plant and
+build modes, central configuration (`0x0E00`–`0x0E0B`), and a hundred
+routines that move, energise, prime, deflate, deploy, apply or release
+something. "Every routine the module declares" cannot be offered; a list
+reviewed by name can.
+
+### Decision 11
+
+1. **What is run.** A routine is offered on a module only where two things
+   agree: the module's own index record declares the identifier for this
+   car, and **the pair (identifier, name as the record writes it)** is in
+   the reviewed table below — the name compared with case and surrounding
+   whitespace ignored. A declaration whose name is not in the table under
+   that identifier is listed in the module panel as before and not run.
+   The self test keeps its own rule (decision 10) and its own mechanics.
+
+2. **The reviewed table, first filling: resets.** Routines whose name says
+   the module forgets a learned value, a counter or a record; none moves
+   anything, none takes a parameter, none names a security level.
+
+   | Identifier | Names covered (as the data writes them) | Declared by |
+   | --- | --- | --- |
+   | `0x0402` | Adaption data clear; Clear Self-learning Data; Clear Pre-Adaptations | RGTM, RGTMB, SPMA, SPMB, TCM |
+   | `0x0403` | Clear flight recorder data; Erase flight recorder data; Erase Data Record | PCM, AWDCM, RDCM |
+   | `0x0406` | Reset All Adaptions; Clear adaption values; Adaption Clear | PCM, DSM, DDM, PDM, HCM, PSM, RLSM, RRSM, CRTM |
+   | `0x0413` | Clear Adaptations; Clear adaptation | TCM |
+   | `0x201A` | Reset of battery monitoring data | BCM, FLM |
+   | `0x205E` | Ignition counter reset | BCM |
+   | `0x304C` | Reset Disc wear protection | ABS |
+   | `0x400D` | Air conditioning system adaption clear; Reset AC compressor protection counter | PCM, HVAC |
+   | `0x400E` | Clear flight recorder data | PCM |
+   | `0x400F` | High pressure fuel system adaption clear | PCM |
+   | `0x4013` | Clear adaption values; Clear Adaptations; Oil change reset | TCM, AWDCM, TCCM, PCM |
+   | `0x4024` | Oil Change Reset; Oil change reset; Service interval reset | IPC, PCM, PDM, TCM |
+   | `0x4026` | Reset DPF pressure sensor adaptation value | PCM |
+   | `0x402C` | Reset Fuel Mass Observer | PCM |
+   | `0x4060` | Reset injector pilot correction learning | PCM |
+   | `0x4063` | Reset Oil Market Counter | PCM |
+   | `0x4064` | Reset water in fuel level | PCM |
+   | `0x40BA` | Clear Particulate values | PCM |
+   | `0x900F` | Reset AC compressor protection counter | HVAC |
+   | `0xDC02` | Oil change reset | AWDCM, TCCM |
+   | `0xF002` | Clear Adaptations | TCM |
+   | `0xF003` | Clear Oil Degradation | TCM |
+   | `0xF011` | Clear Pre-Adaptations | TCM |
+   | `0xF026` | Reset of battery monitoring data | BCM |
+
+   Twenty-four identifiers; with `0x0202` the closed set holds twenty-five.
+   Left out on purpose, each for a reason the name gives: the "…
+   Exchanged" and "Component Replacement" declarations (they tell the
+   module a part is new — a different statement from a reset, to be
+   reviewed on their own); `Reset/ Clear Specified Function` (`0x040E`),
+   `Activate service function - various` (`0x405B`), `Calibration
+   Selection`, `Classification`, `Store adaptive parameters`, every "Set
+   …" (they take a choice the data does not describe); `Clear SASM
+   Calibration` (`0x200F`) and every "Clear … Calibration" (the car then
+   needs the calibration this product does not run); `Clear EEPROM`,
+   `Clean Data Flash`, `Erase Central Configuration`, the BCM's
+   `Clear …_ARRAY` routines and `Reset Lock Timer` (meaning unknown);
+   `Clear Power Module Parameter Set` under `0x201A` (unknown). Each may
+   join by a later filling of the table, one line of this ADR per entry.
+   The service-interval reset, named in the stage's own scope line, is
+   in: `0x4024`.
+
+3. **How a reset is run: opened, asked, answered, left.** The data gives
+   these routines no time and no screen, so the run is the start and its
+   answer. The extended session is opened first (`0x10 03`) for every run
+   of this slice, the six declarations that say `01` included — the
+   extended session is not less than the default one, and one mechanism is
+   one less thing to get wrong on the first car; `0x31 01 xx xx` starts the
+   routine with no option record, the data naming none; a `ResponsePending`
+   (`0x78`) is waited through as the executor already waits for every
+   service, five seconds more after each pending answer; **the start's
+   positive answer is the result**, its bytes shown as bytes and said to be
+   undescribed. Then one `0x31 03 xx xx` asks for results, because some
+   modules keep them there: its refusal by name (`requestSequenceError`,
+   `subFunctionNotSupported`) is recorded and ends nothing. No keep-alive
+   loop and no stop: nothing is running after the answer. The way back is
+   `0x10 01` on every ending, as decision 4 says. Once the run has ended the module's codes are read again, as
+   after the self test and the clear, and both reads travel with the
+   record. A refusal at the start ran nothing and reads nothing.
+
+4. **The confirmation.** One question per routine, naming the module and
+   the routine by the data's name, carrying the class `SERVICE_ROUTINE`,
+   the low-battery line where there is one, and **one plain sentence for
+   what a reset does**, in the interface language, by the kind the name
+   gives: a learned value — "the module forgets what it has learned and
+   learns it again as the car is driven; until then it may behave
+   differently"; a counter — "the counter starts again, as after the
+   service it counts"; a record — "the record is erased and cannot be read
+   back". The control names the operation — "Run {name} on {module}" —
+   and never holds the focus by default. Inside the service mode only. No
+   wording about our own mechanics: the tester is an ordinary user (the
+   owner, 2026-11-28).
+
+5. **The record.** `routine_runs` as decision 10 defines it, with the
+   routine's identifier and the data's name, the kind, `no screen` in
+   place of the time and timeout, the session, every exchange in order
+   with its answer by name, the result bytes, how it ended.
+   `report-intake` accepts it and takes nothing from it as evidence. The
+   readable report's "Service operations" lists it under the name.
+
+6. **The guard, loosened for exactly this table.** `STAGE_2_ROUTINES` in
+   `uds-execution` becomes the table above — identifier and the names it
+   covers — and the guard checks the count of its entries against this
+   ADR (twenty-five) and that the closed routine type is built from a
+   table entry alone, never from a number; the shell's `RoutineRunService`
+   may look an index record up in the table and may not build the type
+   any other way. The one constructor `routine_control(sub_function,
+   routine)` stays the one; the intent `RoutineControl` stays the one; the
+   keep-alive stays the executor's; `SecurityAccess`, `RequestDownload`,
+   `TransferData`, `InputOutputControl` and `EcuReset` stay forbidden
+   everywhere. The rule "the routines this product sends are a closed set"
+   is unchanged in kind: the set is longer and every member is named here.
+
+7. **The bench.** `SYNTHMOD` declares `0x0406 Reset All Adaptions` in the
+   synthetic index; the bench answers the start in the extended session
+   with one status byte, refuses it in the default session, refuses the
+   request for results with `requestSequenceError`, and the whole-stack
+   test runs it end to end, finds the record with the name and the kind,
+   and finds the two reads of codes. The run-time guard's list of services
+   seen on the bus gains nothing: `0x10`, `0x31`, `0x3E` were there.
+
+8. **Not in this slice.** Every identifier and name outside the table;
+   routines with an option record; routines with a screen other than the
+   self test; two routines in one go; a meaning for the status bytes;
+   K-line modules (no routine declared). Steps 3 and 4 remain the outline
+   of decision 10. Whether the "… Exchanged" declarations join is a
+   question for a later line of the table, put to the owner with the first
+   car's result.
+
+9. **Version and gates.** `1.2.11` on the owner's word, once the slice is
+   on the bench end to end. The row of `SAFETY_BOUNDARIES.md` for
+   `routine_runs` and the guard's count change in the commit that adds the
+   code, as every operation of stage 2 has. Validation: `IMPLEMENTED` /
+   `FIXTURE_TESTED` on the bench; no bare-adapter gate exists for a write;
+   `VEHICLE_CONFIRMED` is a tester's session in which a listed reset was
+   started and answered — the L322 tester's TCM `0x4013` is the one asked
+   for, and his session file will say what the module did.
+
+### What this amendment does not decide
+
+The actuators of step 3 and the adaptations of step 4; the "… Exchanged"
+declarations; a meaning for any status byte; whether a reset the module
+refuses should be tried again in another session (it is not: the refusal
+is the record).

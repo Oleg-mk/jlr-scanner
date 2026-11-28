@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import { browserDemoState } from "./browserDemoState";
 import { browserDemoEnabled } from "./adapter";
 import type { VehicleDescription } from "./library";
 import type { DtcSummary } from "./moduleRead";
@@ -101,6 +102,7 @@ class BrowserServiceClient implements ServiceClient {
 
   setServiceMode(on: boolean) {
     this.on = on;
+    browserDemoState.serviceMode = on;
     return Promise.resolve({
       captures: 0,
       moduleReads: 0,

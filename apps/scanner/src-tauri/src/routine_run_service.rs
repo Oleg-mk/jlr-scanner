@@ -1,12 +1,16 @@
 //! Running a routine a module declares (`ADR-0036`, step 2): the on-demand
-//! self test, `0x0202`, and no other routine in this slice.
+//! self test, `0x0202`, and - since the amendment of 2026-11-28 - the
+//! resets of the reviewed table, each offered only where the module's own
+//! index declares its identifier under a name the table covers.
 //!
 //! The shell's side of it, beside `dtc_clear_service`: the run is planned
 //! from the same survey and the same resolved plan a read uses, and sent only
 //! as prepared services - the start with the extended session opened and
 //! held, a keep-alive on every step while the test runs, the request for
 //! results once the data's time has run, and the way back to the default
-//! session with whichever step ends the run. Each step is one request over
+//! session with whichever step ends the run. A reset has no screen and no
+//! time: the start's answer is its result, the one request for results that
+//! follows ends the run whatever it answers. Each step is one request over
 //! the adapter, taken and released, so a stop gets through between two. The
 //! result is the bytes the module answered with; nothing is read into them.
 //! Nothing here decides whether the run was a good idea; the person did, in
@@ -25,8 +29,8 @@ use serde_json::{json, Value};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use uds_execution::{
     decode_service_response, prepare_service_transaction, DiagnosticTargetIdentity,
-    PreparedUdsService, RoutineStep, ServiceUdsIntent, StageTwoRoutine, UdsServiceOutcome,
-    READ_DTC_INFORMATION_CAPABILITY, SELF_TEST_ROUTINE,
+    PreparedUdsService, RoutineKind, RoutineStep, ServiceUdsIntent, StageTwoRoutine,
+    UdsServiceOutcome, READ_DTC_INFORMATION_CAPABILITY, SELF_TEST_ROUTINE,
 };
 
 /// How long one step is given: the start, a keep-alive, the stop. The
@@ -45,13 +49,19 @@ pub const ROUTINE_RUN_SAFETY_CLASS: &str = "SERVICE_ROUTINE";
 const SELF_TEST_IDS: &[&str] = &["202", "0202"];
 
 /// The three prepared steps of one run, from one plan, and what the data
-/// says of the test they run.
+/// says of the routine they run.
 pub struct PreparedRoutineRun {
     pub start: PreparedUdsService,
     pub results: PreparedUdsService,
     pub stop: PreparedUdsService,
     pub route_validation: String,
+    /// The routine as the reviewed table names it: identifier, name, kind.
+    pub routine: StageTwoRoutine,
+    /// SDD's own name for it in this car's data.
     pub test_name: String,
+    /// Whether the data gives it a screen with a time (the self test) or
+    /// not (a reset: the start's answer is the result).
+    pub screen: bool,
     pub time_ms: u32,
     pub timeout_ms: u32,
 }
@@ -162,10 +172,13 @@ impl RoutineRunService {
             .unwrap_or(ROUTINE_STEP_TIMEOUT)
     }
 
-    /// The three steps, from the plan the read uses, where the two records
-    /// agree that this module runs this test (`ADR-0036`, step 2, decision
-    /// 1): the module's index declares `0x0202` without a security level,
-    /// and the ODST pack gives this car the test with its time and timeout.
+    /// The three steps, from the plan the read uses, where the records
+    /// agree that this module runs this routine. For the self test
+    /// (`ADR-0036`, step 2, decision 1): the module's index declares
+    /// `0x0202` without a security level, and the ODST pack gives this car
+    /// the test with its time and timeout. For a reset (amendment of
+    /// 2026-11-28): the module's index declares the identifier without a
+    /// security level, under a name the reviewed table covers.
     pub fn prepare(
         library: &KnowledgeLibrary,
         module: &ModuleSurveyEntry,
@@ -174,34 +187,71 @@ impl RoutineRunService {
         if module.ecu_family != request.ecu_family {
             return Err(not_offered("the survey entry is another module's"));
         }
-        if !SELF_TEST_IDS.contains(&request.test_id.as_str()) {
-            return Err(not_offered(
-                "only the on-demand self test, routine 0x0202, is run in this step",
-            ));
-        }
-        let declared = module.accepted_operations.iter().any(|operation| {
-            operation.kind == "ROUTINE"
-                && parse_hex_identifier(&operation.identifier) == Some(SELF_TEST_ROUTINE)
-                && operation.security.is_none()
-        });
-        if !declared {
-            return Err(not_offered(
-                "the module's index does not declare routine 0x0202 for this car, or names a security level for it",
-            ));
-        }
-        let test = module
-            .self_tests
-            .iter()
-            .find(|test| test.test_id == request.test_id)
-            .ok_or_else(|| {
-                not_offered(
-                    "the ODST pack gives this car no screen for the self test of this module",
+        let (routine, test_name, screen, time_ms, timeout_ms) = match &request.routine {
+            Some(asked) => {
+                let Some(identifier) = parse_hex_identifier(asked) else {
+                    return Err(not_offered("the routine identifier is not a number"));
+                };
+                if identifier == SELF_TEST_ROUTINE {
+                    return Err(not_offered(
+                        "the self test is run through its screen, not as a reset",
+                    ));
+                }
+                let declared = module.accepted_operations.iter().find(|operation| {
+                    operation.kind == "ROUTINE"
+                        && parse_hex_identifier(&operation.identifier) == Some(identifier)
+                        && operation.security.is_none()
+                });
+                let Some(declared) = declared else {
+                    return Err(not_offered(
+                        "the module's index does not declare this routine for this car, or names a security level for it",
+                    ));
+                };
+                let name = declared.name.clone().unwrap_or_default();
+                let Some(routine) = StageTwoRoutine::reviewed(identifier, &name) else {
+                    return Err(not_offered(
+                        "this routine, under the name the module's index gives it, is not in the reviewed table of ADR-0036",
+                    ));
+                };
+                (routine, name, false, 0, 0)
+            }
+            None => {
+                if !SELF_TEST_IDS.contains(&request.test_id.as_str()) {
+                    return Err(not_offered(
+                        "only the on-demand self test, routine 0x0202, is run through a screen",
+                    ));
+                }
+                let declared = module.accepted_operations.iter().find(|operation| {
+                    operation.kind == "ROUTINE"
+                        && parse_hex_identifier(&operation.identifier) == Some(SELF_TEST_ROUTINE)
+                        && operation.security.is_none()
+                });
+                let Some(declared) = declared else {
+                    return Err(not_offered(
+                        "the module's index does not declare routine 0x0202 for this car, or names a security level for it",
+                    ));
+                };
+                let routine = StageTwoRoutine::reviewed(
+                    SELF_TEST_ROUTINE,
+                    declared.name.as_deref().unwrap_or_default(),
                 )
-            })?;
-        let (Some(time_ms), Some(timeout_ms)) = (test.time_ms, test.timeout_ms) else {
-            return Err(not_offered(
-                "the data does not say how long the test runs, so the product does not run it",
-            ));
+                .ok_or_else(|| not_offered("the self test is not in the reviewed table"))?;
+                let test = module
+                    .self_tests
+                    .iter()
+                    .find(|test| test.test_id == request.test_id)
+                    .ok_or_else(|| {
+                        not_offered(
+                            "the ODST pack gives this car no screen for the self test of this module",
+                        )
+                    })?;
+                let (Some(time_ms), Some(timeout_ms)) = (test.time_ms, test.timeout_ms) else {
+                    return Err(not_offered(
+                        "the data does not say how long the test runs, so the product does not run it",
+                    ));
+                };
+                (routine, test.name.clone(), true, time_ms, timeout_ms)
+            }
         };
 
         let context = vehicle_context(&request.context);
@@ -223,7 +273,7 @@ impl RoutineRunService {
         let step = |step: RoutineStep| {
             prepare_service_transaction(
                 &resolution,
-                ServiceUdsIntent::routine_control(target.clone(), StageTwoRoutine::SelfTest, step),
+                ServiceUdsIntent::routine_control(target.clone(), routine, step),
             )
             .map_err(|error| preparation_error(error.to_string()))
         };
@@ -232,7 +282,9 @@ impl RoutineRunService {
             results: step(RoutineStep::RequestResults)?,
             stop: step(RoutineStep::Stop)?,
             route_validation,
-            test_name: test.name.clone(),
+            routine,
+            test_name,
+            screen,
             time_ms,
             timeout_ms,
         })
@@ -249,6 +301,9 @@ impl RoutineRunService {
         let mut snapshot = idle();
         snapshot.ecu_family = request.ecu_family.clone();
         snapshot.test_id = request.test_id.clone();
+        if let Some(routine) = &request.routine {
+            snapshot.routine = routine.clone();
+        }
         snapshot.state = RoutineRunState::Failed;
         snapshot.error = Some(error);
         self.snapshot = snapshot;
@@ -274,6 +329,9 @@ impl RoutineRunService {
         snapshot.ecu_family = request.ecu_family.clone();
         snapshot.test_id = request.test_id.clone();
         snapshot.test_name = prepared.test_name.clone();
+        snapshot.routine = format!("0x{:04X}", prepared.routine.identifier());
+        snapshot.kind = prepared.routine.kind().name().to_string();
+        snapshot.screen = prepared.screen;
         snapshot.route_id = prepared.start.transaction().backend_route().to_string();
         snapshot.route_validation = if synthetic {
             "SYNTHETIC".into()
@@ -298,8 +356,14 @@ impl RoutineRunService {
                 snapshot.session = Some(format!("0x{:02X}", raw.session));
                 self.exchanges.extend(raw.exchanges.iter().cloned());
                 match decode_service_response(&prepared.start, &raw.raw_diagnostic_response) {
-                    Ok(Some(UdsServiceOutcome::RoutineControlled { .. })) => {
+                    Ok(Some(UdsServiceOutcome::RoutineControlled { status, .. })) => {
                         snapshot.state = RoutineRunState::Running;
+                        // A reset has no screen: the start's answer is its
+                        // result, and the request for results that follows
+                        // at once may add to it or be refused.
+                        if !prepared.screen {
+                            snapshot.result_hex = Some(hex(&status));
+                        }
                     }
                     Ok(Some(UdsServiceOutcome::Negative(negative))) => {
                         snapshot.state = RoutineRunState::Refused;
@@ -388,10 +452,19 @@ impl RoutineRunService {
                 match decoded {
                     Some(Ok(Some(UdsServiceOutcome::RoutineControlled { status, .. }))) => {
                         self.snapshot.state = RoutineRunState::Completed;
-                        self.snapshot.result_hex = Some(hex(&status));
+                        if !status.is_empty() || self.snapshot.result_hex.is_none() {
+                            self.snapshot.result_hex = Some(hex(&status));
+                        }
                     }
                     Some(Ok(Some(UdsServiceOutcome::Negative(negative)))) => {
-                        self.snapshot.state = RoutineRunState::Refused;
+                        // A reset keeps no result to ask for: the start
+                        // answered, and the refusal here is recorded beside
+                        // it, not against it (ADR-0036, 2026-11-28).
+                        self.snapshot.state = if self.snapshot.screen {
+                            RoutineRunState::Refused
+                        } else {
+                            RoutineRunState::Completed
+                        };
                         self.snapshot.refusal = Some(format!("{:?}", negative.code));
                     }
                     Some(Ok(Some(UdsServiceOutcome::Cleared { .. }))) => fail(
@@ -519,6 +592,8 @@ impl RoutineRunService {
             "routine": self.snapshot.routine,
             "test_id": self.snapshot.test_id,
             "test_name": self.snapshot.test_name,
+            "kind": self.snapshot.kind,
+            "screen": self.snapshot.screen,
             "adapter_model": self.adapter.as_ref().map(|adapter| adapter.name.clone()),
             "route_id": self.snapshot.route_id,
             "route_validation": self.snapshot.route_validation,
@@ -598,6 +673,8 @@ fn idle() -> RoutineRunSnapshot {
         routine: format!("0x{SELF_TEST_ROUTINE:04X}"),
         test_id: String::new(),
         test_name: String::new(),
+        kind: RoutineKind::SelfTest.name().into(),
+        screen: true,
         operation: ROUTINE_RUN_OPERATION.into(),
         safety_class: ROUTINE_RUN_SAFETY_CLASS.into(),
         route_id: String::new(),

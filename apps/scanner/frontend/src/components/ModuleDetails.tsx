@@ -49,10 +49,32 @@ interface ModuleDetailsProps {
   routineRun?: RoutineRunSnapshot;
   routineBusy?: boolean;
   onRunTest?: (ecuFamily: string, testId: string) => void;
+  /** A reset of the reviewed table (ADR-0036, 2026-11-28): the module and the routine identifier. */
+  onRunReset?: (ecuFamily: string, identifier: string) => void;
   onStopTest?: () => void;
 }
 
 /** Whether the module's index declares the self test's routine, with no security level. */
+/**
+ * What a reset does, in one plain sentence by the kind the reviewed table
+ * gives it (ADR-0036, 2026-11-28, decision 4): the person is an ordinary
+ * user, and the question says what will change, not how it is sent.
+ */
+function resetSentence(kind: string): string {
+  switch (kind) {
+    case "LEARNED_VALUES":
+      return t(
+        "The module forgets what it has learned and learns it again as the car is driven; until then it may behave differently.",
+      );
+    case "COUNTER":
+      return t("The counter starts again, as after the service it counts.");
+    case "RECORD":
+      return t("The record is erased and cannot be read back.");
+    default:
+      return "";
+  }
+}
+
 function declaresSelfTest(module: ModuleSurveyEntry): boolean {
   return (module.acceptedOperations ?? []).some(
     (operation) =>
@@ -156,6 +178,7 @@ export function ModuleDetails({
   routineRun,
   routineBusy = false,
   onRunTest,
+  onRunReset,
   onStopTest,
 }: ModuleDetailsProps) {
   const language = useLanguage();
@@ -163,6 +186,7 @@ export function ModuleDetails({
   const [confirmClear, setConfirmClear] = useState(false);
   // And the one before a self test: the test it is for, or none.
   const [confirmTest, setConfirmTest] = useState<string | null>(null);
+  const [confirmReset, setConfirmReset] = useState<string | null>(null);
   const [helpLanguage] = useHelpLanguage(language);
   if (module === null) {
     return (
@@ -701,6 +725,70 @@ export function ModuleDetails({
                           .join(" · ")}
                       </span>
                     </div>
+                    {/* A reset the reviewed table covers (ADR-0036, 2026-11-28):
+                        one key inside the service mode, one plain question,
+                        the answer as the module gave it. */}
+                    {serviceMode &&
+                    onRunReset !== undefined &&
+                    operation.kind === "ROUTINE" &&
+                    (operation.runnable ?? null) !== null ? (
+                      <div className="mode-operation">
+                        <button
+                          className="button button--service"
+                          type="button"
+                          disabled={routineBusy || busy || !adapterReady || routineRun?.state === "RUNNING"}
+                          onClick={() => setConfirmReset(operation.identifier)}
+                        >
+                          {t("Run the routine")}
+                        </button>
+                        <span className="button-hint">
+                          {t("SERVICE_ROUTINE · the module answers at once; the answer is shown as it is.")}
+                        </span>
+                      </div>
+                    ) : null}
+                    {routineRun !== undefined &&
+                    routineRun.state !== "IDLE" &&
+                    !routineRun.screen &&
+                    routineRun.ecuFamily === module.ecuFamily &&
+                    routineRun.routine === operation.identifier ? (
+                      <RoutineOutcome run={routineRun} onStop={onStopTest} />
+                    ) : null}
+                    {confirmReset === operation.identifier ? (
+                      <ConfirmDialog
+                        title={t("Run {name} on {module}", {
+                          name: operation.name ?? operation.identifier,
+                          module: module.ecuFamily,
+                        })}
+                        confirmLabel={t("Run {name} on {module}", {
+                          name: operation.name ?? operation.identifier,
+                          module: module.ecuFamily,
+                        })}
+                        cancelLabel={t("Cancel")}
+                        onConfirm={() => {
+                          setConfirmReset(null);
+                          onRunReset?.(module.ecuFamily, operation.identifier);
+                        }}
+                        onCancel={() => setConfirmReset(null)}
+                      >
+                        <p>
+                          <strong>{module.ecuFamily}</strong>
+                          {dataText(module.names, module.name, language) !== null
+                            ? ` — ${dataText(module.names, module.name, language)}`
+                            : ""}
+                          {` · ${operation.name ?? operation.identifier}`}
+                        </p>
+                        <p>{resetSentence(operation.runnable ?? "")}</p>
+                        <p>
+                          {t("Operation: run the routine {routine} · class SERVICE_ROUTINE", {
+                            routine: operation.identifier,
+                          })}
+                        </p>
+                        {batteryNotice !== null ? (
+                          <p className="battery-precondition">{batteryNotice}</p>
+                        ) : null}
+                        <p>{t("The result is shown as the module answers it; this library does not describe it.")}</p>
+                      </ConfirmDialog>
+                    ) : null}
                   </li>
                 ))}
               </ul>

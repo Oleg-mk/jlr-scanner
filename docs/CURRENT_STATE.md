@@ -1,12 +1,14 @@
-Status: **2026-11-23 — three read-only corrections from the first tester's 2026-11-15 files and his SDD screens, built, verified on those files and in the interface, and the day's wrong turn removed. (1) Fitment: the platform document's `<fitment>` is exported and carried to every surveyed module; a silent `optional` module is drawn as SDD draws it — a neutral square, "optional, not fitted?" — and only a silent `mandatory` one in red: on the tester's last session 0 red instead of 11, the ten absent modules all `optional`, matching his SDD module map. The VIM, `optional` too but seen by his SDD, carries SDD's own reason: the platform document's `<method type="connect">` — SDD connects it through the BCM before reading it (`VIM_CONNECT_01`; the ISM and SCLM likewise through GEM/REM) — exported as a claim of its own and drawn as "not woken", silence expected, since this read-only stage sends no such command. (2) The configuration decoder matched an enumeration's option by the field's bits shifted down, where SDD writes most options in place: the tester's configuration read showed 110 bare numbers, now 4, and three values read wrongly before are corrected (seven seats, message centre fitted, speedometer offset 2.0). The form is chosen per parameter from its own options; 23 rows of 4 parameters in the corpus are really shifted and still are. (3) SDD's datalogger offers 253 signals for his engine where this offered 92 identifiers: the difference is SDD's generic catalogue — 1,140 identifiers qualified to no module and no car — which SDD offers and does not verify. They are now listed under every module of the live read as SDD lists them, behind a fold with a filter, ticked as the module's own are, marked "no module in SDD", declined by the module at read time (`ADR-0044`). A sweep that asked the module for each of the 1,140 was built the same day and withdrawn on the owner's word: minutes per module for a list SDD shows at once. The report dialog opens in Downloads and refuses the library's folder, after a report saved there stopped the library loading. Libraries re-issued from a fresh export carrying both new claims: owner `CBBC-3BEE`, tester `3556-4E52`. The voltage at the connector of 2026-11-15 is committed as it was; what the bare adapter answers is recorded below.**
-
-Status: **2026-11-27 — the connector voltage on the bare adapter, said as it is; the L322's last breakpoint read as open; 1.2.10.** Two sessions of the owner's adapter in USB with nothing known on the OBD side (2026-11-15 and 2026-11-27, 128 reads): the command answers every time with status `0x00000000` (`eSuccess`), body +8 always `0x00000003`, and a value that wanders between 0 and 7.9 V with no pattern, every raw value a whole multiple of 35.44 mV. That is all the bench says: the exchange works, and the value on a bare adapter is noise. A figure of "12.45 V read as ~36 V", carried in the 2026-11-23 status from another session's note, was never seen by the owner and is withdrawn; whether the value is the battery on a car is `NOT_YET_VALIDATED`, and the owner's rule is to show it as the firmware gives it, with no hedging note, and to draw the conclusion from the first tester's session on a car. The L322 of a tester candidate (issue #1, model year 2012) selected no breakpoint: SDD's L322 data ends with `MY10`, whose range the data leaves open above, and the interface read the open end as the one year 2010. The marker is now said as "from 2010" and a VIN of 2012 pre-selects it. The frontend test run is capped at two workers in the repository's own config after a full-width run froze the owner's PC. Released as 1.2.10 with the tester's library `3556-4E52`.**
+Status: **2026-11-28 — stage 2, step 2 widened: the resets a module declares, run from a reviewed list; the cable confirmed on Apple silicon by a tester; reading on the move allowed with a passenger.** The L322 tester (issue #1) asked for SDD's `Clear adaption values` on his gearbox and for live reading while driving; the owner's answer the same day: nothing stops stage 2 at the desk, a car to correct on arrives in two weeks. `ADR-0036` is amended (written first, accepted, then built): the one routine of step 2, the self test, becomes a **reviewed table of twenty-five lines** — the self test and twenty-four resets of learned values, counters and records — each run only where the module's own index declares the identifier *under a name the table covers*, because the data shows an identifier alone names nothing (`0x4013` is a gearbox adaptation clear on a TCM and an oil-change reset on a PCM; `0xF002` closes a tailgate on one module and clears adaptations on another). The 253 identifiers of the corpus were read through by name; VIN learn, keys, immobilisation, programming, EEPROM, plant modes, configuration and everything that moves or primes stay out, each class named in the ADR. A reset has no screen and no time in the data (`MAX_ROUTINE_RUN_TIME` is empty in all 8,095 declarations): the extended session is opened, the start's answer is the result, one request for results follows and its refusal by name ends nothing, the way back at once, the codes read again. The closed routine type is built from a table line and a declaration's name by its one constructor and the guard counts the table against the ADR; the survey marks the matching declarations `runnable` with their kind; the interface offers one key under such a declaration inside the service mode, one question with a plain sentence by kind («модуль забуде вивчене і вивчить знову під час їзди»), the answer as the module gave it. The bench's SYNTHMOD declares `0x0406 Reset All Adaptions` and answers it; the whole-stack test runs it (`10 03`, `31 01 04 06`, `3E 00`, `31 03 04 06` refused `0x24`, `10 01`) and refuses the same identifier under another name; the interface test runs it after the question; the browser preview walks it (its session now remembers the service mode, which it never could). `IMPLEMENTED` / `FIXTURE_TESTED`; no reset has met a car; the L322 tester's TCM `0x4013` is the one asked for. Also today, from his report in the issue: his clone cable is seen on Apple silicon with macOS 27, the first such confirmation in writing; and the standing-car rule of `ADR-0022` is reversed — reading on the move is allowed when a passenger runs the application.**
 
 # Current State
 
 This file records what is done. `ROADMAP.md` records what is next and why in that
 order, including the owner-only gates. Keep both current; neither may live only
 in a chat session.
+
+Earlier — **2026-11-27 — the connector voltage on the bare adapter, said as it is; the L322's last breakpoint read as open; 1.2.10.** Two sessions of the owner's adapter in USB with nothing known on the OBD side (2026-11-15 and 2026-11-27, 128 reads): the command answers every time with status `0x00000000` (`eSuccess`), body +8 always `0x00000003`, and a value that wanders between 0 and 7.9 V with no pattern, every raw value a whole multiple of 35.44 mV. That is all the bench says: the exchange works, and the value on a bare adapter is noise. A figure of "12.45 V read as ~36 V", carried in the 2026-11-23 status from another session's note, was never seen by the owner and is withdrawn; whether the value is the battery on a car is `NOT_YET_VALIDATED`, and the owner's rule is to show it as the firmware gives it, with no hedging note, and to draw the conclusion from the first tester's session on a car. The L322 of a tester candidate (issue #1, model year 2012) selected no breakpoint: SDD's L322 data ends with `MY10`, whose range the data leaves open above, and the interface read the open end as the one year 2010. The marker is now said as "from 2010" and a VIN of 2012 pre-selects it. The frontend test run is capped at two workers in the repository's own config after a full-width run froze the owner's PC. Released as 1.2.10 with the tester's library `3556-4E52`.**
+
+Earlier — **2026-11-23 — three read-only corrections from the first tester's 2026-11-15 files and his SDD screens, built, verified on those files and in the interface, and the day's wrong turn removed. (1) Fitment: the platform document's `<fitment>` is exported and carried to every surveyed module; a silent `optional` module is drawn as SDD draws it — a neutral square, "optional, not fitted?" — and only a silent `mandatory` one in red: on the tester's last session 0 red instead of 11, the ten absent modules all `optional`, matching his SDD module map. The VIM, `optional` too but seen by his SDD, carries SDD's own reason: the platform document's `<method type="connect">` — SDD connects it through the BCM before reading it (`VIM_CONNECT_01`; the ISM and SCLM likewise through GEM/REM) — exported as a claim of its own and drawn as "not woken", silence expected, since this read-only stage sends no such command. (2) The configuration decoder matched an enumeration's option by the field's bits shifted down, where SDD writes most options in place: the tester's configuration read showed 110 bare numbers, now 4, and three values read wrongly before are corrected (seven seats, message centre fitted, speedometer offset 2.0). The form is chosen per parameter from its own options; 23 rows of 4 parameters in the corpus are really shifted and still are. (3) SDD's datalogger offers 253 signals for his engine where this offered 92 identifiers: the difference is SDD's generic catalogue — 1,140 identifiers qualified to no module and no car — which SDD offers and does not verify. They are now listed under every module of the live read as SDD lists them, behind a fold with a filter, ticked as the module's own are, marked "no module in SDD", declined by the module at read time (`ADR-0044`). A sweep that asked the module for each of the 1,140 was built the same day and withdrawn on the owner's word: minutes per module for a list SDD shows at once. The report dialog opens in Downloads and refuses the library's folder, after a report saved there stopped the library loading. Libraries re-issued from a fresh export carrying both new claims: owner `CBBC-3BEE`, tester `3556-4E52`. The voltage at the connector of 2026-11-15 is committed as it was; what the bare adapter answers is recorded below.**
 
 Earlier — **2026-11-15, afternoon — the tester's session on 1.2.9: the same eleven modules silent in three full passes over two days, with the battery low and after the engine ran, so the battery is not the cause; one of them, the CCM, is on a car that has speed control, and the data points at the adaptive system's radar unit, a hypothesis his SDD screenshot will settle. While the engine ran the adapter answered late and two channels did not open — cause unknown, `ADR-0042`'s matching held. The voltage at the connector that SDD shows is one `cGetValue` with value id 3, read from the vendor library the same afternoon; `ADR-0030` amended, accepted and built the same afternoon: the adapter as an always-on source, gated next on the owner's bare adapter; building it revived a guard rule over `sdd-ingest` that had matched nothing since September. A thirteenth development principle: analyse before recording.**
 
@@ -177,6 +179,96 @@ On 2026-11-11 the tester received the 32-bit installer's name, the
 Discovery 4 copy by a private link, the step to load it, and a request for
 whatever happens — a crash included, his being the first run of this
 product on a real 32-bit machine. Waiting for his report.
+
+## 2026-11-28, later — stage 2, step 2 widened: the resets a module declares, from a reviewed list (`ADR-0036` amended)
+
+**Why now.** The L322 tester asked whether the product will run SDD's
+`Clear adaption values` on his gearbox's TCM; the owner, the same day:
+«що нам заважає робити етап 2 … через дві неділі у нас буде авто тестера
+… і ми зможемо внести правки». Nothing technical does. The order chosen:
+widen step 2 by one class at the desk now, let the first car run the
+clear and a reset in one session, then steps 3 and 4 on a mechanism a car
+has answered.
+
+**What the data says, read before the ADR was written.** 8,095 routine
+declarations over 1,610 module contexts, 253 identifiers, 323 names, all
+`service=0x31`, `session=03` but six, no security level anywhere, no run
+time anywhere. An identifier alone names nothing: the same number is a
+gearbox adaptation clear on one module and an oil-change reset, a voltage
+override, a tailgate command on others. The list holds VIN learn (1,308
+declarations), key programming, immobilisation, software update, EEPROM
+erasure, plant modes, central configuration, and a hundred routines that
+move or prime something. So "every routine the module declares" cannot be
+offered, and a list reviewed by name can.
+
+**The amendment (decision 11).** A routine is run only where the module's
+own index declares its identifier for this car *and* the pair (identifier,
+name as the record writes it) is in the ADR's table. First filling: 24
+resets of learned values, counters and records — among them the TCM's
+`0x4013 Clear adaption values`, the service-interval reset `0x4024` (the
+first item of the stage's own scope line), the battery-monitoring reset
+`0x201A` — each line listing the names it covers and the modules that
+declare it. Left out by name, each with its reason: "… Exchanged" and
+"Component Replacement" (a different statement), routines that take a
+choice (`0x040E`, `0x405B`, "Set …"), "Clear … Calibration" (leaves the car
+needing a calibration the product does not run), EEPROM and data-flash
+erasure, routines of unknown meaning. The table is where the work returns
+to: a line added or removed with its date, no new record (the owner's
+reading, confirmed).
+
+**How a reset runs.** No screen, no time: the extended session is opened
+for every run of this slice, `0x31 01` starts it with no option record,
+`ResponsePending` is waited through as the executor waits for every
+service, the start's positive answer is the result (bytes, undescribed);
+one `0x31 03` asks for results and its refusal by name ends nothing; no
+keep-alive loop, no stop; `0x10 01` on every ending; the codes read again
+after, both reads in the record.
+
+**Built, the same day.**
+
+- `uds-execution`: `RoutineKind`, `ReviewedRoutine`, the table
+  `STAGE_2_ROUTINES` of 25 lines; `StageTwoRoutine` is a struct with
+  private fields and the one constructor `reviewed(identifier,
+  declared_name)`, names compared with case and whitespace folded; the
+  self test's line covers every name, as decision 10 identifies it by its
+  number and its screen. `uds` names NRC `0x24`
+  (`RequestSequenceError`), which the simulator maps back.
+- `diagnostic-session`: a declaration the table covers, with no security
+  level, is marked `runnable` with its kind in `AcceptedOperationSummary`
+  (the self test excluded: its own list).
+- The shell's `RoutineRunService`: `RoutineRunRequest.routine` names a
+  reset; `prepare` takes the reset path (index declaration → table lookup
+  by name → the three prepared steps) or the self-test path as before;
+  the snapshot and the record carry `kind` and `screen`; a reset's start
+  answer is its result, a results request refused leaves the run
+  `COMPLETED` with the refusal beside it.
+- The bench: SYNTHMOD's synthetic index declares `0x0406 Reset All
+  Adaptions`; the bench answers the start in the extended session with
+  one status byte, refuses it in the default session, refuses results
+  and stop with `0x24`.
+- The interface: one key "Run the routine" under a runnable declaration
+  of "What this module will accept", inside the service mode; one
+  question — module, the data's name, the plain sentence by kind, the
+  class, the battery line where there is one; `RoutineOutcome` says
+  "waiting for the module's answer" while a reset is pending and, once
+  complete, "the module keeps no result to ask for: …" beside the answer;
+  uk/ru wording for all of it. The browser preview's session client now
+  answers the service mode its service client set, so the mode can be
+  walked in the preview at all (it never could).
+- The guard: the table counted against the ADR (25), the type's fields
+  private, the one constructor, no struct literal of the type outside
+  `uds-execution`. `SAFETY_BOUNDARIES.md`'s `routine_runs` row says both
+  paths.
+- Tests: the whole-stack bench test runs the reset end to end (the five
+  exchanges, the record's kind, screen and name) and refuses `0x0400`
+  under its unreviewed name and `0x4013` the index does not declare; the
+  service-mode interface test runs it after the question (162 frontend
+  tests); the f9 golden counts the new declaration; all Rust tests of the
+  touched crates green, clippy and lint green; the slice walked in the
+  browser preview in English and Ukrainian.
+
+**State.** `IMPLEMENTED` / `FIXTURE_TESTED`. No reset has met a car. The
+version turns 1.2.11 on the owner's word.
 
 ## 2026-11-28 — the cable on Apple silicon, confirmed by a tester; reading on the move allowed with a passenger
 

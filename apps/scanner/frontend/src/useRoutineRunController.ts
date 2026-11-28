@@ -63,12 +63,12 @@ export function useRoutineRunController(
   }, [client, clearTimer]);
 
   const start = useCallback(
-    async (ecuFamily: string, testId: string) => {
+    async (ecuFamily: string, testId: string, routine: string | null = null) => {
       if (!serviceMode) return;
       setBusy(true);
       clearTimer();
       try {
-        const started = await client.start({ ecuFamily, testId, context: vehicle });
+        const started = await client.start({ ecuFamily, testId, routine, context: vehicle });
         setSnapshot(started);
         if (started.state !== "RUNNING") {
           await onEnded();

@@ -739,30 +739,58 @@ const udsServices = (udsServiceBlock.match(/^\s{4}[A-Z]\w+\s*\{/gm) ?? []).lengt
 if (udsServices !== 2) {
   failures.push(`uds-execution declares ${udsServices} service intents, ADR-0036 step 2 names 2`);
 }
-// ADR-0036 step 2: the routines this product sends are a closed set, and
-// the set is the self test alone; the intent takes the closed type, never
-// a number.
-if (
-  !/pub const SELF_TEST_ROUTINE: u16 = 0x0202;/.test(udsExecutionSource) ||
-  !/pub const STAGE_2_ROUTINES: &\[u16\] = &\[SELF_TEST_ROUTINE\];/.test(udsExecutionSource)
-) {
-  failures.push("uds-execution's routines are not the closed set ADR-0036 step 2 names: 0x0202 alone");
+// ADR-0036 step 2, widened on 2026-11-28: the routines this product sends
+// are a closed set - the reviewed table, one line per entry of the ADR's
+// table (the self test and twenty-four resets) - and the closed routine
+// type is built from a line of that table and a declaration's name, by
+// its one constructor, never from a number the interface chose.
+const STAGE_2_ROUTINE_LINES = 25;
+if (!/pub const SELF_TEST_ROUTINE: u16 = 0x0202;/.test(udsExecutionSource)) {
+  failures.push("uds-execution must name the self test, 0x0202, as ADR-0036 step 2 does");
 }
-const routineEnumStart = udsExecutionSource.indexOf("pub enum StageTwoRoutine {");
-const routineEnumEnd =
-  routineEnumStart >= 0
-    ? udsExecutionSource.indexOf(String.fromCharCode(10) + "}", routineEnumStart)
-    : -1;
-const routineBlock =
-  routineEnumStart >= 0 && routineEnumEnd > routineEnumStart
-    ? udsExecutionSource.slice(routineEnumStart, routineEnumEnd)
+const routineTableStart = udsExecutionSource.indexOf("pub const STAGE_2_ROUTINES: &[ReviewedRoutine] = &[");
+const routineTableEnd =
+  routineTableStart >= 0 ? udsExecutionSource.indexOf(String.fromCharCode(10) + "];", routineTableStart) : -1;
+const routineTable =
+  routineTableStart >= 0 && routineTableEnd > routineTableStart
+    ? udsExecutionSource.slice(routineTableStart, routineTableEnd)
     : "";
-const stageTwoRoutines = (routineBlock.match(/^\s{4}[A-Z]\w+,/gm) ?? []).length;
-if (stageTwoRoutines !== 1) {
-  failures.push(`uds-execution declares ${stageTwoRoutines} routines of stage 2, ADR-0036 step 2 names 1`);
+const routineLines = (routineTable.match(/ReviewedRoutine \{/g) ?? []).length;
+if (routineLines !== STAGE_2_ROUTINE_LINES) {
+  failures.push(
+    `uds-execution's reviewed table holds ${routineLines} routines, ADR-0036 (2026-11-28) names ${STAGE_2_ROUTINE_LINES}`,
+  );
+}
+const routineStructStart = udsExecutionSource.indexOf("pub struct StageTwoRoutine {");
+const routineStructEnd =
+  routineStructStart >= 0 ? udsExecutionSource.indexOf(String.fromCharCode(10) + "}", routineStructStart) : -1;
+const routineStruct =
+  routineStructStart >= 0 && routineStructEnd > routineStructStart
+    ? udsExecutionSource.slice(routineStructStart, routineStructEnd)
+    : "";
+if (routineStruct === "" || /^\s{4}pub /m.test(routineStruct)) {
+  failures.push("uds-execution's closed routine type must keep its fields private: it is built from the reviewed table alone");
+}
+const reviewedConstructors = (
+  udsExecutionSource.match(/^\s{4}pub fn reviewed\(identifier: u16, declared_name: &str\) -> Option<Self>/gm) ?? []
+).length;
+if (reviewedConstructors !== 1) {
+  failures.push("uds-execution's closed routine type must have the one constructor ADR-0036 (2026-11-28) names: reviewed(identifier, declared_name)");
 }
 if (!/routine: StageTwoRoutine,/.test(udsServiceBlock)) {
   failures.push("uds-execution's routine intent must take the closed routine type, not a number");
+}
+// The shell may look a declaration up in the table and may not build the
+// type any other way: no struct literal of it anywhere outside uds-execution.
+for (const [name, path] of [
+  ["prowlone-shell", "apps/scanner/src-tauri/src/routine_run_service.rs"],
+  ["prowlone-shell", "apps/scanner/src-tauri/src/lib.rs"],
+  ["diagnostic-session", "crates/diagnostic-session/src/lib.rs"],
+]) {
+  const source = await readFile(new URL(path, root), "utf8");
+  if (/StageTwoRoutine\s*\{/.test(source)) {
+    failures.push(`${name} builds the closed routine type by hand; only StageTwoRoutine::reviewed may`);
+  }
 }
 
 const diagnosticsCoreSource = await readFile(

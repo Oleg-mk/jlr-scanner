@@ -1812,6 +1812,24 @@ fn accepted_operations_for(
         };
         let fields = parse_encoding(encoding.as_deref().unwrap_or_default());
         let field = |name: &str| fields.get(name).cloned().filter(|text| !text.is_empty());
+        // A routine the reviewed table of ADR-0036 (2026-11-28) covers by
+        // identifier and name, with no security level in front of it, is
+        // the one kind of declaration the product runs; the self test has
+        // its own list and its own rule.
+        let runnable = (kind == "ROUTINE" && field("security").is_none())
+            .then(|| {
+                let number = identifier.trim_start_matches("0x");
+                u16::from_str_radix(number, 16).ok()
+            })
+            .flatten()
+            .and_then(|number| {
+                uds_execution::StageTwoRoutine::reviewed(
+                    number,
+                    field("name").as_deref().unwrap_or(""),
+                )
+            })
+            .filter(|routine| routine.kind() != uds_execution::RoutineKind::SelfTest)
+            .map(|routine| routine.kind().name().to_string());
         found.push(AcceptedOperationSummary {
             kind: kind.to_string(),
             identifier: identifier.clone(),
@@ -1824,6 +1842,7 @@ fn accepted_operations_for(
             max_run_time: field("max_run_time"),
             restart_while_running: field("restart_while_running"),
             safety_class: safety_class.to_string(),
+            runnable,
         });
     }
     // One order a person can follow: by what it would cost, then by number.

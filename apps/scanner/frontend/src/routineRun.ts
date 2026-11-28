@@ -22,19 +22,29 @@ export type RoutineRunState =
 
 export interface RoutineRunRequest {
   ecuFamily: string;
-  /** The test's identifier in the ODST pack: `202` for the self test. */
+  /** The test's identifier in the ODST pack: `202` for the self test; empty for a reset. */
   testId: string;
+  /**
+   * A reset of the reviewed table (ADR-0036, amendment of 2026-11-28): the
+   * routine identifier as the module's index writes it, `0x4013`. Absent
+   * for the self test.
+   */
+  routine?: string | null;
   context: VehicleDescription;
 }
 
 export interface RoutineRunSnapshot {
   state: RoutineRunState;
   ecuFamily: string;
-  /** `0x0202`. */
+  /** `0x0202` for the self test, the reset's identifier otherwise. */
   routine: string;
   testId: string;
-  /** SDD's own name for the test. */
+  /** SDD's own name for the test or the reset. */
   testName: string;
+  /** What the routine does, by the reviewed table: SELF_TEST, LEARNED_VALUES, COUNTER or RECORD. */
+  kind: string;
+  /** Whether the data gives the routine a screen with a time; a reset has none, and the start's answer is its result. */
+  screen: boolean;
   /** `ROUTINE_RUN`. */
   operation: string;
   /** `SERVICE_ROUTINE`. */
@@ -80,6 +90,8 @@ export const createRoutineRunSnapshot = (): RoutineRunSnapshot => ({
   routine: "0x0202",
   testId: "",
   testName: "",
+  kind: "SELF_TEST",
+  screen: true,
   operation: "ROUTINE_RUN",
   safetyClass: "SERVICE_ROUTINE",
   routeId: "",
@@ -132,21 +144,27 @@ class BrowserRoutineRunClient implements RoutineRunClient {
 
   start(request: RoutineRunRequest) {
     this.startedAt = Date.now();
+    const reset = request.routine ?? null;
+    const digits = reset === null ? "02 02" : `${reset.slice(2, 4)} ${reset.slice(4, 6)}`;
     this.last = {
       ...createRoutineRunSnapshot(),
       state: "RUNNING",
       ecuFamily: request.ecuFamily,
+      routine: reset ?? "0x0202",
       testId: request.testId,
-      testName: `ODST_0202_${request.ecuFamily}_HLP`,
+      testName: reset === null ? `ODST_0202_${request.ecuFamily}_HLP` : "Reset All Adaptions",
+      kind: reset === null ? "SELF_TEST" : "LEARNED_VALUES",
+      screen: reset === null,
       routeId: "hs-can",
       routeValidation: "BROWSER_PREVIEW",
       session: "0x03",
-      timeMs: 3000,
-      timeoutMs: 5000,
+      timeMs: reset === null ? 3000 : 0,
+      timeoutMs: reset === null ? 5000 : 0,
       startedUnixMs: this.startedAt,
+      resultHex: reset === null ? null : "00",
       exchanges: [
         ["10 03", "50 03 00 32 01 F4"],
-        ["31 01 02 02", "71 01 02 02"],
+        [`31 01 ${digits}`, reset === null ? `71 01 ${digits}` : `71 01 ${digits} 00`],
       ],
     };
     return Promise.resolve(this.last);
@@ -154,6 +172,27 @@ class BrowserRoutineRunClient implements RoutineRunClient {
 
   step() {
     if (this.last.state !== "RUNNING") return Promise.resolve(this.last);
+    if (!this.last.screen) {
+      // A reset: the start's answer was the result, the request for results
+      // is refused as out of sequence, and the module is brought back.
+      const digits = `${this.last.routine.slice(2, 4)} ${this.last.routine.slice(4, 6)}`;
+      this.last = {
+        ...this.last,
+        state: "COMPLETED",
+        elapsedMs: Date.now() - this.startedAt,
+        refusal: "RequestSequenceError",
+        codesAfter: [],
+        codesFound: [],
+        exchanges: [
+          ...this.last.exchanges,
+          ["3E 00", "7E 00"],
+          [`31 03 ${digits}`, "7F 31 24"],
+          ["10 01", "50 01 00 32 01 F4"],
+        ],
+        reportAvailable: true,
+      };
+      return Promise.resolve(this.last);
+    }
     const elapsedMs = Date.now() - this.startedAt;
     if (elapsedMs < this.last.timeMs) {
       this.last = {

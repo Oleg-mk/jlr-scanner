@@ -107,6 +107,9 @@ pub enum NegativeResponseCode {
     SubFunctionNotSupported,
     IncorrectMessageLengthOrInvalidFormat,
     ConditionsNotCorrect,
+    /// `0x24`: a step out of order - a request for the results of a
+    /// routine that keeps none, for one.
+    RequestSequenceError,
     RequestOutOfRange,
     SecurityAccessDenied,
     InvalidKey,
@@ -126,6 +129,7 @@ impl NegativeResponseCode {
             0x12 => Self::SubFunctionNotSupported,
             0x13 => Self::IncorrectMessageLengthOrInvalidFormat,
             0x22 => Self::ConditionsNotCorrect,
+            0x24 => Self::RequestSequenceError,
             0x31 => Self::RequestOutOfRange,
             0x33 => Self::SecurityAccessDenied,
             0x35 => Self::InvalidKey,

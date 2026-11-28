@@ -192,6 +192,7 @@ fn nrc_byte(code: NegativeResponseCode) -> u8 {
         NegativeResponseCode::SubFunctionNotSupported => 0x12,
         NegativeResponseCode::IncorrectMessageLengthOrInvalidFormat => 0x13,
         NegativeResponseCode::ConditionsNotCorrect => 0x22,
+        NegativeResponseCode::RequestSequenceError => 0x24,
         NegativeResponseCode::RequestOutOfRange => 0x31,
         NegativeResponseCode::SecurityAccessDenied => 0x33,
         NegativeResponseCode::InvalidKey => 0x35,

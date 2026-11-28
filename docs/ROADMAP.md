@@ -770,6 +770,23 @@ Not in this slice: any other routine, several tests in one go, a meaning
 for the result bytes, the self tests of K-line modules. No operation has
 met a car.
 
+**Widened 2026-11-28 (ADR-0036 amended, decision 11): the resets.** At the
+L322 tester's question and on the owner's word, step 2 runs a second class
+of routine: the ones whose name says the module forgets a learned value, a
+counter or a record. A reviewed table in the ADR — twenty-four identifiers
+with the names the data writes them under, the self test beside them — is
+the closed set; a declaration is run only where the module's own index
+declares the identifier under a name the table covers, because the corpus
+shows an identifier alone names nothing (0x4013 is a gearbox adaptation
+clear on a TCM and an oil-change reset on a PCM). VIN learn, keys,
+immobilisation, programming, EEPROM, plant modes, configuration and every
+routine that moves or primes stay out by name. A reset has no screen and no
+time in the data: the extended session is opened, the start's answer is the
+result, one request for results follows and its refusal ends nothing, the
+codes are read again. Built and walked on the bench the same day; the table
+is where the work returns to, one line at a time. No reset has met a car;
+the L322 tester's TCM 0x4013 is the first asked for.
+
 ### F25 — the MOST modules by their own address (built 2026-09-19, `ADR-0039`)
 
 The debt of the unreachable MOST ring, read again from the data: of the

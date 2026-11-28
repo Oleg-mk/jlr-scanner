@@ -175,6 +175,12 @@ export interface AcceptedOperationSummary {
   restartWhileRunning: string | null;
   /** `PERSISTENT_CHANGE`, `VOLATILE_CONTROL` or `SERVICE_ROUTINE`. */
   safetyClass: string;
+  /**
+   * For a routine in the reviewed table of ADR-0036 (2026-11-28), matched
+   * by identifier and name: what it does - LEARNED_VALUES, COUNTER or
+   * RECORD - and so the service mode runs it. Absent otherwise.
+   */
+  runnable?: string | null;
 }
 
 export interface SelfTestSummary {

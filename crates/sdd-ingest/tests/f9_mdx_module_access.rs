@@ -136,8 +136,11 @@ fn the_readable_half_is_left_to_the_catalogues_that_already_hold_it() {
     assert!(store.get_record("f9-mdx.synthmod.wr.0100").is_none());
     assert!(store.get_record("f9-mdx.synthmod.ct.0100").is_none());
     // An entry with no number cannot be addressed, so it is passed over
-    // rather than recorded with a hole in it.
-    assert_eq!(store.record_count(), 6);
+    // rather than recorded with a hole in it. Seven records: the write, the
+    // control, four routines (0x0400, 0x0202, 0x0406 - the reset of the
+    // reviewed table, ADR-0036 of 2026-11-28 - and 0x0500 of the second
+    // section) and the second section's write.
+    assert_eq!(store.record_count(), 7);
 }
 
 /// Seven documents in SDD 169 carry a second `<DATA_IDENTIFIERS>` or a

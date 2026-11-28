@@ -23,7 +23,12 @@ export function RoutineOutcome({ run, onStop }: RoutineOutcomeProps) {
   const seconds = (ms: number) => Math.round(ms / 1000);
   return (
     <div className={`clear-outcome routine-outcome routine-outcome--${run.state.toLowerCase()}`} role="status">
-      {run.state === "RUNNING" ? (
+      {run.state === "RUNNING" && !run.screen ? (
+        <p>
+          <strong>{t("Waiting for the module's answer…")}</strong>
+        </p>
+      ) : null}
+      {run.state === "RUNNING" && run.screen ? (
         <div className="mode-operation">
           <strong>
             {t("Running: {elapsed} s of {time} s", {
@@ -44,6 +49,9 @@ export function RoutineOutcome({ run, onStop }: RoutineOutcomeProps) {
           {run.session !== null ? ` ${t("in session {session}", { session: run.session })}` : ""}
           {run.routeValidation === "SYNTHETIC" ? ` · ${t("bench, synthetic")}` : ""}
           {` · ${t("{seconds} s", { seconds: seconds(run.elapsedMs) })}`}
+          {!run.screen && run.refusal !== null
+            ? ` · ${t("the module keeps no result to ask for: {refusal}", { refusal: run.refusal })}`
+            : ""}
         </p>
       ) : null}
       {run.state === "COMPLETED" ? (
@@ -53,7 +61,11 @@ export function RoutineOutcome({ run, onStop }: RoutineOutcomeProps) {
       ) : null}
       {run.state === "REFUSED" ? (
         <p>
-          <strong>{t("The module refused the test: {refusal}", { refusal: run.refusal ?? "—" })}</strong>
+          <strong>
+            {run.screen
+              ? t("The module refused the test: {refusal}", { refusal: run.refusal ?? "—" })
+              : t("The module refused the routine: {refusal}", { refusal: run.refusal ?? "—" })}
+          </strong>
         </p>
       ) : null}
       {run.state === "STOPPED" ? (
@@ -69,7 +81,7 @@ export function RoutineOutcome({ run, onStop }: RoutineOutcomeProps) {
       ) : null}
       {run.state === "FAILED" ? (
         <p>
-          <strong>{t("The test was not run.")}</strong>
+          <strong>{run.screen ? t("The test was not run.") : t("The routine was not run.")}</strong>
           {run.error !== null ? ` ${t(run.error.message)}` : ""}
           {run.error?.technicalDetails ? (
             <span className="module-validation"> {run.error.technicalDetails}</span>
@@ -79,7 +91,13 @@ export function RoutineOutcome({ run, onStop }: RoutineOutcomeProps) {
       {run.codesAfter !== null && run.codesFound.length > 0 ? (
         <>
           <p>
-            <strong>{t("What the test found: {count} code(s)", { count: run.codesFound.length })}</strong>
+            <strong>
+              {run.screen
+                ? t("What the test found: {count} code(s)", { count: run.codesFound.length })
+                : t("Codes after the routine that were not there before: {count}", {
+                    count: run.codesFound.length,
+                  })}
+            </strong>
           </p>
           <ul className="clear-outcome-codes">
             {run.codesFound.map((dtc) => {
@@ -101,9 +119,13 @@ export function RoutineOutcome({ run, onStop }: RoutineOutcomeProps) {
       ) : null}
       {run.codesAfter !== null && run.codesFound.length === 0 ? (
         <p>
-          {t("The test logged no new code; the module holds {count} code(s).", {
-            count: run.codesAfter.length,
-          })}
+          {run.screen
+            ? t("The test logged no new code; the module holds {count} code(s).", {
+                count: run.codesAfter.length,
+              })
+            : t("No new code after the routine; the module holds {count} code(s).", {
+                count: run.codesAfter.length,
+              })}
         </p>
       ) : null}
       {run.exchanges.length > 0 ? (

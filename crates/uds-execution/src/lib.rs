@@ -40,11 +40,206 @@ pub const DTC_CLEAR_OPERATION: &str = "DTC_CLEAR";
 pub const ROUTINE_CONTROL_CAPABILITY: &str = "uds.service31.routine_control.service_routine";
 /// The operation's name in the safety table and the report.
 pub const ROUTINE_RUN_OPERATION: &str = "ROUTINE_RUN";
-/// The on-demand self test: the one routine of stage 2's second step.
+/// The on-demand self test: the first routine of stage 2's second step.
 pub const SELF_TEST_ROUTINE: u16 = 0x0202;
-/// Every routine identifier this product will send, in every step of
-/// stage 2 so far - the closed set the architecture guard reads.
-pub const STAGE_2_ROUTINES: &[u16] = &[SELF_TEST_ROUTINE];
+
+/// What a reviewed routine does, as its name says (`ADR-0036`, amendment
+/// of 2026-11-28): the confirmation's plain sentence is chosen by it.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum RoutineKind {
+    /// The module runs its monitors now and logs what it finds.
+    SelfTest,
+    /// The module forgets what it has learned and learns it again.
+    LearnedValues,
+    /// A counter starts again.
+    Counter,
+    /// A record is erased.
+    Record,
+}
+
+impl RoutineKind {
+    /// The kind's name in the snapshot, the record and the interface.
+    pub fn name(self) -> &'static str {
+        match self {
+            Self::SelfTest => "SELF_TEST",
+            Self::LearnedValues => "LEARNED_VALUES",
+            Self::Counter => "COUNTER",
+            Self::Record => "RECORD",
+        }
+    }
+}
+
+/// One line of the reviewed table of `ADR-0036` (amendment of 2026-11-28):
+/// a routine identifier, the names the data writes it under that the
+/// review covered, and what it does. A declaration is run only where its
+/// identifier and its name are both here; an empty list of names stands
+/// for the self test alone, which decision 10 identifies by its number and
+/// its ODST screen.
+#[derive(Debug)]
+pub struct ReviewedRoutine {
+    pub identifier: u16,
+    pub names: &'static [&'static str],
+    pub kind: RoutineKind,
+}
+
+/// Every routine this product will send, in every step of stage 2 so far -
+/// the closed set the architecture guard reads, one line per entry of the
+/// ADR's table. Twenty-five lines: the self test and twenty-four resets.
+pub const STAGE_2_ROUTINES: &[ReviewedRoutine] = &[
+    ReviewedRoutine {
+        identifier: SELF_TEST_ROUTINE,
+        names: &[],
+        kind: RoutineKind::SelfTest,
+    },
+    ReviewedRoutine {
+        identifier: 0x0402,
+        names: &[
+            "Adaption data clear",
+            "Clear Self-learning Data",
+            "Clear Pre-Adaptations",
+        ],
+        kind: RoutineKind::LearnedValues,
+    },
+    ReviewedRoutine {
+        identifier: 0x0403,
+        names: &[
+            "Clear flight recorder data",
+            "Erase flight recorder data",
+            "Erase Data Record",
+        ],
+        kind: RoutineKind::Record,
+    },
+    ReviewedRoutine {
+        identifier: 0x0406,
+        names: &[
+            "Reset All Adaptions",
+            "Clear adaption values",
+            "Adaption Clear",
+        ],
+        kind: RoutineKind::LearnedValues,
+    },
+    ReviewedRoutine {
+        identifier: 0x0413,
+        names: &["Clear Adaptations", "Clear adaptation"],
+        kind: RoutineKind::LearnedValues,
+    },
+    ReviewedRoutine {
+        identifier: 0x201A,
+        names: &["Reset of battery monitoring data"],
+        kind: RoutineKind::Counter,
+    },
+    ReviewedRoutine {
+        identifier: 0x205E,
+        names: &["Ignition counter reset"],
+        kind: RoutineKind::Counter,
+    },
+    ReviewedRoutine {
+        identifier: 0x304C,
+        names: &["Reset Disc wear protection"],
+        kind: RoutineKind::Counter,
+    },
+    ReviewedRoutine {
+        identifier: 0x400D,
+        names: &[
+            "Air conditioning system adaption clear",
+            "Reset AC compressor protection counter",
+        ],
+        kind: RoutineKind::LearnedValues,
+    },
+    ReviewedRoutine {
+        identifier: 0x400E,
+        names: &["Clear flight recorder data"],
+        kind: RoutineKind::Record,
+    },
+    ReviewedRoutine {
+        identifier: 0x400F,
+        names: &["High pressure fuel system adaption clear"],
+        kind: RoutineKind::LearnedValues,
+    },
+    ReviewedRoutine {
+        identifier: 0x4013,
+        names: &[
+            "Clear adaption values",
+            "Clear Adaptations",
+            "Oil change reset",
+        ],
+        kind: RoutineKind::LearnedValues,
+    },
+    ReviewedRoutine {
+        identifier: 0x4024,
+        names: &["Oil Change Reset", "Service interval reset"],
+        kind: RoutineKind::Counter,
+    },
+    ReviewedRoutine {
+        identifier: 0x4026,
+        names: &["Reset DPF pressure sensor adaptation value"],
+        kind: RoutineKind::LearnedValues,
+    },
+    ReviewedRoutine {
+        identifier: 0x402C,
+        names: &["Reset Fuel Mass Observer"],
+        kind: RoutineKind::LearnedValues,
+    },
+    ReviewedRoutine {
+        identifier: 0x4060,
+        names: &["Reset injector pilot correction learning"],
+        kind: RoutineKind::LearnedValues,
+    },
+    ReviewedRoutine {
+        identifier: 0x4063,
+        names: &["Reset Oil Market Counter"],
+        kind: RoutineKind::Counter,
+    },
+    ReviewedRoutine {
+        identifier: 0x4064,
+        names: &["Reset water in fuel level"],
+        kind: RoutineKind::Counter,
+    },
+    ReviewedRoutine {
+        identifier: 0x40BA,
+        names: &["Clear Particulate values"],
+        kind: RoutineKind::Record,
+    },
+    ReviewedRoutine {
+        identifier: 0x900F,
+        names: &["Reset AC compressor protection counter"],
+        kind: RoutineKind::Counter,
+    },
+    ReviewedRoutine {
+        identifier: 0xDC02,
+        names: &["Oil change reset"],
+        kind: RoutineKind::Counter,
+    },
+    ReviewedRoutine {
+        identifier: 0xF002,
+        names: &["Clear Adaptations"],
+        kind: RoutineKind::LearnedValues,
+    },
+    ReviewedRoutine {
+        identifier: 0xF003,
+        names: &["Clear Oil Degradation"],
+        kind: RoutineKind::Counter,
+    },
+    ReviewedRoutine {
+        identifier: 0xF011,
+        names: &["Clear Pre-Adaptations"],
+        kind: RoutineKind::LearnedValues,
+    },
+    ReviewedRoutine {
+        identifier: 0xF026,
+        names: &["Reset of battery monitoring data"],
+        kind: RoutineKind::Counter,
+    },
+];
+
+/// A name as the review compares it: case and surrounding whitespace
+/// ignored, runs of whitespace folded.
+fn fold_name(name: &str) -> String {
+    name.split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ")
+        .to_ascii_lowercase()
+}
 /// The group that means every code, re-exported so the shell needs no protocol crate.
 pub use uds::ALL_DTC_GROUPS;
 /// Diagnostic protocol name the SDD platform corpus declares for UDS buses.
@@ -168,20 +363,57 @@ impl ReadOnlyUdsIntent {
     }
 }
 
-/// A routine of stage 2 as a closed type: one value per routine the
-/// record allows, so that a routine identifier is never a number the
-/// interface chose (`ADR-0036`, step 2).
+/// A routine of stage 2 as a closed type: built from one line of the
+/// reviewed table and a declaration of the module's index that matches it,
+/// and from nothing else, so that a routine identifier is never a number
+/// the interface chose (`ADR-0036`, step 2; amendment of 2026-11-28).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum StageTwoRoutine {
-    /// `0x0202`, the on-demand self test.
-    SelfTest,
+pub struct StageTwoRoutine {
+    identifier: u16,
+    name: &'static str,
+    kind: RoutineKind,
 }
 
 impl StageTwoRoutine {
+    /// The only way to build one: the identifier and the name as the
+    /// module's own record writes them, found together in the reviewed
+    /// table. The self test's line covers every name, as decision 10
+    /// identifies it by its number and its ODST screen.
+    pub fn reviewed(identifier: u16, declared_name: &str) -> Option<Self> {
+        let declared = fold_name(declared_name);
+        STAGE_2_ROUTINES
+            .iter()
+            .filter(|line| line.identifier == identifier)
+            .find_map(|line| {
+                if line.names.is_empty() {
+                    return Some(Self {
+                        identifier,
+                        name: "Self Test",
+                        kind: line.kind,
+                    });
+                }
+                line.names
+                    .iter()
+                    .find(|name| fold_name(name) == declared)
+                    .map(|name| Self {
+                        identifier,
+                        name,
+                        kind: line.kind,
+                    })
+            })
+    }
+
     pub fn identifier(self) -> u16 {
-        match self {
-            Self::SelfTest => SELF_TEST_ROUTINE,
-        }
+        self.identifier
+    }
+
+    /// The name of the table's line this routine matched.
+    pub fn name(self) -> &'static str {
+        self.name
+    }
+
+    pub fn kind(self) -> RoutineKind {
+        self.kind
     }
 }
 

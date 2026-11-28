@@ -62,6 +62,14 @@
 				<MAX_ROUTINE_RUN_TIME/>
 				<RESTART_WHILE_RUNNING>yes</RESTART_WHILE_RUNNING>
 			</ROUTINE>
+			<!-- A reset of the reviewed table (ADR-0036, 2026-11-28), under a
+			     name SDD writes it with; the bench answers it. -->
+			<ROUTINE ID="routine_0406" SESSION_REFS="session_03">
+				<NAME>Reset All Adaptions</NAME>
+				<NUMBER>0x0406</NUMBER>
+				<MAX_ROUTINE_RUN_TIME/>
+				<RESTART_WHILE_RUNNING>no</RESTART_WHILE_RUNNING>
+			</ROUTINE>
 		</ROUTINE_IDENTIFIERS>
 		<!-- A second section of each kind. Seven documents in SDD 169 carry
 		     one, and reading only the first dropped what stood here. -->

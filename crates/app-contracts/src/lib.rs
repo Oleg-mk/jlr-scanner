@@ -565,6 +565,13 @@ pub struct AcceptedOperationSummary {
     /// The security level standing in front of it, where SDD names one.
     /// Absent means SDD names none, not that none exists on the car.
     pub security: Option<String>,
+    /// For a routine: the kind of the reviewed table's line this
+    /// declaration matches by identifier and name (`ADR-0036`, amendment
+    /// of 2026-11-28) - `LEARNED_VALUES`, `COUNTER` or `RECORD` - and so
+    /// the product runs it inside the service mode. None where it does
+    /// not; the self test is offered through its own list.
+    #[serde(default)]
+    pub runnable: Option<String>,
     /// For a routine: how long SDD says it may run, and whether it may be
     /// restarted while it is running.
     pub max_run_time: Option<String>,
@@ -748,8 +755,14 @@ pub struct DtcClearSnapshot {
 #[serde(rename_all = "camelCase")]
 pub struct RoutineRunRequest {
     pub ecu_family: String,
-    /// The test's identifier in the ODST pack: `202` for the self test.
+    /// The test's identifier in the ODST pack: `202` for the self test;
+    /// empty for a reset.
     pub test_id: String,
+    /// A reset of the reviewed table (`ADR-0036`, amendment of
+    /// 2026-11-28): the routine identifier as the index writes it,
+    /// `0x4013`. None for the self test.
+    #[serde(default)]
+    pub routine: Option<String>,
     pub context: VehicleContextInput,
 }
 
@@ -776,11 +789,21 @@ pub enum RoutineRunState {
 pub struct RoutineRunSnapshot {
     pub state: RoutineRunState,
     pub ecu_family: String,
-    /// The routine, `0x0202`.
+    /// The routine: `0x0202` for the self test, the reset's identifier
+    /// otherwise.
     pub routine: String,
     pub test_id: String,
-    /// SDD's own name for the test.
+    /// SDD's own name for the test or the reset.
     pub test_name: String,
+    /// What the routine does, by the reviewed table: `SELF_TEST`,
+    /// `LEARNED_VALUES`, `COUNTER` or `RECORD`.
+    #[serde(default)]
+    pub kind: String,
+    /// Whether the data gives the routine a screen with a time: the self
+    /// test has one and is held and polled; a reset has none, and the
+    /// start's answer is its result.
+    #[serde(default)]
+    pub screen: bool,
     /// `ROUTINE_RUN`.
     pub operation: String,
     /// `SERVICE_ROUTINE`.
