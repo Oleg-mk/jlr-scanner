@@ -267,8 +267,23 @@ after, both reads in the record.
   touched crates green, clippy and lint green; the slice walked in the
   browser preview in English and Ukrainian.
 
-**State.** `IMPLEMENTED` / `FIXTURE_TESTED`. No reset has met a car. The
-version turns 1.2.11 on the owner's word.
+**State.** `IMPLEMENTED` / `FIXTURE_TESTED`. No reset has met a car.
+
+Build 1.2.11, the same day, on the owner's word («Так, 1.2.11»): commit
+f26589c, the preflight passed on that commit before the push, tag
+`v1.2.11` pushed by name, run 46121616404, all five jobs green. Windows x64
+ProwlOne_1.2.11_x64-setup.exe, 5,957,849 bytes, SHA-256
+303edb8d44437d79c1a223170e47be1443522253f48e1c35dd3de3dbaeaa16b0; Windows
+x86 ProwlOne_1.2.11_x86-setup.exe, 5,667,679 bytes, SHA-256
+1d66c9677b0794b3b779d23a830011e34399d6dc746b881e86e588db23535114; macOS
+ProwlOne_1.2.11_universal.dmg, 16,203,061 bytes, SHA-256
+9660a7f37f926baa0cab06683660c2b230841fd39bce0c043c4cf3dc2cc76278. All three
+in `Desktop\ProwlOne-1.2.11` beside the owner's library zip `CBBC-3BEE`;
+the 1.2.10 folder moved to `Downloads\prowlone-superseded\ProwlOne-1.2.10`.
+Published on the Releases page as a pre-release under the standing rule.
+The first build with a reset in the service mode; the testers' libraries
+of 2026-11-23 and 2026-11-27 need no re-issue, the table lives in the
+code.
 
 ## 2026-11-28 — the cable on Apple silicon, confirmed by a tester; reading on the move allowed with a passenger
 
